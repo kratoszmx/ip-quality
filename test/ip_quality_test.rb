@@ -9,6 +9,9 @@ class IpQualityTest < Minitest::Test
   SCRIPT = File.join(ROOT, "ip-quality.zsh")
   DNSBL = File.join(ROOT, "ref", "dnsbl.list")
   ISO3166 = File.join(ROOT, "ref", "iso3166.json")
+  PING0_LIBRARY = File.join(ROOT, "lib", "ping0.zsh")
+  PING0_GEO_FIXTURE = File.join(ROOT, "test", "fixtures", "ping0", "public-geo.txt")
+  PING0_CHALLENGE_FIXTURE = File.join(ROOT, "test", "fixtures", "ping0", "challenge.html")
 
   BANNED_SOURCE_PATTERNS = {
     bash_runtime: /(^|[^A-Za-z0-9_])bash([^A-Za-z0-9_]|$)/i,
@@ -73,8 +76,53 @@ class IpQualityTest < Minitest::Test
     stdout, stderr, status = run_script("--self-test")
 
     assert status.success?, stderr
-    assert_match(/SELF-TEST OK: zsh runtime, validators, and \d+ DNSBL entries/, stdout)
+    assert_match(/SELF-TEST OK: zsh runtime, validators, Ping0 parser, and \d+ DNSBL entries/, stdout)
     assert_empty stderr
+  end
+
+  def test_reputation_plan_discloses_ping0_public_result_and_risk_limitation
+    stdout, stderr, status = run_script("--scope", "reputation")
+
+    assert status.success?, stderr
+    assert_includes stdout, "Ping0 public geo"
+    assert_includes stdout, "official free /geo endpoint"
+    assert_includes stdout, "not a risk score"
+    assert_empty stderr
+  end
+
+  def test_ping0_parser_accepts_exact_four_line_geo_and_rejects_challenge_html
+    parser_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      source "$1"
+      response=$(<"$2")
+      ping0_parse_geo "$response" "$3" || exit $?
+      print -r -- "${ping0_parsed[0]}|${ping0_parsed[2]}|${ping0_parsed[3]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      parser_probe,
+      "ping0-parser-test",
+      PING0_LIBRARY,
+      PING0_GEO_FIXTURE,
+      "198.51.100.23"
+    )
+    assert status.success?, stderr
+    assert_equal "198.51.100.23|AS64500|Example Network\n", stdout
+    assert_empty stderr
+
+    _stdout, _stderr, challenge_status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      parser_probe,
+      "ping0-parser-test",
+      PING0_LIBRARY,
+      PING0_CHALLENGE_FIXTURE,
+      "198.51.100.23"
+    )
+    refute challenge_status.success?
   end
 
   def test_concurrency_is_hard_bounded
@@ -137,7 +185,7 @@ class IpQualityTest < Minitest::Test
   end
 
   def test_vendored_references_are_regular_local_data_without_cookie_state
-    [DNSBL, ISO3166].each do |path|
+    [DNSBL, ISO3166, PING0_LIBRARY, PING0_GEO_FIXTURE, PING0_CHALLENGE_FIXTURE].each do |path|
       assert File.file?(path), "missing reference: #{path}"
       refute File.symlink?(path), "symlinked reference: #{path}"
       refute_includes File.binread(path), "\0", "binary reference: #{path}"
@@ -164,6 +212,8 @@ class IpQualityTest < Minitest::Test
     assert_includes upstream, "cookies.txt"
     assert_includes providers, "Upstream relay"
     assert_includes providers, "Unknown"
+    assert_includes providers, "Ping0"
+    assert_includes providers, "public `/geo`"
     assert_includes license, "GNU AFFERO GENERAL PUBLIC LICENSE"
   end
 

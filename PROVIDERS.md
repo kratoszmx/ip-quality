@@ -24,10 +24,22 @@ or malformed addresses are not accepted as a successful public result.
 | DB-IP public page | Direct public page | crawler, proxy, abuse, country, estimated threat |
 | ipdata via `ipinfo.check.place` | Upstream relay | country and threat factors |
 | IPQualityScore via `ipinfo.check.place` | Upstream relay | fraud score and proxy/VPN/Tor/bot factors |
+| Ping0 public `/geo` | Direct official public endpoint | returned IP, location, ASN, and organization; the returned IP must exactly match the tested address |
 
 “Upstream relay” is intentionally visible in the report model: it is not treated
 as equivalent to a user-owned subscription to each vendor's official API. If a
 relay or direct page changes schema, its result is unknown rather than clean.
+
+Ping0 is intentionally narrower than the other risk rows. Its documented free
+`/geo` interface returns four text lines—IP, location, ASN, and organization—so
+the report records those fields as a named observation and keeps
+`RiskScore: null`. Ping0's detailed `apiloc` interface is a paid, API-keyed
+service; this repository neither purchases access nor places an API key in a
+URL. The interactive IP page currently requires browser verification and is not
+scraped or bypassed. A malformed response, challenge page, or returned-IP
+mismatch is `unknown`/rejected, never clean. See the
+[official Ping0 API description](https://ping0.cc/ip/api) and
+[official risk-score FAQ](https://ping0.cc/ip/faq).
 
 ## Media and AI scope
 

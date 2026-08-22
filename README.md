@@ -9,6 +9,50 @@ of `network-manager`.
 The current fork has been validated offline. No live provider query was run as
 part of the import and porting work.
 
+## Test one exact Clash leaf without changing the live subscription
+
+`bin/test-clash-leaf` reads the currently selected Clash Verge profile through
+a verified, read-only snapshot. It lists only concrete inline `proxies` (not
+proxy groups or `DIRECT`/`REJECT`), copies the exact selected leaf and any
+concrete `dialer-proxy` dependencies into a private temporary configuration,
+and starts a separate Mihomo bound only to `127.0.0.1` on a random port. It does
+not switch, import, rewrite, reload, or restart the live Clash profile.
+
+List the available leaf names without starting Mihomo or using the network:
+
+```zsh
+/bin/zsh -f ./bin/test-clash-leaf --list-leaves
+```
+
+Interactively choose a leaf and run the multi-source reputation report through
+that isolated leaf:
+
+```zsh
+/bin/zsh -f ./bin/test-clash-leaf \
+  --select \
+  --confirm-network-lookup \
+  -4 \
+  -f
+```
+
+For a repeatable non-interactive run, replace `--select` with
+`--leaf 'exact node name'`. Before a live run, the minimal extracted profile can
+be checked without opening a listener or querying the network:
+
+```zsh
+/bin/zsh -f ./bin/test-clash-leaf \
+  --leaf 'exact node name' \
+  --config-test-only
+```
+
+An explicit `--profile PATH` may be used instead of the active Clash Verge
+profile. Profile files must be regular, current-user-owned, non-symlinked,
+single-link files with mode `0600` or `0644`. The live leaf runner deliberately
+fixes the reporter scope to `reputation`: those HTTP(S) observations can be
+forced through its local proxy, while the reporter's mail, DNSBL, and some
+media checks contain direct DNS/TCP flows that would not prove the selected
+leaf's egress.
+
 ## Safety model
 
 Running the command with no arguments only prints a disclosure plan. It performs
@@ -31,9 +75,11 @@ A live lookup requires the exact confirmation flag:
 ```
 
 The confirmation means that every selected third party may observe the tested
-egress IP and the time of the query. It does not authorize changing Clash,
-starting a proxy, uploading a report, installing software, or creating a paid
-resource.
+egress IP and the time of the query. When passed directly to `ip-quality.zsh`,
+it does not authorize starting a proxy. When passed to `test-clash-leaf`, it
+also authorizes only the temporary loopback Mihomo process described above. It
+never authorizes changing live Clash state, uploading a report, installing
+software, or creating a paid resource.
 
 This fork deliberately has:
 
@@ -51,7 +97,7 @@ This fork deliberately has:
 
 | Scope | What it queries |
 | --- | --- |
-| `reputation` | Multiple reputation, geolocation, network-type, proxy/VPN/Tor, abuse, bot, and risk-score sources |
+| `reputation` | Multiple reputation, geolocation, network-type, proxy/VPN/Tor, abuse, bot, and risk-score sources, plus Ping0 public geo/ASN/organization |
 | `dnsbl` | The vendored DNSBL zone set, for IPv4 only |
 | `media-ai` | TikTok, Netflix, YouTube Premium, Prime Video, Reddit, and OpenAI public accessibility endpoints |
 | `mail` | Public MX records and bounded SMTP greeting probes on port 25 |
@@ -72,6 +118,12 @@ The reporter preserves each provider's result. Conflicting results are not
 collapsed into an unexplained “clean” verdict. Missing, malformed, rate-limited,
 or failed responses remain blank/null/unknown rather than being interpreted as
 clean. See [PROVIDERS.md](PROVIDERS.md) for the source and disclosure inventory.
+
+Ping0's official free `/geo` response contributes the returned location, ASN,
+and organization only after its returned IP exactly matches the already-tested
+egress address. The public endpoint does not expose Ping0's numeric risk score,
+so the report records that score as `Unknown`/`null`; it does not scrape the
+interactive verification page or present missing data as clean.
 
 ## Supported compatibility options
 
@@ -101,6 +153,26 @@ installs them. Depending on scope, it uses the system `/bin/zsh` plus `curl`,
 `jq`, `bc`, `dig`, `nslookup`, `nc`, `xargs`, `gunzip`, and ordinary macOS text
 tools.
 
+The exact-leaf runner additionally uses the system `/usr/bin/ruby` standard
+library for safe YAML parsing and process ownership, the Mihomo executable
+bundled with Clash Verge, and `/usr/sbin/lsof` to prove that the random listener
+belongs to the isolated child process. It does not install any of them.
+
+## Source layout
+
+| Path | Responsibility |
+| --- | --- |
+| `ip-quality.zsh` | zsh-native provider aggregation, report rendering, and explicit live-query gate |
+| `bin/test-clash-leaf` | thin zsh entrypoint for exact-leaf selection |
+| `lib/safe_snapshot.rb` | reusable race-resistant local-file snapshot contract |
+| `lib/clash_leaf_profile.rb` | active-profile resolution and minimal exact-leaf rendering |
+| `lib/isolated_mihomo_session.rb` | random loopback port, listener ownership, cleanup, and proxy environment |
+| `lib/clash_leaf_command.rb` | CLI policy and reporter orchestration |
+| `lib/ping0.zsh` | pure parser for the official public Ping0 `/geo` response |
+| `ref/` | vendored runtime data |
+| `test/fixtures/` | sanitized provider/parser fixtures only |
+| `test/` | offline contracts; no external network or live Mihomo |
+
 ## Result caveats
 
 This is an observation aggregator, not a certificate that an IP is universally
@@ -110,8 +182,8 @@ Check.Place relay rather than a customer-owned formal API account; those rows
 must be interpreted as named observations and can become unavailable.
 
 Mail and DNSBL checks use direct DNS/TCP traffic and are not carried by an HTTP
-proxy environment. A future proxy-path measurement must use an isolated,
-loopback-only Mihomo process under the repository's network workflow.
+proxy environment. For that reason, the exact-leaf runner limits itself to the
+reputation scope and refuses to imply that direct flows measured the leaf.
 
 ## Provenance and license
 

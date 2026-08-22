@@ -45,6 +45,12 @@ The imported `ip.sh` was renamed to `ip-quality.zsh` and substantially modified:
 - retained masked-IP output by default and disabled command-line proxy secrets;
 - added offline self-tests, provider disclosure documentation, and repository
   safety rules;
+- added a strict parser for Ping0's official free `/geo` response; it preserves
+  location/ASN/organization only after an exact IP match and leaves the
+  unavailable public risk score null;
+- added a zsh entrypoint backed by source-auditable system-Ruby libraries that
+  read the current Clash profile without mutation, extract one exact inline
+  leaf, and own a temporary loopback-only Mihomo lifecycle;
 - normalized the malformed annotated DNSBL entry
   `hostkarma.junkemailfilter.com[brl]` to the queryable zone name
   `hostkarma.junkemailfilter.com`, then removed duplicate zone entries.

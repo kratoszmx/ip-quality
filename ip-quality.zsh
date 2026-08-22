@@ -7,10 +7,17 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-08-08-m4.1"
+script_version="v2026-08-23-m4.2"
 typeset SCRIPT_DIR="${0:A:h}"
+typeset LIB_DIR="$SCRIPT_DIR/lib"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
+typeset PING0_LIB="$LIB_DIR/ping0.zsh"
+[[ -f "$PING0_LIB" && -r "$PING0_LIB" && ! -L "$PING0_LIB" ]]||{
+print -ru2 -- "ERROR: unsafe or missing local library: $PING0_LIB"
+exit 66
+}
+source "$PING0_LIB"
 typeset query_scope="full"
 typeset network_lookup_confirmed=0
 typeset plan_only=0
@@ -54,6 +61,7 @@ typeset -A ip2location
 typeset -A dbip
 typeset -A ipdata
 typeset -A ipqs
+typeset -A ping0
 typeset -A tiktok
 typeset -A netflix
 typeset -A youtube
@@ -75,6 +83,7 @@ typeset -A sbasic
 typeset -A stype
 typeset -A sscore
 typeset -A sfactor
+typeset -A sping0
 typeset -A smedia
 typeset -A smail
 typeset -A smailstatus
@@ -205,6 +214,16 @@ sfactor[robot]="Robot:  "
 sfactor[yes]="$Font_Red$Font_B Yes$Font_Suffix"
 sfactor[no]="$Font_Green$Font_B No $Font_Suffix"
 sfactor[na]="$Font_Green$Font_B N/A$Font_Suffix"
+sping0[title]="Ping0 public observation"
+sping0[status]="Status:                 "
+sping0[location]="Location:               "
+sping0[asn]="ASN:                    "
+sping0[org]="Organization:           "
+sping0[risk]="Risk score:             "
+sping0[match]="verified against tested IP"
+sping0[unknown]="Unknown"
+sping0[mismatch]="response IP did not match; result rejected"
+sping0[norisk]="not exposed by the official public /geo endpoint"
 smedia[yes]="  $Back_Green$Font_White Yes $Font_Suffix  "
 smedia[no]=" $Back_Red$Font_White Block $Font_Suffix "
 smedia[bad]="$Back_Red$Font_White Failed $Font_Suffix "
@@ -329,6 +348,16 @@ sfactor[robot]="机器人："
 sfactor[yes]="$Font_Red$Font_B 是 $Font_Suffix"
 sfactor[no]="$Font_Green$Font_B 否 $Font_Suffix"
 sfactor[na]="$Font_Green$Font_B 无 $Font_Suffix"
+sping0[title]="Ping0 官方公开观测"
+sping0[status]="状态：                  "
+sping0[location]="位置：                  "
+sping0[asn]="自治系统号：            "
+sping0[org]="组织：                  "
+sping0[risk]="风险分数：              "
+sping0[match]="已与本次测试 IP 核对一致"
+sping0[unknown]="未知"
+sping0[mismatch]="响应 IP 不一致，结果已拒绝"
+sping0[norisk]="官方公开 /geo 端点不提供风险分数"
 smedia[yes]=" $Back_Green$Font_White 解锁 $Font_Suffix  "
 smedia[no]=" $Back_Red$Font_White 屏蔽 $Font_Suffix  "
 smedia[bad]=" $Back_Red$Font_White 失败 $Font_Suffix  "
@@ -464,7 +493,8 @@ print -r -- "  scope: $query_scope"
 print -r -- "  DNSBL concurrency cap: $dnsbl_concurrency"
 print -r -- "  output: masked IP by default; local stdout/file only"
 print -r -- "  telemetry/report upload/remote code: disabled"
-scope_includes reputation&&print -r -- "  reputation sources: IPinfo Check.Place relay, IPinfo, Scamalytics, ipapi.is, AbuseIPDB Check.Place relay, IP2Location, DB-IP, ipdata, IPQualityScore"
+scope_includes reputation&&print -r -- "  reputation sources: IPinfo Check.Place relay, IPinfo, Scamalytics, ipapi.is, AbuseIPDB Check.Place relay, IP2Location, DB-IP, ipdata, IPQualityScore, Ping0 public geo"
+scope_includes reputation&&print -r -- "  Ping0 limitation: the official free /geo endpoint exposes IP/location/ASN/organization, not a risk score"
 scope_includes media-ai&&print -r -- "  media/AI sources: TikTok, Netflix, YouTube Premium, Prime Video, Reddit, OpenAI public endpoints"
 scope_includes mail&&print -r -- "  mail sources: public MX DNS plus bounded SMTP greeting probes"
 scope_includes dnsbl&&print -r -- "  DNSBL sources: vendored $DNSBL_FILE (up to $dnsbl_concurrency concurrent DNS lookups)"
@@ -497,7 +527,7 @@ print -ru2 -- "SELF-TEST FAILED: not running under zsh"
 return 1
 }
 local reference_file
-for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json";do
+for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json" "$PING0_LIB";do
 [[ -f "$reference_file" && -r "$reference_file" && ! -L "$reference_file" ]]||{
 print -ru2 -- "SELF-TEST FAILED: unsafe or missing reference file: $reference_file"
 return 1
@@ -562,6 +592,18 @@ is_nonnegative_decimal "0.25"&&! is_nonnegative_decimal '0; print unsafe'||{
 print -ru2 -- "SELF-TEST FAILED: decimal validation changed"
 return 1
 }
+ping0_parse_geo $'198.51.100.23\nExample Region\nAS64500\nExample Network\n' "198.51.100.23"||{
+print -ru2 -- "SELF-TEST FAILED: valid Ping0 public geo fixture rejected"
+return 1
+}
+[[ "${ping0_parsed[0]}" == "198.51.100.23" && "${ping0_parsed[2]}" == "AS64500" ]]||{
+print -ru2 -- "SELF-TEST FAILED: Ping0 public geo fields changed"
+return 1
+}
+ping0_parse_geo $'198.51.100.24\nExample Region\nAS64500\nExample Network\n' "198.51.100.23"&&{
+print -ru2 -- "SELF-TEST FAILED: Ping0 IP mismatch accepted"
+return 1
+}
 is_signed_decimal "-33.86"&&! is_signed_decimal '1; print unsafe'||{
 print -ru2 -- "SELF-TEST FAILED: signed decimal validation changed"
 return 1
@@ -571,7 +613,7 @@ local dnsbl_summary=$(printf '%s\n' Clean Clean Blacklisted Other Unknown|summar
 print -ru2 -- "SELF-TEST FAILED: DNSBL outcome aggregation changed"
 return 1
 }
-print -r -- "SELF-TEST OK: zsh runtime, validators, and ${#dnsbl_zones[@]} DNSBL entries"
+print -r -- "SELF-TEST OK: zsh runtime, validators, Ping0 parser, and ${#dnsbl_zones[@]} DNSBL entries"
 }
 
 typeset -A browsers=(
@@ -1247,6 +1289,33 @@ ipqs[tor]=$(echo "$RESPONSE"|jq -r '.tor')
 ipqs[vpn]=$(echo "$RESPONSE"|jq -r '.vpn')
 ipqs[abuser]=$(echo "$RESPONSE"|jq -r '.recent_abuse')
 ipqs[robot]=$(echo "$RESPONSE"|jq -r '.bot_status')
+}
+db_ping0(){
+local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Ping0 public geo $Font_Suffix"
+((ibar_step+=3))
+show_progress_bar "$temp_info" $((40-13-${sinfo[ldatabase]}))
+ping0=()
+ping0[status]="unknown"
+ping0[match]="null"
+ping0[riskstatus]="official_public_endpoint_does_not_expose_risk"
+local endpoint="https://ipv4.ping0.cc/geo"
+[[ "$1" -eq 6 ]]&&endpoint="https://ipv6.ping0.cc/geo"
+local RESPONSE=$(curl_safe $CurlARG -sS -L -$1 -m 10 --max-filesize 4096 "$endpoint" 2>/dev/null)
+ping0_parse_geo "$RESPONSE" "$IP"
+local parse_status=$?
+case "$parse_status" in
+0)ping0[status]="verified"
+ping0[match]="true"
+ping0[location]="${ping0_parsed[1]}"
+ping0[asn]="${ping0_parsed[2]}"
+ping0[org]="${ping0_parsed[3]}"
+;;
+2)ping0[status]="ip_mismatch"
+ping0[match]="false"
+;;
+*)ping0[status]="unknown"
+ping0[match]="null"
+esac
 }
 function check_ip_valide(){
 local IPPattern='^(\<([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\>\.){3}\<([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\>$'
@@ -1979,6 +2048,23 @@ echo -ne "\r$Font_Cyan${sfactor[abuser]}$Font_Suffix$tmp_factor\n"
 tmp_factor=$(format_factor "${ip2location[robot]}" "${ipapi[robot]}" "${ipqs[robot]}" "${scamalytics[robot]}" "${ipdata[robot]}" "${ipinfo[robot]}" "${dbip[robot]}")
 echo -ne "\r$Font_Cyan${sfactor[robot]}$Font_Suffix$tmp_factor\n"
 }
+show_ping0(){
+echo -ne "\r$Font_B${sping0[title]}$Font_Suffix\n"
+if [[ "${ping0[status]}" == "verified" && "${ping0[match]}" == "true" ]];then
+echo -ne "\r$Font_Cyan${sping0[status]}$Font_Green${sping0[match]}$Font_Suffix\n"
+echo -ne "\r$Font_Cyan${sping0[location]}$Font_Suffix"
+print -r -- "${ping0[location]}"
+echo -ne "\r$Font_Cyan${sping0[asn]}$Font_Suffix"
+print -r -- "${ping0[asn]}"
+echo -ne "\r$Font_Cyan${sping0[org]}$Font_Suffix"
+print -r -- "${ping0[org]}"
+elif [[ "${ping0[status]}" == "ip_mismatch" ]];then
+echo -ne "\r$Font_Cyan${sping0[status]}$Font_Red${sping0[mismatch]}$Font_Suffix\n"
+else
+echo -ne "\r$Font_Cyan${sping0[status]}$Font_Purple${sping0[unknown]}$Font_Suffix\n"
+fi
+echo -ne "\r$Font_Cyan${sping0[risk]}$Font_Purple${sping0[unknown]}$Font_Suffix (${sping0[norisk]})\n"
+}
 show_media(){
 echo -ne "\r${smedia[title]}\n"
 echo -ne "\r$Font_Cyan${smedia[meida]}$Font_I TikTok   Netflix Youtube  AmazonPV  Reddit   ChatGPT $Font_Suffix\n"
@@ -2279,6 +2365,24 @@ mail_updates+=".Mail |= . * { DNSBlacklist: { Marked: ${smail[m]:-null} } } | "
 mail_updates+=".Mail |= . * { DNSBlacklist: { Blacklisted: ${smail[b]:-null} } } | "
 mail_updates+=".Mail |= . * { DNSBlacklist: { Unknown: ${smail[u]:-null} } } | "
 ipjson=$(echo "$ipjson"|jq "$head_updates$basic_updates$type_updates$score_updates$factor_updates$media_updates$mail_updates.")
+if scope_includes reputation;then
+ipjson=$(print -r -- "$ipjson"|jq \
+--arg status "${ping0[status]:-unknown}" \
+--arg location "${ping0[location]:-}" \
+--arg asn "${ping0[asn]:-}" \
+--arg organization "${ping0[org]:-}" \
+--arg risk_status "${ping0[riskstatus]:-official_public_endpoint_does_not_expose_risk}" \
+--argjson ip_match "${ping0[match]:-null}" \
+'.Ping0 = {
+  Status: $status,
+  IPMatch: $ip_match,
+  Location: (if $location == "" then null else $location end),
+  ASN: (if $asn == "" then null else $asn end),
+  Organization: (if $organization == "" then null else $organization end),
+  RiskScore: null,
+  RiskStatus: $risk_status
+}')
+fi
 }
 check_IP(){
 IP=$1
@@ -2292,6 +2396,7 @@ ipjson='{
       "Type": {},
       "Score": {},
       "Factor": {},
+      "Ping0": {},
       "Media": {},
       "Mail": {}
     }'
@@ -2307,6 +2412,7 @@ db_ip2location $2
 db_dbip
 db_ipdata $2
 db_ipqs $2
+db_ping0 $2
 fi
 if scope_includes media-ai;then
 MediaUnlockTest_TikTok $2
@@ -2332,6 +2438,7 @@ fi
 show_type
 show_score
 show_factor
+show_ping0
 fi
 scope_includes media-ai&&show_media
 scope_includes mail&&show_mail $2
