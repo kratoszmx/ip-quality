@@ -9,6 +9,7 @@ class IpQualityTest < Minitest::Test
   SCRIPT = File.join(ROOT, "bin", "ip-quality")
   DNSBL = File.join(ROOT, "ref", "dnsbl.list")
   ISO3166 = File.join(ROOT, "ref", "iso3166.json")
+  COMMON_PROVIDER_LIBRARY = File.join(ROOT, "providers", "common.zsh")
   PING0_LIBRARY = File.join(ROOT, "providers", "ping0.zsh")
   RIPESTAT_LIBRARY = File.join(ROOT, "providers", "ripestat.zsh")
   INTERNETDB_LIBRARY = File.join(ROOT, "providers", "shodan_internetdb.zsh")
@@ -171,6 +172,27 @@ class IpQualityTest < Minitest::Test
     refute mismatch_status.success?
   end
 
+  def test_common_provider_helpers_validate_objects_and_merge_boolean_signals_conservatively
+    helper_probe = <<~'ZSH'
+      source "$1"
+      provider_json_is_object '{"provider":"fixture"}' || exit 1
+      provider_json_is_object '[]' && exit 2
+      print -r -- "$(provider_merge_boolean_signals false true null)|$(provider_merge_boolean_signals false false)|$(provider_merge_boolean_signals false null)"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      helper_probe,
+      "common-provider-test",
+      COMMON_PROVIDER_LIBRARY
+    )
+
+    assert status.success?, stderr
+    assert_equal "true|false|\n", stdout
+    assert_empty stderr
+  end
+
   def test_reputation_report_uses_provider_rows_without_the_fragile_score_bar
     report_probe = <<~'ZSH'
       setopt KSH_ARRAYS
@@ -182,7 +204,7 @@ class IpQualityTest < Minitest::Test
       sscore[title]='三、风险评分'
       sfactor[title]='四、风险因子'
       ip2location[score]=21
-      ip2location[risk]='低风险'
+      ipapi[risk]='High'
       ipapi[proxy]=false
       ipqs[vpn]=true
       clean_ansi(){ print -rn -- "$1" }
@@ -202,12 +224,14 @@ class IpQualityTest < Minitest::Test
     assert status.success?, stderr
     assert_includes stdout, "IP2Location"
     assert_match(/参数\s+\|.*IP2Location.*Scamalytics/, stdout)
-    assert_includes stdout, "直接公开端点"
+    assert_includes stdout, "公开示例组件"
+    assert_includes stdout, "直接公开 API"
     assert_includes stdout, "上游中继"
     assert_match(/分值\s+\|\s+21/, stdout)
     assert_includes stdout, "分段／标签"
     assert_includes stdout, "量表"
     assert_includes stdout, "Scamalytics"
+    assert_includes stdout, "仅显示平台明确返回的标签"
     assert_includes stdout, "未知不等于低风险"
     refute_includes stdout, "风险等级："
     refute_match(/IP2Location\s+分值=/, stdout)
@@ -243,12 +267,14 @@ class IpQualityTest < Minitest::Test
     assert_empty stderr
   end
 
-  def test_report_identifies_the_relay_and_new_standalone_remote_without_claiming_a_local_maxmind_database
+  def test_report_identifies_the_relay_and_online_repository_without_claiming_a_local_maxmind_database
     source = File.read(SCRIPT, encoding: "UTF-8")
 
-    assert_includes source, "/Users/zmx/gitrepos/ipquality.git"
+    assert_includes source, "https://github.com/kratoszmx/ipquality"
     assert_includes source, "Check.Place 中继；上游标注 MaxMind"
     assert_includes source, "Check.Place relay; MaxMind-labeled upstream data"
+    assert_includes source, "IPinfo public demo widget"
+    refute_includes source, "/Users/zmx/gitrepos/ipquality.git"
     refute_includes source, "/Users/zmx/gitrepos/network-manager.git"
     refute_includes source, "Maxmind 数据库"
   end
@@ -346,6 +372,7 @@ class IpQualityTest < Minitest::Test
     [
       DNSBL,
       ISO3166,
+      COMMON_PROVIDER_LIBRARY,
       PING0_LIBRARY,
       RIPESTAT_LIBRARY,
       INTERNETDB_LIBRARY,
@@ -383,6 +410,7 @@ class IpQualityTest < Minitest::Test
     assert_includes providers, "Unknown"
     assert_includes providers, "Ping0"
     assert_includes providers, "public `/geo`"
+    assert_includes providers, "invent a band from local thresholds"
     assert_includes license, "GNU AFFERO GENERAL PUBLIC LICENSE"
   end
 
@@ -401,15 +429,8 @@ class IpQualityTest < Minitest::Test
     end
   end
 
-  def test_usb_receive_wrapper_is_exact_target_and_cleans_appledouble_sidecars
-    wrapper = File.join(ROOT, "scripts", "git-receive-pack-usb-clean")
-    source = File.read(wrapper, encoding: "UTF-8")
-
-    assert File.executable?(wrapper)
-    assert_includes source, 'expected="/Volumes/USB/gitreposbak/ipquality.git"'
-    assert_includes source, '/usr/bin/git-receive-pack "$repo"'
-    assert_includes source, '/usr/sbin/dot_clean -m "$repo"'
-    assert_includes source, 'if [ "$repo" != "$expected" ]'
+  def test_obsolete_local_remote_wrapper_is_absent
+    refute File.exist?(File.join(ROOT, "scripts", "git-receive-pack-usb-clean"))
   end
 
   private

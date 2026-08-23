@@ -16,9 +16,9 @@ or malformed addresses are not accepted as a successful public result.
 | Report row | Access style | Main observations |
 | --- | --- | --- |
 | Check.Place relay (upstream labels the payload as MaxMind) | Upstream relay | ASN, organization, city/region, registered region, coordinates, timezone |
-| IPinfo public widget | Direct public web endpoint | ASN/company type, country, privacy flags, location |
+| IPinfo public demo widget | Direct public demo component, not the token-authenticated API | ASN/company type, country, privacy flags, location |
 | Scamalytics via `ipinfo.check.place` | Upstream relay | score, proxy, VPN, Tor, blacklist/bot indicators |
-| ipapi.is | Direct public endpoint | ASN/type and risk factors |
+| ipapi.is | Direct public API | ASN/type, provider-supplied abuser-score label, and risk factors |
 | AbuseIPDB via `ipinfo.check.place` | Upstream relay | abuse score and usage/risk factors |
 | IP2Location via `ipinfo.check.place` | Upstream relay | fraud score and proxy-category factors |
 | ipdata via `ipinfo.check.place` | Upstream relay | country and threat factors |
@@ -30,9 +30,12 @@ or malformed addresses are not accepted as a successful public result.
 “Upstream relay” is intentionally visible in the report model: it is not treated
 as equivalent to a user-owned subscription to each vendor's official API. If a
 relay or direct page changes schema, its result is unknown rather than clean.
-Score scales are shown per provider and are not averaged. The adjacent textual
-band may be returned by the source or derived from a documented local threshold;
-it is display context, not a second independent observation.
+Score scales are shown per provider and are not averaged. A textual label is
+shown only when that provider explicitly returned it. The reporter does not
+invent a band from local thresholds: a missing label remains `Unknown`, even
+when the numeric score is present. At present, ipapi.is supplies an informal
+label inside `company.abuser_score`; the relay responses used for Scamalytics,
+AbuseIPDB, IP2Location, and IPQualityScore supply numbers without a label.
 
 The basic-information heading deliberately does not claim that this machine owns
 or queries a local MaxMind database. No `.mmdb`, MaxMind account credential, or
@@ -47,6 +50,13 @@ are actually licensed. Keep direct IPinfo/ipapi.is observations and RIPEstat
 routing context alongside MaxMind instead of replacing all sources with one
 database. Geography, network type, anonymization, abuse, and open-port context are
 different questions and must remain separate.
+
+IPinfo's documented API uses `api.ipinfo.io` with an access token. This project
+currently calls the separate public `/widget/demo/` component and labels it as
+such; it does not imply API-account ownership. ipapi.is documents its public
+endpoint and the two-part `abuser_score` string, including the provider's own
+informal description. See the [IPinfo developer documentation](https://ipinfo.io/developers)
+and [ipapi.is developer documentation](https://ipapi.is/developers.html).
 
 Ping0 is intentionally narrower than the other risk rows. Its documented free
 `/geo` interface returns four text lines—IP, location, ASN, and organization—so
@@ -76,6 +86,16 @@ corresponding formal AbuseIPDB, IPQualityScore, IP2Location, ipdata, and
 Scamalytics products require customer access or credentials. Relay results are
 therefore labeled `Upstream relay`, kept separate by provider, and never treated
 as equivalent to a user-owned vendor API.
+
+Even where a vendor publishes suggested decision thresholds, this relay-based
+report does not synthesize a vendor label. For example, IPQualityScore documents
+that strictness and other request options change the score, while this project
+does not control or authenticate the relay's account settings. AbuseIPDB's
+official API also requires an API key, and its `abuseConfidenceScore` is kept as
+a confidence scale rather than converted into a local low/high verdict. See the
+[IPQualityScore response parameters](https://www.ipqualityscore.com/documentation/proxy-detection-api/response-parameters),
+[IPQualityScore advanced options](https://www.ipqualityscore.com/documentation/proxy-detection-api/advanced-options),
+and [AbuseIPDB API documentation](https://docs.abuseipdb.com/).
 
 The former DB-IP HTML scraper is removed. It depended on an unversioned page
 layout and invented numeric values 0/50/100 from qualitative labels. This was

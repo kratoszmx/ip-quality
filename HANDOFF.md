@@ -6,20 +6,23 @@ Last validated: 2026-08-23, Asia/Shanghai.
 
 - Worktree: `/Users/zmx/Projects/projects/ipquality`
 - Branch: `main` only
-- Local origin: `/Users/zmx/gitrepos/ipquality.git`
-- USB mirror: `/Volumes/USB/gitreposbak/ipquality.git`
-- Online primary target: `https://github.com/kratoszmx/ipquality.git`
+- Online primary: `https://github.com/kratoszmx/ipquality.git` (private;
+  repository created by the owner, but unavailable to the current local credential)
 - Online backup: `https://github.com/kratosbackup/ipquality.git` (private)
+- Temporary branch upstream: `github-kratosbackup/main`
 
-The `kratosbackup/ipquality` private repository was created successfully. The
-configured `kratoszmx/ipquality` target does not yet exist: GitHub rejected both
-REST and GraphQL creation with `Resource not accessible by personal access
-token`. The stored main-account token can authenticate as `kratoszmx`, but it
-does not have repository-creation authority. Never replace the target silently
-or place a token in this repository's remote URLs or Git configuration.
-The `usb` remote uses `scripts/git-receive-pack-usb-clean`, an exact-target
-receive wrapper that runs macOS `dot_clean` after each receive attempt so
-AppleDouble sidecars cannot remain as invalid Git refs or object names.
+The owner reports that `kratoszmx/ipquality` now exists. Current REST access to
+that private target returns HTTP 404, and Git HTTPS reports `repository not
+found`; the existing local credential therefore cannot read or push it. Keep the
+remote configured, but do not claim it is synchronized until its repository
+permission is updated. `kratosbackup/ipquality` remains the verified, usable
+online remote. Never place a token in a remote URL or Git configuration.
+
+The obsolete `origin` and `usb` remotes were disconnected. Their exact bare
+repositories, `/Users/zmx/gitrepos/ipquality.git` and
+`/Volumes/USB/gitreposbak/ipquality.git`, were moved to the macOS Trash rather
+than deleted irreversibly. The USB receive wrapper was removed with those
+remotes. This worktree now uses online remotes only.
 
 ## Extracted history
 
@@ -59,6 +62,10 @@ without retaining parent-repository files or nested Git metadata.
 - Terminal reputation sections are matrices: providers across the top and
   dimensions down the left. Safe boolean factors are green, risk factors are red,
   and unknown values are purple. Unknown never means low risk.
+- Risk-score labels appear only when the provider explicitly returns one. Numeric
+  relay scores are never converted into locally invented low/medium/high bands.
+- IPinfo is identified as a public demo widget, ipapi.is as a direct public API,
+  and Check.Place-backed vendor rows as upstream relays.
 - JSON is built with `jq --arg` bindings rather than source interpolation, and
   keeps booleans, numbers, and null values typed.
 - User-selected output paths use an exclusive, no-follow file descriptor; existing
@@ -79,7 +86,6 @@ Run from the repository root:
 
 ```text
 /bin/zsh -n bin/ip-quality bin/test-clash-leaf scripts/test-offline providers/*.zsh report/*.zsh
-/bin/sh -n scripts/git-receive-pack-usb-clean
 /usr/bin/ruby -c leaf_runner/command.rb
 /usr/bin/ruby -c leaf_runner/isolated_mihomo_session.rb
 /usr/bin/ruby -c leaf_runner/safe_snapshot.rb
@@ -87,7 +93,7 @@ Run from the repository root:
 /bin/zsh -f bin/ip-quality --self-test
 ```
 
-The full offline suite currently has 33 runs and 412 assertions. A read-only
+The full offline suite currently has 34 runs and 422 assertions. A read-only
 probe of the real Clash Verge cache also resolved a remote subscription and an
 exact inline leaf, then passed Mihomo `-t` without starting a listener or making
 an IP-provider lookup. Afterward, the project workspace residue count was zero in

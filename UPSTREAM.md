@@ -56,6 +56,8 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 - replaced the fragile proportional score-text bar with explicit per-provider
   matrices with providers across the top, dimensions down the left,
   provider-specific scales, stable `Unknown` values, and green/red factor colors;
+- removed locally synthesized risk bands from relay scores; only a provider's
+  explicitly returned text label is displayed, while absent labels stay unknown;
 - added a zsh entrypoint backed by source-auditable system-Ruby libraries that
   select one cached remote Clash Verge subscription independently of the active
   profile, extract one exact inline leaf, and own a temporary loopback-only
@@ -63,6 +65,8 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 - split Clash runner, provider parser, and report code by responsibility, then
   moved the verified-file snapshot helper into `leaf_runner/` because it has no
   consumer outside that runtime;
+- extracted network-free provider JSON validation and conservative multi-signal
+  boolean merging into `providers/common.zsh` for reuse by provider adapters;
 - extracted the complete `network-manager/ip-quality/` history into the standalone
   `ipquality` repository on 2026-08-23 and removed the obsolete parent-repository
   routing hooks instead of leaving compatibility wrappers;

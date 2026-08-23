@@ -107,14 +107,14 @@ if [[ "$YY" == "cn" ]];then
 print -r -- "每个平台仅显示其实际提供的分类；未提供的字段保持未知。"
 report_table_row "${Font_B}参数${Font_Suffix}" 12 23 "$Font_B$Font_Cyan IPinfo$Font_Suffix" "$Font_B$Font_Cyan ipapi.is$Font_Suffix" "$Font_B$Font_Cyan IP2Location$Font_Suffix" "$Font_B$Font_Cyan AbuseIPDB$Font_Suffix"
 report_table_rule 4 12 23
-report_table_row "来源" 12 23 "$(report_neutral_value '直接公开端点')" "$(report_neutral_value '直接公开端点')" "$(report_neutral_value '上游中继')" "$(report_neutral_value '上游中继')"
+report_table_row "来源" 12 23 "$(report_neutral_value '公开示例组件')" "$(report_neutral_value '直接公开 API')" "$(report_neutral_value '上游中继')" "$(report_neutral_value '上游中继')"
 report_table_row "使用类型" 12 23 "$(report_preserved_value "${ipinfo[susetype]}")" "$(report_preserved_value "${ipapi[susetype]}")" "$(report_preserved_value "${ip2location[susetype]}")" "$(report_preserved_value "${abuseipdb[susetype]}")"
 report_table_row "公司类型" 12 23 "$(report_preserved_value "${ipinfo[scomtype]}")" "$(report_preserved_value "${ipapi[scomtype]}")" "$(report_preserved_value "${ip2location[scomtype]}")" "$(report_unknown)"
 else
 print -r -- "Each provider column contains only classifications that source returned; unavailable fields stay Unknown."
 report_table_row "${Font_B}Field${Font_Suffix}" 12 23 "$Font_B$Font_Cyan IPinfo$Font_Suffix" "$Font_B$Font_Cyan ipapi.is$Font_Suffix" "$Font_B$Font_Cyan IP2Location$Font_Suffix" "$Font_B$Font_Cyan AbuseIPDB$Font_Suffix"
 report_table_rule 4 12 23
-report_table_row "Source" 12 23 "$(report_neutral_value 'direct public endpoint')" "$(report_neutral_value 'direct public endpoint')" "$(report_neutral_value 'upstream relay')" "$(report_neutral_value 'upstream relay')"
+report_table_row "Source" 12 23 "$(report_neutral_value 'public demo widget')" "$(report_neutral_value 'direct public API')" "$(report_neutral_value 'upstream relay')" "$(report_neutral_value 'upstream relay')"
 report_table_row "Usage type" 12 23 "$(report_preserved_value "${ipinfo[susetype]}")" "$(report_preserved_value "${ipapi[susetype]}")" "$(report_preserved_value "${ip2location[susetype]}")" "$(report_preserved_value "${abuseipdb[susetype]}")"
 report_table_row "Company type" 12 23 "$(report_preserved_value "${ipinfo[scomtype]}")" "$(report_preserved_value "${ipapi[scomtype]}")" "$(report_preserved_value "${ip2location[scomtype]}")" "$(report_unknown)"
 fi
@@ -123,14 +123,14 @@ fi
 show_score(){
 print -r -- "$Font_B${sscore[title]}$Font_Suffix"
 if [[ "$YY" == "cn" ]];then
-print -r -- "不同平台的分值定义不可直接横向比较；分段可能来自平台标签或本地阈值；未知不等于低风险。"
+print -r -- "不同平台的分值定义不可直接横向比较；仅显示平台明确返回的标签，本程序不生成本地阈值标签；未知不等于低风险。"
 report_table_row "${Font_B}参数${Font_Suffix}" 12 18 "$Font_B$Font_Cyan IP2Location$Font_Suffix" "$Font_B$Font_Cyan Scamalytics$Font_Suffix" "$Font_B$Font_Cyan ipapi.is$Font_Suffix" "$Font_B$Font_Cyan AbuseIPDB$Font_Suffix" "$Font_B$Font_Cyan IPQualityScore$Font_Suffix"
 report_table_rule 5 12 18
 report_table_row "分值" 12 18 "$(report_neutral_value "${ip2location[score]}")" "$(report_neutral_value "${scamalytics[score]}")" "$(report_neutral_value "${ipapi[score]}")" "$(report_neutral_value "${abuseipdb[score]}")" "$(report_neutral_value "${ipqs[score]}")"
 report_table_row "分段／标签" 12 18 "$(report_preserved_value "${ip2location[risk]}")" "$(report_preserved_value "${scamalytics[risk]}")" "$(report_preserved_value "${ipapi[risk]}")" "$(report_preserved_value "${abuseipdb[risk]}")" "$(report_preserved_value "${ipqs[risk]}")"
 report_table_row "量表" 12 18 "$(report_neutral_value '0-100 fraud')" "$(report_neutral_value '0-100 fraud')" "$(report_neutral_value '0-100% abuse')" "$(report_neutral_value '0-100 confidence')" "$(report_neutral_value '0-100 fraud')"
 else
-print -r -- "Provider scores are not directly comparable; bands may be provider labels or local thresholds; Unknown never means low risk."
+print -r -- "Provider scores are not directly comparable; labels appear only when explicitly returned by a provider, and this reporter invents no local threshold labels; Unknown never means low risk."
 report_table_row "${Font_B}Field${Font_Suffix}" 12 18 "$Font_B$Font_Cyan IP2Location$Font_Suffix" "$Font_B$Font_Cyan Scamalytics$Font_Suffix" "$Font_B$Font_Cyan ipapi.is$Font_Suffix" "$Font_B$Font_Cyan AbuseIPDB$Font_Suffix" "$Font_B$Font_Cyan IPQualityScore$Font_Suffix"
 report_table_rule 5 12 18
 report_table_row "Score" 12 18 "$(report_neutral_value "${ip2location[score]}")" "$(report_neutral_value "${scamalytics[score]}")" "$(report_neutral_value "${ipapi[score]}")" "$(report_neutral_value "${abuseipdb[score]}")" "$(report_neutral_value "${ipqs[score]}")"
