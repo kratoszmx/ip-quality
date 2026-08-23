@@ -4,34 +4,45 @@ require "minitest/autorun"
 require "stringio"
 require "tmpdir"
 require "yaml"
-require_relative "../lib/clash_leaf_command"
+require_relative "../leaf_runner/command"
 
 class ClashLeafRunnerTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
   WRAPPER = File.join(ROOT, "bin", "test-clash-leaf")
 
-  def test_active_profile_is_resolved_from_a_verified_read_only_snapshot
-    Dir.mktmpdir("ip-quality-active-profile-") do |directory|
-      profiles_directory = File.join(directory, "profiles")
-      Dir.mkdir(profiles_directory, 0o700)
-      profile_path = File.join(profiles_directory, "active.yaml")
-      registry_path = File.join(directory, "profiles.yaml")
-      write_private_yaml(profile_path, fixture_document)
-      write_private_yaml(
-        registry_path,
-        {
-          "current" => "fixture-current",
-          "items" => [
-            { "uid" => "fixture-current", "file" => "active.yaml", "type" => "local" }
-          ]
-        }
-      )
-
-      source = IpQuality::ClashLeafProfile.from_active_clash_verge(app_root: directory)
+  def test_cached_remote_subscription_is_resolved_without_using_the_active_profile
+    Dir.mktmpdir("ip-quality-subscription-") do |directory|
+      write_clash_verge_fixture(directory)
+      catalog = IpQuality::SubscriptionCatalog.new(app_root: directory)
+      source = catalog.source_for(catalog.entries.fetch(0))
       profile = IpQuality::ClashLeafProfile.new(source)
 
-      assert_equal "current Clash Verge profile (read-only snapshot)", source.description
+      assert_equal "cached remote subscription \"Fixture Remote\" (read-only snapshot)", source.description
       assert_equal %w[TransportLeaf TargetLeaf], profile.leaf_names
+      refute_includes source.description, "https://"
+    end
+  end
+
+  def test_default_flow_selects_subscription_then_leaf_without_repeating_the_leaf_count
+    Dir.mktmpdir("ip-quality-subscription-select-") do |directory|
+      write_clash_verge_fixture(directory)
+      stdout = StringIO.new
+      stderr = StringIO.new
+      command = IpQuality::ClashLeafCommand.new(
+        stdout: stdout,
+        stderr: stderr,
+        stdin: StringIO.new("1\n2\n"),
+        app_root: directory
+      )
+
+      exit_code = command.run([])
+
+      assert_equal 0, exit_code
+      assert_includes stdout.string, "Cached remote subscriptions:"
+      assert_includes stdout.string, "Available inline leaves"
+      assert_includes stdout.string, "exact leaf: TargetLeaf"
+      refute_match(/\d+ inline leaves/, stdout.string)
+      assert_empty stderr.string
     end
   end
 
@@ -138,7 +149,7 @@ class ClashLeafRunnerTest < Minitest::Test
 
   def test_entrypoint_is_a_thin_zsh_wrapper_and_all_runtime_code_is_source_auditable
     wrapper = File.binread(WRAPPER)
-    sources = Dir.glob(File.join(ROOT, "{bin,lib}", "**", "*"))
+    sources = Dir.glob(File.join(ROOT, "{bin,leaf_runner,lib,providers,report}", "**", "*"))
       .select { |path| File.file?(path) }
       .map { |path| File.binread(path) }
       .join("\n")
@@ -189,5 +200,33 @@ class ClashLeafRunnerTest < Minitest::Test
   def write_private_yaml(path, document)
     File.write(path, YAML.dump(document))
     File.chmod(0o600, path)
+  end
+
+  def write_clash_verge_fixture(directory)
+    profiles_directory = File.join(directory, "profiles")
+    Dir.mkdir(profiles_directory, 0o700)
+    write_private_yaml(File.join(profiles_directory, "remote.yaml"), fixture_document)
+    write_private_yaml(File.join(profiles_directory, "active-local.yaml"), { "proxies" => [] })
+    write_private_yaml(
+      File.join(directory, "profiles.yaml"),
+      {
+        "current" => "fixture-active-local",
+        "items" => [
+          {
+            "uid" => "fixture-active-local",
+            "name" => "Active Local",
+            "file" => "active-local.yaml",
+            "type" => "local"
+          },
+          {
+            "uid" => "fixture-remote",
+            "name" => "Fixture Remote",
+            "file" => "remote.yaml",
+            "type" => "remote",
+            "url" => "https://secret-subscription.test.invalid/token"
+          }
+        ]
+      }
+    )
   end
 end

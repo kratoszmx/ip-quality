@@ -1,0 +1,7 @@
+{
+  "ip": "198.51.100.23",
+  "ports": [22, 443],
+  "vulns": ["CVE-2099-0001"],
+  "tags": ["vpn"],
+  "hostnames": ["fixture.invalid"]
+}

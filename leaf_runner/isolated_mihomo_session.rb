@@ -4,7 +4,7 @@ require "fileutils"
 require "open3"
 require "socket"
 require "tmpdir"
-require_relative "safe_snapshot"
+require_relative "../lib/safe_snapshot"
 
 module IpQuality
   class IsolatedMihomoSession

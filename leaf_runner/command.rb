@@ -2,7 +2,8 @@
 
 require "English"
 require "optparse"
-require_relative "clash_leaf_profile"
+require_relative "profile"
+require_relative "subscription_catalog"
 require_relative "isolated_mihomo_session"
 
 module IpQuality
@@ -13,15 +14,17 @@ module IpQuality
     EX_SOFTWARE = 70
     REPORTER = File.expand_path("../ip-quality.zsh", __dir__).freeze
 
-    def initialize(stdout: $stdout, stderr: $stderr, stdin: $stdin)
+    def initialize(stdout: $stdout, stderr: $stderr, stdin: $stdin, app_root: SubscriptionCatalog::DEFAULT_APP_ROOT)
       @stdout = stdout
       @stderr = stderr
       @stdin = stdin
+      @app_root = app_root
       @profile_path = nil
       @mihomo_path = IsolatedMihomoSession::DEFAULT_MIHOMO
+      @subscription_name = nil
       @leaf_name = nil
-      @select = false
-      @list = false
+      @list_subscriptions = false
+      @list_leaves = false
       @confirmed = false
       @config_test_only = false
       @help_requested = false
@@ -39,15 +42,20 @@ module IpQuality
       end
 
       validate_option_combinations!
+      if @list_subscriptions
+        print_subscription_list(subscription_catalog.entries)
+        return 0
+      end
+
       source = load_source
       profile = ClashLeafProfile.new(source)
 
-      if @list
+      if @list_leaves
         print_leaf_list(profile.leaf_names)
         return 0
       end
 
-      selected = @select ? select_leaf(profile.leaf_names) : @leaf_name
+      selected = @leaf_name || select_leaf(profile.leaf_names)
       ensure_exact_leaf!(profile, selected)
 
       unless @confirmed || @config_test_only
@@ -66,12 +74,12 @@ module IpQuality
         return 0
       end
 
-      run_live_report(session, source, selected)
+      run_live_report(session)
     rescue OptionParser::ParseError => error
       @stderr.puts "ERROR: #{error.message}"
       @stderr.puts parser
       EX_USAGE
-    rescue ClashLeafProfile::Error, SafeSnapshot::Error => error
+    rescue ClashLeafProfile::Error, SubscriptionCatalog::Error, SafeSnapshot::Error => error
       @stderr.puts "ERROR: #{error.message}"
       EX_NOINPUT
     rescue IsolatedMihomoSession::Error => error
@@ -91,18 +99,21 @@ module IpQuality
       OptionParser.new do |options|
         options.banner = <<~BANNER
           Usage:
-            test-clash-leaf --list-leaves [--profile PATH]
-            test-clash-leaf --select --confirm-network-lookup [-4|-6] [-f] [-j]
-            test-clash-leaf --leaf NAME --config-test-only [--profile PATH]
+            test-clash-leaf --confirm-network-lookup [-4|-6] [-f] [-j]
+            test-clash-leaf --list-subscriptions
+            test-clash-leaf --subscription NAME --list-leaves
+            test-clash-leaf --profile PATH --leaf NAME --config-test-only
 
-          The current Clash profile is read only. A selected leaf is copied into a
-          temporary 127.0.0.1-only Mihomo process; the live subscription and current
-          Clash selection are never changed.
+          By default, choose one cached remote Clash Verge subscription and then one
+          exact inline leaf. The active profile is never used or changed. The leaf is
+          copied into a temporary 127.0.0.1-only Mihomo process.
         BANNER
-        options.on("--list-leaves", "List exact inline leaf names without network access") { @list = true }
-        options.on("--select", "Choose one exact leaf from an interactive numbered list") { @select = true }
+        options.on("--list-subscriptions", "List cached remote subscription names without network access") { @list_subscriptions = true }
+        options.on("--list-leaves", "List exact inline leaf names without network access") { @list_leaves = true }
+        options.on("--select", "Compatibility flag; interactive selection is now the default") { nil }
+        options.on("--subscription NAME", "Select one cached remote subscription by exact display name") { |value| @subscription_name = value }
         options.on("--leaf NAME", "Select one exact leaf name non-interactively") { |value| @leaf_name = value }
-        options.on("--profile PATH", "Use an explicit local profile instead of the active Clash Verge profile") { |value| @profile_path = value }
+        options.on("--profile PATH", "Use an explicit local profile instead of a cached subscription") { |value| @profile_path = value }
         options.on("--mihomo PATH", "Use an explicit local Mihomo executable") { |value| @mihomo_path = value }
         options.on("--config-test-only", "Render and run Mihomo -t only; start no listener and make no lookup") { @config_test_only = true }
         options.on("--confirm-network-lookup", "Authorize the isolated reputation lookup") { @confirmed = true }
@@ -127,9 +138,13 @@ module IpQuality
     end
 
     def validate_option_combinations!
-      selectors = [@list, @select, !@leaf_name.nil?].count(true)
-      raise OptionParser::InvalidArgument, "choose exactly one of --list-leaves, --select, or --leaf" unless selectors == 1
-      if @list && (@confirmed || @config_test_only || !@report_arguments.empty? || @family)
+      if @profile_path && @subscription_name
+        raise OptionParser::InvalidArgument, "--profile and --subscription are mutually exclusive"
+      end
+      if @list_subscriptions && (@profile_path || @subscription_name || @leaf_name || @list_leaves || @confirmed || @config_test_only || !@report_arguments.empty? || @family)
+        raise OptionParser::InvalidArgument, "--list-subscriptions cannot be combined with source, leaf, lookup, or report options"
+      end
+      if @list_leaves && (@leaf_name || @confirmed || @config_test_only || !@report_arguments.empty? || @family)
         raise OptionParser::InvalidArgument, "--list-leaves cannot be combined with lookup or report options"
       end
       if @confirmed && @config_test_only
@@ -145,18 +160,34 @@ module IpQuality
     end
 
     def load_source
-      if @profile_path
-        ClashLeafProfile.from_file(@profile_path)
-      else
-        ClashLeafProfile.from_active_clash_verge
-      end
+      return ClashLeafProfile.from_file(@profile_path) if @profile_path
+
+      catalog = subscription_catalog
+      entry = @subscription_name ? catalog.find_exact(@subscription_name) : select_subscription(catalog.entries)
+      catalog.source_for(entry)
+    end
+
+    def subscription_catalog
+      @subscription_catalog ||= SubscriptionCatalog.new(app_root: @app_root)
+    end
+
+    def print_subscription_list(entries)
+      @stdout.puts "Cached remote subscriptions:"
+      entries.each_with_index { |entry, index| @stdout.printf("%3d  %s\n", index + 1, entry.name) }
+    end
+
+    def select_subscription(entries)
+      print_subscription_list(entries)
+      @stdout.print "Select one subscription number: "
+      @stdout.flush
+      entries.fetch(read_selection(entries.length, "subscription"))
     end
 
     def print_leaf_list(names)
       raise ClashLeafProfile::Error, "the selected profile has no inline leaf proxies" if names.empty?
 
+      @stdout.puts "Available inline leaves (groups and built-ins excluded):"
       names.each_with_index { |name, index| @stdout.printf("%3d  %s\n", index + 1, name) }
-      @stdout.puts "#{names.length} inline leaves; proxy groups and DIRECT/REJECT are excluded."
     end
 
     def select_leaf(names)
@@ -165,14 +196,18 @@ module IpQuality
       print_leaf_list(names)
       @stdout.print "Select one leaf number: "
       @stdout.flush
+      names.fetch(read_selection(names.length, "leaf"))
+    end
+
+    def read_selection(length, label)
       answer = @stdin.gets
-      raise OptionParser::InvalidArgument, "no leaf selection was entered" unless answer
+      raise OptionParser::InvalidArgument, "no #{label} selection was entered" unless answer
 
       stripped = answer.strip
-      unless stripped.match?(/\A[0-9]+\z/) && stripped.to_i.between?(1, names.length)
-        raise OptionParser::InvalidArgument, "leaf selection must be a listed number"
+      unless stripped.match?(/\A[0-9]+\z/) && stripped.to_i.between?(1, length)
+        raise OptionParser::InvalidArgument, "#{label} selection must be a listed number"
       end
-      names.fetch(stripped.to_i - 1)
+      stripped.to_i - 1
     end
 
     def ensure_exact_leaf!(profile, selected)
@@ -189,15 +224,15 @@ module IpQuality
       @stdout.puts "  runtime: temporary Mihomo bound only to 127.0.0.1 on a random port"
       @stdout.puts "  reporter scope: reputation only (HTTP(S) requests forced through the isolated leaf)"
       @stdout.puts "  Ping0: official public geo/ASN/organization observation; public endpoint has no risk score"
+      @stdout.puts "  RIPEstat: official routed-prefix/origin-ASN context; not a risk score"
+      @stdout.puts "  Shodan InternetDB: official IPv4 exposure context; not a risk score"
       @stdout.puts "  start gate: add --confirm-network-lookup"
     end
 
-    def run_live_report(session, source, selected)
-      @stderr.puts "[leaf-runner] Read-only source: #{source.description}"
-      @stderr.puts "[leaf-runner] Starting isolated loopback Mihomo for exact leaf #{selected.inspect}"
+    def run_live_report(session)
+      @stderr.puts "[leaf-runner] Testing the selected cached-subscription leaf through isolated loopback Mihomo."
       result = nil
       session.with_running do |running|
-        @stderr.puts "[leaf-runner] Listener ownership verified at 127.0.0.1:#{running.port}"
         command = [
           "/bin/zsh",
           "-f",
@@ -211,7 +246,7 @@ module IpQuality
         system(running.proxy_environment, *command)
         result = $CHILD_STATUS
       end
-      @stderr.puts "[leaf-runner] Isolated Mihomo stopped; live Clash state was not changed."
+      @stderr.puts "[leaf-runner] Isolated Mihomo stopped; live Clash state was unchanged."
       return 0 if result && result.success?
 
       result && result.exitstatus ? result.exitstatus : 1

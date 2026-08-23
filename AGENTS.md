@@ -15,9 +15,10 @@ reporter derived from `xykt/IPQuality`.
 - Live checks may query third-party services and disclose the tested egress IP to
   them. Keep each provider named in the report and document the disclosure.
 - Do not activate, reload, restart, or rewrite live Clash/Mihomo state. Exact-leaf
-  proxy validation must copy only the selected inline leaf into a private,
-  temporary, loopback-only Mihomo process with a random port and verified
-  listener ownership.
+  proxy validation must read one cached remote subscription selected independently
+  of the active profile, then copy only the selected inline leaf into a private,
+  temporary, loopback-only Mihomo process with a random port and verified listener
+  ownership.
 - Do not upload reports, emit telemetry, show advertisements, or fetch executable
   configuration. Reference datasets used by the program must be vendored and
   provenance-recorded.
@@ -44,11 +45,13 @@ reporter derived from `xykt/IPQuality`.
 
 - `ip-quality.zsh`: provider queries, aggregation, and report output.
 - `bin/test-clash-leaf`: thin zsh exact-leaf entrypoint.
-- `lib/safe_snapshot.rb`: reusable verified local-file reads.
-- `lib/clash_leaf_profile.rb`: active-profile resolution and leaf extraction.
-- `lib/isolated_mihomo_session.rb`: loopback lifecycle and owned cleanup.
-- `lib/clash_leaf_command.rb`: CLI policy and reporter invocation.
-- `lib/ping0.zsh`: network-free Ping0 public `/geo` parser.
+- `lib/safe_snapshot.rb`: the only subproject-common library; reusable verified
+  local-file reads with no Clash or provider policy.
+- `leaf_runner/`: cached-subscription catalog, exact-leaf extraction, CLI policy,
+  loopback lifecycle, listener ownership proof, and cleanup.
+- `providers/`: network-free, fixture-testable provider response parsers.
+- `report/`: provider-aware terminal report rendering; provider scales must not be
+  collapsed into one synthetic score.
 - `ref/`: runtime reference data; `test/fixtures/`: sanitized test data.
 
 ## Development and validation

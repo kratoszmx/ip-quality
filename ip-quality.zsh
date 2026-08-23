@@ -7,17 +7,24 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-08-23-m4.2"
+script_version="v2026-08-23-m4.3"
 typeset SCRIPT_DIR="${0:A:h}"
-typeset LIB_DIR="$SCRIPT_DIR/lib"
+typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
+typeset REPORT_DIR="$SCRIPT_DIR/report"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
-typeset PING0_LIB="$LIB_DIR/ping0.zsh"
-[[ -f "$PING0_LIB" && -r "$PING0_LIB" && ! -L "$PING0_LIB" ]]||{
-print -ru2 -- "ERROR: unsafe or missing local library: $PING0_LIB"
+typeset PING0_LIB="$PROVIDER_DIR/ping0.zsh"
+typeset RIPESTAT_LIB="$PROVIDER_DIR/ripestat.zsh"
+typeset INTERNETDB_LIB="$PROVIDER_DIR/shodan_internetdb.zsh"
+typeset REPUTATION_REPORT_LIB="$REPORT_DIR/reputation.zsh"
+typeset local_library
+for local_library in "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+[[ -f "$local_library" && -r "$local_library" && ! -L "$local_library" ]]||{
+print -ru2 -- "ERROR: unsafe or missing local library: $local_library"
 exit 66
 }
-source "$PING0_LIB"
+source "$local_library"
+done
 typeset query_scope="full"
 typeset network_lookup_confirmed=0
 typeset plan_only=0
@@ -58,10 +65,11 @@ typeset -A scamalytics
 typeset -A ipapi
 typeset -A abuseipdb
 typeset -A ip2location
-typeset -A dbip
 typeset -A ipdata
 typeset -A ipqs
 typeset -A ping0
+typeset -A ripestat
+typeset -A internetdb
 typeset -A tiktok
 typeset -A netflix
 typeset -A youtube
@@ -149,7 +157,7 @@ shead[title]="IP QUALITY CHECK REPORT: "
 shead[title_lite]="IP QUALITY CHECK REPORT(LITE): "
 shead[ver]="Version: $script_version"
 shead[command]="/bin/zsh -f ./ip-quality.zsh --confirm-network-lookup --scope $query_scope -E"
-shead[git]="https://github.com/xykt/IPQuality (derived; see UPSTREAM.md)"
+shead[git]="/Users/zmx/gitrepos/network-manager.git (ip-quality/)"
 shead[time_label]="Report Time: "
 shead[ltitle]=25
 shead[ltitle_lite]=31
@@ -201,7 +209,6 @@ sscore[highrisk]="$Font_Red${Font_B}HighRisk$Font_Suffix"
 sscore[dos]="$Font_Red${Font_B}DoS$Font_Suffix"
 sscore[colon]=": "
 sscore[title]="3. Risk Score"
-sscore[range]="${Font_Cyan}Levels:         $Font_I$Font_White${Back_Green}VeryLow     Low $Back_Yellow     Medium     $Back_Red High   VeryHigh$Font_Suffix"
 sfactor[title]="4. Risk Factors"
 sfactor[factor]="DB:  "
 sfactor[countrycode]="Region: "
@@ -283,7 +290,7 @@ shead[title]="IP质量体检报告："
 shead[title_lite]="IP质量体检报告(Lite)："
 shead[ver]="脚本版本：$script_version"
 shead[command]="/bin/zsh -f ./ip-quality.zsh --confirm-network-lookup --scope $query_scope"
-shead[git]="https://github.com/xykt/IPQuality（衍生版；详见 UPSTREAM.md）"
+shead[git]="/Users/zmx/gitrepos/network-manager.git（ip-quality/）"
 shead[time_label]="报告时间："
 shead[ltitle]=16
 shead[ltitle_lite]=22
@@ -335,7 +342,6 @@ sscore[highrisk]="$Font_Red$Font_B高风险$Font_Suffix"
 sscore[dos]="$Font_Red$Font_B建议封禁$Font_Suffix"
 sscore[colon]="："
 sscore[title]="三、风险评分"
-sscore[range]="$Font_Cyan风险等级：      $Font_I$Font_White$Back_Green极低         低 $Back_Yellow      中等      $Back_Red 高         极高$Font_Suffix"
 sfactor[title]="四、风险因子"
 sfactor[factor]="库： "
 sfactor[countrycode]="地区：  "
@@ -493,8 +499,9 @@ print -r -- "  scope: $query_scope"
 print -r -- "  DNSBL concurrency cap: $dnsbl_concurrency"
 print -r -- "  output: masked IP by default; local stdout/file only"
 print -r -- "  telemetry/report upload/remote code: disabled"
-scope_includes reputation&&print -r -- "  reputation sources: IPinfo Check.Place relay, IPinfo, Scamalytics, ipapi.is, AbuseIPDB Check.Place relay, IP2Location, DB-IP, ipdata, IPQualityScore, Ping0 public geo"
+scope_includes reputation&&print -r -- "  reputation sources: MaxMind relay, IPinfo, Scamalytics relay, ipapi.is, AbuseIPDB relay, IP2Location relay, ipdata relay, IPQualityScore relay, Ping0 public geo, RIPEstat, Shodan InternetDB (IPv4)"
 scope_includes reputation&&print -r -- "  Ping0 limitation: the official free /geo endpoint exposes IP/location/ASN/organization, not a risk score"
+scope_includes reputation&&print -r -- "  context-only sources: RIPEstat reports routing; Shodan InternetDB reports public exposure, not cleanliness"
 scope_includes media-ai&&print -r -- "  media/AI sources: TikTok, Netflix, YouTube Premium, Prime Video, Reddit, OpenAI public endpoints"
 scope_includes mail&&print -r -- "  mail sources: public MX DNS plus bounded SMTP greeting probes"
 scope_includes dnsbl&&print -r -- "  DNSBL sources: vendored $DNSBL_FILE (up to $dnsbl_concurrency concurrent DNS lookups)"
@@ -527,7 +534,7 @@ print -ru2 -- "SELF-TEST FAILED: not running under zsh"
 return 1
 }
 local reference_file
-for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json" "$PING0_LIB";do
+for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$reference_file" && -r "$reference_file" && ! -L "$reference_file" ]]||{
 print -ru2 -- "SELF-TEST FAILED: unsafe or missing reference file: $reference_file"
 return 1
@@ -604,6 +611,26 @@ ping0_parse_geo $'198.51.100.24\nExample Region\nAS64500\nExample Network\n' "19
 print -ru2 -- "SELF-TEST FAILED: Ping0 IP mismatch accepted"
 return 1
 }
+ripestat_parse_network_info '{"status":"ok","data":{"prefix":"198.51.100.0/24","asns":[64500]}}'||{
+print -ru2 -- "SELF-TEST FAILED: valid RIPEstat fixture rejected"
+return 1
+}
+[[ "${ripestat_parsed[prefix]}" == "198.51.100.0/24" && "${ripestat_parsed[origins]}" == "AS64500" ]]||{
+print -ru2 -- "SELF-TEST FAILED: RIPEstat fields changed"
+return 1
+}
+internetdb_parse_response '{"ip":"198.51.100.23","ports":[22,443],"vulns":["CVE-2099-0001"],"tags":["vpn"],"hostnames":["fixture.invalid"]}' "198.51.100.23"||{
+print -ru2 -- "SELF-TEST FAILED: valid Shodan InternetDB fixture rejected"
+return 1
+}
+[[ "${internetdb_parsed[port_count]}" == "2" && "${internetdb_parsed[vulnerability_count]}" == "1" ]]||{
+print -ru2 -- "SELF-TEST FAILED: Shodan InternetDB fields changed"
+return 1
+}
+internetdb_parse_response '{"ip":"198.51.100.24","ports":[],"vulns":[],"tags":[],"hostnames":[]}' "198.51.100.23"&&{
+print -ru2 -- "SELF-TEST FAILED: Shodan InternetDB IP mismatch accepted"
+return 1
+}
 is_signed_decimal "-33.86"&&! is_signed_decimal '1; print unsafe'||{
 print -ru2 -- "SELF-TEST FAILED: signed decimal validation changed"
 return 1
@@ -613,7 +640,7 @@ local dnsbl_summary=$(printf '%s\n' Clean Clean Blacklisted Other Unknown|summar
 print -ru2 -- "SELF-TEST FAILED: DNSBL outcome aggregation changed"
 return 1
 }
-print -r -- "SELF-TEST OK: zsh runtime, validators, Ping0 parser, and ${#dnsbl_zones[@]} DNSBL entries"
+print -r -- "SELF-TEST OK: zsh runtime, validators, provider parsers, and ${#dnsbl_zones[@]} DNSBL entries"
 }
 
 typeset -A browsers=(
@@ -1112,9 +1139,9 @@ abuseipdb[risk]=""
 elif [[ ${abuseipdb[score]} -lt 25 ]];then
 abuseipdb[risk]="${sscore[low]}"
 elif [[ ${abuseipdb[score]} -lt 75 ]];then
-abuseipdb[risk]="${sscore[high]}"
+abuseipdb[risk]="${sscore[elevated]}"
 elif [[ ${abuseipdb[score]} -ge 75 ]];then
-abuseipdb[risk]="${sscore[dos]}"
+abuseipdb[risk]="${sscore[high]}"
 fi
 }
 db_ip2location(){
@@ -1213,39 +1240,6 @@ elif [[ ${ip2location[score]} -ge 66 ]];then
 ip2location[risk]="${sscore[high]}"
 fi
 }
-db_dbip(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}DB-IP $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-6-${sinfo[ldatabase]}))
-dbip=()
-if [[ $IP == *:* ]];then
-local RESPONSE=$(curl_safe -sL -m 10 "https://db-ip.com/$IP")
-else
-local RESPONSE=$(curl_safe $CurlARG -sL -m 10 "https://db-ip.com/$IP")
-fi
-local -a results
-results=("${(@f)$(echo "$RESPONSE"|awk '/<th class='\''text-center'\''>Crawler/ {flag=1; next}
-             flag && /<span class="sr-only">/ {
-                 if ($0 ~ /Yes/) print "true";
-                 else if ($0 ~ /No/) print "false";
-             }
-             /<\/tr>/ && flag {flag=0}')}" )
-dbip[robot]="${results[0]}"
-dbip[proxy]="${results[1]}"
-dbip[abuser]="${results[2]}"
-dbip[risktext]=$(echo "$RESPONSE"|sed -n 's/.*Estimated threat level for this IP address is[[:space:]]*<span[^>]*>\([^<]*\)<.*/\1/p')
-dbip[countrycode]=$(echo "$RESPONSE"|sed -n '/<code class="language-json">/,/<\/code>/p'|sed -n 's/.*"countryCode"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-case ${dbip[risktext]} in
-"low")dbip[risk]="${sscore[low]}"
-dbip[score]=0
-;;
-"medium")dbip[risk]="${sscore[medium]}"
-dbip[score]=50
-;;
-"high")dbip[risk]="${sscore[high]}"
-dbip[score]=100
-esac
-}
 db_ipdata(){
 local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}ipdata $Font_Suffix"
 ((ibar_step+=3))
@@ -1316,6 +1310,39 @@ ping0[match]="false"
 *)ping0[status]="unknown"
 ping0[match]="null"
 esac
+}
+db_ripestat(){
+local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}RIPEstat routing $Font_Suffix"
+((ibar_step+=3))
+show_progress_bar "$temp_info" $((40-13-${sinfo[ldatabase]}))
+ripestat=()
+ripestat[status]="unknown"
+local RESPONSE=$(curl_safe $CurlARG -sS -L -$1 -m 10 --max-filesize 65536 --get --data-urlencode "resource=$IP" "https://stat.ripe.net/data/network-info/data.json" 2>/dev/null)
+if ripestat_parse_network_info "$RESPONSE";then
+ripestat[status]="${ripestat_parsed[status]}"
+ripestat[prefix]="${ripestat_parsed[prefix]}"
+ripestat[origins]="${ripestat_parsed[origins]}"
+fi
+}
+db_shodan_internetdb(){
+internetdb=()
+internetdb[status]="unknown"
+if [[ "$1" -ne 4 ]];then
+internetdb[status]="not supported for IPv6"
+return 0
+fi
+local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Shodan InternetDB $Font_Suffix"
+((ibar_step+=3))
+show_progress_bar "$temp_info" $((40-17-${sinfo[ldatabase]}))
+local RESPONSE=$(curl_safe $CurlARG -sS -L -4 -m 10 --max-filesize 262144 "https://internetdb.shodan.io/$IP" 2>/dev/null)
+if internetdb_parse_response "$RESPONSE" "$IP";then
+internetdb[status]="${internetdb_parsed[status]}"
+internetdb[ports]="${internetdb_parsed[ports]}"
+internetdb[port_count]="${internetdb_parsed[port_count]}"
+internetdb[vulnerability_count]="${internetdb_parsed[vulnerability_count]}"
+internetdb[tags]="${internetdb_parsed[tags]}"
+internetdb[hostname_count]="${internetdb_parsed[hostname_count]}"
+fi
 }
 function check_ip_valide(){
 local IPPattern='^(\<([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\>\.){3}\<([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\>$'
@@ -1814,7 +1841,9 @@ sort -u "$DNSBL_FILE"|xargs -P "$parallel_jobs" -I {} /bin/zsh -fc '
   local lookup_status=$?
   if (( lookup_status != 0 )); then
     print -r -- Unknown
-  elif [[ -z "$result" || "$result" == 127.255.255.* ]]; then
+  elif [[ "$result" == 127.255.255.* ]]; then
+    print -r -- Unknown
+  elif [[ -z "$result" ]]; then
     print -r -- Clean
   elif [[ "$result" == "127.0.0.2" ]]; then
     print -r -- Blacklisted
@@ -1953,118 +1982,6 @@ echo -ne "\r$Font_Cyan${sbasic[type]}$Back_Red$Font_B$Font_White${sbasic[type1]}
 fi
 fi
 }
-show_type(){
-echo -ne "\r${stype[title]}\n"
-echo -ne "\r$Font_Cyan${stype[db]}$Font_I   IPinfo       ipapi    IP2Location   AbuseIPDB $Font_Suffix\n"
-echo -ne "\r$Font_Cyan${stype[usetype]}$Font_Suffix${ipinfo[susetype]}${ipapi[susetype]}${ip2location[susetype]}${abuseipdb[susetype]}\n"
-echo -ne "\r$Font_Cyan${stype[comtype]}$Font_Suffix${ipinfo[scomtype]}${ipapi[scomtype]}${ip2location[scomtype]}\n"
-}
-sscore_text(){
-local text="$1"
-local p2=$2
-local p3=$3
-local p4=$4
-local p5=$5
-local p6=$6
-local tmplen
-local tmp
-if ((p2>=p4));then
-tmplen=$((49+15*(p2-p4)/(p5-p4)-p6))
-elif ((p2>=p3));then
-tmplen=$((33+16*(p2-p3)/(p4-p3)-p6))
-elif ((p2>=0));then
-tmplen=$((17+16*p2/p3-p6))
-else
-tmplen=0
-fi
-tmp=$(printf '%*s' $tmplen '')
-local total_length=${#tmp}
-local text_length=${#text}
-local tmp1="${tmp:1:total_length-text_length}$text|"
-sscore[text1]="${tmp1:1:16-p6}"
-sscore[text2]="${tmp1:17-p6:16}"
-sscore[text3]="${tmp1:33-p6:16}"
-sscore[text4]="${tmp1:49-p6}"
-}
-show_score(){
-echo -ne "\r${sscore[title]}\n"
-echo -ne "\r${sscore[range]}\n"
-if [[ -n ${ip2location[score]} ]];then
-sscore_text "${ip2location[score]}" ${ip2location[score]} 33 66 99 13
-echo -ne "\r${Font_Cyan}IP2Location${sscore[colon]}$Font_White$Font_B${sscore[text1]}$Back_Green${sscore[text2]}$Back_Yellow${sscore[text3]}$Back_Red${sscore[text4]}$Font_Suffix${ip2location[risk]}\n"
-fi
-if [[ -n ${scamalytics[score]} ]];then
-sscore_text "${scamalytics[score]}" ${scamalytics[score]} 20 60 100 13
-echo -ne "\r${Font_Cyan}Scamalytics${sscore[colon]}$Font_White$Font_B${sscore[text1]}$Back_Green${sscore[text2]}$Back_Yellow${sscore[text3]}$Back_Red${sscore[text4]}$Font_Suffix${scamalytics[risk]}\n"
-fi
-if [[ -n ${ipapi[score]} ]];then
-local tmp_score=$(echo "${ipapi[scorenum]} * 10000 / 1"|bc)
-sscore_text "${ipapi[score]}" $tmp_score 85 300 10000 7
-echo -ne "\r${Font_Cyan}ipapi${sscore[colon]}$Font_White$Font_B${sscore[text1]}$Back_Green${sscore[text2]}$Back_Yellow${sscore[text3]}$Back_Red${sscore[text4]}$Font_Suffix${ipapi[risk]}\n"
-fi
-sscore_text "${abuseipdb[score]}" ${abuseipdb[score]} 25 25 100 11
-[[ -n ${abuseipdb[score]} ]]&&echo -ne "\r${Font_Cyan}AbuseIPDB${sscore[colon]}$Font_White$Font_B${sscore[text1]}$Back_Green${sscore[text2]}$Back_Yellow${sscore[text3]}$Back_Red${sscore[text4]}$Font_Suffix${abuseipdb[risk]}\n"
-if [ -n "${ipqs[score]}" ]&&[ "${ipqs[score]}" != "null" ];then
-sscore_text "${ipqs[score]}" ${ipqs[score]} 75 85 100 6
-echo -ne "\r${Font_Cyan}IPQS${sscore[colon]}$Font_White$Font_B${sscore[text1]}$Back_Green${sscore[text2]}$Back_Yellow${sscore[text3]}$Back_Red${sscore[text4]}$Font_Suffix${ipqs[risk]}\n"
-fi
-sscore_text " " ${dbip[score]} 33 66 100 7
-[[ -n ${dbip[risk]} ]]&&echo -ne "\r${Font_Cyan}DB-IP${sscore[colon]}$Font_White$Font_B${sscore[text1]}$Back_Green${sscore[text2]}$Back_Yellow${sscore[text3]}$Back_Red${sscore[text4]}$Font_Suffix${dbip[risk]}\n"
-}
-format_factor(){
-local dynamic_text="  "
-local factor_value
-for factor_value in "$@";do
-if [[ "$factor_value" == "true" ]];then
-dynamic_text+="${sfactor[yes]}"
-elif [[ "$factor_value" == "false" ]];then
-dynamic_text+="${sfactor[no]}"
-elif [[ ${#factor_value} -eq 2 ]];then
-dynamic_text+="$Font_Green[$factor_value]$Font_Suffix"
-else
-dynamic_text+="${sfactor[na]}"
-fi
-dynamic_text+="    "
-done
-echo "$dynamic_text"
-return 0
-}
-show_factor(){
-local tmp_factor=""
-echo -ne "\r${sfactor[title]}\n"
-echo -ne "\r$Font_Cyan${sfactor[factor]}${Font_I}IP2Location ipapi IPQS Scamalytics ipdata IPinfo DB-IP$Font_Suffix\n"
-tmp_factor=$(format_factor "${ip2location[countrycode]}" "${ipapi[countrycode]}" "${ipqs[countrycode]}" "${scamalytics[countrycode]}" "${ipdata[countrycode]}" "${ipinfo[countrycode]}" "${dbip[countrycode]}")
-echo -ne "\r$Font_Cyan${sfactor[countrycode]}$Font_Suffix$tmp_factor\n"
-tmp_factor=$(format_factor "${ip2location[proxy]}" "${ipapi[proxy]}" "${ipqs[proxy]}" "${scamalytics[proxy]}" "${ipdata[proxy]}" "${ipinfo[proxy]}" "${dbip[proxy]}")
-echo -ne "\r$Font_Cyan${sfactor[proxy]}$Font_Suffix$tmp_factor\n"
-tmp_factor=$(format_factor "${ip2location[tor]}" "${ipapi[tor]}" "${ipqs[tor]}" "${scamalytics[tor]}" "${ipdata[tor]}" "${ipinfo[tor]}" "${dbip[tor]}")
-echo -ne "\r$Font_Cyan${sfactor[tor]}$Font_Suffix$tmp_factor\n"
-tmp_factor=$(format_factor "${ip2location[vpn]}" "${ipapi[vpn]}" "${ipqs[vpn]}" "${scamalytics[vpn]}" "${ipdata[vpn]}" "${ipinfo[vpn]}" "${dbip[vpn]}")
-echo -ne "\r$Font_Cyan${sfactor[vpn]}$Font_Suffix$tmp_factor\n"
-tmp_factor=$(format_factor "${ip2location[server]}" "${ipapi[server]}" "${ipqs[server]}" "${scamalytics[server]}" "${ipdata[server]}" "${ipinfo[server]}" "${dbip[server]}")
-echo -ne "\r$Font_Cyan${sfactor[server]}$Font_Suffix$tmp_factor\n"
-tmp_factor=$(format_factor "${ip2location[abuser]}" "${ipapi[abuser]}" "${ipqs[abuser]}" "${scamalytics[abuser]}" "${ipdata[abuser]}" "${ipinfo[abuser]}" "${dbip[abuser]}")
-echo -ne "\r$Font_Cyan${sfactor[abuser]}$Font_Suffix$tmp_factor\n"
-tmp_factor=$(format_factor "${ip2location[robot]}" "${ipapi[robot]}" "${ipqs[robot]}" "${scamalytics[robot]}" "${ipdata[robot]}" "${ipinfo[robot]}" "${dbip[robot]}")
-echo -ne "\r$Font_Cyan${sfactor[robot]}$Font_Suffix$tmp_factor\n"
-}
-show_ping0(){
-echo -ne "\r$Font_B${sping0[title]}$Font_Suffix\n"
-if [[ "${ping0[status]}" == "verified" && "${ping0[match]}" == "true" ]];then
-echo -ne "\r$Font_Cyan${sping0[status]}$Font_Green${sping0[match]}$Font_Suffix\n"
-echo -ne "\r$Font_Cyan${sping0[location]}$Font_Suffix"
-print -r -- "${ping0[location]}"
-echo -ne "\r$Font_Cyan${sping0[asn]}$Font_Suffix"
-print -r -- "${ping0[asn]}"
-echo -ne "\r$Font_Cyan${sping0[org]}$Font_Suffix"
-print -r -- "${ping0[org]}"
-elif [[ "${ping0[status]}" == "ip_mismatch" ]];then
-echo -ne "\r$Font_Cyan${sping0[status]}$Font_Red${sping0[mismatch]}$Font_Suffix\n"
-else
-echo -ne "\r$Font_Cyan${sping0[status]}$Font_Purple${sping0[unknown]}$Font_Suffix\n"
-fi
-echo -ne "\r$Font_Cyan${sping0[risk]}$Font_Purple${sping0[unknown]}$Font_Suffix (${sping0[norisk]})\n"
-}
 show_media(){
 echo -ne "\r${smedia[title]}\n"
 echo -ne "\r$Font_Cyan${smedia[meida]}$Font_I TikTok   Netflix Youtube  AmazonPV  Reddit   ChatGPT $Font_Suffix\n"
@@ -2200,7 +2117,7 @@ else
 head_updates+=".Head |= . + { IP: \"${IPhide:-null}\" } | "
 fi
 head_updates+=".Head |= . + { Command: \"${shead[command]:-null}\" } | "
-head_updates+=".Head |= . + { GitHub: \"${shead[git]:-null}\" } | "
+head_updates+=".Head |= . + { Repository: \"${shead[git]:-null}\" } | "
 head_updates+=".Head |= . + { Time: \"${shead[time_raw]:-null}\" } | "
 head_updates+=".Head |= . + { Version: \"${script_version:-null}\" } | "
 if [ $mode_lite -eq 0 ];then
@@ -2269,56 +2186,48 @@ score_updates+=".Score |= . + { SCAMALYTICS: \"${scamalytics[score]:-null}\" } |
 score_updates+=".Score |= . + { ipapi: \"${ipapi[score]:-null}\" } | "
 score_updates+=".Score |= . + { AbuseIPDB: \"${abuseipdb[score]:-null}\" } | "
 score_updates+=".Score |= . + { IPQS: \"${ipqs[score]:-null}\" } | "
-score_updates+=".Score |= . + { DBIP: \"${dbip[score]:-null}\" } | "
 factor_updates+=$(factor_bool "${ip2location[countrycode]}" "IP2LOCATION" "CountryCode")
 factor_updates+=$(factor_bool "${ipapi[countrycode]}" "ipapi" "CountryCode")
 factor_updates+=$(factor_bool "${ipqs[countrycode]}" "IPQS" "CountryCode")
 factor_updates+=$(factor_bool "${scamalytics[countrycode]}" "SCAMALYTICS" "CountryCode")
 factor_updates+=$(factor_bool "${ipdata[countrycode]}" "ipdata" "CountryCode")
 factor_updates+=$(factor_bool "${ipinfo[countrycode]}" "IPinfo" "CountryCode")
-factor_updates+=$(factor_bool "${dbip[countrycode]}" "DBIP" "CountryCode")
 factor_updates+=$(factor_bool "${ip2location[proxy]}" "IP2LOCATION" "Proxy")
 factor_updates+=$(factor_bool "${ipapi[proxy]}" "ipapi" "Proxy")
 factor_updates+=$(factor_bool "${ipqs[proxy]}" "IPQS" "Proxy")
 factor_updates+=$(factor_bool "${scamalytics[proxy]}" "SCAMALYTICS" "Proxy")
 factor_updates+=$(factor_bool "${ipdata[proxy]}" "ipdata" "Proxy")
 factor_updates+=$(factor_bool "${ipinfo[proxy]}" "IPinfo" "Proxy")
-factor_updates+=$(factor_bool "${dbip[proxy]}" "DBIP" "Proxy")
 factor_updates+=$(factor_bool "${ip2location[tor]}" "IP2LOCATION" "Tor")
 factor_updates+=$(factor_bool "${ipapi[tor]}" "ipapi" "Tor")
 factor_updates+=$(factor_bool "${ipqs[tor]}" "IPQS" "Tor")
 factor_updates+=$(factor_bool "${scamalytics[tor]}" "SCAMALYTICS" "Tor")
 factor_updates+=$(factor_bool "${ipdata[tor]}" "ipdata" "Tor")
 factor_updates+=$(factor_bool "${ipinfo[tor]}" "IPinfo" "Tor")
-factor_updates+=$(factor_bool "${dbip[tor]}" "DBIP" "Tor")
 factor_updates+=$(factor_bool "${ip2location[vpn]}" "IP2LOCATION" "VPN")
 factor_updates+=$(factor_bool "${ipapi[vpn]}" "ipapi" "VPN")
 factor_updates+=$(factor_bool "${ipqs[vpn]}" "IPQS" "VPN")
 factor_updates+=$(factor_bool "${scamalytics[vpn]}" "SCAMALYTICS" "VPN")
 factor_updates+=$(factor_bool "${ipdata[vpn]}" "ipdata" "VPN")
 factor_updates+=$(factor_bool "${ipinfo[vpn]}" "IPinfo" "VPN")
-factor_updates+=$(factor_bool "${dbip[vpn]}" "DBIP" "VPN")
 factor_updates+=$(factor_bool "${ip2location[server]}" "IP2LOCATION" "Server")
 factor_updates+=$(factor_bool "${ipapi[server]}" "ipapi" "Server")
 factor_updates+=$(factor_bool "${ipqs[server]}" "IPQS" "Server")
 factor_updates+=$(factor_bool "${scamalytics[server]}" "SCAMALYTICS" "Server")
 factor_updates+=$(factor_bool "${ipdata[server]}" "ipdata" "Server")
 factor_updates+=$(factor_bool "${ipinfo[server]}" "IPinfo" "Server")
-factor_updates+=$(factor_bool "${dbip[server]}" "DBIP" "Server")
 factor_updates+=$(factor_bool "${ip2location[abuser]}" "IP2LOCATION" "Abuser")
 factor_updates+=$(factor_bool "${ipapi[abuser]}" "ipapi" "Abuser")
 factor_updates+=$(factor_bool "${ipqs[abuser]}" "IPQS" "Abuser")
 factor_updates+=$(factor_bool "${scamalytics[abuser]}" "SCAMALYTICS" "Abuser")
 factor_updates+=$(factor_bool "${ipdata[abuser]}" "ipdata" "Abuser")
 factor_updates+=$(factor_bool "${ipinfo[abuser]}" "IPinfo" "Abuser")
-factor_updates+=$(factor_bool "${dbip[abuser]}" "DBIP" "Abuser")
 factor_updates+=$(factor_bool "${ip2location[robot]}" "IP2LOCATION" "Robot")
 factor_updates+=$(factor_bool "${ipapi[robot]}" "ipapi" "Robot")
 factor_updates+=$(factor_bool "${ipqs[robot]}" "IPQS" "Robot")
 factor_updates+=$(factor_bool "${scamalytics[robot]}" "SCAMALYTICS" "Robot")
 factor_updates+=$(factor_bool "${ipdata[robot]}" "ipdata" "Robot")
 factor_updates+=$(factor_bool "${ipinfo[robot]}" "IPinfo" "Robot")
-factor_updates+=$(factor_bool "${dbip[robot]}" "DBIP" "Robot")
 media_updates+=".Media |= . * { TikTok: { Status: \"$(clean_ansi "${tiktok[ustatus]:-null}")\" } } | "
 media_updates+=".Media |= . * { Netflix: { Status: \"$(clean_ansi "${netflix[ustatus]:-null}")\" } } | "
 media_updates+=".Media |= . * { Youtube: { Status: \"$(clean_ansi "${youtube[ustatus]:-null}")\" } } | "
@@ -2382,6 +2291,30 @@ ipjson=$(print -r -- "$ipjson"|jq \
   RiskScore: null,
   RiskStatus: $risk_status
 }')
+ipjson=$(print -r -- "$ipjson"|jq \
+--arg routing_status "${ripestat[status]:-unknown}" \
+--arg prefix "${ripestat[prefix]:-}" \
+--arg origins "${ripestat[origins]:-}" \
+--arg exposure_status "${internetdb[status]:-unknown}" \
+--arg ports "${internetdb[ports]:-}" \
+--arg port_count "${internetdb[port_count]:-}" \
+--arg vulnerability_count "${internetdb[vulnerability_count]:-}" \
+--arg tags "${internetdb[tags]:-}" \
+'.Routing = {
+  Provider: "RIPEstat Network Info",
+  Status: $routing_status,
+  Prefix: (if $prefix == "" then null else $prefix end),
+  OriginASNs: (if $origins == "" then [] else ($origins | split(", ")) end)
+} |
+.Exposure = {
+  Provider: "Shodan InternetDB",
+  Status: $exposure_status,
+  Ports: (if $ports == "" then [] else ($ports | split(", ") | map(tonumber)) end),
+  PortCount: (if $port_count == "" then null else ($port_count | tonumber) end),
+  KnownVulnerabilityCount: (if $vulnerability_count == "" then null else ($vulnerability_count | tonumber) end),
+  Tags: (if $tags == "" then [] else ($tags | split(", ")) end),
+  IsReputationScore: false
+}')
 fi
 }
 check_IP(){
@@ -2397,6 +2330,8 @@ ipjson='{
       "Score": {},
       "Factor": {},
       "Ping0": {},
+      "Routing": {},
+      "Exposure": {},
       "Media": {},
       "Mail": {}
     }'
@@ -2409,10 +2344,11 @@ db_scamalytics $2
 db_ipapi $2
 db_abuseipdb $2
 db_ip2location $2
-db_dbip
 db_ipdata $2
 db_ipqs $2
 db_ping0 $2
+db_ripestat $2
+db_shodan_internetdb $2
 fi
 if scope_includes media-ai;then
 MediaUnlockTest_TikTok $2
@@ -2439,6 +2375,8 @@ show_type
 show_score
 show_factor
 show_ping0
+show_routing
+show_exposure
 fi
 scope_includes media-ai&&show_media
 scope_includes mail&&show_mail $2

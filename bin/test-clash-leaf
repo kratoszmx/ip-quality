@@ -5,4 +5,4 @@ unsetopt RCS GLOBAL_RCS
 umask 077
 
 typeset SCRIPT_DIR="${0:A:h}"
-exec /usr/bin/ruby --disable-gems "$SCRIPT_DIR/../lib/clash_leaf_command.rb" "$@"
+exec /usr/bin/ruby --disable-gems "$SCRIPT_DIR/../leaf_runner/command.rb" "$@"

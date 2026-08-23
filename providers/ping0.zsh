@@ -1,4 +1,4 @@
-# Pure parser for Ping0's documented public /geo response. Network access stays
+# Ping0's documented public /geo response parser. Network access stays
 # in ip-quality.zsh so this library is fixture-testable and reusable.
 
 typeset -ga ping0_parsed=()

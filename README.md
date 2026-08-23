@@ -11,47 +11,53 @@ part of the import and porting work.
 
 ## Test one exact Clash leaf without changing the live subscription
 
-`bin/test-clash-leaf` reads the currently selected Clash Verge profile through
-a verified, read-only snapshot. It lists only concrete inline `proxies` (not
-proxy groups or `DIRECT`/`REJECT`), copies the exact selected leaf and any
-concrete `dialer-proxy` dependencies into a private temporary configuration,
-and starts a separate Mihomo bound only to `127.0.0.1` on a random port. It does
-not switch, import, rewrite, reload, or restart the live Clash profile.
+`bin/test-clash-leaf` first lists the remote subscriptions already registered
+and cached by Clash Verge, then lists only the concrete inline `proxies` from
+the chosen subscription (not proxy groups or `DIRECT`/`REJECT`). The active
+profile is neither selected nor read. The runner copies the exact chosen leaf
+and any concrete `dialer-proxy` dependencies into a private temporary
+configuration and starts a separate Mihomo bound only to `127.0.0.1` on a
+random port. It does not refresh a subscription, switch a selection, import,
+rewrite, reload, or restart live Clash state.
 
-List the available leaf names without starting Mihomo or using the network:
+List the cached remote subscription names without starting Mihomo or using the
+network:
 
 ```zsh
-/bin/zsh -f ./bin/test-clash-leaf --list-leaves
+/bin/zsh -f ./bin/test-clash-leaf --list-subscriptions
 ```
 
-Interactively choose a leaf and run the multi-source reputation report through
-that isolated leaf:
+The normal one-command flow asks for a subscription number and then a leaf
+number before running the multi-source reputation report through that isolated
+leaf:
 
 ```zsh
 /bin/zsh -f ./bin/test-clash-leaf \
-  --select \
   --confirm-network-lookup \
   -4 \
   -f
 ```
 
-For a repeatable non-interactive run, replace `--select` with
+For a repeatable non-interactive run, pass both
+`--subscription 'exact subscription display name'` and
 `--leaf 'exact node name'`. Before a live run, the minimal extracted profile can
 be checked without opening a listener or querying the network:
 
 ```zsh
 /bin/zsh -f ./bin/test-clash-leaf \
+  --subscription 'exact subscription display name' \
   --leaf 'exact node name' \
   --config-test-only
 ```
 
-An explicit `--profile PATH` may be used instead of the active Clash Verge
-profile. Profile files must be regular, current-user-owned, non-symlinked,
-single-link files with mode `0600` or `0644`. The live leaf runner deliberately
-fixes the reporter scope to `reputation`: those HTTP(S) observations can be
-forced through its local proxy, while the reporter's mail, DNSBL, and some
-media checks contain direct DNS/TCP flows that would not prove the selected
-leaf's egress.
+`--subscription NAME --list-leaves` lists one subscription's exact leaves
+without a live lookup. An explicit `--profile PATH` remains available for a
+separate local fixture or candidate file. Profile files must be regular,
+current-user-owned, non-symlinked, single-link files with mode `0600` or `0644`.
+The live leaf runner deliberately fixes the reporter scope to `reputation`:
+those HTTP(S) observations can be forced through its local proxy, while the
+reporter's mail, DNSBL, and some media checks contain direct DNS/TCP flows that
+would not prove the selected leaf's egress.
 
 ## Safety model
 
@@ -97,7 +103,7 @@ This fork deliberately has:
 
 | Scope | What it queries |
 | --- | --- |
-| `reputation` | Multiple reputation, geolocation, network-type, proxy/VPN/Tor, abuse, bot, and risk-score sources, plus Ping0 public geo/ASN/organization |
+| `reputation` | Multiple reputation, geolocation, network-type, proxy/VPN/Tor, abuse, bot, and risk-score sources; Ping0 geo/ASN/organization; RIPEstat routing context; Shodan InternetDB IPv4 exposure context |
 | `dnsbl` | The vendored DNSBL zone set, for IPv4 only |
 | `media-ai` | TikTok, Netflix, YouTube Premium, Prime Video, Reddit, and OpenAI public accessibility endpoints |
 | `mail` | Public MX records and bounded SMTP greeting probes on port 25 |
@@ -124,6 +130,12 @@ and organization only after its returned IP exactly matches the already-tested
 egress address. The public endpoint does not expose Ping0's numeric risk score,
 so the report records that score as `Unknown`/`null`; it does not scrape the
 interactive verification page or present missing data as clean.
+
+RIPEstat and Shodan InternetDB add dimensions rather than another synthetic
+cleanliness score. RIPEstat reports the routed prefix and origin ASN data from
+RIPE routing infrastructure. InternetDB reports observed public ports, tags,
+and known-vulnerability counts for IPv4. An unavailable response remains
+`Unknown`; zero returned items are shown as zero only after a valid response.
 
 ## Supported compatibility options
 
@@ -165,10 +177,9 @@ belongs to the isolated child process. It does not install any of them.
 | `ip-quality.zsh` | zsh-native provider aggregation, report rendering, and explicit live-query gate |
 | `bin/test-clash-leaf` | thin zsh entrypoint for exact-leaf selection |
 | `lib/safe_snapshot.rb` | reusable race-resistant local-file snapshot contract |
-| `lib/clash_leaf_profile.rb` | active-profile resolution and minimal exact-leaf rendering |
-| `lib/isolated_mihomo_session.rb` | random loopback port, listener ownership, cleanup, and proxy environment |
-| `lib/clash_leaf_command.rb` | CLI policy and reporter orchestration |
-| `lib/ping0.zsh` | pure parser for the official public Ping0 `/geo` response |
+| `leaf_runner/` | cached-subscription catalog, minimal exact-leaf rendering, CLI policy, random loopback listener ownership, cleanup, and proxy environment |
+| `providers/` | pure parsers for Ping0, RIPEstat, and Shodan InternetDB responses |
+| `report/` | provider-row reputation report rendering without fragile proportional text bars |
 | `ref/` | vendored runtime data |
 | `test/fixtures/` | sanitized provider/parser fixtures only |
 | `test/` | offline contracts; no external network or live Mihomo |
@@ -180,6 +191,11 @@ This is an observation aggregator, not a certificate that an IP is universally
 differ. Some retained upstream checks use public web pages or the upstream
 Check.Place relay rather than a customer-owned formal API account; those rows
 must be interpreted as named observations and can become unavailable.
+
+The previous DB-IP HTML scraper was removed: it depended on an unversioned page
+layout and converted the words low/medium/high into invented numeric values
+0/50/100. The report now shows each real provider score with its own scale and
+always renders missing providers as `Unknown` instead of omitting their rows.
 
 Mail and DNSBL checks use direct DNS/TCP traffic and are not carried by an HTTP
 proxy environment. For that reason, the exact-leaf runner limits itself to the

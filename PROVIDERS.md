@@ -21,14 +21,18 @@ or malformed addresses are not accepted as a successful public result.
 | ipapi.is | Direct public endpoint | ASN/type and risk factors |
 | AbuseIPDB via `ipinfo.check.place` | Upstream relay | abuse score and usage/risk factors |
 | IP2Location via `ipinfo.check.place` | Upstream relay | fraud score and proxy-category factors |
-| DB-IP public page | Direct public page | crawler, proxy, abuse, country, estimated threat |
 | ipdata via `ipinfo.check.place` | Upstream relay | country and threat factors |
 | IPQualityScore via `ipinfo.check.place` | Upstream relay | fraud score and proxy/VPN/Tor/bot factors |
 | Ping0 public `/geo` | Direct official public endpoint | returned IP, location, ASN, and organization; the returned IP must exactly match the tested address |
+| RIPEstat Network Info | Direct official public API | routed prefix and origin ASN data from RIPE routing data; context only, not a reputation score |
+| Shodan InternetDB | Direct official public API, IPv4 | observed public ports, hostnames, tags, and known-vulnerability count; context only, not a reputation score |
 
 “Upstream relay” is intentionally visible in the report model: it is not treated
 as equivalent to a user-owned subscription to each vendor's official API. If a
 relay or direct page changes schema, its result is unknown rather than clean.
+Score scales are shown per provider and are not averaged. The adjacent textual
+band may be returned by the source or derived from a documented local threshold;
+it is display context, not a second independent observation.
 
 Ping0 is intentionally narrower than the other risk rows. Its documented free
 `/geo` interface returns four text lines—IP, location, ASN, and organization—so
@@ -40,6 +44,34 @@ scraped or bypassed. A malformed response, challenge page, or returned-IP
 mismatch is `unknown`/rejected, never clean. See the
 [official Ping0 API description](https://ping0.cc/ip/api) and
 [official risk-score FAQ](https://ping0.cc/ip/faq).
+
+RIPEstat's documented Network Info endpoint returns the covering prefix and
+origin ASN set using RIPE routing data. Shodan InternetDB is a no-key,
+non-commercial public lookup updated from Shodan's InternetDB dataset. Neither
+source makes a cleanliness judgment, so the terminal and JSON reports keep
+them under routing/exposure context rather than the risk-score table. See the
+[RIPEstat Network Info documentation](https://stat.ripe.net/docs/data-api/api-endpoints/network-info.html),
+[RIPEstat Data API documentation](https://stat.ripe.net/docs/data-api/ripestat-data-api),
+and [Shodan InternetDB](https://internetdb.shodan.io/).
+
+## Source-selection rationale
+
+The report prefers an official public endpoint when one is useful without a
+credential. It retains the named Check.Place relay rows for breadth because the
+corresponding formal AbuseIPDB, IPQualityScore, IP2Location, ipdata, and
+Scamalytics products require customer access or credentials. Relay results are
+therefore labeled `Upstream relay`, kept separate by provider, and never treated
+as equivalent to a user-owned vendor API.
+
+The former DB-IP HTML scraper is removed. It depended on an unversioned page
+layout and invented numeric values 0/50/100 from qualitative labels. This was
+both brittle and misleading. GreyNoise Community is a useful future optional
+source for internet-scanner context, but unauthenticated use is limited to ten
+lookups per day and authenticated community use is also quota-bound; it should
+be enabled only through a secret-managed optional provider rather than consumed
+by every default report. See the
+[GreyNoise Community API policy](https://docs.greynoise.io/docs/using-the-greynoise-community-api)
+and [official AbuseIPDB API documentation](https://docs.abuseipdb.com/).
 
 ## Media and AI scope
 
@@ -65,11 +97,15 @@ describe local outbound port-25 reachability. No message is submitted.
 The IPv4 address is reversed and queried against each zone in the vendored
 `ref/dnsbl.list`. Lookup outcomes are kept as:
 
-- `Clean`: the DNS query completed and the zone returned no listing, or its
-  documented ignore-style `127.255.255.*` result;
+- `Clean`: the DNS query completed and the zone returned no listing;
 - `Blacklisted`: the zone returned `127.0.0.2`;
-- `Marked`: the zone returned another answer;
+- `Marked`: the zone returned another ordinary listing answer;
 - `Unknown`: the DNS lookup itself failed or timed out.
 
 The hard concurrency maximum is 50. A failed DNS command is never counted as a
-clean result.
+clean result. Resolver-policy answers such as Spamhaus `127.255.255.252`,
+`127.255.255.254`, and `127.255.255.255` are errors, not evidence that the IP is
+listed or clean. DNSBL interpretation is therefore only authoritative when the
+resolver is permitted and supported by the zone operator. See the
+[Spamhaus DNSBL usage FAQ](https://www.spamhaus.org/faqs/dnsbl-usage/) and
+[Spamhaus fair-use policy](https://www.spamhaus.org/blocklists/dnsbl-fair-use-policy/).

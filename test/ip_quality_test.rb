@@ -9,9 +9,14 @@ class IpQualityTest < Minitest::Test
   SCRIPT = File.join(ROOT, "ip-quality.zsh")
   DNSBL = File.join(ROOT, "ref", "dnsbl.list")
   ISO3166 = File.join(ROOT, "ref", "iso3166.json")
-  PING0_LIBRARY = File.join(ROOT, "lib", "ping0.zsh")
+  PING0_LIBRARY = File.join(ROOT, "providers", "ping0.zsh")
+  RIPESTAT_LIBRARY = File.join(ROOT, "providers", "ripestat.zsh")
+  INTERNETDB_LIBRARY = File.join(ROOT, "providers", "shodan_internetdb.zsh")
+  REPUTATION_REPORT = File.join(ROOT, "report", "reputation.zsh")
   PING0_GEO_FIXTURE = File.join(ROOT, "test", "fixtures", "ping0", "public-geo.txt")
   PING0_CHALLENGE_FIXTURE = File.join(ROOT, "test", "fixtures", "ping0", "challenge.html")
+  RIPESTAT_FIXTURE = File.join(ROOT, "test", "fixtures", "ripestat", "network-info.json")
+  INTERNETDB_FIXTURE = File.join(ROOT, "test", "fixtures", "shodan", "internetdb.json")
 
   BANNED_SOURCE_PATTERNS = {
     bash_runtime: /(^|[^A-Za-z0-9_])bash([^A-Za-z0-9_]|$)/i,
@@ -76,7 +81,7 @@ class IpQualityTest < Minitest::Test
     stdout, stderr, status = run_script("--self-test")
 
     assert status.success?, stderr
-    assert_match(/SELF-TEST OK: zsh runtime, validators, Ping0 parser, and \d+ DNSBL entries/, stdout)
+    assert_match(/SELF-TEST OK: zsh runtime, validators, provider parsers, and \d+ DNSBL entries/, stdout)
     assert_empty stderr
   end
 
@@ -123,6 +128,84 @@ class IpQualityTest < Minitest::Test
       "198.51.100.23"
     )
     refute challenge_status.success?
+  end
+
+  def test_official_context_provider_parsers_reject_mismatches_and_keep_dimensions
+    parser_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      source "$1"
+      response=$(<"$2")
+      ripestat_parse_network_info "$response" || exit $?
+      print -r -- "${ripestat_parsed[prefix]}|${ripestat_parsed[origins]}"
+      source "$3"
+      response=$(<"$4")
+      internetdb_parse_response "$response" "$5" || exit $?
+      print -r -- "${internetdb_parsed[ports]}|${internetdb_parsed[vulnerability_count]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      parser_probe,
+      "provider-parser-test",
+      RIPESTAT_LIBRARY,
+      RIPESTAT_FIXTURE,
+      INTERNETDB_LIBRARY,
+      INTERNETDB_FIXTURE,
+      "198.51.100.23"
+    )
+    assert status.success?, stderr
+    assert_equal "198.51.100.0/24|AS64500\n22, 443|1\n", stdout
+    assert_empty stderr
+
+    _stdout, _stderr, mismatch_status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      'setopt KSH_ARRAYS; source "$1"; internetdb_parse_response "$(<"$2")" "$3"',
+      "provider-mismatch-test",
+      INTERNETDB_LIBRARY,
+      INTERNETDB_FIXTURE,
+      "198.51.100.24"
+    )
+    refute mismatch_status.success?
+  end
+
+  def test_reputation_report_uses_provider_rows_without_the_fragile_score_bar
+    report_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      Font_Cyan='' Font_Suffix='' Font_B='' Font_Green='' Font_Red='' Font_Purple=''
+      YY=cn
+      typeset -A stype sscore sfactor sping0
+      typeset -A ipinfo ipapi ip2location abuseipdb scamalytics ipqs ipdata ping0 ripestat internetdb
+      stype[title]='二、IP类型属性'
+      sscore[title]='三、风险评分'
+      sfactor[title]='四、风险因子'
+      ip2location[score]=21
+      ip2location[risk]='低风险'
+      ipapi[proxy]=false
+      ipqs[vpn]=true
+      clean_ansi(){ print -rn -- "$1" }
+      source "$1"
+      show_type
+      show_score
+      show_factor
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      report_probe,
+      "report-test",
+      REPUTATION_REPORT
+    )
+    assert status.success?, stderr
+    assert_includes stdout, "IP2Location"
+    assert_includes stdout, "分值=21"
+    assert_includes stdout, "Scamalytics"
+    assert_includes stdout, "未知不等于低风险"
+    refute_includes stdout, "风险等级："
+    refute_includes stderr, "unrecognized modifier"
   end
 
   def test_concurrency_is_hard_bounded
@@ -185,7 +268,18 @@ class IpQualityTest < Minitest::Test
   end
 
   def test_vendored_references_are_regular_local_data_without_cookie_state
-    [DNSBL, ISO3166, PING0_LIBRARY, PING0_GEO_FIXTURE, PING0_CHALLENGE_FIXTURE].each do |path|
+    [
+      DNSBL,
+      ISO3166,
+      PING0_LIBRARY,
+      RIPESTAT_LIBRARY,
+      INTERNETDB_LIBRARY,
+      REPUTATION_REPORT,
+      PING0_GEO_FIXTURE,
+      PING0_CHALLENGE_FIXTURE,
+      RIPESTAT_FIXTURE,
+      INTERNETDB_FIXTURE
+    ].each do |path|
       assert File.file?(path), "missing reference: #{path}"
       refute File.symlink?(path), "symlinked reference: #{path}"
       refute_includes File.binread(path), "\0", "binary reference: #{path}"

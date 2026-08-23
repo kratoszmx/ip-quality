@@ -48,9 +48,20 @@ The imported `ip.sh` was renamed to `ip-quality.zsh` and substantially modified:
 - added a strict parser for Ping0's official free `/geo` response; it preserves
   location/ASN/organization only after an exact IP match and leaves the
   unavailable public risk score null;
+- added strict, fixture-tested parsers for the official RIPEstat Network Info
+  and Shodan InternetDB endpoints, exposing routing and public-exposure context
+  without mislabeling either as a cleanliness score;
+- removed the brittle DB-IP HTML scraper and its invented 0/50/100 conversion
+  of qualitative low/medium/high page text;
+- replaced the fragile proportional score-text bar with explicit per-provider
+  rows, provider-specific scales, stable `Unknown` values, and expanded factor
+  dimensions;
 - added a zsh entrypoint backed by source-auditable system-Ruby libraries that
-  read the current Clash profile without mutation, extract one exact inline
-  leaf, and own a temporary loopback-only Mihomo lifecycle;
+  select one cached remote Clash Verge subscription independently of the active
+  profile, extract one exact inline leaf, and own a temporary loopback-only
+  Mihomo lifecycle;
+- split Clash runner, provider parser, and report code out of the subproject's
+  common `lib/`, leaving only the generic verified-file snapshot contract;
 - normalized the malformed annotated DNSBL entry
   `hostkarma.junkemailfilter.com[brl]` to the queryable zone name
   `hostkarma.junkemailfilter.com`, then removed duplicate zone entries.

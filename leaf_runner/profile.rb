@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "yaml"
-require_relative "safe_snapshot"
+require_relative "../lib/safe_snapshot"
 
 module IpQuality
   class ClashLeafProfile
@@ -16,40 +16,13 @@ module IpQuality
 
     def self.from_file(path)
       snapshot = SafeSnapshot.read(path)
-      Source.new("explicit profile", snapshot.path, parse_yaml(snapshot.bytes, snapshot.path))
+      from_snapshot("explicit profile", snapshot)
     rescue SafeSnapshot::Error => error
       raise Error, error.message
     end
 
-    def self.from_active_clash_verge(app_root: default_app_root)
-      app_root = File.expand_path(app_root)
-      SafeSnapshot.verify_directory(app_root)
-      SafeSnapshot.verify_directory(File.join(app_root, "profiles"))
-      registry_path = File.join(app_root, "profiles.yaml")
-      registry_before = SafeSnapshot.read(registry_path)
-      registry = parse_yaml(registry_before.bytes, registry_path)
-      active_filename = active_filename_from(registry)
-      profile_path = confined_profile_path(app_root, active_filename)
-      profile = SafeSnapshot.read(profile_path)
-      registry_after = SafeSnapshot.read(registry_path)
-
-      unless SafeSnapshot.same?(registry_before, registry_after)
-        raise Error, "the active Clash selection changed while it was being read"
-      end
-      SafeSnapshot.verify_directory(app_root)
-      SafeSnapshot.verify_directory(File.join(app_root, "profiles"))
-
-      Source.new(
-        "current Clash Verge profile (read-only snapshot)",
-        profile.path,
-        parse_yaml(profile.bytes, profile.path)
-      )
-    rescue SafeSnapshot::Error => error
-      raise Error, error.message
-    end
-
-    def self.default_app_root
-      File.expand_path("~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev")
+    def self.from_snapshot(description, snapshot)
+      Source.new(description, snapshot.path, parse_yaml(snapshot.bytes, snapshot.path))
     end
 
     def self.parse_yaml(bytes, label)
@@ -106,39 +79,6 @@ module IpQuality
       visit.call(root, 0)
     end
     private_class_method :validate_tree!
-
-    def self.active_filename_from(registry)
-      current = registry["current"]
-      items = registry["items"]
-      raise Error, "Clash profile registry has no current selection" unless safe_text?(current)
-      raise Error, "Clash profile registry has no item list" unless items.is_a?(Array)
-
-      matches = items.select do |item|
-        item.is_a?(Hash) && item["uid"] == current
-      end
-      raise Error, "current Clash selection is missing or ambiguous" unless matches.length == 1
-
-      filename = matches.first["file"]
-      raise Error, "current Clash selection has no safe profile filename" unless safe_filename?(filename)
-
-      filename
-    end
-    private_class_method :active_filename_from
-
-    def self.confined_profile_path(app_root, filename)
-      profiles_root = File.join(app_root, "profiles")
-      candidate = File.expand_path(filename, profiles_root)
-      prefix = profiles_root.end_with?(File::SEPARATOR) ? profiles_root : profiles_root + File::SEPARATOR
-      raise Error, "active profile path escapes the Clash profile directory" unless candidate.start_with?(prefix)
-
-      candidate
-    end
-    private_class_method :confined_profile_path
-
-    def self.safe_filename?(value)
-      safe_text?(value) && File.basename(value) == value && value.match?(/\A[A-Za-z0-9._-]+\z/)
-    end
-    private_class_method :safe_filename?
 
     def self.safe_text?(value, max_bytes = 512)
       value.is_a?(String) && !value.empty? && value.bytesize <= max_bytes && !value.match?(/[[:cntrl:]]/)
