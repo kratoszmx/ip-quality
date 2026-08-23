@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
+# Verified local-file reads shared only by the exact-leaf runtime.
+
 # Read a local file through one already-open descriptor and reject symlinks,
-# hard links, ownership changes, and path replacement races. This module is
-# intentionally independent of Clash so it can later move to a repository-wide
-# safety library without dragging IP-quality policy with it.
+# hard links, ownership changes, and path replacement races. This helper remains
+# in the exact-leaf runtime because its ownership and mode policy is specific to
+# this repository's Clash cache and executable boundaries.
 module IpQuality
   module SafeSnapshot
     class Error < StandardError

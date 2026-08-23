@@ -27,7 +27,7 @@ The hashes below identify the exact upstream inputs before local modification:
 
 ## Local modifications
 
-The imported `ip.sh` was renamed to `ip-quality.zsh` and substantially modified:
+The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 
 - ported from Bash 4+ assumptions to the system `/bin/zsh`;
 - removed the Bash version check and remote Bash upgrade instruction;
@@ -54,14 +54,20 @@ The imported `ip.sh` was renamed to `ip-quality.zsh` and substantially modified:
 - removed the brittle DB-IP HTML scraper and its invented 0/50/100 conversion
   of qualitative low/medium/high page text;
 - replaced the fragile proportional score-text bar with explicit per-provider
-  rows, provider-specific scales, stable `Unknown` values, and expanded factor
-  dimensions;
+  matrices with providers across the top, dimensions down the left,
+  provider-specific scales, stable `Unknown` values, and green/red factor colors;
 - added a zsh entrypoint backed by source-auditable system-Ruby libraries that
   select one cached remote Clash Verge subscription independently of the active
   profile, extract one exact inline leaf, and own a temporary loopback-only
   Mihomo lifecycle;
-- split Clash runner, provider parser, and report code out of the subproject's
-  common `lib/`, leaving only the generic verified-file snapshot contract;
+- split Clash runner, provider parser, and report code by responsibility, then
+  moved the verified-file snapshot helper into `leaf_runner/` because it has no
+  consumer outside that runtime;
+- extracted the complete `network-manager/ip-quality/` history into the standalone
+  `ipquality` repository on 2026-08-23 and removed the obsolete parent-repository
+  routing hooks instead of leaving compatibility wrappers;
+- labeled the Check.Place basic-information response as an upstream,
+  MaxMind-shaped relay rather than claiming a local official MaxMind database;
 - normalized the malformed annotated DNSBL entry
   `hostkarma.junkemailfilter.com[brl]` to the queryable zone name
   `hostkarma.junkemailfilter.com`, then removed duplicate zone entries.
@@ -79,6 +85,6 @@ in this directory or intended for Git history.
 
 ## License continuity
 
-`ip-quality.zsh` is a modified version of the upstream AGPL-3.0 program. The
+`bin/ip-quality` is a modified version of the upstream AGPL-3.0 program. The
 upstream `LICENSE` is preserved verbatim. Redistribution or network service use
 must continue to satisfy the AGPL-3.0 source-availability obligations.

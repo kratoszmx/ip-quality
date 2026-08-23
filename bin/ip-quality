@@ -7,8 +7,8 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-08-23-m4.3"
-typeset SCRIPT_DIR="${0:A:h}"
+script_version="v2026-08-23-standalone.1"
+typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset REPORT_DIR="$SCRIPT_DIR/report"
 typeset REF_DIR="$SCRIPT_DIR/ref"
@@ -100,6 +100,8 @@ typeset -A stail
 typeset mode_lite=0
 typeset mode_json=0
 typeset mode_output=0
+typeset outputfile=""
+typeset output_fd=-1
 typeset ipjson
 typeset ibar_step=0
 typeset PADDING=""
@@ -108,9 +110,9 @@ typeset CurlARG=""
 typeset UA_Browser
 typeset -a shelp_lines=(
 "IP QUALITY CHECK SCRIPT IP质量体检脚本"
-"Safe default: /bin/zsh ./ip-quality.zsh [--scope SCOPE]"
+"Safe default: /bin/zsh ./bin/ip-quality [--scope SCOPE]"
 "安全默认：不加确认参数时只显示查询计划，不访问网络"
-"Live query: /bin/zsh ./ip-quality.zsh --confirm-network-lookup [--scope SCOPE] [-4|-6]"
+"Live query: /bin/zsh ./bin/ip-quality --confirm-network-lookup [--scope SCOPE] [-4|-6]"
 "            --scope reputation|dnsbl|media-ai|mail|full"
 "            --dnsbl-concurrency 1..50       Bounded DNSBL workers                     DNSBL并发上限"
 "            --plan                          Print disclosure plan only                仅显示披露计划"
@@ -122,7 +124,7 @@ typeset -a shelp_lines=(
 "            -i eth0                        Specify network interface                  指定检测网卡"
 "               ipaddress                   Specify outbound IP Address                指定检测出口IP"
 "            -j                             JSON output                                JSON输出"
-"            -l cn|en|jp|es|de|fr|ru|pt     Specify script language                    指定报告语言"
+"            -l cn|en                       Specify script language                    指定报告语言"
 "            -o /path/to/file.ansi          Output ANSI report to file                 输出ANSI报告至文件"
 "               /path/to/file.json          Output JSON result to file                 输出JSON结果至文件"
 "               /path/to/file.anyother      Output plain text report to file           输出纯文本报告至文件"
@@ -131,7 +133,7 @@ typeset -a shelp_lines=(
 shelp=$(printf "%s\n" "${shelp_lines[@]}")
 set_language(){
 case "$YY" in
-"en"|"jp"|"es"|"de"|"fr"|"ru"|"pt")swarn[1]="ERROR: Unsupported parameters!"
+"en")swarn[1]="ERROR: Unsupported parameters!"
 swarn[2]="ERROR: IP address format error!"
 swarn[3]="ERROR: Dependencies are missing; use the repository env workflow. No installer was run."
 swarn[4]="ERROR: Parameter -4 conflicts with -i or -6!"
@@ -156,13 +158,13 @@ sinfo[ldnsbl]=28
 shead[title]="IP QUALITY CHECK REPORT: "
 shead[title_lite]="IP QUALITY CHECK REPORT(LITE): "
 shead[ver]="Version: $script_version"
-shead[command]="/bin/zsh -f ./ip-quality.zsh --confirm-network-lookup --scope $query_scope -E"
-shead[git]="/Users/zmx/gitrepos/network-manager.git (ip-quality/)"
+shead[command]="/bin/zsh -f ./bin/ip-quality --confirm-network-lookup --scope $query_scope -E"
+shead[git]="/Users/zmx/gitrepos/ipquality.git"
 shead[time_label]="Report Time: "
 shead[ltitle]=25
 shead[ltitle_lite]=31
 shead[ptime]=$(printf '%7s' '')
-sbasic[title]="1. Basic Information (${Font_I}Maxmind Database$Font_Suffix)"
+sbasic[title]="1. Basic Information (${Font_I}Check.Place relay; MaxMind-labeled upstream data$Font_Suffix)"
 sbasic[title_lite]="1. Basic Information (${Font_I}IPinfo Database$Font_Suffix)"
 sbasic[asn]="ASN:                    "
 sbasic[noasn]="Not Assigned"
@@ -289,13 +291,13 @@ sinfo[ldnsbl]=21
 shead[title]="IP质量体检报告："
 shead[title_lite]="IP质量体检报告(Lite)："
 shead[ver]="脚本版本：$script_version"
-shead[command]="/bin/zsh -f ./ip-quality.zsh --confirm-network-lookup --scope $query_scope"
-shead[git]="/Users/zmx/gitrepos/network-manager.git（ip-quality/）"
+shead[command]="/bin/zsh -f ./bin/ip-quality --confirm-network-lookup --scope $query_scope"
+shead[git]="/Users/zmx/gitrepos/ipquality.git"
 shead[time_label]="报告时间："
 shead[ltitle]=16
 shead[ltitle_lite]=22
 shead[ptime]=$(printf '%8s' '')
-sbasic[title]="一、基础信息（${Font_I}Maxmind 数据库$Font_Suffix）"
+sbasic[title]="一、基础信息（${Font_I}Check.Place 中继；上游标注 MaxMind$Font_Suffix）"
 sbasic[title_lite]="一、基础信息（${Font_I}IPinfo 数据库$Font_Suffix）"
 sbasic[asn]="自治系统号：            "
 sbasic[noasn]="未分配"
@@ -330,16 +332,16 @@ stype[title]="二、IP类型属性"
 stype[db]="数据库：   "
 stype[usetype]="使用类型： "
 stype[comtype]="公司类型： "
-sscore[verylow]="$Font_Green$Font_B极低风险$Font_Suffix"
-sscore[low]="$Font_Green$Font_B低风险$Font_Suffix"
-sscore[medium]="$Font_Yellow$Font_B中风险$Font_Suffix"
-sscore[high]="$Font_Red$Font_B高风险$Font_Suffix"
-sscore[veryhigh]="$Font_Red$Font_B极高风险$Font_Suffix"
-sscore[elevated]="$Font_Yellow$Font_B较高风险$Font_Suffix"
-sscore[suspicious]="$Font_Yellow$Font_B可疑IP$Font_Suffix"
-sscore[risky]="$Font_Red$Font_B存在风险$Font_Suffix"
-sscore[highrisk]="$Font_Red$Font_B高风险$Font_Suffix"
-sscore[dos]="$Font_Red$Font_B建议封禁$Font_Suffix"
+sscore[verylow]="${Font_Green}${Font_B}极低风险${Font_Suffix}"
+sscore[low]="${Font_Green}${Font_B}低风险${Font_Suffix}"
+sscore[medium]="${Font_Yellow}${Font_B}中风险${Font_Suffix}"
+sscore[high]="${Font_Red}${Font_B}高风险${Font_Suffix}"
+sscore[veryhigh]="${Font_Red}${Font_B}极高风险${Font_Suffix}"
+sscore[elevated]="${Font_Yellow}${Font_B}较高风险${Font_Suffix}"
+sscore[suspicious]="${Font_Yellow}${Font_B}可疑IP${Font_Suffix}"
+sscore[risky]="${Font_Red}${Font_B}存在风险${Font_Suffix}"
+sscore[highrisk]="${Font_Red}${Font_B}高风险${Font_Suffix}"
+sscore[dos]="${Font_Red}${Font_B}建议封禁${Font_Suffix}"
 sscore[colon]="："
 sscore[title]="三、风险评分"
 sfactor[title]="四、风险因子"
@@ -384,17 +386,17 @@ smedia[region]="地区：   "
 smedia[type]="方式：   "
 smail[title]="六、邮局连通性及黑名单检测"
 smail[port]="本地25端口出站："
-smail[yes]="$Font_Green可用$Font_Suffix"
-smail[no]="$Font_Red阻断$Font_Suffix"
-smail[occupied]="$Font_Yellow占用$Font_Suffix"
-smail[blocked]="$Font_Red远端25端口不可达​$Font_Suffix"
+smail[yes]="${Font_Green}可用${Font_Suffix}"
+smail[no]="${Font_Red}阻断${Font_Suffix}"
+smail[occupied]="${Font_Yellow}占用${Font_Suffix}"
+smail[blocked]="${Font_Red}远端25端口不可达​${Font_Suffix}"
 smail[provider]="通信："
 smail[dnsbl]="IP地址黑名单数据库："
-smail[available]="$Font_Suffix$Font_Cyan有效 $Font_B"
-smail[clean]="$Font_Suffix$Font_Green正常 $Font_B"
-smail[marked]="$Font_Suffix$Font_Yellow已标记 $Font_B"
-smail[blacklisted]="$Font_Suffix$Font_Red黑名单 $Font_B"
-smail[unknown]="$Font_Suffix$Font_Purple未知 $Font_B"
+smail[available]="${Font_Suffix}${Font_Cyan}有效 ${Font_B}"
+smail[clean]="${Font_Suffix}${Font_Green}正常 ${Font_B}"
+smail[marked]="${Font_Suffix}${Font_Yellow}已标记 ${Font_B}"
+smail[blacklisted]="${Font_Suffix}${Font_Red}黑名单 ${Font_B}"
+smail[unknown]="${Font_Suffix}${Font_Purple}未知 ${Font_B}"
 stail[thanks]="本次运行未发送遥测，也未上传报告。"
 ;;
 *)echo -ne "ERROR: Language not supported!"
@@ -471,7 +473,7 @@ shift
 ;;
 -x|-x*|-y|-y*|-M|-M*)
 print -ru2 -- "ERROR: proxy arguments, automatic installers, and remote menus are disabled."
-print -ru2 -- "Use the supervised network-manager egress workflow for proxy paths."
+print -ru2 -- "Use bin/test-clash-leaf for a supervised isolated proxy path."
 return 64
 ;;
 --)shift
@@ -499,7 +501,7 @@ print -r -- "  scope: $query_scope"
 print -r -- "  DNSBL concurrency cap: $dnsbl_concurrency"
 print -r -- "  output: masked IP by default; local stdout/file only"
 print -r -- "  telemetry/report upload/remote code: disabled"
-scope_includes reputation&&print -r -- "  reputation sources: MaxMind relay, IPinfo, Scamalytics relay, ipapi.is, AbuseIPDB relay, IP2Location relay, ipdata relay, IPQualityScore relay, Ping0 public geo, RIPEstat, Shodan InternetDB (IPv4)"
+scope_includes reputation&&print -r -- "  reputation sources: Check.Place MaxMind-labeled relay, IPinfo, Scamalytics relay, ipapi.is, AbuseIPDB relay, IP2Location relay, ipdata relay, IPQualityScore relay, Ping0 public geo, RIPEstat, Shodan InternetDB (IPv4)"
 scope_includes reputation&&print -r -- "  Ping0 limitation: the official free /geo endpoint exposes IP/location/ASN/organization, not a risk score"
 scope_includes reputation&&print -r -- "  context-only sources: RIPEstat reports routing; Shodan InternetDB reports public exposure, not cleanliness"
 scope_includes media-ai&&print -r -- "  media/AI sources: TikTok, Netflix, YouTube Premium, Prime Video, Reddit, OpenAI public endpoints"
@@ -638,6 +640,63 @@ return 1
 local dnsbl_summary=$(printf '%s\n' Clean Clean Blacklisted Other Unknown|summarize_dnsbl_results)
 [[ "$dnsbl_summary" == "5 2 1 1 1" ]]||{
 print -ru2 -- "SELF-TEST FAILED: DNSBL outcome aggregation changed"
+return 1
+}
+set_language
+local json_special=$'Example "Org" \\ relay\nsecond line'
+query_scope="reputation"
+fullIP=1
+mode_lite=0
+IP="198.51.100.23"
+IPhide="198.51.*.*"
+shead[time_raw]="2026-08-23T00:00:00Z"
+maxmind=()
+ipinfo=()
+ipapi=()
+ip2location=()
+abuseipdb=()
+scamalytics=()
+ipqs=()
+ipdata=()
+ping0=()
+ripestat=()
+internetdb=()
+maxmind[org]="$json_special"
+maxmind[countrycode]="US"
+maxmind[regcountrycode]="US"
+ipinfo[susetype]="${stype[hosting]}"
+ip2location[score]="3"
+ipqs[score]="100"
+ipqs[risk]=$'High "quoted"'
+ipqs[proxy]="true"
+ping0[status]="verified"
+ping0[match]="true"
+ping0[organization]="$json_special"
+ping0[org]="$json_special"
+ripestat[status]="ok"
+ripestat[prefix]="198.51.100.0/24"
+ripestat[origins]="AS64500"
+internetdb[status]="ok"
+internetdb[ports]="22, 443"
+internetdb[port_count]="2"
+internetdb[vulnerability_count]="1"
+internetdb[tags]="vpn, edge"
+save_json||{
+print -ru2 -- "SELF-TEST FAILED: JSON rendering failed"
+return 1
+}
+print -r -- "$ipjson"|jq -e --arg expected "$json_special" '
+  .Info.Organization == $expected and
+  .Type.Source.IPinfo == "direct public" and
+  .Score.IPQS == "100" and
+  .ScoreMeta.IPQS.Band == "High \"quoted\"" and
+  .Factor.Proxy.IPQS == true and
+  .Factor.VPN.IPinfo == null and
+  .Ping0.Organization == $expected and
+  .Exposure.Ports == [22, 443] and
+  .Mail.Port25 == null
+' >/dev/null||{
+print -ru2 -- "SELF-TEST FAILED: JSON escaping or typing changed"
 return 1
 }
 print -r -- "SELF-TEST OK: zsh runtime, validators, provider parsers, and ${#dnsbl_zones[@]} DNSBL entries"
@@ -859,8 +918,8 @@ zoom_level=14
 fi
 echo "https://check.place/$lat,$lon,$zoom_level,$YY"
 }
-db_maxmind(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Maxmind $Font_Suffix"
+db_maxmind_relay(){
+local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Check.Place / MaxMind relay $Font_Suffix"
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-8-${sinfo[ldatabase]}))
 maxmind=()
@@ -2052,19 +2111,26 @@ CurlARG="$useNIC"
 j)mode_json=1
 ;;
 l)YY=$(echo "$OPTARG"|tr '[:upper:]' '[:lower:]')
+case "$YY" in
+cn|en) ;;
+*)ERRORcode=1
+YY="cn"
+break
+;;
+esac
 ;;
 o)mode_output=1
-outputfile="$OPTARG"
+outputfile="${OPTARG:A}"
 [[ -z $outputfile ]]&&{
 ERRORcode=1
 break
 }
-[[ -e $outputfile ]]&&{
+[[ -e $outputfile || -L $outputfile ]]&&{
 ERRORcode=10
 break
 }
 local output_parent="${outputfile:h}"
-[[ -d "$output_parent" && -w "$output_parent" ]]||{
+[[ -d "$output_parent" && ! -L "$output_parent" && -w "$output_parent" ]]||{
 ERRORcode=11
 break
 }
@@ -2089,233 +2155,282 @@ input=$(echo "$input"|sed 's/\x1b\[[0-9;]*m//g')
 input=$(echo "$input"|sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 echo -n "$input"
 }
-factor_bool(){
-local tmp_txt=""
-if [[ $1 == "true" ]];then
-tmp_txt+=".Factor |= . * { $3: { $2: true } } | "
-elif [[ $1 == "false" ]];then
-tmp_txt+=".Factor |= . * { $3: { $2: false } } | "
-elif [ ${#1} -eq 2 ];then
-tmp_txt+=".Factor |= . * { $3: { $2: \"$1\" } } | "
+open_report_output(){
+[[ $output_fd -ge 0 ]]&&return 0
+zmodload zsh/system 2>/dev/null||{
+print -ru2 -- "ERROR: zsh/system is unavailable; cannot create the report safely."
+return 69
+}
+sysopen -w -m 600 -o creat,excl,nofollow,cloexec,sync -u output_fd "$outputfile" 2>/dev/null||{
+if [[ "$YY" == "cn" ]];then
+print -ru2 -- "错误：无法以独占、安全模式创建报告文件：$outputfile"
 else
-tmp_txt+=".Factor |= . * { $3: { $2: null } } | "
+print -ru2 -- "ERROR: cannot create the report path exclusively and safely: $outputfile"
 fi
-[[ -z $tmp_txt ]]&&tmp_txt="null"
-echo "$tmp_txt"
+return 73
+}
+}
+
+write_report_output(){
+typeset ansi_report="$1"
+typeset payload
+case "$outputfile" in
+*.[aA][nN][sS][iI])payload="$ansi_report"
+;;
+*.[jJ][sS][oO][nN])payload="$ipjson"
+;;
+*)payload=$(print -r -- "$ansi_report"|sed 's/\x1b\[[0-9;]*[mGKHF]//g')
+esac
+open_report_output||return $?
+print -r -u "$output_fd" -- "$payload"||return 74
+}
+
+close_report_output(){
+if [[ $output_fd -ge 0 ]];then
+exec {output_fd}>&-
+output_fd=-1
+fi
 }
 save_json(){
-local head_updates=""
-local basic_updates=""
-local type_updates=""
-local score_updates=""
-local factor_updates=""
-local media_updates=""
-local mail_updates=""
-if [ $fullIP -eq 1 ];then
-head_updates+=".Head |= . + { IP: \"${IP:-null}\" } | "
+local info_asn info_org info_lat info_lon info_dms info_map info_timezone
+local info_city info_post info_subcode info_sub info_countrycode info_country
+local info_continentcode info_continent info_regcountrycode info_regcountry info_type=""
+if [[ $mode_lite -eq 0 ]];then
+info_asn="${maxmind[asn]:-}"
+info_org="${maxmind[org]:-}"
+info_lat="${maxmind[lat]:-}"
+info_lon="${maxmind[lon]:-}"
+info_dms="${maxmind[dms]:-}"
+info_map="${maxmind[map]:-}"
+info_timezone="${maxmind[timezone]:-}"
+info_city="${maxmind[city]:-}"
+info_post="${maxmind[post]:-}"
+info_subcode="${maxmind[subcode]:-}"
+info_sub="${maxmind[sub]:-}"
+info_countrycode="${maxmind[countrycode]:-}"
+info_country="${maxmind[country]:-}"
+info_continentcode="${maxmind[continentcode]:-}"
+info_continent="${maxmind[continent]:-}"
+info_regcountrycode="${maxmind[regcountrycode]:-}"
+info_regcountry="${maxmind[regcountry]:-}"
 else
-head_updates+=".Head |= . + { IP: \"${IPhide:-null}\" } | "
+info_asn="${ipinfo[asn]:-}"
+info_org="${ipinfo[org]:-}"
+info_lat="${ipinfo[lat]:-}"
+info_lon="${ipinfo[lon]:-}"
+info_dms="${ipinfo[dms]:-}"
+info_map="${ipinfo[map]:-}"
+info_timezone="${ipinfo[timezone]:-}"
+info_city="${ipinfo[city]:-}"
+info_post="${ipinfo[post]:-}"
+info_subcode=""
+info_sub=""
+info_countrycode="${ipinfo[countrycode]:-}"
+info_country="${ipinfo[country]:-}"
+info_continentcode=""
+info_continent="${ipinfo[continent]:-}"
+info_regcountrycode="${ipinfo[regcountrycode]:-}"
+info_regcountry="${ipinfo[regcountry]:-}"
 fi
-head_updates+=".Head |= . + { Command: \"${shead[command]:-null}\" } | "
-head_updates+=".Head |= . + { Repository: \"${shead[git]:-null}\" } | "
-head_updates+=".Head |= . + { Time: \"${shead[time_raw]:-null}\" } | "
-head_updates+=".Head |= . + { Version: \"${script_version:-null}\" } | "
-if [ $mode_lite -eq 0 ];then
-basic_updates+=".Info |= . + { ASN: \"${maxmind[asn]:-null}\" } | "
-basic_updates+=".Info |= . + { Organization: \"${maxmind[org]:-null}\" } | "
-basic_updates+=".Info |= . + { Latitude: \"${maxmind[lat]:-null}\" } | "
-basic_updates+=".Info |= . + { Longitude: \"${maxmind[lon]:-null}\" } | "
-basic_updates+=".Info |= . + { DMS: \"${maxmind[dms]:-null}\" } | "
-basic_updates+=".Info |= . + { Map: \"${maxmind[map]:-null}\" } | "
-basic_updates+=".Info |= . + { TimeZone: \"${maxmind[timezone]:-null}\" } | "
-basic_updates+=".Info |= . * { City: { Name: \"${maxmind[city]:-null}\" } } | "
-basic_updates+=".Info |= . * { City: { PostalCode: \"${maxmind[post]:-null}\" } } | "
-basic_updates+=".Info |= . * { City: { SubCode: \"${maxmind[subcode]:-null}\" } } | "
-basic_updates+=".Info |= . * { City: { Subdivisions: \"${maxmind[sub]:-null}\" } } | "
-basic_updates+=".Info |= . * { Region: { Code: \"${maxmind[countrycode]:-null}\" } } | "
-basic_updates+=".Info |= . * { Region: { Name: \"${maxmind[country]:-null}\" } } | "
-basic_updates+=".Info |= . * { Continent: { Code: \"${maxmind[continentcode]:-null}\" } } | "
-basic_updates+=".Info |= . * { Continent: { Name: \"${maxmind[continent]:-null}\" } } | "
-basic_updates+=".Info |= . * { RegisteredRegion: { Code: \"${maxmind[regcountrycode]:-null}\" } } | "
-basic_updates+=".Info |= . * { RegisteredRegion: { Name: \"${maxmind[regcountry]:-null}\" } } | "
-if [[ -n ${maxmind[countrycode]} && ${maxmind[countrycode]} != "null" ]];then
-if [ "${maxmind[countrycode]}" == "${maxmind[regcountrycode]}" ];then
-basic_updates+=".Info |= . + { Type: \"$(clean_ansi "${sbasic[type0]:-null}")\" } | "
+if [[ -n "$info_countrycode" && "$info_countrycode" != "null" ]];then
+if [[ "$info_countrycode" == "$info_regcountrycode" ]];then
+info_type=$(clean_ansi "${sbasic[type0]:-}")
 else
-basic_updates+=".Info |= . + { Type: \"$(clean_ansi "${sbasic[type1]:-null}")\" } | "
-fi
-else
-basic_updates+='.Info |= . + { Type: "null" } | '
-fi
-else
-basic_updates+=".Info |= . + { ASN: \"${ipinfo[asn]:-null}\" } | "
-basic_updates+=".Info |= . + { Organization: \"${ipinfo[org]:-null}\" } | "
-basic_updates+=".Info |= . + { Latitude: \"${ipinfo[lat]:-null}\" } | "
-basic_updates+=".Info |= . + { Longitude: \"${ipinfo[lon]:-null}\" } | "
-basic_updates+=".Info |= . + { DMS: \"${ipinfo[dms]:-null}\" } | "
-basic_updates+=".Info |= . + { Map: \"${ipinfo[map]:-null}\" } | "
-basic_updates+=".Info |= . + { TimeZone: \"${ipinfo[timezone]:-null}\" } | "
-basic_updates+=".Info |= . * { City: { Name: \"${ipinfo[city]:-null}\" } } | "
-basic_updates+=".Info |= . * { City: { PostalCode: \"${ipinfo[post]:-null}\" } } | "
-basic_updates+='.Info |= . * { City: { SubCode: "null" } } | '
-basic_updates+='.Info |= . * { City: { Subdivisions: "null" } } | '
-basic_updates+=".Info |= . * { Region: { Code: \"${ipinfo[countrycode]:-null}\" } } | "
-basic_updates+=".Info |= . * { Region: { Name: \"${ipinfo[country]:-null}\" } } | "
-basic_updates+='.Info |= . * { Continent: { Code: "null" } } | '
-basic_updates+=".Info |= . * { Continent: { Name: \"${ipinfo[continent]:-null}\" } } | "
-basic_updates+=".Info |= . * { RegisteredRegion: { Code: \"${ipinfo[regcountrycode]:-null}\" } } | "
-basic_updates+=".Info |= . * { RegisteredRegion: { Name: \"${ipinfo[regcountry]:-null}\" } } | "
-if [[ -n ${ipinfo[countrycode]} && ${ipinfo[countrycode]} != "null" ]];then
-if [ "${ipinfo[countrycode]}" == "${ipinfo[regcountrycode]}" ];then
-basic_updates+=".Info |= . + { Type: \"$(clean_ansi "${sbasic[type0]:-null}")\" } | "
-else
-basic_updates+=".Info |= . + { Type: \"$(clean_ansi "${sbasic[type1]:-null}")\" } | "
-fi
-else
-basic_updates+='.Info |= . + { Type: "null" } | '
+info_type=$(clean_ansi "${sbasic[type1]:-}")
 fi
 fi
-type_updates+=".Type |= . * { Usage: { IPinfo: \"$(clean_ansi "${ipinfo[susetype]:-null}")\" } } | "
-type_updates+=".Type |= . * { Usage: { ipapi: \"$(clean_ansi "${ipapi[susetype]:-null}")\" } } | "
-type_updates+=".Type |= . * { Usage: { AbuseIPDB: \"$(clean_ansi "${abuseipdb[susetype]:-null}")\" } } | "
-type_updates+=".Type |= . * { Usage: { IP2LOCATION: \"$(clean_ansi "${ip2location[susetype]:-null}")\" } } | "
-type_updates+=".Type |= . * { Company: { IPinfo: \"$(clean_ansi "${ipinfo[scomtype]:-null}")\" } } | "
-type_updates+=".Type |= . * { Company: { ipapi: \"$(clean_ansi "${ipapi[scomtype]:-null}")\" } } | "
-score_updates+=".Score |= . + { IP2LOCATION: \"${ip2location[score]:-null}\" } | "
-score_updates+=".Score |= . + { SCAMALYTICS: \"${scamalytics[score]:-null}\" } | "
-score_updates+=".Score |= . + { ipapi: \"${ipapi[score]:-null}\" } | "
-score_updates+=".Score |= . + { AbuseIPDB: \"${abuseipdb[score]:-null}\" } | "
-score_updates+=".Score |= . + { IPQS: \"${ipqs[score]:-null}\" } | "
-factor_updates+=$(factor_bool "${ip2location[countrycode]}" "IP2LOCATION" "CountryCode")
-factor_updates+=$(factor_bool "${ipapi[countrycode]}" "ipapi" "CountryCode")
-factor_updates+=$(factor_bool "${ipqs[countrycode]}" "IPQS" "CountryCode")
-factor_updates+=$(factor_bool "${scamalytics[countrycode]}" "SCAMALYTICS" "CountryCode")
-factor_updates+=$(factor_bool "${ipdata[countrycode]}" "ipdata" "CountryCode")
-factor_updates+=$(factor_bool "${ipinfo[countrycode]}" "IPinfo" "CountryCode")
-factor_updates+=$(factor_bool "${ip2location[proxy]}" "IP2LOCATION" "Proxy")
-factor_updates+=$(factor_bool "${ipapi[proxy]}" "ipapi" "Proxy")
-factor_updates+=$(factor_bool "${ipqs[proxy]}" "IPQS" "Proxy")
-factor_updates+=$(factor_bool "${scamalytics[proxy]}" "SCAMALYTICS" "Proxy")
-factor_updates+=$(factor_bool "${ipdata[proxy]}" "ipdata" "Proxy")
-factor_updates+=$(factor_bool "${ipinfo[proxy]}" "IPinfo" "Proxy")
-factor_updates+=$(factor_bool "${ip2location[tor]}" "IP2LOCATION" "Tor")
-factor_updates+=$(factor_bool "${ipapi[tor]}" "ipapi" "Tor")
-factor_updates+=$(factor_bool "${ipqs[tor]}" "IPQS" "Tor")
-factor_updates+=$(factor_bool "${scamalytics[tor]}" "SCAMALYTICS" "Tor")
-factor_updates+=$(factor_bool "${ipdata[tor]}" "ipdata" "Tor")
-factor_updates+=$(factor_bool "${ipinfo[tor]}" "IPinfo" "Tor")
-factor_updates+=$(factor_bool "${ip2location[vpn]}" "IP2LOCATION" "VPN")
-factor_updates+=$(factor_bool "${ipapi[vpn]}" "ipapi" "VPN")
-factor_updates+=$(factor_bool "${ipqs[vpn]}" "IPQS" "VPN")
-factor_updates+=$(factor_bool "${scamalytics[vpn]}" "SCAMALYTICS" "VPN")
-factor_updates+=$(factor_bool "${ipdata[vpn]}" "ipdata" "VPN")
-factor_updates+=$(factor_bool "${ipinfo[vpn]}" "IPinfo" "VPN")
-factor_updates+=$(factor_bool "${ip2location[server]}" "IP2LOCATION" "Server")
-factor_updates+=$(factor_bool "${ipapi[server]}" "ipapi" "Server")
-factor_updates+=$(factor_bool "${ipqs[server]}" "IPQS" "Server")
-factor_updates+=$(factor_bool "${scamalytics[server]}" "SCAMALYTICS" "Server")
-factor_updates+=$(factor_bool "${ipdata[server]}" "ipdata" "Server")
-factor_updates+=$(factor_bool "${ipinfo[server]}" "IPinfo" "Server")
-factor_updates+=$(factor_bool "${ip2location[abuser]}" "IP2LOCATION" "Abuser")
-factor_updates+=$(factor_bool "${ipapi[abuser]}" "ipapi" "Abuser")
-factor_updates+=$(factor_bool "${ipqs[abuser]}" "IPQS" "Abuser")
-factor_updates+=$(factor_bool "${scamalytics[abuser]}" "SCAMALYTICS" "Abuser")
-factor_updates+=$(factor_bool "${ipdata[abuser]}" "ipdata" "Abuser")
-factor_updates+=$(factor_bool "${ipinfo[abuser]}" "IPinfo" "Abuser")
-factor_updates+=$(factor_bool "${ip2location[robot]}" "IP2LOCATION" "Robot")
-factor_updates+=$(factor_bool "${ipapi[robot]}" "ipapi" "Robot")
-factor_updates+=$(factor_bool "${ipqs[robot]}" "IPQS" "Robot")
-factor_updates+=$(factor_bool "${scamalytics[robot]}" "SCAMALYTICS" "Robot")
-factor_updates+=$(factor_bool "${ipdata[robot]}" "ipdata" "Robot")
-factor_updates+=$(factor_bool "${ipinfo[robot]}" "IPinfo" "Robot")
-media_updates+=".Media |= . * { TikTok: { Status: \"$(clean_ansi "${tiktok[ustatus]:-null}")\" } } | "
-media_updates+=".Media |= . * { Netflix: { Status: \"$(clean_ansi "${netflix[ustatus]:-null}")\" } } | "
-media_updates+=".Media |= . * { Youtube: { Status: \"$(clean_ansi "${youtube[ustatus]:-null}")\" } } | "
-media_updates+=".Media |= . * { AmazonPrimeVideo: { Status: \"$(clean_ansi "${amazon[ustatus]:-null}")\" } } | "
-media_updates+=".Media |= . * { Reddit: { Status: \"$(clean_ansi "${reddit[ustatus]:-null}")\" } } | "
-media_updates+=".Media |= . * { ChatGPT: { Status: \"$(clean_ansi "${chatgpt[ustatus]:-null}")\" } } | "
-media_updates+=".Media |= . * { TikTok: { Region: \"$(clean_ansi "${tiktok[uregion]//[][]/}")\" } } | "
-media_updates+=".Media |= . * { Netflix: { Region: \"$(clean_ansi "${netflix[uregion]//[][]/}")\" } } | "
-media_updates+=".Media |= . * { Youtube: { Region: \"$(clean_ansi "${youtube[uregion]//[][]/}")\" } } | "
-media_updates+=".Media |= . * { AmazonPrimeVideo: { Region: \"$(clean_ansi "${amazon[uregion]//[][]/}")\" } } | "
-media_updates+=".Media |= . * { Reddit: { Region: \"$(clean_ansi "${reddit[uregion]//[][]/}")\" } } | "
-media_updates+=".Media |= . * { ChatGPT: { Region: \"$(clean_ansi "${chatgpt[uregion]//[][]/}")\" } } | "
-media_updates+=".Media |= . * { TikTok: { Type: \"$(clean_ansi "${tiktok[utype]:-null}")\" } } | "
-media_updates+=".Media |= . * { Netflix: { Type: \"$(clean_ansi "${netflix[utype]:-null}")\" } } | "
-media_updates+=".Media |= . * { Youtube: { Type: \"$(clean_ansi "${youtube[utype]:-null}")\" } } | "
-media_updates+=".Media |= . * { AmazonPrimeVideo: { Type: \"$(clean_ansi "${amazon[utype]:-null}")\" } } | "
-media_updates+=".Media |= . * { Reddit: { Type: \"$(clean_ansi "${reddit[utype]:-null}")\" } } | "
-media_updates+=".Media |= . * { ChatGPT: { Type: \"$(clean_ansi "${chatgpt[utype]:-null}")\" } } | "
-if ! scope_includes mail;then
-mail_updates+=".Mail |= . + { Port25: null } | "
-elif [[ ${smail[local]} -eq 1 ]];then
-mail_updates+=".Mail |= . + { Port25: true } | "
+
+local reputation_enabled=false
+scope_includes reputation&&reputation_enabled=true
+local mail_port25=null
+local mail_services='{}'
+local service service_value
+if scope_includes mail;then
+case "${smail[local]:-0}" in
+1)mail_port25=true
+;;
+2)mail_port25=null
+;;
+*)mail_port25=false
+esac
 for service in "${services[@]}";do
-if [[ ${smailstatus[$service]} == "true" ]];then
-mail_updates+=".Mail |= . + { \"$service\": true } | "
-else
-mail_updates+=".Mail |= . + { \"$service\": false } | "
-fi
-done
-elif [[ ${smail[local]} -eq 2 ]];then
-mail_updates+=".Mail |= . + { Port25: null } | "
-for service in "${services[@]}";do
-mail_updates+=".Mail |= . + { \"$service\": null } | "
-done
-else
-mail_updates+=".Mail |= . + { Port25: false } | "
-for service in "${services[@]}";do
-mail_updates+=".Mail |= . + { \"$service\": false } | "
+case "${smail[local]:-0}:${smailstatus[$service]:-false}" in
+1:true)service_value=true
+;;
+2:*)service_value=null
+;;
+*)service_value=false
+esac
+mail_services=$(print -r -- "$mail_services"|jq -c --arg key "$service" --argjson value "$service_value" '. + {($key): $value}')||return 1
 done
 fi
-mail_updates+=".Mail |= . * { DNSBlacklist: { Total: ${smail[t]:-null} } } | "
-mail_updates+=".Mail |= . * { DNSBlacklist: { Clean: ${smail[c]:-null} } } | "
-mail_updates+=".Mail |= . * { DNSBlacklist: { Marked: ${smail[m]:-null} } } | "
-mail_updates+=".Mail |= . * { DNSBlacklist: { Blacklisted: ${smail[b]:-null} } } | "
-mail_updates+=".Mail |= . * { DNSBlacklist: { Unknown: ${smail[u]:-null} } } | "
-ipjson=$(echo "$ipjson"|jq "$head_updates$basic_updates$type_updates$score_updates$factor_updates$media_updates$mail_updates.")
-if scope_includes reputation;then
-ipjson=$(print -r -- "$ipjson"|jq \
---arg status "${ping0[status]:-unknown}" \
---arg location "${ping0[location]:-}" \
---arg asn "${ping0[asn]:-}" \
---arg organization "${ping0[org]:-}" \
---arg risk_status "${ping0[riskstatus]:-official_public_endpoint_does_not_expose_risk}" \
---argjson ip_match "${ping0[match]:-null}" \
-'.Ping0 = {
-  Status: $status,
-  IPMatch: $ip_match,
-  Location: (if $location == "" then null else $location end),
-  ASN: (if $asn == "" then null else $asn end),
-  Organization: (if $organization == "" then null else $organization end),
-  RiskScore: null,
-  RiskStatus: $risk_status
-}')
-ipjson=$(print -r -- "$ipjson"|jq \
---arg routing_status "${ripestat[status]:-unknown}" \
---arg prefix "${ripestat[prefix]:-}" \
---arg origins "${ripestat[origins]:-}" \
---arg exposure_status "${internetdb[status]:-unknown}" \
---arg ports "${internetdb[ports]:-}" \
---arg port_count "${internetdb[port_count]:-}" \
---arg vulnerability_count "${internetdb[vulnerability_count]:-}" \
---arg tags "${internetdb[tags]:-}" \
-'.Routing = {
-  Provider: "RIPEstat Network Info",
-  Status: $routing_status,
-  Prefix: (if $prefix == "" then null else $prefix end),
-  OriginASNs: (if $origins == "" then [] else ($origins | split(", ")) end)
-} |
-.Exposure = {
-  Provider: "Shodan InternetDB",
-  Status: $exposure_status,
-  Ports: (if $ports == "" then [] else ($ports | split(", ") | map(tonumber)) end),
-  PortCount: (if $port_count == "" then null else ($port_count | tonumber) end),
-  KnownVulnerabilityCount: (if $vulnerability_count == "" then null else ($vulnerability_count | tonumber) end),
-  Tags: (if $tags == "" then [] else ($tags | split(", ")) end),
-  IsReputationScore: false
-}')
-fi
+
+local displayed_ip="${IPhide:-}"
+[[ $fullIP -eq 1 ]]&&displayed_ip="${IP:-}"
+ipjson=$(jq -n \
+--arg head_ip "$displayed_ip" \
+--arg head_command "${shead[command]:-}" \
+--arg head_repository "${shead[git]:-}" \
+--arg head_time "${shead[time_raw]:-}" \
+--arg head_version "${script_version:-}" \
+--arg info_source "Check.Place upstream relay; MaxMind-labeled response" \
+--arg info_asn "$info_asn" --arg info_org "$info_org" \
+--arg info_lat "$info_lat" --arg info_lon "$info_lon" \
+--arg info_dms "$info_dms" --arg info_map "$info_map" \
+--arg info_timezone "$info_timezone" --arg info_city "$info_city" \
+--arg info_post "$info_post" --arg info_subcode "$info_subcode" \
+--arg info_sub "$info_sub" --arg info_countrycode "$info_countrycode" \
+--arg info_country "$info_country" --arg info_continentcode "$info_continentcode" \
+--arg info_continent "$info_continent" --arg info_regcountrycode "$info_regcountrycode" \
+--arg info_regcountry "$info_regcountry" --arg info_type "$info_type" \
+--arg type_ipinfo_usage "$(clean_ansi "${ipinfo[susetype]:-}")" \
+--arg type_ipapi_usage "$(clean_ansi "${ipapi[susetype]:-}")" \
+--arg type_ip2_usage "$(clean_ansi "${ip2location[susetype]:-}")" \
+--arg type_abuse_usage "$(clean_ansi "${abuseipdb[susetype]:-}")" \
+--arg type_ipinfo_company "$(clean_ansi "${ipinfo[scomtype]:-}")" \
+--arg type_ipapi_company "$(clean_ansi "${ipapi[scomtype]:-}")" \
+--arg type_ip2_company "$(clean_ansi "${ip2location[scomtype]:-}")" \
+--arg score_ip2 "${ip2location[score]:-}" --arg score_scam "${scamalytics[score]:-}" \
+--arg score_ipapi "${ipapi[score]:-}" --arg score_abuse "${abuseipdb[score]:-}" \
+--arg score_ipqs "${ipqs[score]:-}" \
+--arg band_ip2 "$(clean_ansi "${ip2location[risk]:-}")" \
+--arg band_scam "$(clean_ansi "${scamalytics[risk]:-}")" \
+--arg band_ipapi "$(clean_ansi "${ipapi[risk]:-}")" \
+--arg band_abuse "$(clean_ansi "${abuseipdb[risk]:-}")" \
+--arg band_ipqs "$(clean_ansi "${ipqs[risk]:-}")" \
+--arg f_ip2_cc "${ip2location[countrycode]:-}" --arg f_ipapi_cc "${ipapi[countrycode]:-}" \
+--arg f_ipqs_cc "${ipqs[countrycode]:-}" --arg f_scam_cc "${scamalytics[countrycode]:-}" \
+--arg f_ipdata_cc "${ipdata[countrycode]:-}" --arg f_ipinfo_cc "${ipinfo[countrycode]:-}" \
+--arg f_ip2_proxy "${ip2location[proxy]:-}" --arg f_ipapi_proxy "${ipapi[proxy]:-}" \
+--arg f_ipqs_proxy "${ipqs[proxy]:-}" --arg f_scam_proxy "${scamalytics[proxy]:-}" \
+--arg f_ipdata_proxy "${ipdata[proxy]:-}" --arg f_ipinfo_proxy "${ipinfo[proxy]:-}" \
+--arg f_ip2_vpn "${ip2location[vpn]:-}" --arg f_ipapi_vpn "${ipapi[vpn]:-}" \
+--arg f_ipqs_vpn "${ipqs[vpn]:-}" --arg f_scam_vpn "${scamalytics[vpn]:-}" \
+--arg f_ipdata_vpn "${ipdata[vpn]:-}" --arg f_ipinfo_vpn "${ipinfo[vpn]:-}" \
+--arg f_ip2_tor "${ip2location[tor]:-}" --arg f_ipapi_tor "${ipapi[tor]:-}" \
+--arg f_ipqs_tor "${ipqs[tor]:-}" --arg f_scam_tor "${scamalytics[tor]:-}" \
+--arg f_ipdata_tor "${ipdata[tor]:-}" --arg f_ipinfo_tor "${ipinfo[tor]:-}" \
+--arg f_ip2_server "${ip2location[server]:-}" --arg f_ipapi_server "${ipapi[server]:-}" \
+--arg f_ipqs_server "${ipqs[server]:-}" --arg f_scam_server "${scamalytics[server]:-}" \
+--arg f_ipdata_server "${ipdata[server]:-}" --arg f_ipinfo_server "${ipinfo[server]:-}" \
+--arg f_ip2_abuse "${ip2location[abuser]:-}" --arg f_ipapi_abuse "${ipapi[abuser]:-}" \
+--arg f_ipqs_abuse "${ipqs[abuser]:-}" --arg f_scam_abuse "${scamalytics[abuser]:-}" \
+--arg f_ipdata_abuse "${ipdata[abuser]:-}" --arg f_ipinfo_abuse "${ipinfo[abuser]:-}" \
+--arg f_ip2_bot "${ip2location[robot]:-}" --arg f_ipapi_bot "${ipapi[robot]:-}" \
+--arg f_ipqs_bot "${ipqs[robot]:-}" --arg f_scam_bot "${scamalytics[robot]:-}" \
+--arg f_ipdata_bot "${ipdata[robot]:-}" --arg f_ipinfo_bot "${ipinfo[robot]:-}" \
+--arg media_tiktok_status "$(clean_ansi "${tiktok[ustatus]:-}")" \
+--arg media_netflix_status "$(clean_ansi "${netflix[ustatus]:-}")" \
+--arg media_youtube_status "$(clean_ansi "${youtube[ustatus]:-}")" \
+--arg media_amazon_status "$(clean_ansi "${amazon[ustatus]:-}")" \
+--arg media_reddit_status "$(clean_ansi "${reddit[ustatus]:-}")" \
+--arg media_chatgpt_status "$(clean_ansi "${chatgpt[ustatus]:-}")" \
+--arg media_tiktok_region "$(clean_ansi "${tiktok[uregion]//[][]/}")" \
+--arg media_netflix_region "$(clean_ansi "${netflix[uregion]//[][]/}")" \
+--arg media_youtube_region "$(clean_ansi "${youtube[uregion]//[][]/}")" \
+--arg media_amazon_region "$(clean_ansi "${amazon[uregion]//[][]/}")" \
+--arg media_reddit_region "$(clean_ansi "${reddit[uregion]//[][]/}")" \
+--arg media_chatgpt_region "$(clean_ansi "${chatgpt[uregion]//[][]/}")" \
+--arg media_tiktok_type "$(clean_ansi "${tiktok[utype]:-}")" \
+--arg media_netflix_type "$(clean_ansi "${netflix[utype]:-}")" \
+--arg media_youtube_type "$(clean_ansi "${youtube[utype]:-}")" \
+--arg media_amazon_type "$(clean_ansi "${amazon[utype]:-}")" \
+--arg media_reddit_type "$(clean_ansi "${reddit[utype]:-}")" \
+--arg media_chatgpt_type "$(clean_ansi "${chatgpt[utype]:-}")" \
+--arg mail_port25 "$mail_port25" --argjson mail_services "$mail_services" \
+--arg dns_total "${smail[t]:-}" --arg dns_clean "${smail[c]:-}" \
+--arg dns_marked "${smail[m]:-}" --arg dns_blacklisted "${smail[b]:-}" \
+--arg dns_unknown "${smail[u]:-}" \
+--argjson reputation_enabled "$reputation_enabled" \
+--arg ping_status "${ping0[status]:-unknown}" --arg ping_match "${ping0[match]:-}" \
+--arg ping_location "${ping0[location]:-}" --arg ping_asn "${ping0[asn]:-}" \
+--arg ping_org "${ping0[org]:-}" \
+--arg ping_risk "${ping0[riskstatus]:-official_public_endpoint_does_not_expose_risk}" \
+--arg routing_status "${ripestat[status]:-unknown}" --arg routing_prefix "${ripestat[prefix]:-}" \
+--arg routing_origins "${ripestat[origins]:-}" \
+--arg exposure_status "${internetdb[status]:-unknown}" --arg exposure_ports "${internetdb[ports]:-}" \
+--arg exposure_port_count "${internetdb[port_count]:-}" \
+--arg exposure_vulns "${internetdb[vulnerability_count]:-}" \
+--arg exposure_tags "${internetdb[tags]:-}" \
+'
+def opt($value): if $value == "" or $value == "null" then null else $value end;
+def boolnull($value): if $value == "true" then true elif $value == "false" then false else null end;
+def factor($value):
+  if $value == "true" then true
+  elif $value == "false" then false
+  elif ($value | test("^[A-Za-z]{2}$")) then $value
+  else null end;
+def intnull($value): try ($value | tonumber) catch null;
+def list($value):
+  if opt($value) == null then []
+  else [$value | split(",")[] | gsub("^\\s+|\\s+$"; "") | select(length > 0)] end;
+def numberlist($value): [list($value)[] | try tonumber catch empty];
+{
+  Head: {
+    IP: opt($head_ip), Command: opt($head_command), Repository: opt($head_repository),
+    Time: opt($head_time), Version: opt($head_version)
+  },
+  Info: {
+    Source: $info_source, ASN: opt($info_asn), Organization: opt($info_org),
+    Latitude: opt($info_lat), Longitude: opt($info_lon), DMS: opt($info_dms),
+    Map: opt($info_map), TimeZone: opt($info_timezone), Type: opt($info_type),
+    City: {Name: opt($info_city), PostalCode: opt($info_post), SubCode: opt($info_subcode), Subdivisions: opt($info_sub)},
+    Region: {Code: opt($info_countrycode), Name: opt($info_country)},
+    Continent: {Code: opt($info_continentcode), Name: opt($info_continent)},
+    RegisteredRegion: {Code: opt($info_regcountrycode), Name: opt($info_regcountry)}
+  },
+  Type: {
+    Source: {IPinfo: "direct public", ipapi: "direct public", IP2LOCATION: "upstream relay", AbuseIPDB: "upstream relay"},
+    Usage: {IPinfo: opt($type_ipinfo_usage), ipapi: opt($type_ipapi_usage), IP2LOCATION: opt($type_ip2_usage), AbuseIPDB: opt($type_abuse_usage)},
+    Company: {IPinfo: opt($type_ipinfo_company), ipapi: opt($type_ipapi_company), IP2LOCATION: opt($type_ip2_company), AbuseIPDB: null}
+  },
+  Score: {IP2LOCATION: opt($score_ip2), SCAMALYTICS: opt($score_scam), ipapi: opt($score_ipapi), AbuseIPDB: opt($score_abuse), IPQS: opt($score_ipqs)},
+  ScoreMeta: {
+    IP2LOCATION: {Band: opt($band_ip2), Scale: "0-100 fraud"},
+    SCAMALYTICS: {Band: opt($band_scam), Scale: "0-100 fraud"},
+    ipapi: {Band: opt($band_ipapi), Scale: "0-100% abuse"},
+    AbuseIPDB: {Band: opt($band_abuse), Scale: "0-100 confidence"},
+    IPQS: {Band: opt($band_ipqs), Scale: "0-100 fraud"}
+  },
+  Factor: {
+    CountryCode: {IP2LOCATION: factor($f_ip2_cc), ipapi: factor($f_ipapi_cc), IPQS: factor($f_ipqs_cc), SCAMALYTICS: factor($f_scam_cc), ipdata: factor($f_ipdata_cc), IPinfo: factor($f_ipinfo_cc)},
+    Proxy: {IP2LOCATION: factor($f_ip2_proxy), ipapi: factor($f_ipapi_proxy), IPQS: factor($f_ipqs_proxy), SCAMALYTICS: factor($f_scam_proxy), ipdata: factor($f_ipdata_proxy), IPinfo: factor($f_ipinfo_proxy)},
+    VPN: {IP2LOCATION: factor($f_ip2_vpn), ipapi: factor($f_ipapi_vpn), IPQS: factor($f_ipqs_vpn), SCAMALYTICS: factor($f_scam_vpn), ipdata: factor($f_ipdata_vpn), IPinfo: factor($f_ipinfo_vpn)},
+    Tor: {IP2LOCATION: factor($f_ip2_tor), ipapi: factor($f_ipapi_tor), IPQS: factor($f_ipqs_tor), SCAMALYTICS: factor($f_scam_tor), ipdata: factor($f_ipdata_tor), IPinfo: factor($f_ipinfo_tor)},
+    Server: {IP2LOCATION: factor($f_ip2_server), ipapi: factor($f_ipapi_server), IPQS: factor($f_ipqs_server), SCAMALYTICS: factor($f_scam_server), ipdata: factor($f_ipdata_server), IPinfo: factor($f_ipinfo_server)},
+    Abuser: {IP2LOCATION: factor($f_ip2_abuse), ipapi: factor($f_ipapi_abuse), IPQS: factor($f_ipqs_abuse), SCAMALYTICS: factor($f_scam_abuse), ipdata: factor($f_ipdata_abuse), IPinfo: factor($f_ipinfo_abuse)},
+    Robot: {IP2LOCATION: factor($f_ip2_bot), ipapi: factor($f_ipapi_bot), IPQS: factor($f_ipqs_bot), SCAMALYTICS: factor($f_scam_bot), ipdata: factor($f_ipdata_bot), IPinfo: factor($f_ipinfo_bot)}
+  },
+  Ping0: {}, Routing: {}, Exposure: {},
+  Media: {
+    TikTok: {Status: opt($media_tiktok_status), Region: opt($media_tiktok_region), Type: opt($media_tiktok_type)},
+    Netflix: {Status: opt($media_netflix_status), Region: opt($media_netflix_region), Type: opt($media_netflix_type)},
+    Youtube: {Status: opt($media_youtube_status), Region: opt($media_youtube_region), Type: opt($media_youtube_type)},
+    AmazonPrimeVideo: {Status: opt($media_amazon_status), Region: opt($media_amazon_region), Type: opt($media_amazon_type)},
+    Reddit: {Status: opt($media_reddit_status), Region: opt($media_reddit_region), Type: opt($media_reddit_type)},
+    ChatGPT: {Status: opt($media_chatgpt_status), Region: opt($media_chatgpt_region), Type: opt($media_chatgpt_type)}
+  },
+  Mail: ({Port25: boolnull($mail_port25)} + $mail_services + {
+    DNSBlacklist: {Total: intnull($dns_total), Clean: intnull($dns_clean), Marked: intnull($dns_marked), Blacklisted: intnull($dns_blacklisted), Unknown: intnull($dns_unknown)}
+  })
+}
+| if $reputation_enabled then
+    .Ping0 = {
+      Status: $ping_status, IPMatch: boolnull($ping_match), Location: opt($ping_location),
+      ASN: opt($ping_asn), Organization: opt($ping_org), RiskScore: null, RiskStatus: $ping_risk
+    }
+    | .Routing = {
+      Provider: "RIPEstat Network Info", Status: $routing_status,
+      Prefix: opt($routing_prefix), OriginASNs: list($routing_origins)
+    }
+    | .Exposure = {
+      Provider: "Shodan InternetDB", Status: $exposure_status,
+      Ports: numberlist($exposure_ports), PortCount: intnull($exposure_port_count),
+      KnownVulnerabilityCount: intnull($exposure_vulns), Tags: list($exposure_tags),
+      IsReputationScore: false
+    }
+  else . end
+')||return 1
 }
 check_IP(){
 IP=$1
@@ -2338,7 +2453,7 @@ ipjson='{
 [[ $2 -eq 4 ]]&&hide_ipv4 $IP
 [[ $2 -eq 6 ]]&&hide_ipv6 $IP
 if scope_includes reputation;then
-db_maxmind $2
+db_maxmind_relay $2
 db_ipinfo
 db_scamalytics $2
 db_ipapi $2
@@ -2383,19 +2498,16 @@ scope_includes mail&&show_mail $2
 scope_includes dnsbl&&[[ $2 -eq 4 ]]&&show_dnsbl
 show_tail
 )
-[[ mode_json -eq 1 || mode_output -eq 1 ]]&&save_json
+if [[ mode_json -eq 1 || mode_output -eq 1 ]];then
+save_json||return 70
+fi
 [[ mode_json -eq 0 ]]&&echo -ne "\r$ip_report\n"
 [[ mode_json -eq 1 ]]&&echo -ne "\r$ipjson\n"
 echo -ne "\r\n"
 if [[ mode_output -eq 1 ]];then
-case "$outputfile" in
-*.[aA][nN][sS][iI])echo "$ip_report" >>"$outputfile" 2>/dev/null
-;;
-*.[jJ][sS][oO][nN])echo "$ipjson" >>"$outputfile" 2>/dev/null
-;;
-*)echo -e "$ip_report"|sed 's/\x1b\[[0-9;]*[mGKHF]//g' >>"$outputfile" 2>/dev/null
-esac
+write_report_output "$ip_report"||return $?
 fi
+return 0
 }
 parse_cli "$@"||exit $?
 if [[ $version_requested -eq 1 ]];then
@@ -2445,5 +2557,12 @@ if [[ $ERRORcode -ne 0 ]];then
 echo -ne "\r$Font_B$Font_Red${swarn[$ERRORcode]}$Font_Suffix\n"
 exit $ERRORcode
 fi
-[[ $IPV4work -ne 0 && $IPV4check -ne 0 ]]&&check_IP "$IPV4" 4
-[[ $IPV6work -ne 0 && $IPV6check -ne 0 ]]&&check_IP "$IPV6" 6
+typeset final_status=0
+if [[ $IPV4work -ne 0 && $IPV4check -ne 0 ]];then
+check_IP "$IPV4" 4||final_status=$?
+fi
+if [[ $final_status -eq 0 && $IPV6work -ne 0 && $IPV6check -ne 0 ]];then
+check_IP "$IPV6" 6||final_status=$?
+fi
+close_report_output
+exit $final_status

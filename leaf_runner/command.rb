@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "English"
 require "optparse"
 require_relative "profile"
 require_relative "subscription_catalog"
@@ -12,13 +11,22 @@ module IpQuality
     EX_NOINPUT = 66
     EX_UNAVAILABLE = 69
     EX_SOFTWARE = 70
-    REPORTER = File.expand_path("../ip-quality.zsh", __dir__).freeze
+    REPORTER = File.expand_path("../bin/ip-quality", __dir__).freeze
+    CLEANUP_SIGNALS = %w[HUP TERM].freeze
+    REPORTER_STOP_TIMEOUT_SECONDS = 3
 
-    def initialize(stdout: $stdout, stderr: $stderr, stdin: $stdin, app_root: SubscriptionCatalog::DEFAULT_APP_ROOT)
+    def initialize(
+      stdout: $stdout,
+      stderr: $stderr,
+      stdin: $stdin,
+      app_root: SubscriptionCatalog::DEFAULT_APP_ROOT,
+      reporter_path: REPORTER
+    )
       @stdout = stdout
       @stderr = stderr
       @stdin = stdin
       @app_root = app_root
+      @reporter_path = reporter_path
       @profile_path = nil
       @mihomo_path = IsolatedMihomoSession::DEFAULT_MIHOMO
       @subscription_name = nil
@@ -30,10 +38,12 @@ module IpQuality
       @help_requested = false
       @report_arguments = []
       @family = nil
+      @previous_signal_handlers = {}
     end
 
     def run(arguments)
       parser = option_parser
+      install_cleanup_signal_handlers
       parser.parse!(arguments)
       raise OptionParser::InvalidOption, arguments.join(" ") unless arguments.empty?
       if @help_requested
@@ -91,6 +101,8 @@ module IpQuality
     rescue StandardError => error
       @stderr.puts "ERROR: isolated leaf runner failed safely (#{error.class})."
       EX_SOFTWARE
+    ensure
+      restore_cleanup_signal_handlers
     end
 
     private
@@ -122,8 +134,8 @@ module IpQuality
         options.on("-f", "Show the full tested IP in the local report") { @report_arguments << "-f" }
         options.on("-j", "Write JSON report to stdout") { @report_arguments << "-j" }
         options.on("-E", "Use English report labels") { @report_arguments << "-E" }
-        options.on("-l LANGUAGE", "Use reporter language: cn, en, jp, es, de, fr, ru, or pt") do |value|
-          allowed = %w[cn en jp es de fr ru pt]
+        options.on("-l LANGUAGE", "Use reporter language: cn or en") do |value|
+          allowed = %w[cn en]
           raise OptionParser::InvalidArgument, "unsupported language" unless allowed.include?(value.downcase)
 
           @report_arguments.concat(["-l", value.downcase])
@@ -236,20 +248,65 @@ module IpQuality
         command = [
           "/bin/zsh",
           "-f",
-          REPORTER,
+          @reporter_path,
           "--confirm-network-lookup",
           "--scope",
           "reputation"
         ]
         command << @family if @family
         command.concat(@report_arguments)
-        system(running.proxy_environment, *command)
-        result = $CHILD_STATUS
+        result = run_reporter(running.proxy_environment, command)
       end
       @stderr.puts "[leaf-runner] Isolated Mihomo stopped; live Clash state was unchanged."
       return 0 if result && result.success?
 
       result && result.exitstatus ? result.exitstatus : 1
+    end
+
+    def install_cleanup_signal_handlers
+      CLEANUP_SIGNALS.each do |signal_name|
+        @previous_signal_handlers[signal_name] = Signal.trap(signal_name) do
+          raise Interrupt, "SIG#{signal_name}"
+        end
+      end
+    end
+
+    def restore_cleanup_signal_handlers
+      @previous_signal_handlers.each do |signal_name, handler|
+        Signal.trap(signal_name, handler)
+      end
+      @previous_signal_handlers.clear
+    end
+
+    def run_reporter(environment, command)
+      pid = Process.spawn(environment, *command, pgroup: true)
+      _waited_pid, status = Process.wait2(pid)
+      pid = nil
+      status
+    ensure
+      terminate_reporter_process_group(pid) if pid
+    end
+
+    def terminate_reporter_process_group(pid)
+      begin
+        Process.kill("TERM", -pid)
+      rescue Errno::ESRCH
+        Process.waitpid(pid)
+        return
+      end
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + REPORTER_STOP_TIMEOUT_SECONDS
+      loop do
+        waited = Process.waitpid2(pid, Process::WNOHANG)
+        return if waited
+        break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+        sleep 0.05
+      end
+
+      Process.kill("KILL", -pid)
+      Process.waitpid(pid)
+    rescue Errno::ECHILD, Errno::ESRCH
+      nil
     end
   end
 end

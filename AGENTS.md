@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This directory owns a zsh-native, source-auditable IP reputation and quality
+This repository owns a zsh-native, source-auditable IP reputation and quality
 reporter derived from `xykt/IPQuality`.
 
 ## Runtime boundary
@@ -25,6 +25,11 @@ reporter derived from `xykt/IPQuality`.
 - Keep raw reports, API keys, cookies, proxy credentials, and account data out of
   Git. Credentials must not be placed in command arguments or persisted in Git
   configuration.
+- The reporter creates no persistent application cache. Clash Verge subscription
+  caches are external read-only inputs and must never be deleted by this project.
+  Owned Mihomo configuration/log workspaces are private temporary directories and
+  must be removed on success, ordinary failure, and interrupt. User-requested
+  `-o` report files are outputs, not caches, and must not be removed automatically.
 
 ## Query policy
 
@@ -43,27 +48,45 @@ reporter derived from `xykt/IPQuality`.
 
 ## Source map
 
-- `ip-quality.zsh`: provider queries, aggregation, and report output.
+- `bin/ip-quality`: provider queries, aggregation, and report output.
 - `bin/test-clash-leaf`: thin zsh exact-leaf entrypoint.
-- `lib/safe_snapshot.rb`: the only subproject-common library; reusable verified
-  local-file reads with no Clash or provider policy.
-- `leaf_runner/`: cached-subscription catalog, exact-leaf extraction, CLI policy,
-  loopback lifecycle, listener ownership proof, and cleanup.
+- `leaf_runner/`: cached-subscription catalog, verified local-file snapshots,
+  exact-leaf extraction, CLI policy, loopback lifecycle, listener ownership proof,
+  and cleanup.
 - `providers/`: network-free, fixture-testable provider response parsers.
 - `report/`: provider-aware terminal report rendering; provider scales must not be
   collapsed into one synthetic score.
 - `ref/`: runtime reference data; `test/fixtures/`: sanitized test data.
+- `scripts/test-offline`: complete fixture-only validation entrypoint.
+- `HANDOFF.md`: current state, validated commands, Git identities, and migration
+  status for the next agent.
+
+## Shared-library boundary
+
+- `/Users/zmx/Projects/myutils` exposes Python utilities. This runtime is restricted
+  to `/bin/zsh` and source-auditable system Ruby, so importing Python utilities or
+  adding a Conda subprocess would increase coupling and weaken the exact-leaf
+  lifecycle. No current public `myutils` API is a valid runtime dependency.
+- Project policy, provider schemas, terminal tables, Clash cache selection, and
+  process cleanup remain project-specific. Do not move them into `myutils`.
+- The former root `lib/` held a Ruby snapshot helper used only by the exact-leaf
+  runtime; it now lives in `leaf_runner/` so the repository has no misleading
+  machine-global utility surface.
 
 ## Development and validation
 
-- This directory must not contain `.git/` or another nested repository.
+- This directory is the Git worktree root and may contain its own `.git/`; no
+  subdirectory may contain nested Git metadata.
 - Preserve the upstream AGPL-3.0 license, commit identity, and modification notes
   in `UPSTREAM.md`.
 - Tests are fixture-only and must not use external DNS, HTTP, mail, SSH, browser,
   proxy, or paid routes.
 - Add new network providers with a saved, sanitized fixture and parser contract.
-- Keep the root offline aggregate compatible with this directory.
-- Focused offline validation runs through
-  `scripts/offline-containment run ip-quality/test/ip_quality_test.rb` or
-  `scripts/offline-containment run ip-quality/test/clash_leaf_runner_test.rb`
-  from the repository root.
+- Run the complete offline suite from the repository root with
+  `/bin/zsh -f scripts/test-offline`.
+- Focused validation uses `/usr/bin/ruby test/ip_quality_test.rb` or
+  `/usr/bin/ruby test/clash_leaf_runner_test.rb`. The runtime entrypoint still
+  uses `--disable-gems`; tests use the system-bundled `minitest` default gem.
+- `README.md` is intentionally absent. Keep agent-operational rules here, provider
+  contracts in `PROVIDERS.md`, provenance in `UPSTREAM.md`, and current state in
+  `HANDOFF.md`.

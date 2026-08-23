@@ -6,7 +6,7 @@ require "json"
 
 class IpQualityTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
-  SCRIPT = File.join(ROOT, "ip-quality.zsh")
+  SCRIPT = File.join(ROOT, "bin", "ip-quality")
   DNSBL = File.join(ROOT, "ref", "dnsbl.list")
   ISO3166 = File.join(ROOT, "ref", "iso3166.json")
   PING0_LIBRARY = File.join(ROOT, "providers", "ping0.zsh")
@@ -201,11 +201,56 @@ class IpQualityTest < Minitest::Test
     )
     assert status.success?, stderr
     assert_includes stdout, "IP2Location"
-    assert_includes stdout, "分值=21"
+    assert_match(/参数\s+\|.*IP2Location.*Scamalytics/, stdout)
+    assert_includes stdout, "直接公开端点"
+    assert_includes stdout, "上游中继"
+    assert_match(/分值\s+\|\s+21/, stdout)
+    assert_includes stdout, "分段／标签"
+    assert_includes stdout, "量表"
     assert_includes stdout, "Scamalytics"
     assert_includes stdout, "未知不等于低风险"
     refute_includes stdout, "风险等级："
+    refute_match(/IP2Location\s+分值=/, stdout)
     refute_includes stderr, "unrecognized modifier"
+  end
+
+  def test_reputation_factor_colors_distinguish_safe_risk_and_unknown_values
+    color_probe = <<~'ZSH'
+      Font_B=$'\033[1m' Font_Red=$'\033[31m' Font_Green=$'\033[32m'
+      Font_Purple=$'\033[35m' Font_Cyan=$'\033[36m' Font_Suffix=$'\033[0m'
+      YY=cn
+      clean_ansi(){ print -rn -- "$1" }
+      source "$1"
+      report_factor_value false
+      print -rn -- '|'
+      report_factor_value true
+      print -rn -- '|'
+      report_factor_value ''
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      color_probe,
+      "report-color-test",
+      REPUTATION_REPORT
+    )
+
+    assert status.success?, stderr
+    assert_includes stdout, "\e[32m\e[1m否"
+    assert_includes stdout, "\e[31m\e[1m是"
+    assert_includes stdout, "\e[35m未知"
+    assert_empty stderr
+  end
+
+  def test_report_identifies_the_relay_and_new_standalone_remote_without_claiming_a_local_maxmind_database
+    source = File.read(SCRIPT, encoding: "UTF-8")
+
+    assert_includes source, "/Users/zmx/gitrepos/ipquality.git"
+    assert_includes source, "Check.Place 中继；上游标注 MaxMind"
+    assert_includes source, "Check.Place relay; MaxMind-labeled upstream data"
+    refute_includes source, "/Users/zmx/gitrepos/network-manager.git"
+    refute_includes source, "Maxmind 数据库"
   end
 
   def test_concurrency_is_hard_bounded
@@ -219,6 +264,23 @@ class IpQualityTest < Minitest::Test
     stdout, stderr, status = run_script("--scope", "dnsbl", "--dnsbl-concurrency", "50")
     assert status.success?, stderr
     assert_includes stdout, "DNSBL concurrency cap: 50"
+  end
+
+  def test_only_implemented_report_languages_are_advertised_and_accepted
+    source = File.read(SCRIPT, encoding: "UTF-8")
+    assert_includes source, "-l cn|en"
+    refute_match(/cn\|en\|jp|\"jp\"\|\"es\"/, source)
+
+    stdout, stderr, status = run_script(
+      "--confirm-network-lookup",
+      "--scope",
+      "reputation",
+      "-l",
+      "jp"
+    )
+    assert_equal 1, status.exitstatus
+    assert_includes stdout, "不支持的参数"
+    assert_empty stderr
   end
 
   def test_removed_upstream_mutation_and_remote_execution_flags_are_rejected
@@ -261,10 +323,23 @@ class IpQualityTest < Minitest::Test
     assert_includes source, "typeset -A"
     assert_includes source, "/bin/zsh -fc"
     assert_includes source, 'command curl -q "$@"'
-    assert_includes source, '${ipqs[score]:-null}'
+    assert_includes source, '--arg score_ipqs "${ipqs[score]:-}"'
+    assert_includes source, '--arg info_org "$info_org"'
+    refute_includes source, "factor_updates"
+    refute_match(/jq\s+"\$head_updates/, source)
     BANNED_SOURCE_PATTERNS.each do |name, pattern|
       refute_match pattern, source, "#{name} unexpectedly remains"
     end
+  end
+
+  def test_report_output_uses_exclusive_nofollow_descriptor_instead_of_check_then_append
+    source = File.read(SCRIPT, encoding: "UTF-8")
+
+    assert_includes source, "zmodload zsh/system"
+    assert_includes source, "sysopen -w -m 600 -o creat,excl,nofollow,cloexec,sync"
+    assert_includes source, 'print -r -u "$output_fd" -- "$payload"'
+    refute_match(/>>\s*"?\$outputfile/, source)
+    assert_includes source, '[[ -e $outputfile || -L $outputfile ]]'
   end
 
   def test_vendored_references_are_regular_local_data_without_cookie_state
@@ -312,9 +387,14 @@ class IpQualityTest < Minitest::Test
   end
 
   def test_directory_has_no_nested_git_metadata_or_opaque_binary
-    refute Dir.exist?(File.join(ROOT, ".git"))
+    root_git_directory = File.join(ROOT, ".git")
+    nested_git_directories = Dir.glob(File.join(ROOT, "**", ".git"))
+                                .reject { |path| path == root_git_directory }
+    assert_empty nested_git_directories
+    refute File.exist?(File.join(ROOT, "README.md"))
 
     Dir.glob(File.join(ROOT, "**", "*"), File::FNM_DOTMATCH).each do |path|
+      next if path == root_git_directory || path.start_with?(root_git_directory + File::SEPARATOR)
       next unless File.file?(path)
 
       refute_includes File.binread(path), "\0", "NUL byte in #{path}"

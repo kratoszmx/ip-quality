@@ -4,7 +4,7 @@ require "fileutils"
 require "open3"
 require "socket"
 require "tmpdir"
-require_relative "../lib/safe_snapshot"
+require_relative "safe_snapshot"
 
 module IpQuality
   class IsolatedMihomoSession
@@ -15,6 +15,8 @@ module IpQuality
     START_TIMEOUT_SECONDS = 10
     STOP_TIMEOUT_SECONDS = 3
     MAX_PORT_ATTEMPTS = 5
+    WORKSPACE_PREFIX = "ip-quality-leaf-".freeze
+    OWNER_MARKER = ".ipquality-owner-pid".freeze
 
     attr_reader :port
 
@@ -27,6 +29,7 @@ module IpQuality
       @reaped = false
       @workspace = nil
       @port = nil
+      @stale_cleanup_done = false
     end
 
     def with_running
@@ -115,8 +118,10 @@ module IpQuality
     def create_workspace
       return if @workspace
 
-      @workspace = Dir.mktmpdir("ip-quality-leaf-", @temp_parent)
+      cleanup_stale_workspaces unless @stale_cleanup_done
+      @workspace = Dir.mktmpdir("#{WORKSPACE_PREFIX}#{Process.pid}-", @temp_parent)
       File.chmod(0o700, @workspace)
+      write_owner_marker
       @config_path = File.join(@workspace, "isolated.mihomo.yaml")
       @log_path = File.join(@workspace, "mihomo.log")
     rescue SystemCallError => error
@@ -131,6 +136,62 @@ module IpQuality
       @workspace = nil
       @config_path = nil
       @log_path = nil
+    end
+
+    def cleanup_stale_workspaces
+      Dir.glob(File.join(@temp_parent, "#{WORKSPACE_PREFIX}*")).each do |path|
+        next unless stale_workspace_owned_by_current_user?(path)
+
+        FileUtils.remove_entry_secure(path)
+      end
+      @stale_cleanup_done = true
+    rescue SystemCallError => error
+      raise Error, "cannot remove an abandoned private workspace: #{error.class}"
+    end
+
+    def stale_workspace_owned_by_current_user?(path)
+      stat = File.lstat(path)
+      return false unless stat.directory? && !stat.symlink? && stat.uid == Process.euid
+      return false unless (stat.mode & 0o777) == 0o700
+
+      pid = workspace_owner_pid(path)
+      pid && pid != Process.pid && !process_alive?(pid)
+    rescue Errno::ENOENT, Errno::EACCES, SafeSnapshot::Error
+      false
+    end
+
+    def workspace_owner_pid(path)
+      marker = File.join(path, OWNER_MARKER)
+      if File.exist?(marker) || File.symlink?(marker)
+        value = SafeSnapshot.read(marker, max_bytes: 32).bytes.strip
+        return Integer(value, 10) if value.match?(/\A[1-9][0-9]*\z/)
+
+        return nil
+      end
+
+      match = File.basename(path).match(/\A#{Regexp.escape(WORKSPACE_PREFIX)}([1-9][0-9]*)-/)
+      match && Integer(match[1], 10)
+    rescue ArgumentError
+      nil
+    end
+
+    def process_alive?(pid)
+      Process.kill(0, pid)
+      true
+    rescue Errno::ESRCH
+      false
+    rescue Errno::EPERM
+      true
+    end
+
+    def write_owner_marker
+      marker = File.join(@workspace, OWNER_MARKER)
+      File.open(marker, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+        file.write("#{Process.pid}\n")
+        file.flush
+        file.fsync
+      end
+      File.chmod(0o600, marker)
     end
 
     def preferred_temp_parent

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "yaml"
-require_relative "../lib/safe_snapshot"
+require_relative "safe_snapshot"
 
 module IpQuality
   class ClashLeafProfile

@@ -1,4 +1,8 @@
 reports/
+.cache/
+tmp/
+.DS_Store
 *.ansi
+*.tmp
 *.report.json
 *.report.txt

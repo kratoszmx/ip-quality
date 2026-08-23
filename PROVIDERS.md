@@ -15,7 +15,7 @@ or malformed addresses are not accepted as a successful public result.
 
 | Report row | Access style | Main observations |
 | --- | --- | --- |
-| MaxMind via `ipinfo.check.place` | Upstream relay | ASN, organization, city/region, registered region, coordinates, timezone |
+| Check.Place relay (upstream labels the payload as MaxMind) | Upstream relay | ASN, organization, city/region, registered region, coordinates, timezone |
 | IPinfo public widget | Direct public web endpoint | ASN/company type, country, privacy flags, location |
 | Scamalytics via `ipinfo.check.place` | Upstream relay | score, proxy, VPN, Tor, blacklist/bot indicators |
 | ipapi.is | Direct public endpoint | ASN/type and risk factors |
@@ -33,6 +33,20 @@ relay or direct page changes schema, its result is unknown rather than clean.
 Score scales are shown per provider and are not averaged. The adjacent textual
 band may be returned by the source or derived from a documented local threshold;
 it is display context, not a second independent observation.
+
+The basic-information heading deliberately does not claim that this machine owns
+or queries a local MaxMind database. No `.mmdb`, MaxMind account credential, or
+GeoIP updater is part of this repository. The relay payload uses MaxMind-shaped
+field names, but its edition, build date, and transformation chain cannot be
+verified locally. Treat it as one attributed upstream observation.
+
+For a future credentialed implementation, use locally updated official MaxMind
+GeoLite2 City and ASN databases for approximate geography and routing ownership,
+then add the paid GeoIP Anonymous IP or IP Risk product only if those risk fields
+are actually licensed. Keep direct IPinfo/ipapi.is observations and RIPEstat
+routing context alongside MaxMind instead of replacing all sources with one
+database. Geography, network type, anonymization, abuse, and open-port context are
+different questions and must remain separate.
 
 Ping0 is intentionally narrower than the other risk rows. Its documented free
 `/geo` interface returns four text lines—IP, location, ASN, and organization—so

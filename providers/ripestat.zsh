@@ -1,5 +1,5 @@
 # Pure parser for RIPEstat Network Info responses. Network access remains in
-# ip-quality.zsh so malformed, stale, and fixture responses can be tested
+# bin/ip-quality so malformed, stale, and fixture responses can be tested
 # without contacting RIPE NCC.
 
 typeset -gA ripestat_parsed=()

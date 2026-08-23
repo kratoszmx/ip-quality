@@ -3,6 +3,7 @@
 require "minitest/autorun"
 require "stringio"
 require "tmpdir"
+require "timeout"
 require "yaml"
 require_relative "../leaf_runner/command"
 
@@ -147,6 +148,175 @@ class ClashLeafRunnerTest < Minitest::Test
     end
   end
 
+  def test_configuration_workspace_is_removed_after_success_and_failure
+    Dir.mktmpdir("ip-quality-cleanup-") do |directory|
+      fake_mihomo = File.join(directory, "fake-mihomo")
+      profile = IpQuality::ClashLeafProfile.new(
+        IpQuality::ClashLeafProfile::Source.new("fixture", "fixture.yaml", fixture_document)
+      )
+
+      File.write(fake_mihomo, "#!/bin/zsh\nexit 0\n")
+      File.chmod(0o700, fake_mihomo)
+      session = IpQuality::IsolatedMihomoSession.new(
+        profile,
+        "TargetLeaf",
+        mihomo_path: fake_mihomo,
+        temp_parent: directory
+      )
+      assert session.configuration_test
+      assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"))
+
+      File.write(fake_mihomo, "#!/bin/zsh\nexit 9\n")
+      File.chmod(0o700, fake_mihomo)
+      failing_session = IpQuality::IsolatedMihomoSession.new(
+        profile,
+        "TargetLeaf",
+        mihomo_path: fake_mihomo,
+        temp_parent: directory
+      )
+      assert_raises(IpQuality::IsolatedMihomoSession::Error) do
+        failing_session.configuration_test
+      end
+      assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"))
+    end
+  end
+
+  def test_next_runtime_scavenges_dead_owned_workspace_without_touching_live_owner
+    Dir.mktmpdir("ip-quality-stale-cleanup-") do |directory|
+      dead_pid = 2_147_483_647
+      dead_pid -= 1 while process_alive?(dead_pid)
+      stale_workspace = File.join(directory, "ip-quality-leaf-#{dead_pid}-abandoned")
+      live_workspace = File.join(directory, "ip-quality-leaf-#{Process.pid}-active")
+      [stale_workspace, live_workspace].each do |workspace|
+        Dir.mkdir(workspace, 0o700)
+        File.write(File.join(workspace, ".ipquality-owner-pid"), "#{File.basename(workspace).split('-')[3]}\n")
+        File.chmod(0o600, File.join(workspace, ".ipquality-owner-pid"))
+      end
+
+      fake_mihomo = File.join(directory, "fake-mihomo")
+      File.write(fake_mihomo, "#!/bin/zsh\nexit 0\n")
+      File.chmod(0o700, fake_mihomo)
+      profile = IpQuality::ClashLeafProfile.new(
+        IpQuality::ClashLeafProfile::Source.new("fixture", "fixture.yaml", fixture_document)
+      )
+      session = IpQuality::IsolatedMihomoSession.new(
+        profile,
+        "TargetLeaf",
+        mihomo_path: fake_mihomo,
+        temp_parent: directory
+      )
+
+      assert session.configuration_test
+      refute Dir.exist?(stale_workspace)
+      assert Dir.exist?(live_workspace)
+    end
+  end
+
+  def test_sigterm_stops_reporter_and_mihomo_then_removes_private_workspace
+    Dir.mktmpdir("ip-quality-signal-cleanup-") do |directory|
+      profile_path = File.join(directory, "profile.yaml")
+      fake_mihomo = File.join(directory, "fake-mihomo")
+      fake_reporter = File.join(directory, "fake-reporter")
+      mihomo_pid_file = File.join(directory, "mihomo.pid")
+      reporter_pid_file = File.join(directory, "reporter.pid")
+      write_private_yaml(profile_path, fixture_document)
+
+      File.write(fake_mihomo, <<~'ZSH')
+        #!/bin/zsh
+        emulate -LR zsh
+        typeset config=''
+        typeset test_only=0
+        while (( $# > 0 )); do
+          case "$1" in
+            -f) config="$2"; shift 2 ;;
+            -t) test_only=1; shift ;;
+            *) shift ;;
+          esac
+        done
+        (( test_only == 1 )) && exit 0
+        typeset port=''
+        while IFS= read -r line; do
+          [[ "$line" == 'mixed-port: '* ]] && port="${line#mixed-port: }"
+        done < "$config"
+        [[ "$port" == <1-65535> ]] || exit 64
+        exec /usr/bin/ruby -rsocket -e '
+          File.write(ENV.fetch("IPQUALITY_TEST_MIHOMO_PID_FILE"), Process.pid.to_s)
+          Signal.trap("TERM") { exit }
+          Signal.trap("HUP") { exit }
+          TCPServer.new("127.0.0.1", Integer(ARGV.fetch(0)))
+          sleep
+        ' "$port"
+      ZSH
+      File.chmod(0o700, fake_mihomo)
+
+      File.write(fake_reporter, <<~'ZSH')
+        #!/bin/zsh
+        print -r -- $$ > "$IPQUALITY_TEST_REPORTER_PID_FILE"
+        while true; do
+          /bin/sleep 1
+        done
+      ZSH
+      File.chmod(0o700, fake_reporter)
+
+      command_library = File.join(ROOT, "leaf_runner", "command.rb")
+      runner = <<~RUBY
+        require #{command_library.inspect}
+        command = IpQuality::ClashLeafCommand.new(
+          reporter_path: ENV.fetch("IPQUALITY_TEST_REPORTER")
+        )
+        exit(command.run([
+          "--profile", ENV.fetch("IPQUALITY_TEST_PROFILE"),
+          "--leaf", "TargetLeaf",
+          "--mihomo", ENV.fetch("IPQUALITY_TEST_MIHOMO"),
+          "--confirm-network-lookup", "-4"
+        ]))
+      RUBY
+      environment = {
+        "IPQUALITY_TEST_PROFILE" => profile_path,
+        "IPQUALITY_TEST_MIHOMO" => fake_mihomo,
+        "IPQUALITY_TEST_REPORTER" => fake_reporter,
+        "IPQUALITY_TEST_MIHOMO_PID_FILE" => mihomo_pid_file,
+        "IPQUALITY_TEST_REPORTER_PID_FILE" => reporter_pid_file,
+        "HOME" => directory,
+        "TMPDIR" => directory
+      }
+      runner_pid = Process.spawn(
+        environment,
+        "/usr/bin/ruby",
+        "-e",
+        runner,
+        out: File::NULL,
+        err: File::NULL
+      )
+
+      begin
+        Timeout.timeout(15) do
+          until File.file?(mihomo_pid_file) && File.file?(reporter_pid_file) &&
+                !Dir.glob(File.join(directory, "ip-quality-leaf-*"), File::FNM_DOTMATCH).empty?
+            sleep 0.05
+          end
+        end
+        Process.kill("TERM", runner_pid)
+        _waited_pid, status = Process.wait2(runner_pid)
+        runner_pid = nil
+
+        assert_equal 130, status.exitstatus
+        Timeout.timeout(5) do
+          until Dir.glob(File.join(directory, "ip-quality-leaf-*"), File::FNM_DOTMATCH).empty? &&
+                !process_alive?(Integer(File.read(mihomo_pid_file))) &&
+                !process_alive?(Integer(File.read(reporter_pid_file)))
+            sleep 0.05
+          end
+        end
+      ensure
+        if runner_pid && process_alive?(runner_pid)
+          Process.kill("KILL", runner_pid)
+          Process.waitpid(runner_pid)
+        end
+      end
+    end
+  end
+
   def test_entrypoint_is_a_thin_zsh_wrapper_and_all_runtime_code_is_source_auditable
     wrapper = File.binread(WRAPPER)
     sources = Dir.glob(File.join(ROOT, "{bin,leaf_runner,lib,providers,report}", "**", "*"))
@@ -159,6 +329,18 @@ class ClashLeafRunnerTest < Minitest::Test
     refute_match(/\/bin\/bash|BASH_REMATCH|\bshopt\b|\bmapfile\b/, sources)
     refute_includes sources, "external-controller"
     refute_includes sources, "secret:"
+  end
+
+  def test_leaf_runner_rejects_unimplemented_report_languages_before_network_access
+    stdout = StringIO.new
+    stderr = StringIO.new
+    command = IpQuality::ClashLeafCommand.new(stdout: stdout, stderr: stderr)
+
+    exit_code = command.run(["-l", "jp"])
+
+    assert_equal IpQuality::ClashLeafCommand::EX_USAGE, exit_code
+    assert_includes stderr.string, "unsupported language"
+    assert_empty stdout.string
   end
 
   private
@@ -228,5 +410,12 @@ class ClashLeafRunnerTest < Minitest::Test
         ]
       }
     )
+  end
+
+  def process_alive?(pid)
+    Process.kill(0, pid)
+    true
+  rescue Errno::ESRCH
+    false
   end
 end
