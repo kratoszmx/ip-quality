@@ -10,6 +10,7 @@ class IpQualityTest < Minitest::Test
   DNSBL = File.join(ROOT, "ref", "dnsbl.list")
   ISO3166 = File.join(ROOT, "ref", "iso3166.json")
   COMMON_PROVIDER_LIBRARY = File.join(ROOT, "providers", "common.zsh")
+  IPQUALITYSCORE_LIBRARY = File.join(ROOT, "providers", "ipqualityscore.zsh")
   PING0_LIBRARY = File.join(ROOT, "providers", "ping0.zsh")
   RIPESTAT_LIBRARY = File.join(ROOT, "providers", "ripestat.zsh")
   INTERNETDB_LIBRARY = File.join(ROOT, "providers", "shodan_internetdb.zsh")
@@ -18,6 +19,8 @@ class IpQualityTest < Minitest::Test
   PING0_CHALLENGE_FIXTURE = File.join(ROOT, "test", "fixtures", "ping0", "challenge.html")
   RIPESTAT_FIXTURE = File.join(ROOT, "test", "fixtures", "ripestat", "network-info.json")
   INTERNETDB_FIXTURE = File.join(ROOT, "test", "fixtures", "shodan", "internetdb.json")
+  INTERNETDB_NO_INFORMATION_FIXTURE = File.join(ROOT, "test", "fixtures", "shodan", "no-information.json")
+  IPQUALITYSCORE_CREDITS_FIXTURE = File.join(ROOT, "test", "fixtures", "ipqualityscore", "insufficient-credits.json")
 
   BANNED_SOURCE_PATTERNS = {
     bash_runtime: /(^|[^A-Za-z0-9_])bash([^A-Za-z0-9_]|$)/i,
@@ -159,6 +162,17 @@ class IpQualityTest < Minitest::Test
     assert_equal "198.51.100.0/24|AS64500\n22, 443|1\n", stdout
     assert_empty stderr
 
+    _stdout, _stderr, malformed_asn_status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      'setopt KSH_ARRAYS; source "$1"; ripestat_parse_network_info "$2"',
+      "ripestat-malformed-asn-test",
+      RIPESTAT_LIBRARY,
+      '{"status":"ok","data":{"prefix":"198.51.100.0/24","asns":["AS64500"]}}'
+    )
+    refute malformed_asn_status.success?
+
     _stdout, _stderr, mismatch_status = Open3.capture3(
       "/bin/zsh",
       "-f",
@@ -179,6 +193,8 @@ class IpQualityTest < Minitest::Test
       provider_json_is_object '[]' && exit 2
       provider_integer_in_range 99 0 99 || exit 3
       provider_integer_in_range 100 0 99 && exit 4
+      provider_has_observation null unknown '' && exit 5
+      provider_has_observation null false || exit 6
       print -r -- "$(provider_merge_boolean_signals false true null)|$(provider_merge_boolean_signals false false)|$(provider_merge_boolean_signals false null)"
     ZSH
     stdout, stderr, status = Open3.capture3(
@@ -195,6 +211,34 @@ class IpQualityTest < Minitest::Test
     assert_empty stderr
   end
 
+  def test_known_provider_failures_are_classified_without_echoing_upstream_messages
+    parser_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      source "$1"
+      ipqualityscore_parse_unavailability "$(<"$2")" || exit $?
+      print -r -- "${ipqualityscore_unavailable[status]}"
+      source "$3"
+      internetdb_parse_unavailability "$(<"$4")" || exit $?
+      print -r -- "${internetdb_unavailable[status]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      parser_probe,
+      "provider-unavailability-test",
+      IPQUALITYSCORE_LIBRARY,
+      IPQUALITYSCORE_CREDITS_FIXTURE,
+      INTERNETDB_LIBRARY,
+      INTERNETDB_NO_INFORMATION_FIXTURE
+    )
+
+    assert status.success?, stderr
+    assert_equal "upstream_insufficient_credits\nnot_found\n", stdout
+    refute_includes stdout, "You have insufficient credits"
+    assert_empty stderr
+  end
+
   def test_reputation_report_uses_provider_rows_without_the_fragile_score_bar
     report_probe = <<~'ZSH'
       setopt KSH_ARRAYS
@@ -205,6 +249,7 @@ class IpQualityTest < Minitest::Test
       stype[title]='二、IP类型属性'
       sscore[title]='三、风险评分'
       sfactor[title]='四、风险因子'
+      ipinfo[susetype]='家宽'
       ip2location[score]=21
       ipapi[risk]='High'
       ipapi[proxy]=false
@@ -225,20 +270,56 @@ class IpQualityTest < Minitest::Test
     )
     assert status.success?, stderr
     assert_includes stdout, "IP2Location"
-    assert_match(/参数\s+\|.*IP2Location.*Scamalytics/, stdout)
+    assert_match(/参数\s+\|.*IP2Location.*ipapi\.is/, stdout)
     assert_includes stdout, "公开示例组件"
-    assert_includes stdout, "直接公开 API"
-    assert_includes stdout, "上游中继"
     assert_match(/分值\s+\|\s+21/, stdout)
     assert_includes stdout, "分段／标签"
     assert_includes stdout, "量表"
-    assert_includes stdout, "0-99 potential risk"
-    assert_includes stdout, "Scamalytics"
-    assert_includes stdout, "仅显示平台明确返回的标签"
-    assert_includes stdout, "未知不等于低风险"
+    assert_includes stdout, "0-99 potential"
+    assert_includes stdout, "IPQS"
+    assert_includes stdout, "—"
+    refute_includes stdout, "Scamalytics"
+    refute_includes stdout, "未知"
     refute_includes stdout, "风险等级："
     refute_match(/IP2Location\s+分值=/, stdout)
+    assert_operator stdout.lines.map { |line| line.chomp.length }.max, :<=, 80
     refute_includes stderr, "unrecognized modifier"
+  end
+
+  def test_unavailable_reputation_sources_are_compacted_into_one_summary_line
+    report_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      Font_Cyan='' Font_Suffix='' Font_B='' Font_Green='' Font_Red='' Font_Purple=''
+      YY=cn
+      typeset -A maxmind ipinfo ipapi ip2location abuseipdb scamalytics ipdata ipqs ping0 ripestat internetdb sping0
+      ping0[status]=unknown
+      ipqs[status]=upstream_insufficient_credits
+      internetdb[status]=not_found
+      clean_ansi(){ print -rn -- "$1" }
+      source "$1"
+      show_ping0
+      show_routing
+      show_exposure
+      show_unavailable_sources
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      report_probe,
+      "report-unavailable-test",
+      REPUTATION_REPORT
+    )
+
+    assert status.success?, stderr
+    assert_equal 1, stdout.lines.length
+    assert_includes stdout, "本次无可用资料（不等于低风险）"
+    assert_includes stdout, "IPQualityScore（上游额度不足）"
+    assert_includes stdout, "RIPEstat"
+    assert_includes stdout, "Shodan InternetDB（无公开记录）"
+    refute_includes stdout, "状态：unknown"
+    refute_includes stdout, "风险分数："
+    assert_empty stderr
   end
 
   def test_reputation_factor_colors_distinguish_safe_risk_and_unknown_values
@@ -273,7 +354,7 @@ class IpQualityTest < Minitest::Test
   def test_report_identifies_the_relay_and_online_repository_without_claiming_a_local_maxmind_database
     source = File.read(SCRIPT, encoding: "UTF-8")
 
-    assert_includes source, "https://github.com/kratoszmx/ipquality"
+    assert_includes source, "https://github.com/kratoszmx/ip-quality"
     assert_includes source, "Check.Place 中继；上游标注 MaxMind"
     assert_includes source, "Check.Place relay; MaxMind-labeled upstream data"
     assert_includes source, "IPinfo public demo widget"

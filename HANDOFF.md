@@ -1,22 +1,20 @@
 # IP quality standalone handoff
 
-Last validated: 2026-08-23, Asia/Shanghai.
+Last validated: 2026-08-24, Asia/Shanghai.
 
 ## Repository identity
 
 - Worktree: `/Users/zmx/Projects/projects/ipquality`
 - Branch: `main` only
-- Online primary: `https://github.com/kratoszmx/ipquality.git` (private;
-  repository created by the owner, but unavailable to the current local credential)
+- Online primary: `https://github.com/kratoszmx/ip-quality.git` (public; empty
+  before the 2026-08-24 synchronization)
 - Online backup: `https://github.com/kratosbackup/ipquality.git` (private)
-- Temporary branch upstream: `github-kratosbackup/main`
+- Branch upstream: `github-kratoszmx/main`
 
-The owner reports that `kratoszmx/ipquality` now exists. Current REST access to
-that private target returns HTTP 404, and Git HTTPS reports `repository not
-found`; the existing local credential therefore cannot read or push it. Keep the
-remote configured, but do not claim it is synchronized until its repository
-permission is updated. `kratosbackup/ipquality` remains the verified, usable
-online remote. Never place a token in a remote URL or Git configuration.
+The corrected `kratoszmx/ip-quality` target is accessible to the owner's current
+credential. GitHub reports it as public; do not change repository visibility
+without an explicit owner decision. `kratosbackup/ipquality` remains the private
+online backup. Never place a token in a remote URL or Git configuration.
 
 The obsolete `origin` and `usb` remotes were disconnected. Their exact bare
 repositories, `/Users/zmx/gitrepos/ipquality.git` and
@@ -59,9 +57,16 @@ without retaining parent-repository files or nested Git metadata.
 
 - Default execution prints a disclosure plan and performs no network lookup.
 - Live provider access requires the exact `--confirm-network-lookup` gate.
-- Terminal reputation sections are matrices: providers across the top and
-  dimensions down the left. Safe boolean factors are green, risk factors are red,
-  and unknown values are purple. Unknown never means low risk.
+- Terminal reputation sections are compact, data-driven matrices: providers with
+  usable results are across the top and dimensions are down the left. Safe boolean
+  factors are green and risk factors are red. A field omitted from an otherwise
+  usable response is shown as `—`; wholly unavailable sources are named once in a
+  compact summary and never presented as clean. JSON retains every provider and
+  represents unavailable values as `null`.
+- Allowlisted unavailability is reported with a reason instead of repeated
+  unknown cells. IPQualityScore relay credit exhaustion and Shodan InternetDB's
+  no-public-record response are currently classified; arbitrary upstream error
+  messages are never echoed.
 - Risk-score labels appear only when the provider explicitly returns one. Numeric
   relay scores are never converted into locally invented low/medium/high bands.
 - IPinfo is identified as a public demo widget, ipapi.is as a direct public API,
@@ -70,6 +75,8 @@ without retaining parent-repository files or nested Git metadata.
   keeps booleans, numbers, and null values typed.
 - User-selected output paths use an exclusive, no-follow file descriptor; existing
   paths and symlinks are rejected.
+- Default terminal and JSON reports mask both the tested IP and a RIPEstat routed
+  prefix derived from it. `-f` is required to reveal either value.
 - The runner deletes its private Mihomo workspace on success, error, and interrupt;
   TERM/HUP also terminate and reap the reporter process group. A later run securely
   scavenges a dead-owner workspace left by unavoidable SIGKILL or host failure.
@@ -93,7 +100,11 @@ Run from the repository root:
 /bin/zsh -f bin/ip-quality --self-test
 ```
 
-The full offline suite currently has 34 runs and 424 assertions. A read-only
+The full offline suite currently has 36 runs and 452 assertions, including both
+green safe-factor and red risk-factor rendering. A live, masked IPv4 reputation
+lookup also verified the compact terminal matrices, the corrected RIPEstat
+string-ASN parser, the IPQualityScore upstream credit status, and Shodan's
+no-public-record status. A read-only
 probe of the real Clash Verge cache also resolved a remote subscription and an
 exact inline leaf, then passed Mihomo `-t` without starting a listener or making
 an IP-provider lookup. Afterward, the project workspace residue count was zero in

@@ -28,3 +28,15 @@ esac
 done
 (( saw_unknown ))||print -rn -- "false"
 }
+
+provider_has_observation(){
+emulate -LR zsh
+typeset observation
+for observation in "$@";do
+case "${observation:l}" in
+""|"null"|"unknown") ;;
+*)return 0
+esac
+done
+return 1
+}

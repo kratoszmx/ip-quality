@@ -7,19 +7,20 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-08-23-standalone.3"
+script_version="v2026-08-24-standalone.4"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset REPORT_DIR="$SCRIPT_DIR/report"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
 typeset COMMON_PROVIDER_LIB="$PROVIDER_DIR/common.zsh"
+typeset IPQUALITYSCORE_LIB="$PROVIDER_DIR/ipqualityscore.zsh"
 typeset PING0_LIB="$PROVIDER_DIR/ping0.zsh"
 typeset RIPESTAT_LIB="$PROVIDER_DIR/ripestat.zsh"
 typeset INTERNETDB_LIB="$PROVIDER_DIR/shodan_internetdb.zsh"
 typeset REPUTATION_REPORT_LIB="$REPORT_DIR/reputation.zsh"
 typeset local_library
-for local_library in "$COMMON_PROVIDER_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for local_library in "$COMMON_PROVIDER_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$local_library" && -r "$local_library" && ! -L "$local_library" ]]||{
 print -ru2 -- "ERROR: unsafe or missing local library: $local_library"
 exit 66
@@ -160,7 +161,7 @@ shead[title]="IP QUALITY CHECK REPORT: "
 shead[title_lite]="IP QUALITY CHECK REPORT(LITE): "
 shead[ver]="Version: $script_version"
 shead[command]="/bin/zsh -f ./bin/ip-quality --confirm-network-lookup --scope $query_scope -E"
-shead[git]="https://github.com/kratoszmx/ipquality"
+shead[git]="https://github.com/kratoszmx/ip-quality"
 shead[time_label]="Report Time: "
 shead[ltitle]=25
 shead[ltitle_lite]=31
@@ -287,7 +288,7 @@ shead[title]="IP质量体检报告："
 shead[title_lite]="IP质量体检报告(Lite)："
 shead[ver]="脚本版本：$script_version"
 shead[command]="/bin/zsh -f ./bin/ip-quality --confirm-network-lookup --scope $query_scope"
-shead[git]="https://github.com/kratoszmx/ipquality"
+shead[git]="https://github.com/kratoszmx/ip-quality"
 shead[time_label]="报告时间："
 shead[ltitle]=16
 shead[ltitle_lite]=22
@@ -521,7 +522,7 @@ print -ru2 -- "SELF-TEST FAILED: not running under zsh"
 return 1
 }
 local reference_file
-for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json" "$COMMON_PROVIDER_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json" "$COMMON_PROVIDER_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$reference_file" && -r "$reference_file" && ! -L "$reference_file" ]]||{
 print -ru2 -- "SELF-TEST FAILED: unsafe or missing reference file: $reference_file"
 return 1
@@ -582,6 +583,10 @@ provider_integer_in_range "0" 0 100&&provider_integer_in_range "100" 0 100&&! pr
 print -ru2 -- "SELF-TEST FAILED: risk score validation changed"
 return 1
 }
+ipqualityscore_parse_unavailability '{"success":false,"message":"Insufficient credits"}'&&[[ "${ipqualityscore_unavailable[status]}" == "upstream_insufficient_credits" ]]||{
+print -ru2 -- "SELF-TEST FAILED: IPQualityScore quota status changed"
+return 1
+}
 is_nonnegative_decimal "0.25"&&! is_nonnegative_decimal '0; print unsafe'||{
 print -ru2 -- "SELF-TEST FAILED: decimal validation changed"
 return 1
@@ -618,8 +623,16 @@ internetdb_parse_response '{"ip":"198.51.100.24","ports":[],"vulns":[],"tags":[]
 print -ru2 -- "SELF-TEST FAILED: Shodan InternetDB IP mismatch accepted"
 return 1
 }
+internetdb_parse_unavailability '{"detail":"No information available"}'&&[[ "${internetdb_unavailable[status]}" == "not_found" ]]||{
+print -ru2 -- "SELF-TEST FAILED: Shodan no-information status changed"
+return 1
+}
 is_signed_decimal "-33.86"&&! is_signed_decimal '1; print unsafe'||{
 print -ru2 -- "SELF-TEST FAILED: signed decimal validation changed"
+return 1
+}
+[[ "$(mask_network_prefix '198.51.100.0/24')" == "198.51.*.*/24" && "$(mask_network_prefix '2001:db8:1234::/48')" == "2001:db8:*::/48" ]]||{
+print -ru2 -- "SELF-TEST FAILED: network-prefix masking changed"
 return 1
 }
 local dnsbl_summary=$(printf '%s\n' Clean Clean Blacklisted Other Unknown|summarize_dnsbl_results)
@@ -638,7 +651,7 @@ return 1
 set_language
 local json_special=$'Example "Org" \\ relay\nsecond line'
 query_scope="reputation"
-fullIP=1
+fullIP=0
 mode_lite=0
 IP="198.51.100.23"
 IPhide="198.51.*.*"
@@ -660,6 +673,7 @@ maxmind[regcountrycode]="US"
 ipinfo[susetype]="${stype[hosting]}"
 ip2location[score]="3"
 ipqs[score]="100"
+ipqs[status]="ok"
 ipapi[risk]=$'High "quoted"'
 ipqs[proxy]="true"
 ping0[status]="verified"
@@ -685,9 +699,11 @@ print -r -- "$ipjson"|jq -e --arg expected "$json_special" '
   .ScoreMeta.IP2LOCATION.Scale == "0-99 potential risk" and
   .ScoreMeta.ipapi.Band == "High \"quoted\"" and
   .ScoreMeta.IPQS.Band == null and
+  .ScoreMeta.IPQS.Status == "ok" and
   .Factor.Proxy.IPQS == true and
   .Factor.VPN.IPinfo == null and
   .Ping0.Organization == $expected and
+  .Routing.Prefix == "198.51.*.*/24" and
   .Exposure.Ports == [22, 443] and
   .Mail.Port25 == null
 ' >/dev/null||{
@@ -788,6 +804,24 @@ local -a ip_parts=("${(@s:.:)1}")
 IPhide="${ip_parts[0]}.${ip_parts[1]}.*.*"
 else
 IPhide=""
+fi
+}
+mask_network_prefix(){
+typeset prefix="$1"
+typeset address="${prefix%/*}"
+typeset prefix_length="${prefix##*/}"
+[[ -n "$address" && "$prefix" != "$address" && "$prefix_length" == <-> ]]||return 1
+if [[ "$address" == *:* ]];then
+typeset -a parts=("${(@s/:/)address}")
+[[ -n "${parts[0]}" && -n "${parts[1]}" ]]||{
+print -rn -- "*::/$prefix_length"
+return 0
+}
+print -rn -- "${parts[0]}:${parts[1]}:*::/$prefix_length"
+else
+typeset -a parts=("${(@s:.:)address}")
+(( ${#parts[@]} == 4 ))||return 1
+print -rn -- "${parts[0]}.${parts[1]}.*.*/$prefix_length"
 fi
 }
 is_valid_ipv6(){
@@ -1293,8 +1327,12 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}IPQS $Font_Suffix"
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-5-${sinfo[ldatabase]}))
 ipqs=()
-local RESPONSE=$(curl_safe $CurlARG -sL -$1 -m 10 "https://ipinfo.check.place/$IP?db=ipqualityscore")
+ipqs[status]="unknown"
+local RESPONSE=$(curl_safe $CurlARG -sL -$1 -m 10 --max-filesize 65536 "https://ipinfo.check.place/$IP?db=ipqualityscore")
 provider_json_is_object "$RESPONSE"||RESPONSE=""
+if ipqualityscore_parse_unavailability "$RESPONSE";then
+ipqs[status]="${ipqualityscore_unavailable[status]}"
+fi
 ipqs[score]=$(echo "$RESPONSE"|jq -r '.fraud_score')
 if ! provider_integer_in_range "${ipqs[score]}" 0 100;then
 ipqs[score]=""
@@ -1306,6 +1344,9 @@ ipqs[tor]=$(echo "$RESPONSE"|jq -r '.tor')
 ipqs[vpn]=$(echo "$RESPONSE"|jq -r '.vpn')
 ipqs[abuser]=$(echo "$RESPONSE"|jq -r '.recent_abuse')
 ipqs[robot]=$(echo "$RESPONSE"|jq -r '.bot_status')
+if provider_has_observation "${ipqs[score]}" "${ipqs[countrycode]}" "${ipqs[proxy]}" "${ipqs[tor]}" "${ipqs[vpn]}" "${ipqs[abuser]}" "${ipqs[robot]}";then
+ipqs[status]="ok"
+fi
 }
 db_ping0(){
 local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Ping0 public geo $Font_Suffix"
@@ -1365,6 +1406,8 @@ internetdb[port_count]="${internetdb_parsed[port_count]}"
 internetdb[vulnerability_count]="${internetdb_parsed[vulnerability_count]}"
 internetdb[tags]="${internetdb_parsed[tags]}"
 internetdb[hostname_count]="${internetdb_parsed[hostname_count]}"
+elif internetdb_parse_unavailability "$RESPONSE";then
+internetdb[status]="${internetdb_unavailable[status]}"
 fi
 }
 function check_ip_valide(){
@@ -2231,6 +2274,10 @@ fi
 
 local displayed_ip="${IPhide:-}"
 [[ $fullIP -eq 1 ]]&&displayed_ip="${IP:-}"
+local displayed_routing_prefix="${ripestat[prefix]:-}"
+if [[ $fullIP -ne 1 && -n "$displayed_routing_prefix" ]];then
+displayed_routing_prefix=$(mask_network_prefix "$displayed_routing_prefix")||displayed_routing_prefix=""
+fi
 ipjson=$(jq -n \
 --arg head_ip "$displayed_ip" \
 --arg head_command "${shead[command]:-}" \
@@ -2262,6 +2309,7 @@ ipjson=$(jq -n \
 --arg band_ipapi "$(clean_ansi "${ipapi[risk]:-}")" \
 --arg band_abuse "$(clean_ansi "${abuseipdb[risk]:-}")" \
 --arg band_ipqs "$(clean_ansi "${ipqs[risk]:-}")" \
+--arg status_ipqs "${ipqs[status]:-unknown}" \
 --arg f_ip2_cc "${ip2location[countrycode]:-}" --arg f_ipapi_cc "${ipapi[countrycode]:-}" \
 --arg f_ipqs_cc "${ipqs[countrycode]:-}" --arg f_scam_cc "${scamalytics[countrycode]:-}" \
 --arg f_ipdata_cc "${ipdata[countrycode]:-}" --arg f_ipinfo_cc "${ipinfo[countrycode]:-}" \
@@ -2310,7 +2358,7 @@ ipjson=$(jq -n \
 --arg ping_location "${ping0[location]:-}" --arg ping_asn "${ping0[asn]:-}" \
 --arg ping_org "${ping0[org]:-}" \
 --arg ping_risk "${ping0[riskstatus]:-official_public_endpoint_does_not_expose_risk}" \
---arg routing_status "${ripestat[status]:-unknown}" --arg routing_prefix "${ripestat[prefix]:-}" \
+--arg routing_status "${ripestat[status]:-unknown}" --arg routing_prefix "$displayed_routing_prefix" \
 --arg routing_origins "${ripestat[origins]:-}" \
 --arg exposure_status "${internetdb[status]:-unknown}" --arg exposure_ports "${internetdb[ports]:-}" \
 --arg exposure_port_count "${internetdb[port_count]:-}" \
@@ -2354,7 +2402,7 @@ def numberlist($value): [list($value)[] | try tonumber catch empty];
     SCAMALYTICS: {Band: opt($band_scam), Scale: "0-100 fraud"},
     ipapi: {Band: opt($band_ipapi), Scale: "0-100% abuse"},
     AbuseIPDB: {Band: opt($band_abuse), Scale: "0-100 confidence"},
-    IPQS: {Band: opt($band_ipqs), Scale: "0-100 fraud"}
+    IPQS: {Band: opt($band_ipqs), Scale: "0-100 fraud", Status: $status_ipqs}
   },
   Factor: {
     CountryCode: {IP2LOCATION: factor($f_ip2_cc), ipapi: factor($f_ipapi_cc), IPQS: factor($f_ipqs_cc), SCAMALYTICS: factor($f_scam_cc), ipdata: factor($f_ipdata_cc), IPinfo: factor($f_ipinfo_cc)},
@@ -2456,6 +2504,7 @@ show_factor
 show_ping0
 show_routing
 show_exposure
+show_unavailable_sources
 fi
 scope_includes media-ai&&show_media
 scope_includes mail&&show_mail $2
@@ -2467,7 +2516,6 @@ save_json||return 70
 fi
 [[ mode_json -eq 0 ]]&&echo -ne "\r$ip_report\n"
 [[ mode_json -eq 1 ]]&&echo -ne "\r$ipjson\n"
-echo -ne "\r\n"
 if [[ mode_output -eq 1 ]];then
 write_report_output "$ip_report"||return $?
 fi

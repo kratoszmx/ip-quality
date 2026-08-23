@@ -2,6 +2,23 @@
 # not a reputation score; missing data is kept unknown rather than called clean.
 
 typeset -gA internetdb_parsed=()
+typeset -gA internetdb_unavailable=()
+
+internetdb_parse_unavailability(){
+emulate -LR zsh
+typeset response="$1"
+typeset detail
+
+internetdb_unavailable=()
+print -rn -- "$response"|jq -e '
+  type == "object" and
+  (.detail | type == "string" and length <= 512)
+' >/dev/null 2>&1||return 1
+detail=$(print -rn -- "$response"|jq -r '.detail')
+[[ "${detail:l}" == *"no information available"* ]]||return 1
+internetdb_unavailable[status]="not_found"
+return 0
+}
 
 internetdb_parse_response(){
 emulate -LR zsh

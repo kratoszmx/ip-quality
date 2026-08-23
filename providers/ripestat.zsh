@@ -18,7 +18,10 @@ print -rn -- "$response"|jq -e '
   (.data.prefix | type == "string") and
   (.data.asns | type == "array") and
   (.data.asns | length <= 64) and
-  all(.data.asns[]; type == "number" and . >= 0 and . <= 4294967295)
+  all(.data.asns[];
+    (type == "number" and . >= 0 and . <= 4294967295 and floor == .) or
+    (type == "string" and test("^[0-9]{1,10}$") and
+      (tonumber >= 0 and tonumber <= 4294967295)))
 ' >/dev/null 2>&1||return 1
 
 prefix=$(print -rn -- "$response"|jq -r '.data.prefix')

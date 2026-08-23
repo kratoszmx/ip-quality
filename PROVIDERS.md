@@ -30,6 +30,10 @@ or malformed addresses are not accepted as a successful public result.
 “Upstream relay” is intentionally visible in the report model: it is not treated
 as equivalent to a user-owned subscription to each vendor's official API. If a
 relay or direct page changes schema, its result is unknown rather than clean.
+Allowlisted provider failures are kept more specific: an exhausted upstream
+IPQualityScore credit pool is reported as such, and Shodan's documented
+no-information response is reported as no public record. Neither state is a
+clean reputation result, and arbitrary upstream error text is never echoed.
 Score scales are shown per provider and are not averaged. A textual label is
 shown only when that provider explicitly returned it. The reporter does not
 invent a band from local thresholds: a missing label remains `Unknown`, even
@@ -70,8 +74,11 @@ mismatch is `unknown`/rejected, never clean. See the
 [official risk-score FAQ](https://ping0.cc/ip/faq).
 
 RIPEstat's documented Network Info endpoint returns the covering prefix and
-origin ASN set using RIPE routing data. Shodan InternetDB is a no-key,
-non-commercial public lookup updated from Shodan's InternetDB dataset. Neither
+origin ASN set using RIPE routing data. The live API may encode ASN members as
+decimal strings or JSON numbers; the strict parser accepts both forms, validates
+the 32-bit ASN range, and normalizes report values to `AS<number>`. Shodan
+InternetDB is a no-key, non-commercial public lookup updated from Shodan's
+InternetDB dataset. Neither
 source makes a cleanliness judgment, so the terminal and JSON reports keep
 them under routing/exposure context rather than the risk-score table. See the
 [RIPEstat Network Info documentation](https://stat.ripe.net/docs/data-api/api-endpoints/network-info.html),
