@@ -5,6 +5,13 @@ emulate -LR zsh
 print -rn -- "$1"|jq -e 'type == "object"' >/dev/null 2>&1
 }
 
+provider_integer_in_range(){
+emulate -LR zsh
+(( $# == 3 ))||return 1
+[[ "$1" == <-> && "$2" == <-> && "$3" == <-> ]]||return 1
+(( $1 >= $2 && $1 <= $3 ))
+}
+
 provider_merge_boolean_signals(){
 emulate -LR zsh
 typeset signal

@@ -58,6 +58,8 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   provider-specific scales, stable `Unknown` values, and green/red factor colors;
 - removed locally synthesized risk bands from relay scores; only a provider's
   explicitly returned text label is displayed, while absent labels stay unknown;
+- corrected the IP2Location/IP2Proxy fraud-score contract to its documented
+  0–99 potential-risk scale instead of presenting it as 0–100;
 - added a zsh entrypoint backed by source-auditable system-Ruby libraries that
   select one cached remote Clash Verge subscription independently of the active
   profile, extract one exact inline leaf, and own a temporary loopback-only

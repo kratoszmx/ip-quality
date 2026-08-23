@@ -20,7 +20,7 @@ or malformed addresses are not accepted as a successful public result.
 | Scamalytics via `ipinfo.check.place` | Upstream relay | score, proxy, VPN, Tor, blacklist/bot indicators |
 | ipapi.is | Direct public API | ASN/type, provider-supplied abuser-score label, and risk factors |
 | AbuseIPDB via `ipinfo.check.place` | Upstream relay | abuse score and usage/risk factors |
-| IP2Location via `ipinfo.check.place` | Upstream relay | fraud score and proxy-category factors |
+| IP2Location via `ipinfo.check.place` | Upstream relay | 0–99 potential-risk score and proxy-category factors |
 | ipdata via `ipinfo.check.place` | Upstream relay | country and threat factors |
 | IPQualityScore via `ipinfo.check.place` | Upstream relay | fraud score and proxy/VPN/Tor/bot factors |
 | Ping0 public `/geo` | Direct official public endpoint | returned IP, location, ASN, and organization; the returned IP must exactly match the tested address |
@@ -95,6 +95,7 @@ official API also requires an API key, and its `abuseConfidenceScore` is kept as
 a confidence scale rather than converted into a local low/high verdict. See the
 [IPQualityScore response parameters](https://www.ipqualityscore.com/documentation/proxy-detection-api/response-parameters),
 [IPQualityScore advanced options](https://www.ipqualityscore.com/documentation/proxy-detection-api/advanced-options),
+the [IP2Location IP2Proxy field documentation](https://www.ip2location.com/documentation/ip2proxy-libraries/lua/api),
 and [AbuseIPDB API documentation](https://docs.abuseipdb.com/).
 
 The former DB-IP HTML scraper is removed. It depended on an unversioned page

@@ -124,18 +124,18 @@ show_score(){
 print -r -- "$Font_B${sscore[title]}$Font_Suffix"
 if [[ "$YY" == "cn" ]];then
 print -r -- "不同平台的分值定义不可直接横向比较；仅显示平台明确返回的标签，本程序不生成本地阈值标签；未知不等于低风险。"
-report_table_row "${Font_B}参数${Font_Suffix}" 12 18 "$Font_B$Font_Cyan IP2Location$Font_Suffix" "$Font_B$Font_Cyan Scamalytics$Font_Suffix" "$Font_B$Font_Cyan ipapi.is$Font_Suffix" "$Font_B$Font_Cyan AbuseIPDB$Font_Suffix" "$Font_B$Font_Cyan IPQualityScore$Font_Suffix"
-report_table_rule 5 12 18
-report_table_row "分值" 12 18 "$(report_neutral_value "${ip2location[score]}")" "$(report_neutral_value "${scamalytics[score]}")" "$(report_neutral_value "${ipapi[score]}")" "$(report_neutral_value "${abuseipdb[score]}")" "$(report_neutral_value "${ipqs[score]}")"
-report_table_row "分段／标签" 12 18 "$(report_preserved_value "${ip2location[risk]}")" "$(report_preserved_value "${scamalytics[risk]}")" "$(report_preserved_value "${ipapi[risk]}")" "$(report_preserved_value "${abuseipdb[risk]}")" "$(report_preserved_value "${ipqs[risk]}")"
-report_table_row "量表" 12 18 "$(report_neutral_value '0-100 fraud')" "$(report_neutral_value '0-100 fraud')" "$(report_neutral_value '0-100% abuse')" "$(report_neutral_value '0-100 confidence')" "$(report_neutral_value '0-100 fraud')"
+report_table_row "${Font_B}参数${Font_Suffix}" 12 20 "$Font_B$Font_Cyan IP2Location$Font_Suffix" "$Font_B$Font_Cyan Scamalytics$Font_Suffix" "$Font_B$Font_Cyan ipapi.is$Font_Suffix" "$Font_B$Font_Cyan AbuseIPDB$Font_Suffix" "$Font_B$Font_Cyan IPQualityScore$Font_Suffix"
+report_table_rule 5 12 20
+report_table_row "分值" 12 20 "$(report_neutral_value "${ip2location[score]}")" "$(report_neutral_value "${scamalytics[score]}")" "$(report_neutral_value "${ipapi[score]}")" "$(report_neutral_value "${abuseipdb[score]}")" "$(report_neutral_value "${ipqs[score]}")"
+report_table_row "分段／标签" 12 20 "$(report_preserved_value "${ip2location[risk]}")" "$(report_preserved_value "${scamalytics[risk]}")" "$(report_preserved_value "${ipapi[risk]}")" "$(report_preserved_value "${abuseipdb[risk]}")" "$(report_preserved_value "${ipqs[risk]}")"
+report_table_row "量表" 12 20 "$(report_neutral_value '0-99 potential risk')" "$(report_neutral_value '0-100 fraud')" "$(report_neutral_value '0-100% abuse')" "$(report_neutral_value '0-100 confidence')" "$(report_neutral_value '0-100 fraud')"
 else
 print -r -- "Provider scores are not directly comparable; labels appear only when explicitly returned by a provider, and this reporter invents no local threshold labels; Unknown never means low risk."
-report_table_row "${Font_B}Field${Font_Suffix}" 12 18 "$Font_B$Font_Cyan IP2Location$Font_Suffix" "$Font_B$Font_Cyan Scamalytics$Font_Suffix" "$Font_B$Font_Cyan ipapi.is$Font_Suffix" "$Font_B$Font_Cyan AbuseIPDB$Font_Suffix" "$Font_B$Font_Cyan IPQualityScore$Font_Suffix"
-report_table_rule 5 12 18
-report_table_row "Score" 12 18 "$(report_neutral_value "${ip2location[score]}")" "$(report_neutral_value "${scamalytics[score]}")" "$(report_neutral_value "${ipapi[score]}")" "$(report_neutral_value "${abuseipdb[score]}")" "$(report_neutral_value "${ipqs[score]}")"
-report_table_row "Band / label" 12 18 "$(report_preserved_value "${ip2location[risk]}")" "$(report_preserved_value "${scamalytics[risk]}")" "$(report_preserved_value "${ipapi[risk]}")" "$(report_preserved_value "${abuseipdb[risk]}")" "$(report_preserved_value "${ipqs[risk]}")"
-report_table_row "Scale" 12 18 "$(report_neutral_value '0-100 fraud')" "$(report_neutral_value '0-100 fraud')" "$(report_neutral_value '0-100% abuse')" "$(report_neutral_value '0-100 confidence')" "$(report_neutral_value '0-100 fraud')"
+report_table_row "${Font_B}Field${Font_Suffix}" 12 20 "$Font_B$Font_Cyan IP2Location$Font_Suffix" "$Font_B$Font_Cyan Scamalytics$Font_Suffix" "$Font_B$Font_Cyan ipapi.is$Font_Suffix" "$Font_B$Font_Cyan AbuseIPDB$Font_Suffix" "$Font_B$Font_Cyan IPQualityScore$Font_Suffix"
+report_table_rule 5 12 20
+report_table_row "Score" 12 20 "$(report_neutral_value "${ip2location[score]}")" "$(report_neutral_value "${scamalytics[score]}")" "$(report_neutral_value "${ipapi[score]}")" "$(report_neutral_value "${abuseipdb[score]}")" "$(report_neutral_value "${ipqs[score]}")"
+report_table_row "Band / label" 12 20 "$(report_preserved_value "${ip2location[risk]}")" "$(report_preserved_value "${scamalytics[risk]}")" "$(report_preserved_value "${ipapi[risk]}")" "$(report_preserved_value "${abuseipdb[risk]}")" "$(report_preserved_value "${ipqs[risk]}")"
+report_table_row "Scale" 12 20 "$(report_neutral_value '0-99 potential risk')" "$(report_neutral_value '0-100 fraud')" "$(report_neutral_value '0-100% abuse')" "$(report_neutral_value '0-100 confidence')" "$(report_neutral_value '0-100 fraud')"
 fi
 }
 

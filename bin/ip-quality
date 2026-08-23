@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-08-23-standalone.2"
+script_version="v2026-08-23-standalone.3"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset REPORT_DIR="$SCRIPT_DIR/report"
@@ -408,10 +408,6 @@ local requested="$1"
 [[ "$query_scope" == "full" || "$query_scope" == "$requested" ]]
 }
 
-is_score_0_to_100(){
-[[ "$1" == <-> ]]&&(( $1 >= 0 && $1 <= 100 ))
-}
-
 is_nonnegative_decimal(){
 local decimal_pattern='^[0-9]+([.][0-9]+)?$'
 [[ "$1" =~ $decimal_pattern ]]
@@ -525,7 +521,7 @@ print -ru2 -- "SELF-TEST FAILED: not running under zsh"
 return 1
 }
 local reference_file
-for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json" "$COMMON_PROVIDER_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$reference_file" && -r "$reference_file" && ! -L "$reference_file" ]]||{
 print -ru2 -- "SELF-TEST FAILED: unsafe or missing reference file: $reference_file"
 return 1
@@ -582,7 +578,7 @@ is_valid_ipv6 "2001:::1"&&{
 print -ru2 -- "SELF-TEST FAILED: invalid IPv6 accepted"
 return 1
 }
-is_score_0_to_100 "0"&&is_score_0_to_100 "100"&&! is_score_0_to_100 "null"&&! is_score_0_to_100 "101"||{
+provider_integer_in_range "0" 0 100&&provider_integer_in_range "100" 0 100&&! provider_integer_in_range "null" 0 100&&! provider_integer_in_range "100" 0 99||{
 print -ru2 -- "SELF-TEST FAILED: risk score validation changed"
 return 1
 }
@@ -686,6 +682,7 @@ print -r -- "$ipjson"|jq -e --arg expected "$json_special" '
   .Info.Organization == $expected and
   .Type.Source.IPinfo == "public demo widget" and
   .Score.IPQS == "100" and
+  .ScoreMeta.IP2LOCATION.Scale == "0-99 potential risk" and
   .ScoreMeta.ipapi.Band == "High \"quoted\"" and
   .ScoreMeta.IPQS.Band == null and
   .Factor.Proxy.IPQS == true and
@@ -1060,7 +1057,7 @@ scamalytics[robot2]=$(echo "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_bo
 scamalytics[robot3]=$(echo "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_bot_semrush')
 scamalytics[robot]=$(provider_merge_boolean_signals "${scamalytics[robot1]}" "${scamalytics[robot2]}" "${scamalytics[robot3]}")
 scamalytics[score]=$(echo "$RESPONSE"|jq -r '.scamalytics.scamalytics_score')
-if ! is_score_0_to_100 "${scamalytics[score]}";then
+if ! provider_integer_in_range "${scamalytics[score]}" 0 100;then
 scamalytics[score]=""
 fi
 scamalytics[risk]=""
@@ -1182,7 +1179,7 @@ case ${abuseipdb[usetype]} in
 *)abuseipdb[susetype]="${stype[other]}"
 esac
 abuseipdb[score]=$(echo "$RESPONSE"|jq -r '.data.abuseConfidenceScore')
-if ! is_score_0_to_100 "${abuseipdb[score]}";then
+if ! provider_integer_in_range "${abuseipdb[score]}" 0 100;then
 abuseipdb[score]=""
 fi
 abuseipdb[risk]=""
@@ -1270,7 +1267,7 @@ ip2location[robot2]=$(echo "$RESPONSE"|jq -r '.proxy.is_scanner')
 ip2location[robot3]=$(echo "$RESPONSE"|jq -r '.proxy.is_botnet')
 ip2location[robot]=$(provider_merge_boolean_signals "${ip2location[robot1]}" "${ip2location[robot2]}" "${ip2location[robot3]}")
 ip2location[score]=$(echo "$RESPONSE"|jq -r '.fraud_score')
-if ! is_score_0_to_100 "${ip2location[score]}";then
+if ! provider_integer_in_range "${ip2location[score]}" 0 99;then
 ip2location[score]=""
 fi
 ip2location[risk]=""
@@ -1299,7 +1296,7 @@ ipqs=()
 local RESPONSE=$(curl_safe $CurlARG -sL -$1 -m 10 "https://ipinfo.check.place/$IP?db=ipqualityscore")
 provider_json_is_object "$RESPONSE"||RESPONSE=""
 ipqs[score]=$(echo "$RESPONSE"|jq -r '.fraud_score')
-if ! is_score_0_to_100 "${ipqs[score]}";then
+if ! provider_integer_in_range "${ipqs[score]}" 0 100;then
 ipqs[score]=""
 fi
 ipqs[risk]=""
@@ -2353,7 +2350,7 @@ def numberlist($value): [list($value)[] | try tonumber catch empty];
   },
   Score: {IP2LOCATION: opt($score_ip2), SCAMALYTICS: opt($score_scam), ipapi: opt($score_ipapi), AbuseIPDB: opt($score_abuse), IPQS: opt($score_ipqs)},
   ScoreMeta: {
-    IP2LOCATION: {Band: opt($band_ip2), Scale: "0-100 fraud"},
+    IP2LOCATION: {Band: opt($band_ip2), Scale: "0-99 potential risk"},
     SCAMALYTICS: {Band: opt($band_scam), Scale: "0-100 fraud"},
     ipapi: {Band: opt($band_ipapi), Scale: "0-100% abuse"},
     AbuseIPDB: {Band: opt($band_abuse), Scale: "0-100 confidence"},

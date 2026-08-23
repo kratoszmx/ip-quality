@@ -93,7 +93,7 @@ Run from the repository root:
 /bin/zsh -f bin/ip-quality --self-test
 ```
 
-The full offline suite currently has 34 runs and 422 assertions. A read-only
+The full offline suite currently has 34 runs and 424 assertions. A read-only
 probe of the real Clash Verge cache also resolved a remote subscription and an
 exact inline leaf, then passed Mihomo `-t` without starting a listener or making
 an IP-provider lookup. Afterward, the project workspace residue count was zero in

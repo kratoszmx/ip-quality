@@ -177,6 +177,8 @@ class IpQualityTest < Minitest::Test
       source "$1"
       provider_json_is_object '{"provider":"fixture"}' || exit 1
       provider_json_is_object '[]' && exit 2
+      provider_integer_in_range 99 0 99 || exit 3
+      provider_integer_in_range 100 0 99 && exit 4
       print -r -- "$(provider_merge_boolean_signals false true null)|$(provider_merge_boolean_signals false false)|$(provider_merge_boolean_signals false null)"
     ZSH
     stdout, stderr, status = Open3.capture3(
@@ -230,6 +232,7 @@ class IpQualityTest < Minitest::Test
     assert_match(/分值\s+\|\s+21/, stdout)
     assert_includes stdout, "分段／标签"
     assert_includes stdout, "量表"
+    assert_includes stdout, "0-99 potential risk"
     assert_includes stdout, "Scamalytics"
     assert_includes stdout, "仅显示平台明确返回的标签"
     assert_includes stdout, "未知不等于低风险"
