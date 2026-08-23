@@ -89,11 +89,18 @@ exact inline leaf, then passed Mihomo `-t` without starting a listener or making
 an IP-provider lookup. Afterward, the project workspace residue count was zero in
 the preferred private temporary parent, macOS `TMPDIR`, and `/tmp`.
 
-## Migration gate
+## Completed parent extraction
 
-Do not remove the original parent subtree until a committed standalone `main` is
-verified in the local origin, USB mirror, and at least one private online remote.
-After removal, delete only the parent repository's explicit IP-quality routing
-entries, run its complete offline suite, commit only those extraction changes,
-and push its local origin and USB mirror. Record the resulting parent commit here
-in a follow-up documentation commit.
+The original `network-manager/ip-quality/` subtree and its explicit root routing
+entries were removed in parent commit
+`e88a5c48ebd3dadea065a2d361f39fc9d5bdf793` (`refactor: extract IP quality
+project`). That commit passed the complete parent offline aggregate in a clean,
+detached worktree and was pushed to both:
+
+- `/Users/zmx/gitrepos/network-manager.git`
+- `/Volumes/USB/gitreposbak/network-manager.git`
+
+Both parent remotes resolve `refs/heads/main` to the same extraction commit. The
+current parent tree has no `ip-quality/` directory and no active `ip-quality`,
+`test-clash-leaf`, or `ip_quality` routing reference. Historical parent commits
+remain ordinary Git recovery evidence; all maintained code now lives here.
