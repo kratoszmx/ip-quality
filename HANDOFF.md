@@ -17,6 +17,9 @@ REST and GraphQL creation with `Resource not accessible by personal access
 token`. The stored main-account token can authenticate as `kratoszmx`, but it
 does not have repository-creation authority. Never replace the target silently
 or place a token in this repository's remote URLs or Git configuration.
+The `usb` remote uses `scripts/git-receive-pack-usb-clean`, an exact-target
+receive wrapper that runs macOS `dot_clean` after each receive attempt so
+AppleDouble sidecars cannot remain as invalid Git refs or object names.
 
 ## Extracted history
 
@@ -76,6 +79,7 @@ Run from the repository root:
 
 ```text
 /bin/zsh -n bin/ip-quality bin/test-clash-leaf scripts/test-offline providers/*.zsh report/*.zsh
+/bin/sh -n scripts/git-receive-pack-usb-clean
 /usr/bin/ruby -c leaf_runner/command.rb
 /usr/bin/ruby -c leaf_runner/isolated_mihomo_session.rb
 /usr/bin/ruby -c leaf_runner/safe_snapshot.rb
@@ -83,7 +87,7 @@ Run from the repository root:
 /bin/zsh -f bin/ip-quality --self-test
 ```
 
-The full offline suite currently has 32 runs and 401 assertions. A read-only
+The full offline suite currently has 33 runs and 412 assertions. A read-only
 probe of the real Clash Verge cache also resolved a remote subscription and an
 exact inline leaf, then passed Mihomo `-t` without starting a listener or making
 an IP-provider lookup. Afterward, the project workspace residue count was zero in

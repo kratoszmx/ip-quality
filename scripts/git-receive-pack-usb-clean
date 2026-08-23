@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+repo="${1:-}"
+expected="/Volumes/USB/gitreposbak/ipquality.git"
+
+if [ "$repo" != "$expected" ]; then
+  echo "ERROR: refusing unexpected receive-pack target" >&2
+  exit 2
+fi
+
+status=0
+/usr/bin/git-receive-pack "$repo" || status=$?
+/usr/sbin/dot_clean -m "$repo" >/dev/null 2>&1 || true
+exit "$status"

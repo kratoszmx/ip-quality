@@ -58,6 +58,8 @@ reporter derived from `xykt/IPQuality`.
   collapsed into one synthetic score.
 - `ref/`: runtime reference data; `test/fixtures/`: sanitized test data.
 - `scripts/test-offline`: complete fixture-only validation entrypoint.
+- `scripts/git-receive-pack-usb-clean`: exact-target USB receive wrapper that
+  removes invalid macOS AppleDouble sidecars after each push.
 - `HANDOFF.md`: current state, validated commands, Git identities, and migration
   status for the next agent.
 
@@ -84,6 +86,9 @@ reporter derived from `xykt/IPQuality`.
 - Add new network providers with a saved, sanitized fixture and parser contract.
 - Run the complete offline suite from the repository root with
   `/bin/zsh -f scripts/test-offline`.
+- Keep the `usb` remote's receive-pack command configured to
+  `scripts/git-receive-pack-usb-clean`; direct pushes to this USB filesystem can
+  create `._*` sidecars that make Git object verification noisy or invalid.
 - Focused validation uses `/usr/bin/ruby test/ip_quality_test.rb` or
   `/usr/bin/ruby test/clash_leaf_runner_test.rb`. The runtime entrypoint still
   uses `--disable-gems`; tests use the system-bundled `minitest` default gem.

@@ -401,6 +401,17 @@ class IpQualityTest < Minitest::Test
     end
   end
 
+  def test_usb_receive_wrapper_is_exact_target_and_cleans_appledouble_sidecars
+    wrapper = File.join(ROOT, "scripts", "git-receive-pack-usb-clean")
+    source = File.read(wrapper, encoding: "UTF-8")
+
+    assert File.executable?(wrapper)
+    assert_includes source, 'expected="/Volumes/USB/gitreposbak/ipquality.git"'
+    assert_includes source, '/usr/bin/git-receive-pack "$repo"'
+    assert_includes source, '/usr/sbin/dot_clean -m "$repo"'
+    assert_includes source, 'if [ "$repo" != "$expected" ]'
+  end
+
   private
 
   def run_script(*arguments)
