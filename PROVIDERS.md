@@ -87,12 +87,19 @@ and [Shodan InternetDB](https://internetdb.shodan.io/).
 
 ## Source-selection rationale
 
-The report prefers an official public endpoint when one is useful without a
-credential. It retains the named Check.Place relay rows for breadth because the
-corresponding formal AbuseIPDB, IPQualityScore, IP2Location, ipdata, and
-Scamalytics products require customer access or credentials. Relay results are
-therefore labeled `Upstream relay`, kept separate by provider, and never treated
-as equivalent to a user-owned vendor API.
+The working source order is intentionally simple:
+
+1. Core official-contract observations: ipapi.is, Ping0, RIPEstat, and Shodan
+   InternetDB.
+2. Supplementary direct observation: IPinfo's public demo widget.
+3. Supplementary relay observations: the named Check.Place-backed rows.
+
+The relay rows remain useful for cross-checking type and risk signals, especially
+when the corresponding formal AbuseIPDB, IPQualityScore, IP2Location, ipdata, and
+Scamalytics APIs require customer access. They are labeled `Upstream relay` and
+never silently promoted to the core tier. A wholly unavailable source disappears
+from the matrices and is named once in the compact availability summary, so
+keeping supplementary breadth does not recreate a wall of `Unknown` cells.
 
 Even where a vendor publishes suggested decision thresholds, this relay-based
 report does not synthesize a vendor label. For example, IPQualityScore documents
@@ -105,15 +112,34 @@ a confidence scale rather than converted into a local low/high verdict. See the
 the [IP2Location IP2Proxy field documentation](https://www.ip2location.com/documentation/ip2proxy-libraries/lua/api),
 and [AbuseIPDB API documentation](https://docs.abuseipdb.com/).
 
-The former DB-IP HTML scraper is removed. It depended on an unversioned page
-layout and invented numeric values 0/50/100 from qualitative labels. This was
-both brittle and misleading. GreyNoise Community is a useful future optional
-source for internet-scanner context, but unauthenticated use is limited to ten
-lookups per day and authenticated community use is also quota-bound; it should
-be enabled only through a secret-managed optional provider rather than consumed
-by every default report. See the
-[GreyNoise Community API policy](https://docs.greynoise.io/docs/using-the-greynoise-community-api)
-and [official AbuseIPDB API documentation](https://docs.abuseipdb.com/).
+The former DB-IP HTML scraper is removed. In practice, scraping an unversioned
+page and turning qualitative labels into invented 0/50/100 values produced more
+confidence than evidence.
+
+### Candidate review
+
+- IpScore has a documented bearer-authenticated JSON API and returns separate
+  fraud, risk, abuse, and Scamalytics fields. It is the strongest candidate from
+  the suggested list once a user-owned API token and the desired score semantics
+  are available. See the [IpScore API overview](https://docs.ipscore.me/) and
+  [official `/check-ip` contract](https://docs.ipscore.me/checkers/check-ip).
+- IPLeak is an AirVPN-operated browser/DNS/routing leak diagnostic. Its own page
+  says the location data is partly MaxMind-based and may be cached. It is useful
+  as a separate interactive leak test, not as another reputation-score column in
+  this non-browser reporter. See [IPLeak's official service description](https://ipleak.net/about).
+- Whoer combines IP data with browser fingerprint, WebRTC, DNS, language, time,
+  and other interactive signals. That score answers browser disguise/leakage,
+  not the exact-leaf reputation question. See [Whoer's official test description](https://whoer.net/).
+- Wave Broadband is an ISP, not an IP reputation dataset or documented lookup
+  API, so an ASN owned by Wave can appear as a result but Wave is not queried as
+  a scoring provider.
+- GreyNoise Community and VirusTotal are credible optional threat-intelligence
+  candidates. GreyNoise describes whether an address has been observed scanning
+  the Internet; VirusTotal exposes engine detections and community reputation.
+  Those dimensions should become their own optional threat-intelligence section
+  after credential handling is selected, rather than being folded into a generic
+  residential-IP score. See the [GreyNoise Community API guide](https://docs.greynoise.io/docs/using-the-greynoise-community-api)
+  and [VirusTotal IP object contract](https://docs.virustotal.com/reference/ip-object).
 
 ## Media and AI scope
 

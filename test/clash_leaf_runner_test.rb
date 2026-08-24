@@ -32,19 +32,112 @@ class ClashLeafRunnerTest < Minitest::Test
       command = IpQuality::ClashLeafCommand.new(
         stdout: stdout,
         stderr: stderr,
-        stdin: StringIO.new("1\n2\n"),
+        stdin: StringIO.new("2\n2\n"),
         app_root: directory
       )
 
       exit_code = command.run([])
 
       assert_equal 0, exit_code
-      assert_includes stdout.string, "Cached remote subscriptions:"
+      assert_includes stdout.string, "Available test routes:"
+      assert_includes stdout.string, "Direct connection"
+      assert_includes stdout.string, "Cached subscription: Fixture Remote"
       assert_includes stdout.string, "Available inline leaves"
       assert_includes stdout.string, "exact leaf: TargetLeaf"
       refute_match(/\d+ inline leaves/, stdout.string)
       assert_empty stderr.string
     end
+  end
+
+  def test_default_route_selector_can_choose_direct_without_loading_a_leaf
+    Dir.mktmpdir("ip-quality-direct-select-") do |directory|
+      write_clash_verge_fixture(directory)
+      stdout = StringIO.new
+      stderr = StringIO.new
+      command = IpQuality::ClashLeafCommand.new(
+        stdout: stdout,
+        stderr: stderr,
+        stdin: StringIO.new("1\n"),
+        app_root: directory
+      )
+
+      exit_code = command.run([])
+
+      assert_equal 0, exit_code
+      assert_includes stdout.string, "Available test routes:"
+      assert_includes stdout.string, "Direct route plan"
+      assert_includes stdout.string, "no temporary Mihomo process"
+      refute_includes stdout.string, "Available inline leaves"
+      assert_empty stderr.string
+    end
+  end
+
+  def test_explicit_direct_plan_does_not_require_a_clash_cache
+    Dir.mktmpdir("ip-quality-direct-plan-") do |directory|
+      stdout = StringIO.new
+      stderr = StringIO.new
+      command = IpQuality::ClashLeafCommand.new(
+        stdout: stdout,
+        stderr: stderr,
+        app_root: File.join(directory, "missing-clash-cache")
+      )
+
+      exit_code = command.run(["--direct", "-4"])
+
+      assert_equal 0, exit_code
+      assert_includes stdout.string, "Direct route plan"
+      assert_includes stdout.string, "current system route"
+      assert_includes stdout.string, "system-level VPN or TUN"
+      assert_empty stderr.string
+    end
+  end
+
+  def test_direct_live_report_unsets_proxy_environment_and_forwards_report_options
+    Dir.mktmpdir("ip-quality-direct-live-") do |directory|
+      fake_reporter = File.join(directory, "fake-reporter")
+      arguments_file = File.join(directory, "arguments.txt")
+      File.write(fake_reporter, <<~'ZSH')
+        [[ -z "${HTTP_PROXY+x}${https_proxy+x}${No_PrOxY+x}" ]] || exit 71
+        print -r -- "$@" > "$IPQUALITY_TEST_ARGUMENTS_FILE"
+      ZSH
+      File.chmod(0o700, fake_reporter)
+      stdout = StringIO.new
+      stderr = StringIO.new
+      command = IpQuality::ClashLeafCommand.new(
+        stdout: stdout,
+        stderr: stderr,
+        app_root: File.join(directory, "missing-clash-cache"),
+        reporter_path: fake_reporter
+      )
+
+      exit_code = with_environment(
+        "HTTP_PROXY" => "http://127.0.0.1:1",
+        "https_proxy" => "http://127.0.0.1:2",
+        "No_PrOxY" => "fixture.invalid",
+        "IPQUALITY_TEST_ARGUMENTS_FILE" => arguments_file
+      ) do
+        command.run(["--direct", "--confirm-network-lookup", "-4", "-j"])
+      end
+
+      assert_equal 0, exit_code
+      assert_equal "--confirm-network-lookup --scope reputation -4 -j\n", File.read(arguments_file)
+      assert_empty stdout.string
+      assert_includes stderr.string, "no Mihomo process is started"
+      assert_includes stderr.string, "live Clash state was unchanged"
+      assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"))
+    end
+  end
+
+  def test_direct_rejects_leaf_only_options_before_network_access
+    stdout = StringIO.new
+    stderr = StringIO.new
+    command = IpQuality::ClashLeafCommand.new(stdout: stdout, stderr: stderr)
+
+    exit_code = command.run(["--direct", "--leaf", "TargetLeaf"])
+
+    assert_equal IpQuality::ClashLeafCommand::EX_USAGE, exit_code
+    assert_includes stderr.string, "--direct cannot be combined"
+    assert_empty stdout.string
   end
 
   def test_renderer_keeps_only_the_exact_leaf_and_recursive_dialer_dependencies
@@ -417,5 +510,15 @@ class ClashLeafRunnerTest < Minitest::Test
     true
   rescue Errno::ESRCH
     false
+  end
+
+  def with_environment(overrides)
+    previous = overrides.each_key.to_h { |key| [key, ENV.key?(key) ? ENV[key] : :missing] }
+    overrides.each { |key, value| ENV[key] = value }
+    yield
+  ensure
+    previous.each do |key, value|
+      value == :missing ? ENV.delete(key) : ENV[key] = value
+    end
   end
 end

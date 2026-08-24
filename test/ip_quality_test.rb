@@ -15,6 +15,7 @@ class IpQualityTest < Minitest::Test
   RIPESTAT_LIBRARY = File.join(ROOT, "providers", "ripestat.zsh")
   INTERNETDB_LIBRARY = File.join(ROOT, "providers", "shodan_internetdb.zsh")
   REPUTATION_REPORT = File.join(ROOT, "report", "reputation.zsh")
+  REPORT_OUTPUT = File.join(ROOT, "report", "output.zsh")
   PING0_GEO_FIXTURE = File.join(ROOT, "test", "fixtures", "ping0", "public-geo.txt")
   PING0_CHALLENGE_FIXTURE = File.join(ROOT, "test", "fixtures", "ping0", "challenge.html")
   RIPESTAT_FIXTURE = File.join(ROOT, "test", "fixtures", "ripestat", "network-info.json")
@@ -89,10 +90,71 @@ class IpQualityTest < Minitest::Test
     assert_empty stderr
   end
 
+  def test_json_stdout_preserves_escaped_control_characters
+    output_probe = <<~'ZSH'
+      source "$1"
+      value=$'tab\tline\nterminal\033[31mred\033[0m'
+      payload=$(jq -n --arg value "$value" '{value: $value}') || exit $?
+      report_emit_stdout "$payload"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      output_probe,
+      "report-output-test",
+      REPORT_OUTPUT
+    )
+
+    assert status.success?, stderr
+    assert_equal "tab\tline\nterminal\e[31mred\e[0m", JSON.parse(stdout).fetch("value")
+    assert_empty stderr
+    assert_includes File.read(SCRIPT), 'report_emit_stdout "$ipjson"'
+    refute_match(/echo -ne "\\r\$ipjson/, File.read(SCRIPT))
+    assert_includes File.read(SCRIPT), "Font_Green=$'\\033[32m'"
+    assert_includes File.read(SCRIPT), "Font_Red=$'\\033[31m'"
+    refute_match(/Font_(?:Green|Red)="\\033/, File.read(SCRIPT))
+  end
+
+  def test_terminal_stdout_keeps_real_green_and_red_ansi_bytes
+    output_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      Font_B=$'\033[1m' Font_Red=$'\033[31m' Font_Green=$'\033[32m'
+      Font_Purple=$'\033[35m' Font_Cyan=$'\033[36m' Font_Suffix=$'\033[0m'
+      YY=cn
+      typeset -A sfactor ipinfo ipapi ip2location abuseipdb scamalytics ipqs ipdata
+      sfactor[title]='四、风险因子'
+      ipapi[proxy]=false
+      ipapi[vpn]=true
+      clean_ansi(){ print -rn -- "$1" }
+      source "$1"
+      source "$2"
+      report=$(show_factor)
+      report_emit_stdout "$report"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      output_probe,
+      "report-color-output-test",
+      REPUTATION_REPORT,
+      REPORT_OUTPUT
+    )
+
+    assert status.success?, stderr
+    assert_includes stdout, "\e[32m\e[1m否"
+    assert_includes stdout, "\e[31m\e[1m是"
+    refute_includes stdout, "\\033["
+    assert_empty stderr
+  end
+
   def test_reputation_plan_discloses_ping0_public_result_and_risk_limitation
     stdout, stderr, status = run_script("--scope", "reputation")
 
     assert status.success?, stderr
+    assert_includes stdout, "core official-contract sources"
+    assert_includes stdout, "supplementary sources"
     assert_includes stdout, "Ping0 public geo"
     assert_includes stdout, "official free /geo endpoint"
     assert_includes stdout, "not a risk score"
@@ -461,6 +523,7 @@ class IpQualityTest < Minitest::Test
       RIPESTAT_LIBRARY,
       INTERNETDB_LIBRARY,
       REPUTATION_REPORT,
+      REPORT_OUTPUT,
       PING0_GEO_FIXTURE,
       PING0_CHALLENGE_FIXTURE,
       RIPESTAT_FIXTURE,
@@ -495,6 +558,9 @@ class IpQualityTest < Minitest::Test
     assert_includes providers, "Ping0"
     assert_includes providers, "public `/geo`"
     assert_includes providers, "invent a band from local thresholds"
+    ["IpScore", "IPLeak", "Whoer", "Wave Broadband", "GreyNoise", "VirusTotal"].each do |candidate|
+      assert_includes providers, candidate
+    end
     assert_includes license, "GNU AFFERO GENERAL PUBLIC LICENSE"
   end
 

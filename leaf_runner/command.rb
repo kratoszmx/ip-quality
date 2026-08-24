@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "optparse"
+require_relative "network_environment"
 require_relative "profile"
 require_relative "subscription_catalog"
 require_relative "isolated_mihomo_session"
@@ -33,8 +34,10 @@ module IpQuality
       @leaf_name = nil
       @list_subscriptions = false
       @list_leaves = false
+      @direct = false
       @confirmed = false
       @config_test_only = false
+      @mihomo_explicit = false
       @help_requested = false
       @report_arguments = []
       @family = nil
@@ -57,7 +60,13 @@ module IpQuality
         return 0
       end
 
-      source = load_source
+      if @direct
+        return run_direct_route
+      end
+
+      source = load_selected_source
+      return run_direct_route if source == :direct
+
       profile = ClashLeafProfile.new(source)
 
       if @list_leaves
@@ -96,10 +105,10 @@ module IpQuality
       @stderr.puts "ERROR: #{error.message}"
       EX_UNAVAILABLE
     rescue Interrupt
-      @stderr.puts "Interrupted; isolated Mihomo cleanup completed."
+      @stderr.puts "Interrupted; child-process cleanup completed."
       130
     rescue StandardError => error
-      @stderr.puts "ERROR: isolated leaf runner failed safely (#{error.class})."
+      @stderr.puts "ERROR: route runner failed safely (#{error.class})."
       EX_SOFTWARE
     ensure
       restore_cleanup_signal_handlers
@@ -112,23 +121,30 @@ module IpQuality
         options.banner = <<~BANNER
           Usage:
             test-clash-leaf --confirm-network-lookup [-4|-6] [-f] [-j]
+            test-clash-leaf --direct --confirm-network-lookup [-4|-6] [-f] [-j]
             test-clash-leaf --list-subscriptions
             test-clash-leaf --subscription NAME --list-leaves
             test-clash-leaf --profile PATH --leaf NAME --config-test-only
 
-          By default, choose one cached remote Clash Verge subscription and then one
-          exact inline leaf. The active profile is never used or changed. The leaf is
-          copied into a temporary 127.0.0.1-only Mihomo process.
+          By default, choose direct connection or one cached remote Clash Verge
+          subscription. A subscription route then asks for one exact inline leaf.
+          Direct uses the current system route with proxy environment variables
+          removed. A leaf is copied into a temporary 127.0.0.1-only Mihomo process.
+          The active Clash profile is never used or changed.
         BANNER
         options.on("--list-subscriptions", "List cached remote subscription names without network access") { @list_subscriptions = true }
         options.on("--list-leaves", "List exact inline leaf names without network access") { @list_leaves = true }
         options.on("--select", "Compatibility flag; interactive selection is now the default") { nil }
+        options.on("--direct", "Use the current system route without HTTP(S) proxy environment variables") { @direct = true }
         options.on("--subscription NAME", "Select one cached remote subscription by exact display name") { |value| @subscription_name = value }
         options.on("--leaf NAME", "Select one exact leaf name non-interactively") { |value| @leaf_name = value }
         options.on("--profile PATH", "Use an explicit local profile instead of a cached subscription") { |value| @profile_path = value }
-        options.on("--mihomo PATH", "Use an explicit local Mihomo executable") { |value| @mihomo_path = value }
+        options.on("--mihomo PATH", "Use an explicit local Mihomo executable") do |value|
+          @mihomo_path = value
+          @mihomo_explicit = true
+        end
         options.on("--config-test-only", "Render and run Mihomo -t only; start no listener and make no lookup") { @config_test_only = true }
-        options.on("--confirm-network-lookup", "Authorize the isolated reputation lookup") { @confirmed = true }
+        options.on("--confirm-network-lookup", "Authorize the selected route's live reputation lookup") { @confirmed = true }
         options.on("-4", "Test IPv4 only") { choose_family("-4") }
         options.on("-6", "Test IPv6 only") { choose_family("-6") }
         options.on("-f", "Show the full tested IP in the local report") { @report_arguments << "-f" }
@@ -153,7 +169,10 @@ module IpQuality
       if @profile_path && @subscription_name
         raise OptionParser::InvalidArgument, "--profile and --subscription are mutually exclusive"
       end
-      if @list_subscriptions && (@profile_path || @subscription_name || @leaf_name || @list_leaves || @confirmed || @config_test_only || !@report_arguments.empty? || @family)
+      if @direct && (@profile_path || @subscription_name || @leaf_name || @list_leaves || @config_test_only || @mihomo_explicit)
+        raise OptionParser::InvalidArgument, "--direct cannot be combined with subscription, leaf, profile, Mihomo, or config-test options"
+      end
+      if @list_subscriptions && (@direct || @profile_path || @subscription_name || @leaf_name || @list_leaves || @confirmed || @config_test_only || @mihomo_explicit || !@report_arguments.empty? || @family)
         raise OptionParser::InvalidArgument, "--list-subscriptions cannot be combined with source, leaf, lookup, or report options"
       end
       if @list_leaves && (@leaf_name || @confirmed || @config_test_only || !@report_arguments.empty? || @family)
@@ -171,12 +190,24 @@ module IpQuality
       @family = value
     end
 
-    def load_source
+    def load_selected_source
       return ClashLeafProfile.from_file(@profile_path) if @profile_path
 
       catalog = subscription_catalog
-      entry = @subscription_name ? catalog.find_exact(@subscription_name) : select_subscription(catalog.entries)
+      entry = if @subscription_name
+                catalog.find_exact(@subscription_name)
+              elsif combined_route_selection?
+                select_route(catalog.entries)
+              else
+                select_subscription(catalog.entries)
+              end
+      return :direct if entry == :direct
+
       catalog.source_for(entry)
+    end
+
+    def combined_route_selection?
+      !@leaf_name && !@list_leaves && !@config_test_only && !@mihomo_explicit
     end
 
     def subscription_catalog
@@ -186,6 +217,24 @@ module IpQuality
     def print_subscription_list(entries)
       @stdout.puts "Cached remote subscriptions:"
       entries.each_with_index { |entry, index| @stdout.printf("%3d  %s\n", index + 1, entry.name) }
+    end
+
+    def print_route_list(entries)
+      @stdout.puts "Available test routes:"
+      @stdout.puts "  1  Direct connection (current system route; proxy environment removed)"
+      entries.each_with_index do |entry, index|
+        @stdout.printf("%3d  Cached subscription: %s\n", index + 2, entry.name)
+      end
+    end
+
+    def select_route(entries)
+      print_route_list(entries)
+      @stdout.print "Select one route number: "
+      @stdout.flush
+      selected = read_selection(entries.length + 1, "route")
+      return :direct if selected.zero?
+
+      entries.fetch(selected - 1)
     end
 
     def select_subscription(entries)
@@ -241,26 +290,54 @@ module IpQuality
       @stdout.puts "  start gate: add --confirm-network-lookup"
     end
 
+    def print_direct_plan
+      @stdout.puts "Direct route plan (no network access has occurred)"
+      @stdout.puts "  route: current system route with inherited proxy environment removed"
+      @stdout.puts "  live Clash profile/selection: read only and unchanged"
+      @stdout.puts "  runtime: reporter only; no temporary Mihomo process"
+      @stdout.puts "  reporter scope: reputation only"
+      @stdout.puts "  note: an active system-level VPN or TUN can still influence the system route"
+      @stdout.puts "  start gate: add --confirm-network-lookup"
+    end
+
+    def run_direct_route
+      unless @confirmed
+        print_direct_plan
+        return 0
+      end
+
+      @stderr.puts "[route-runner] Testing direct connection through the current system route; no Mihomo process is started."
+      result = run_reporter(NetworkEnvironment.without_proxy_variables, reporter_command)
+      @stderr.puts "[route-runner] Direct report finished; live Clash state was unchanged."
+      return 0 if result.success?
+
+      result.exitstatus || 1
+    end
+
     def run_live_report(session)
       @stderr.puts "[leaf-runner] Testing the selected cached-subscription leaf through isolated loopback Mihomo."
       result = nil
       session.with_running do |running|
-        command = [
-          "/bin/zsh",
-          "-f",
-          @reporter_path,
-          "--confirm-network-lookup",
-          "--scope",
-          "reputation"
-        ]
-        command << @family if @family
-        command.concat(@report_arguments)
-        result = run_reporter(running.proxy_environment, command)
+        result = run_reporter(running.proxy_environment, reporter_command)
       end
       @stderr.puts "[leaf-runner] Isolated Mihomo stopped; live Clash state was unchanged."
       return 0 if result && result.success?
 
       result && result.exitstatus ? result.exitstatus : 1
+    end
+
+    def reporter_command
+      command = [
+        "/bin/zsh",
+        "-f",
+        @reporter_path,
+        "--confirm-network-lookup",
+        "--scope",
+        "reputation"
+      ]
+      command << @family if @family
+      command.concat(@report_arguments)
+      command
     end
 
     def install_cleanup_signal_handlers

@@ -4,6 +4,7 @@ require "fileutils"
 require "open3"
 require "socket"
 require "tmpdir"
+require_relative "network_environment"
 require_relative "safe_snapshot"
 
 module IpQuality
@@ -56,7 +57,7 @@ module IpQuality
       raise Error, "isolated Mihomo is not running" unless @pid && !@reaped && @port
 
       endpoint = "http://127.0.0.1:#{@port}"
-      environment = proxy_environment_unsets
+      environment = NetworkEnvironment.without_proxy_variables
       environment.merge!(
         "ALL_PROXY" => endpoint,
         "HTTP_PROXY" => endpoint,
@@ -232,16 +233,10 @@ module IpQuality
     end
 
     def mihomo_environment
-      proxy_environment_unsets.merge(
+      NetworkEnvironment.without_proxy_variables.merge(
         "HOME" => @workspace,
         "TMPDIR" => @workspace
       )
-    end
-
-    def proxy_environment_unsets
-      ENV.each_key.each_with_object({}) do |key, result|
-        result[key] = nil if key.match?(/\A(?:all|http|https|no)_proxy\z/i)
-      end
     end
 
     def mihomo_command(test: false)

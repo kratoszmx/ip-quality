@@ -43,6 +43,12 @@ without retaining parent-repository files or nested Git metadata.
   remains.
 - Exact-leaf runtime code is under `leaf_runner/`; provider parsers, terminal
   rendering, references, fixtures, and tests have their own directories.
+- The default route selector places direct connection beside cached remote
+  subscriptions. Direct mode removes inherited proxy environment variables and
+  runs no Mihomo process; subscription mode retains exact-leaf isolation.
+- Report stdout goes through `report/output.zsh`, which uses raw zsh `print` so
+  JSON escapes such as `\n` and `\t` survive unchanged until the consumer parses
+  them.
 - The former generic-looking `lib/safe_snapshot.rb` is now the project-specific
   `leaf_runner/safe_snapshot.rb`.
 - The obsolete README is removed under the local AI-native documentation policy.
@@ -57,6 +63,9 @@ without retaining parent-repository files or nested Git metadata.
 
 - Default execution prints a disclosure plan and performs no network lookup.
 - Live provider access requires the exact `--confirm-network-lookup` gate.
+- Reputation sources are described in two tiers: official-contract core sources
+  and clearly attributed supplementary demo/relay sources. Browser leak pages
+  remain separate from this non-browser reputation report.
 - Terminal reputation sections are compact, data-driven matrices: providers with
   usable results are across the top and dimensions are down the left. Safe boolean
   factors are green and risk factors are red. A field omitted from an otherwise
@@ -93,22 +102,25 @@ Run from the repository root:
 
 ```text
 /bin/zsh -n bin/ip-quality bin/test-clash-leaf scripts/test-offline providers/*.zsh report/*.zsh
-/usr/bin/ruby -c leaf_runner/command.rb
-/usr/bin/ruby -c leaf_runner/isolated_mihomo_session.rb
-/usr/bin/ruby -c leaf_runner/safe_snapshot.rb
+for file in leaf_runner/*.rb; do /usr/bin/ruby -c "$file"; done
 /bin/zsh -f scripts/test-offline
 /bin/zsh -f bin/ip-quality --self-test
+print -r -- 1 | /bin/zsh -f bin/test-clash-leaf
 ```
 
-The full offline suite currently has 36 runs and 452 assertions, including both
-green safe-factor and red risk-factor rendering. A live, masked IPv4 reputation
-lookup also verified the compact terminal matrices, the corrected RIPEstat
-string-ASN parser, the IPQualityScore upstream credit status, and Shodan's
-no-public-record status. A read-only
-probe of the real Clash Verge cache also resolved a remote subscription and an
-exact inline leaf, then passed Mihomo `-t` without starting a listener or making
-an IP-provider lookup. Afterward, the project workspace residue count was zero in
-the preferred private temporary parent, macOS `TMPDIR`, and `/tmp`.
+The full offline suite currently has 42 runs and 538 assertions. It covers raw
+JSON stdout with embedded tab/newline/ANSI data, real green safe-factor and red
+risk-factor bytes, direct-route proxy-environment removal, exact-leaf isolation,
+and cleanup on success, failure, and signal.
+
+A live, masked direct IPv4 JSON report parsed successfully with `jq`, retained
+the expected typed top-level sections, and left zero owned leaf workspaces. A
+masked terminal pass produced 47 compact lines with no repeated blank line and no
+`Unknown` cell wall; unavailable IPQualityScore and Shodan results were each
+summarized once. A read-only probe of the real Clash Verge cache also selected an
+exact inline leaf and passed Mihomo `-t` without starting a listener or making an
+IP-provider lookup. The preferred private temporary parent and `/tmp` both stayed
+at zero owned workspaces before and after that run.
 
 ## Completed parent extraction
 
