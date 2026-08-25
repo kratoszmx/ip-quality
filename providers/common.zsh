@@ -40,3 +40,13 @@ esac
 done
 return 1
 }
+
+provider_connection_type_server_flag(){
+emulate -LR zsh
+case "${1:l}" in
+"data center")print -rn -- "true"
+;;
+residential|corporate|education|mobile)print -rn -- "false"
+;;
+esac
+}

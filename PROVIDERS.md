@@ -23,18 +23,33 @@ or malformed addresses are not accepted as a successful public result.
 | AbuseIPDB via `ipinfo.check.place` | Upstream relay | abuse score and usage/risk factors |
 | IP2Location via `ipinfo.check.place` | Upstream relay | 0–99 potential-risk score and proxy-category factors |
 | ipdata via `ipinfo.check.place` | Upstream relay | country and threat factors |
-| IPQualityScore | Direct official API when `IPQS_API_KEY` is configured; otherwise the named Check.Place relay | fraud score and proxy/VPN/Tor/bot factors |
+| IPQualityScore | Direct official API when `IPQS_API_KEY` is configured; otherwise the named Check.Place relay | connection type, fraud score, and proxy/VPN/Tor/bot factors |
 | Ping0 public `/geo` | Direct official public endpoint | returned IP, location, ASN, and organization; the returned IP must exactly match the tested address |
 | RIPEstat Network Info | Direct official public API | routed prefix and origin ASN data from RIPE routing data; context only, not a reputation score |
-| Shodan InternetDB | Direct official public API, IPv4 | observed public ports, hostnames, tags, and known-vulnerability count; context only, not a reputation score |
+| Shodan InternetDB | Direct official public API, IPv4 | observed public ports, hostname count, tags, and known-vulnerability count; context only, not a reputation score |
+
+Every runtime reputation source has an explicit terminal destination:
+
+| Source | Terminal destination |
+| --- | --- |
+| Check.Place/MaxMind-shaped response | Basic information |
+| IPinfo, Ipregistry, IPQS, ipapi.is, IP2Location, AbuseIPDB | Type matrix when that source supplies a type |
+| IP2Location, Scamalytics, ipapi.is, AbuseIPDB, IPQS | Score matrix; IPQS keeps a source/status cell even when no score is returned |
+| IP2Location, ipapi.is, Ipregistry, IPQS, Scamalytics, ipdata, IPinfo | Factor matrix when at least one factor is supplied |
+| Ping0, RIPEstat, Shodan InternetDB | Official network observations |
+
+The candidate-review sites later in this document are research notes, not live
+queries. They are not advertised as report evidence until a fixture-tested
+adapter actually calls them.
 
 “Upstream relay” is intentionally visible in the report model: it is not treated
 as equivalent to a user-owned subscription to each vendor's official API. If a
 relay or direct page changes schema, its result is unknown rather than clean.
 Allowlisted provider failures are kept more specific: when the Check.Place
-relay's shared IPQualityScore account has spent its credits, the report names
-that relay account explicitly. This is not a judgment about the tested IP and
-not the user's quota; a user-owned official IPQS key bypasses that relay.
+relay's shared IPQualityScore account has spent its credits, the IPQS
+source/status cell names that state explicitly. This is not a judgment about
+the tested IP and not the user's quota; a user-owned official IPQS key bypasses
+that relay.
 Shodan's documented no-information response is reported as no public record.
 Neither state is a clean reputation result, and arbitrary upstream error text
 is never echoed.
@@ -77,6 +92,13 @@ mismatch is `unknown`/rejected, never clean. See the
 [official Ping0 API description](https://ping0.cc/ip/api) and
 [official risk-score FAQ](https://ping0.cc/ip/faq).
 
+For an explicitly supplied target address, Ping0 `/geo` is skipped and the
+report explains why: that endpoint reports the caller's current egress and
+cannot truthfully validate an arbitrary target. Other reputation providers use
+their target-IP parameters. Explicit targets are restricted to the `reputation`
+and `dnsbl` scopes so media, mail, and other host-route probes are not mislabeled
+as observations of the target.
+
 RIPEstat's documented Network Info endpoint returns the covering prefix and
 origin ASN set using RIPE routing data. The live API may encode ASN members as
 decimal strings or JSON numbers; the strict parser accepts both forms, validates
@@ -104,6 +126,11 @@ Scamalytics APIs require customer access. They are labeled `Upstream relay` and
 never silently promoted to the core tier. A wholly unavailable source disappears
 from the matrices and is named once in the compact availability summary, so
 keeping supplementary breadth does not recreate a wall of `Unknown` cells.
+IPQS is the deliberate exception: because it is always attempted through either
+the official key or the named relay, its score column remains visible with a
+compact source/status value such as available, rate-limited, out of credit, or
+query failed. When a connection type is returned, it also appears in the type
+matrix.
 
 Even where a vendor publishes suggested decision thresholds, this relay-based
 report does not synthesize a vendor label. For example, IPQualityScore documents
@@ -213,6 +240,11 @@ The IPv4 address is reversed and queried against each zone in the vendored
 - `Blacklisted`: the zone returned `127.0.0.2`;
 - `Marked`: the zone returned another ordinary listing answer;
 - `Unknown`: the DNS lookup itself failed or timed out.
+
+The terminal report names every `Blacklisted` or `Marked` zone instead of only
+showing a count. JSON keeps a `Results` object for every queried zone alongside
+the aggregate totals, so each provider answer remains traceable and can be
+rechecked independently.
 
 The hard concurrency maximum is 50. A failed DNS command is never counted as a
 clean result. Resolver-policy answers such as Spamhaus `127.255.255.252`,

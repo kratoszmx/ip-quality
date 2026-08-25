@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-08-25-standalone.8"
+script_version="v2026-08-26-standalone.9"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset REPORT_DIR="$SCRIPT_DIR/report"
@@ -37,6 +37,7 @@ typeset self_test_requested=0
 typeset help_requested=0
 typeset version_requested=0
 typeset dnsbl_concurrency=50
+typeset requested_ip=""
 typeset -a legacy_args=()
 Font_B=$'\033[1m'
 Font_D=$'\033[2m'
@@ -128,7 +129,7 @@ typeset -a shelp_lines=(
 "            -f                             Show full IP on reports                    报告展示完整IP地址"
 "            -h                             Help information                           帮助信息"
 "            -i eth0                        Specify network interface                  指定检测网卡"
-"               ipaddress                   Specify outbound IP Address                指定检测出口IP"
+"               ipaddress                   Inspect a public target IP                 检测指定公网IP"
 "            -j                             JSON output                                JSON输出"
 "            -l cn|en                       Specify script language                    指定报告语言"
 "            -o /path/to/file.ansi          Output ANSI report to file                 输出ANSI报告至文件"
@@ -151,6 +152,8 @@ swarn[11]="ERROR: Output file is not writable!"
 swarn[40]="ERROR: IPv4 is not available!"
 swarn[60]="ERROR: IPv6 is not available!"
 swarn[61]="ERROR: DNSBL scope supports IPv4 only!"
+swarn[62]="ERROR: an explicit target IP supports reputation or DNSBL scope only!"
+swarn[63]="ERROR: the explicit target IP conflicts with the selected address family!"
 sinfo[database]="Checking IP database "
 sinfo[media]="Checking stream media "
 sinfo[ai]="Checking AI provider "
@@ -269,6 +272,8 @@ swarn[11]="错误：输出文件不可写！"
 swarn[40]="错误：IPV4不可用！"
 swarn[60]="错误：IPV6不可用！"
 swarn[61]="错误：DNSBL范围仅支持IPv4！"
+swarn[62]="错误：指定公网IP仅支持信誉或DNSBL范围！"
+swarn[63]="错误：指定公网IP与选择的IPv4/IPv6类型冲突！"
 sinfo[database]="正在检测IP数据库 "
 sinfo[media]="正在检测流媒体服务商 "
 sinfo[ai]="正在检测AI服务商 "
@@ -435,6 +440,8 @@ case "$raw" in
 business|corporate)print -rn -- "${stype[business]}"
 ;;
 isp|consumer|residential)print -rn -- "${stype[isp]}"
+;;
+mobile)print -rn -- "${stype[mobile]}"
 ;;
 hosting|"data center")print -rn -- "${stype[hosting]}"
 ;;
@@ -607,6 +614,15 @@ is_valid_ipv6 "2001:::1"&&{
 print -ru2 -- "SELF-TEST FAILED: invalid IPv6 accepted"
 return 1
 }
+(
+query_scope="reputation"
+requested_ip="8.8.8.8"
+IPV4check=1 IPV6check=1 IPV4work=0 IPV6work=0 ERRORcode=0
+prepare_explicit_target&&[[ "$IPV4" == "8.8.8.8" && $IPV4work -eq 1 && $IPV6check -eq 0 ]]
+)||{
+print -ru2 -- "SELF-TEST FAILED: explicit public target preparation changed"
+return 1
+}
 provider_integer_in_range "0" 0 100&&provider_integer_in_range "100" 0 100&&! provider_integer_in_range "null" 0 100&&! provider_integer_in_range "100" 0 99||{
 print -ru2 -- "SELF-TEST FAILED: risk score validation changed"
 return 1
@@ -623,8 +639,16 @@ ipregistry_parse_response '{"ip":"198.51.100.23","connection":{"type":"hosting"}
 print -ru2 -- "SELF-TEST FAILED: Ipregistry parser contract changed"
 return 1
 }
-ipqualityscore_parse_response '{"success":true,"fraud_score":87,"country_code":"US","proxy":true,"vpn":true,"tor":false,"recent_abuse":false,"bot_status":false,"connection_type":"Data Center"}'&&[[ "${ipqualityscore_parsed[score]}" == "87" && "${ipqualityscore_parsed[server]}" == "true" ]]||{
+ipqualityscore_parse_response '{"success":true,"fraud_score":87,"country_code":"US","proxy":true,"vpn":true,"tor":false,"recent_abuse":false,"bot_status":false,"connection_type":"Data Center"}'&&[[ "${ipqualityscore_parsed[score]}" == "87" && "${ipqualityscore_parsed[connection_type]}" == "Data Center" && "${ipqualityscore_parsed[server]}" == "true" ]]||{
 print -ru2 -- "SELF-TEST FAILED: official IPQualityScore parser contract changed"
+return 1
+}
+[[ "$(provider_connection_type_server_flag 'Data Center')" == "true" && "$(provider_connection_type_server_flag 'Residential')" == "false" && -z "$(provider_connection_type_server_flag 'Unknown')" ]]||{
+print -ru2 -- "SELF-TEST FAILED: provider connection-type normalization changed"
+return 1
+}
+[[ "$(styled_provider_type 'Mobile')" == "${stype[mobile]}" ]]||{
+print -ru2 -- "SELF-TEST FAILED: provider mobile display normalization changed"
 return 1
 }
 is_nonnegative_decimal "0.25"&&! is_nonnegative_decimal '0; print unsafe'||{
@@ -655,7 +679,7 @@ internetdb_parse_response '{"ip":"198.51.100.23","ports":[22,443],"vulns":["CVE-
 print -ru2 -- "SELF-TEST FAILED: valid Shodan InternetDB fixture rejected"
 return 1
 }
-[[ "${internetdb_parsed[port_count]}" == "2" && "${internetdb_parsed[vulnerability_count]}" == "1" ]]||{
+[[ "${internetdb_parsed[port_count]}" == "2" && "${internetdb_parsed[hostname_count]}" == "1" && "${internetdb_parsed[vulnerability_count]}" == "1" ]]||{
 print -ru2 -- "SELF-TEST FAILED: Shodan InternetDB fields changed"
 return 1
 }
@@ -716,10 +740,12 @@ ipregistry[status]="ok"
 ipregistry[susetype]="${stype[hosting]}"
 ipregistry[scomtype]="${stype[hosting]}"
 ipregistry[proxy]="false"
+ip2location[susetype]="${stype[unknown]}"
 ip2location[score]="3"
 ipqs[score]="100"
 ipqs[status]="ok"
 ipqs[source]="official_api"
+ipqs[susetype]="${stype[hosting]}"
 ipapi[risk]=$'High "quoted"'
 ipqs[proxy]="true"
 ping0[status]="verified"
@@ -732,8 +758,15 @@ ripestat[origins]="AS64500"
 internetdb[status]="ok"
 internetdb[ports]="22, 443"
 internetdb[port_count]="2"
+internetdb[hostname_count]="1"
 internetdb[vulnerability_count]="1"
 internetdb[tags]="vpn, edge"
+smail[t]="2"
+smail[c]="1"
+smail[m]="0"
+smail[b]="1"
+smail[u]="0"
+smail[dnsbl_results]=$'dnsbl.example\tClean\nlisted.example\tBlacklisted'
 save_json||{
 print -ru2 -- "SELF-TEST FAILED: JSON rendering failed"
 return 1
@@ -742,7 +775,11 @@ print -r -- "$ipjson"|jq -e --arg expected "$json_special" '
   .Info.Organization == $expected and
   .Type.Source.IPinfo == "public demo widget" and
   .Type.Source.Ipregistry == "official API" and
+  .Type.Source.IPQS == "official_api" and
   .Type.Status.Ipregistry == "ok" and
+  .Type.Status.IPQS == "ok" and
+  .Type.Usage.IPQS != null and
+  .Type.Usage.IP2LOCATION == null and
   .Score.IPQS == "100" and
   .ScoreMeta.IP2LOCATION.Scale == "0-99 potential risk" and
   .ScoreMeta.ipapi.Band == "High \"quoted\"" and
@@ -755,6 +792,9 @@ print -r -- "$ipjson"|jq -e --arg expected "$json_special" '
   .Ping0.Organization == $expected and
   .Routing.Prefix == "198.51.*.*/24" and
   .Exposure.Ports == [22, 443] and
+  .Exposure.HostnameCount == 1 and
+  .Mail.DNSBlacklist.Results["dnsbl.example"] == "Clean" and
+  .Mail.DNSBlacklist.Results["listed.example"] == "Blacklisted" and
   .Mail.Port25 == null
 ' >/dev/null||{
 print -ru2 -- "SELF-TEST FAILED: JSON escaping or typing changed"
@@ -908,6 +948,51 @@ break
 fi
 done
 }
+
+prepare_explicit_target(){
+case "$query_scope" in
+reputation|dnsbl) ;;
+*)ERRORcode=62
+return 1
+esac
+if is_valid_ipv4 "$requested_ip";then
+if is_private_ipv4 "$requested_ip";then
+ERRORcode=2
+return 1
+fi
+if [[ $IPV4check -eq 0 ]];then
+ERRORcode=63
+return 1
+fi
+IPV4="$requested_ip"
+IPV4work=1
+IPV4check=1
+IPV6=""
+IPV6work=0
+IPV6check=0
+return 0
+fi
+if is_valid_ipv6 "$requested_ip";then
+if is_private_ipv6 "$requested_ip";then
+ERRORcode=2
+return 1
+fi
+if [[ $IPV6check -eq 0 ]];then
+ERRORcode=63
+return 1
+fi
+IPV6="$requested_ip"
+IPV6work=1
+IPV6check=1
+IPV4=""
+IPV4work=0
+IPV4check=0
+return 0
+fi
+ERRORcode=2
+return 1
+}
+
 hide_ipv6(){
 if [[ -n $1 ]];then
 local expanded_ip=$(echo "$1"|sed 's/::/:0000:0000:0000:0000:0000:0000:0000:0000:/g'|cut -d ':' -f1-8)
@@ -1416,6 +1501,8 @@ if ipqualityscore_parse_response "$RESPONSE";then
 ipqs[status]="ok"
 ipqs[score]="${ipqualityscore_parsed[score]}"
 ipqs[countrycode]="${ipqualityscore_parsed[country_code]}"
+ipqs[usetype]="${ipqualityscore_parsed[connection_type]}"
+ipqs[susetype]=$(styled_provider_type "${ipqs[usetype]}")
 ipqs[proxy]="${ipqualityscore_parsed[proxy]}"
 ipqs[tor]="${ipqualityscore_parsed[tor]}"
 ipqs[vpn]="${ipqualityscore_parsed[vpn]}"
@@ -1441,9 +1528,12 @@ if ! provider_integer_in_range "${ipqs[score]}" 0 100;then
 ipqs[score]=""
 fi
 ipqs[countrycode]=$(echo "$RESPONSE"|jq -r '.country_code')
+ipqs[usetype]=$(echo "$RESPONSE"|jq -r 'if (.connection_type | type) == "string" and (.connection_type | length) <= 64 then .connection_type else empty end')
+ipqs[susetype]=$(styled_provider_type "${ipqs[usetype]}")
 ipqs[proxy]=$(echo "$RESPONSE"|jq -r '.proxy')
 ipqs[tor]=$(echo "$RESPONSE"|jq -r '.tor')
 ipqs[vpn]=$(echo "$RESPONSE"|jq -r '.vpn')
+ipqs[server]=$(provider_connection_type_server_flag "${ipqs[usetype]}")
 ipqs[abuser]=$(echo "$RESPONSE"|jq -r '.recent_abuse')
 ipqs[robot]=$(echo "$RESPONSE"|jq -r '.bot_status')
 if provider_has_observation "${ipqs[score]}" "${ipqs[countrycode]}" "${ipqs[proxy]}" "${ipqs[tor]}" "${ipqs[vpn]}" "${ipqs[abuser]}" "${ipqs[robot]}";then
@@ -1460,6 +1550,10 @@ ping0=()
 ping0[status]="unknown"
 ping0[match]="null"
 ping0[riskstatus]="official_public_endpoint_does_not_expose_risk"
+if [[ -n "$requested_ip" ]];then
+ping0[status]="not_applicable_target"
+return 0
+fi
 local endpoint="https://ipv4.ping0.cc/geo"
 [[ "$1" -eq 6 ]]&&endpoint="https://ipv6.ping0.cc/geo"
 local RESPONSE=$(curl_safe $CurlARG -sS -L -$1 -m 10 --max-filesize 4096 "$endpoint" 2>/dev/null)
@@ -1987,11 +2081,12 @@ local other=0
 local unknown=0
 local line
 while IFS= read -r line;do
+[[ "$line" == *$'\t'* ]]&&line="${line##*$'\t'}"
 ((total++))
 case "$line" in
 "Clean")((clean++));;
 "Blacklisted")((blacklisted++));;
-"Other")((other++));;
+"Other"|"Marked")((other++));;
 *)((unknown++))
 esac
 done
@@ -2010,28 +2105,32 @@ sort -u "$DNSBL_FILE"|xargs -P "$parallel_jobs" -I {} /bin/zsh -fc '
   result=$(dig +time=3 +tries=1 +short "$reversed_ip.$zone" A 2>/dev/null)
   local lookup_status=$?
   if (( lookup_status != 0 )); then
-    print -r -- Unknown
+    printf "%s\t%s\n" "$zone" "Unknown"
   elif [[ "$result" == 127.255.255.* ]]; then
-    print -r -- Unknown
+    printf "%s\t%s\n" "$zone" "Unknown"
   elif [[ -z "$result" ]]; then
-    print -r -- Clean
+    printf "%s\t%s\n" "$zone" "Clean"
   elif [[ "$result" == "127.0.0.2" ]]; then
-    print -r -- Blacklisted
+    printf "%s\t%s\n" "$zone" "Blacklisted"
   else
-    print -r -- Other
+    printf "%s\t%s\n" "$zone" "Marked"
   fi
-' ip-quality-dnsbl "$reversed_ip" "{}"|summarize_dnsbl_results
+' ip-quality-dnsbl "$reversed_ip" "{}"|LC_ALL=C sort
 }
 check_dnsbl(){
 local temp_info="$Font_Cyan$Font_B${sinfo[dnsbl]} $Font_Suffix"
 ((ibar_step=95))
 show_progress_bar "$temp_info" $((40-1-${sinfo[ldnsbl]}))
-local num_array=($(check_dnsbl_parallel "$IP" "$2"))
+local dnsbl_results=$(check_dnsbl_parallel "$IP" "$2")
+local num_array=($(print -r -- "$dnsbl_results"|summarize_dnsbl_results))
 smail[t]=${num_array[0]:-0}
 smail[c]=${num_array[1]:-0}
 smail[m]=${num_array[2]:-0}
 smail[b]=${num_array[3]:-0}
 smail[u]=${num_array[4]:-0}
+smail[dnsbl_results]="$dnsbl_results"
+smail[blacklisted_zones]=$(print -r -- "$dnsbl_results"|awk -F '\t' '$2 == "Blacklisted" {print $1}'|paste -sd, -|sed 's/,/, /g')
+smail[marked_zones]=$(print -r -- "$dnsbl_results"|awk -F '\t' '$2 == "Marked" {print $1}'|paste -sd, -|sed 's/,/, /g')
 smail[sdnsbl]="$Font_Cyan${smail[dnsbl]}  ${smail[available]}${smail[t]}   ${smail[clean]}${smail[c]}   ${smail[marked]}${smail[m]}   ${smail[blacklisted]}${smail[b]}   ${smail[unknown]}${smail[u]}$Font_Suffix"
 }
 show_head(){
@@ -2178,6 +2277,20 @@ fi
 }
 show_dnsbl(){
 echo -ne "\r${smail[sdnsbl]}\n"
+if [[ -n "${smail[blacklisted_zones]}" ]];then
+if [[ "$YY" == "cn" ]];then
+print -r -- "${Font_Red}黑名单命中：${smail[blacklisted_zones]}${Font_Suffix}"
+else
+print -r -- "${Font_Red}Blacklisted by: ${smail[blacklisted_zones]}${Font_Suffix}"
+fi
+fi
+if [[ -n "${smail[marked_zones]}" ]];then
+if [[ "$YY" == "cn" ]];then
+print -r -- "${Font_Yellow}其他标记：${smail[marked_zones]}${Font_Suffix}"
+else
+print -r -- "${Font_Yellow}Other listings: ${smail[marked_zones]}${Font_Suffix}"
+fi
+fi
 }
 show_tail(){
 echo -ne "\r$(printf '%72s'|tr ' ' '=')\n"
@@ -2251,6 +2364,12 @@ E)YY="en"
 \?)ERRORcode=1
 esac
 done
+shift $((OPTIND-1))
+if (( $# > 1 ));then
+ERRORcode=1
+elif (( $# == 1 ));then
+requested_ip="$1"
+fi
 CurlARG="$useNIC"
 }
 show_help(){
@@ -2304,6 +2423,7 @@ save_json(){
 local info_asn info_org info_lat info_lon info_dms info_map info_timezone
 local info_city info_post info_subcode info_sub info_countrycode info_country
 local info_continentcode info_continent info_regcountrycode info_regcountry info_type=""
+local info_source="Check.Place upstream relay; MaxMind-labeled response"
 if [[ $mode_lite -eq 0 ]];then
 info_asn="${maxmind[asn]:-}"
 info_org="${maxmind[org]:-}"
@@ -2323,6 +2443,7 @@ info_continent="${maxmind[continent]:-}"
 info_regcountrycode="${maxmind[regcountrycode]:-}"
 info_regcountry="${maxmind[regcountry]:-}"
 else
+info_source="IPinfo public demo widget"
 info_asn="${ipinfo[asn]:-}"
 info_org="${ipinfo[org]:-}"
 info_lat="${ipinfo[lat]:-}"
@@ -2385,7 +2506,7 @@ ipjson=$(jq -n \
 --arg head_repository "${shead[git]:-}" \
 --arg head_time "${shead[time_raw]:-}" \
 --arg head_version "${script_version:-}" \
---arg info_source "Check.Place upstream relay; MaxMind-labeled response" \
+--arg info_source "$info_source" \
 --arg info_asn "$info_asn" --arg info_org "$info_org" \
 --arg info_lat "$info_lat" --arg info_lon "$info_lon" \
 --arg info_dms "$info_dms" --arg info_map "$info_map" \
@@ -2397,6 +2518,7 @@ ipjson=$(jq -n \
 --arg info_regcountry "$info_regcountry" --arg info_type "$info_type" \
 --arg type_ipinfo_usage "$(clean_ansi "${ipinfo[susetype]:-}")" \
 --arg type_ipregistry_usage "$(clean_ansi "${ipregistry[susetype]:-}")" \
+--arg type_ipqs_usage "$(clean_ansi "${ipqs[susetype]:-}")" \
 --arg type_ipapi_usage "$(clean_ansi "${ipapi[susetype]:-}")" \
 --arg type_ip2_usage "$(clean_ansi "${ip2location[susetype]:-}")" \
 --arg type_abuse_usage "$(clean_ansi "${abuseipdb[susetype]:-}")" \
@@ -2464,7 +2586,7 @@ ipjson=$(jq -n \
 --arg mail_port25 "$mail_port25" --argjson mail_services "$mail_services" \
 --arg dns_total "${smail[t]:-}" --arg dns_clean "${smail[c]:-}" \
 --arg dns_marked "${smail[m]:-}" --arg dns_blacklisted "${smail[b]:-}" \
---arg dns_unknown "${smail[u]:-}" \
+--arg dns_unknown "${smail[u]:-}" --arg dns_results "${smail[dnsbl_results]:-}" \
 --argjson reputation_enabled "$reputation_enabled" \
 --arg ping_status "${ping0[status]:-unknown}" --arg ping_match "${ping0[match]:-}" \
 --arg ping_location "${ping0[location]:-}" --arg ping_asn "${ping0[asn]:-}" \
@@ -2474,10 +2596,13 @@ ipjson=$(jq -n \
 --arg routing_origins "${ripestat[origins]:-}" \
 --arg exposure_status "${internetdb[status]:-unknown}" --arg exposure_ports "${internetdb[ports]:-}" \
 --arg exposure_port_count "${internetdb[port_count]:-}" \
+--arg exposure_hostname_count "${internetdb[hostname_count]:-}" \
 --arg exposure_vulns "${internetdb[vulnerability_count]:-}" \
 --arg exposure_tags "${internetdb[tags]:-}" \
 '
-def opt($value): if $value == "" or $value == "null" then null else $value end;
+def opt($value):
+  if $value == "" or $value == "null" or $value == "未知" or ($value | ascii_downcase) == "unknown"
+  then null else $value end;
 def boolnull($value): if $value == "true" then true elif $value == "false" then false else null end;
 def factor($value):
   if $value == "true" then true
@@ -2489,6 +2614,9 @@ def list($value):
   if opt($value) == null then []
   else [$value | split(",")[] | gsub("^\\s+|\\s+$"; "") | select(length > 0)] end;
 def numberlist($value): [list($value)[] | try tonumber catch empty];
+def dnsresults($value):
+  reduce ($value | split("\n")[] | split("\t") | select(length == 2)) as $row
+    ({}; . + {($row[0]): $row[1]});
 {
   Head: {
     IP: opt($head_ip), Repository: opt($head_repository),
@@ -2504,10 +2632,10 @@ def numberlist($value): [list($value)[] | try tonumber catch empty];
     RegisteredRegion: {Code: opt($info_regcountrycode), Name: opt($info_regcountry)}
   },
   Type: {
-    Source: {IPinfo: "public demo widget", Ipregistry: "official API", ipapi: "direct public API", IP2LOCATION: "upstream relay", AbuseIPDB: "upstream relay"},
-    Status: {Ipregistry: $status_ipregistry},
-    Usage: {IPinfo: opt($type_ipinfo_usage), Ipregistry: opt($type_ipregistry_usage), ipapi: opt($type_ipapi_usage), IP2LOCATION: opt($type_ip2_usage), AbuseIPDB: opt($type_abuse_usage)},
-    Company: {IPinfo: opt($type_ipinfo_company), Ipregistry: opt($type_ipregistry_company), ipapi: opt($type_ipapi_company), IP2LOCATION: opt($type_ip2_company), AbuseIPDB: null}
+    Source: {IPinfo: "public demo widget", Ipregistry: "official API", IPQS: $source_ipqs, ipapi: "direct public API", IP2LOCATION: "upstream relay", AbuseIPDB: "upstream relay"},
+    Status: {Ipregistry: $status_ipregistry, IPQS: $status_ipqs},
+    Usage: {IPinfo: opt($type_ipinfo_usage), Ipregistry: opt($type_ipregistry_usage), IPQS: opt($type_ipqs_usage), ipapi: opt($type_ipapi_usage), IP2LOCATION: opt($type_ip2_usage), AbuseIPDB: opt($type_abuse_usage)},
+    Company: {IPinfo: opt($type_ipinfo_company), Ipregistry: opt($type_ipregistry_company), IPQS: null, ipapi: opt($type_ipapi_company), IP2LOCATION: opt($type_ip2_company), AbuseIPDB: null}
   },
   Score: {IP2LOCATION: opt($score_ip2), SCAMALYTICS: opt($score_scam), ipapi: opt($score_ipapi), AbuseIPDB: opt($score_abuse), IPQS: opt($score_ipqs)},
   ScoreMeta: {
@@ -2536,7 +2664,10 @@ def numberlist($value): [list($value)[] | try tonumber catch empty];
     ChatGPT: {Status: opt($media_chatgpt_status), Region: opt($media_chatgpt_region), Type: opt($media_chatgpt_type)}
   },
   Mail: ({Port25: boolnull($mail_port25)} + $mail_services + {
-    DNSBlacklist: {Total: intnull($dns_total), Clean: intnull($dns_clean), Marked: intnull($dns_marked), Blacklisted: intnull($dns_blacklisted), Unknown: intnull($dns_unknown)}
+    DNSBlacklist: {
+      Total: intnull($dns_total), Clean: intnull($dns_clean), Marked: intnull($dns_marked),
+      Blacklisted: intnull($dns_blacklisted), Unknown: intnull($dns_unknown), Results: dnsresults($dns_results)
+    }
   })
 }
 | if $reputation_enabled then
@@ -2551,6 +2682,7 @@ def numberlist($value): [list($value)[] | try tonumber catch empty];
     | .Exposure = {
       Provider: "Shodan InternetDB", Status: $exposure_status,
       Ports: numberlist($exposure_ports), PortCount: intnull($exposure_port_count),
+      HostnameCount: intnull($exposure_hostname_count),
       KnownVulnerabilityCount: intnull($exposure_vulns), Tags: list($exposure_tags),
       IsReputationScore: false
     }
@@ -2560,7 +2692,8 @@ def numberlist($value): [list($value)[] | try tonumber catch empty];
 check_IP(){
 IP=$1
 ibar_step=0
-unset 'smail[local]' 'smail[remote]' 'smail[t]' 'smail[c]' 'smail[m]' 'smail[b]' 'smail[u]' 'smail[sdnsbl]'
+unset 'smail[local]' 'smail[remote]' 'smail[t]' 'smail[c]' 'smail[m]' 'smail[b]' 'smail[u]' 'smail[sdnsbl]' \
+  'smail[dnsbl_results]' 'smail[blacklisted_zones]' 'smail[marked_zones]'
 smailstatus=()
 smail_response=()
 ipjson='{
@@ -2652,7 +2785,10 @@ fi
 
 get_opts "${legacy_args[@]}"
 set_language
-[[ "$query_scope" == "dnsbl" && $IPV4check -eq 0 ]]&&ERRORcode=61
+if [[ -n "$requested_ip" ]];then
+prepare_explicit_target||true
+fi
+[[ $ERRORcode -eq 0 && "$query_scope" == "dnsbl" && $IPV4check -eq 0 ]]&&ERRORcode=61
 if [[ $ERRORcode -ne 0 ]];then
 echo -ne "\r$Font_B$Font_Red${swarn[$ERRORcode]}$Font_Suffix\n"
 exit $ERRORcode
@@ -2663,6 +2799,7 @@ check_reference_files||exit $?
 set_report_time
 generate_random_user_agent
 adapt_locale
+if [[ -z "$requested_ip" ]];then
 if [[ $IPV4check -ne 0 ]];then
 get_ipv4
 is_valid_ipv4 "$IPV4"
@@ -2674,6 +2811,7 @@ get_ipv6
 is_valid_ipv6 "$IPV6"
 else
 IPV6work=0
+fi
 fi
 [[ $IPV4check -eq 1 && $IPV6check -eq 0 && $IPV4work -eq 0 ]]&&ERRORcode=40
 [[ $IPV4check -eq 0 && $IPV6check -eq 1 && $IPV6work -eq 0 ]]&&ERRORcode=60

@@ -72,6 +72,14 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   uninterrupted row, replaced ambiguous-width missing markers with ASCII, and
   merged Ping0, RIPEstat, and Shodan into one official-network observation
   section;
+- kept IPQS visible with an explicit source/query-status row, retained its
+  documented connection type, and added Shodan hostname counts that were
+  previously parsed but discarded by report output;
+- repaired the advertised explicit-target IP path, restricted it to honest
+  reputation/DNSBL scopes, and skipped current-egress-only Ping0 observations
+  for those targets;
+- retained every DNSBL zone result in JSON and named marked/blacklisted zones in
+  terminal output instead of collapsing all provider answers into counts;
 - removed locally synthesized risk bands from relay scores; only a provider's
   explicitly returned text label is displayed, while absent labels stay unknown;
 - corrected the IP2Location/IP2Proxy fraud-score contract to its documented
@@ -84,7 +92,8 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   moved the verified-file snapshot helper into `leaf_runner/` because it has no
   consumer outside that runtime;
 - extracted network-free provider JSON validation and conservative multi-signal
-  boolean merging into `providers/common.zsh` for reuse by provider adapters;
+  boolean merging plus connection-type normalization into
+  `providers/common.zsh` for reuse by provider adapters;
 - extracted the complete `network-manager/ip-quality/` history into the standalone
   `ipquality` repository on 2026-08-23 and removed the obsolete parent-repository
   routing hooks instead of leaving compatibility wrappers;

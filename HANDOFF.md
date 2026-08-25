@@ -1,6 +1,6 @@
 # IP quality standalone handoff
 
-Last validated: 2026-08-25, Asia/Shanghai.
+Last validated: 2026-08-26, Asia/Shanghai.
 
 ## Repository identity
 
@@ -59,8 +59,13 @@ without retaining parent-repository files or nested Git metadata.
 - Optional official Ipregistry and IPQualityScore adapters live
   beside their fixture-testable parsers in `providers/`. Their strict local
   credential file is data-only, mode `600`, and never enters Git, reports, or
-  process arguments. An unconfigured optional source does not create an empty
-  table column.
+  process arguments. IPQS falls back to the named Check.Place relay and always
+  keeps a compact source/status score column; an unavailable optional
+  Ipregistry source does not create an empty table column.
+- A positional public target address is now a working reporter input rather
+  than stale help text. It is limited to reputation or DNSBL lookups. Ping0 is
+  skipped with an explanation because its public `/geo` endpoint can only
+  verify the caller's current egress.
 - DB-IP is intentionally absent: its free location endpoint duplicates existing
   observations, while its useful proxy/crawler/threat fields require the paid
   Extended plan. The retired scraper, parser, fixture, JSON keys, and credential
@@ -94,10 +99,15 @@ without retaining parent-repository files or nested Git metadata.
   label uses an ASCII slash, avoiding ambiguous-width punctuation that otherwise
   shifts every later separator in some terminals. Ping0, RIPEstat, and Shodan
   share one compact official-network observation section.
+- IPQS exposes connection type in the type matrix when supplied, score and
+  source/status in the score matrix on every attempted query, and returned
+  booleans in the factor matrix. Relay failure, quota, and rate-limit states no
+  longer make the provider disappear. Shodan's parsed hostname count is now
+  retained in terminal and JSON output.
 - Allowlisted unavailability is reported with a reason instead of repeated
-  unknown cells. IPQualityScore relay credit exhaustion explicitly names the
-  Check.Place relay account, while a direct-key quota error names the user's
-  official API account. Shodan InternetDB's no-public-record response is shown as
+  unknown cells. IPQualityScore relay credit exhaustion is attributed in its
+  score source/status row, while a direct-key quota error is attributed to the
+  official API. Shodan InternetDB's no-public-record response is shown as
   context rather than cleanliness; arbitrary upstream error messages are never
   echoed.
 - Risk-score labels appear only when the provider explicitly returns one. Numeric
@@ -105,7 +115,12 @@ without retaining parent-repository files or nested Git metadata.
 - IPinfo is identified as a public demo widget, ipapi.is as a direct public API,
   and Check.Place-backed vendor rows as upstream relays.
 - JSON is built with `jq --arg` bindings rather than source interpolation, and
-  keeps booleans, numbers, and null values typed.
+  keeps booleans, numbers, and null values typed. The basic-information source
+  follows the actual MaxMind-shaped relay/IPinfo fallback, and display labels
+  such as `未知` normalize to JSON `null`.
+- DNSBL terminal output names every marked or blacklisted zone. JSON retains a
+  per-zone `Results` map in addition to totals, so aggregate counts never erase
+  which source produced a finding.
 - User-selected output paths use an exclusive, no-follow file descriptor; existing
   paths and symlinks are rejected.
 - Default terminal and JSON reports mask both the tested IP and a RIPEstat routed
@@ -140,12 +155,13 @@ for file in leaf_runner/*.rb; do /usr/bin/ruby -c "$file"; done
 print -r -- 1 | /bin/zsh -f bin/test-clash-leaf
 ```
 
-The full offline suite currently has 46 runs and 651 assertions. It covers raw
+The full offline suite currently has 48 runs and 697 assertions. It covers raw
 JSON stdout with embedded tab/newline/ANSI data, real green safe-factor and red
 risk-factor bytes, single-matrix CJK/ANSI table separator positions, strict
 official provider fixtures and private data-only credential loading, direct-route
-proxy-environment removal, exact-leaf isolation, and cleanup on success, failure,
-and signal.
+proxy-environment removal, explicit-target scope/family validation, per-zone
+DNSBL JSON retention, exact-leaf isolation, and cleanup on success, failure, and
+signal.
 
 A live direct IPv4 menu run on 2026-08-25 displayed the exact IP under the
 explicit `-f` choice, produced aligned type/score/factor tables with real green
@@ -164,6 +180,16 @@ Ipregistry key from the private data-only credential file. The official endpoint
 returned `ok`; the strict parser retained its usage/company, country, proxy, VPN,
 Tor, hosting, and abuse fields, and the resulting JSON passed typed assertions.
 The secret itself never appeared in output, process arguments, or Git.
+
+Three owner-supplied public IPv4 targets were compared live on 2026-08-26 with
+reputation and all 422 vendored DNSBL zones. The direct Ipregistry, IPinfo,
+ipapi.is, RIPEstat, and Shodan paths returned usable observations; Ping0 was
+correctly skipped for explicit targets. The Check.Place vendor relays returned
+no usable JSON during this run, and IPQS stayed visible as relay/query-failed.
+One target had a single ASN-level DNSBL listing plus a Shodan `proxy` tag, one
+had the Shodan tag without a DNSBL listing, and one had neither. Raw full-IP
+JSON/ANSI reports stayed in a private directory under `/Users/zmx/tmp` and were
+not added to Git.
 
 ## Completed parent extraction
 

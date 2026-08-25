@@ -128,6 +128,46 @@ en:official)print -rn -- "official API"
 esac
 }
 
+report_score_source_status(){
+typeset source_kind="$1" query_state="$2"
+typeset source_label state_label state_color="${Font_Purple:-}"
+case "$YY:$source_kind" in
+cn:official)source_label="官方"
+;;
+cn:direct)source_label="直连"
+;;
+cn:relay)source_label="中继"
+;;
+en:official)source_label="official"
+;;
+en:direct)source_label="direct"
+;;
+*)source_label="relay"
+esac
+case "$YY:$query_state" in
+cn:ok)state_label="可用" state_color="${Font_Green:-}"
+;;
+cn:upstream_insufficient_credits|cn:official_insufficient_credits)state_label="额度用完"
+;;
+cn:rate_limited)state_label="限流"
+;;
+cn:not_configured)state_label="未配置"
+;;
+cn:*)state_label="查询失败"
+;;
+en:ok)state_label="available" state_color="${Font_Green:-}"
+;;
+en:upstream_insufficient_credits|en:official_insufficient_credits)state_label="no credit"
+;;
+en:rate_limited)state_label="rate limit"
+;;
+en:not_configured)state_label="not set"
+;;
+*)state_label="failed"
+esac
+print -rn -- "${Font_Cyan:-}$source_label${Font_Suffix:-}/${state_color}$state_label${Font_Suffix:-}"
+}
+
 report_display_width(){
 typeset plain non_ascii
 plain=$(clean_ansi "$1")
@@ -203,6 +243,16 @@ sources+=("$(report_type_source official)")
 usages+=("${ipregistry[susetype]}")
 companies+=("${ipregistry[scomtype]}")
 fi
+if report_any_known "${ipqs[susetype]}";then
+headers+=("${Font_B}${Font_Cyan}IPQS$Font_Suffix")
+if [[ "${ipqs[source]}" == "official_api" ]];then
+sources+=("$(report_type_source official)")
+else
+sources+=("$(report_type_source relay)")
+fi
+usages+=("${ipqs[susetype]}")
+companies+=("")
+fi
 if report_any_known "${ipapi[susetype]}" "${ipapi[scomtype]}";then
 headers+=("${Font_B}${Font_Cyan}ipapi.is$Font_Suffix")
 sources+=("$(report_type_source direct)")
@@ -242,26 +292,40 @@ report_table_row "$company_label" 10 "$cell_width" "${rendered_companies[@]}"
 }
 
 show_score(){
-typeset -a headers scores risks scales
+typeset -a headers scores risks scales source_statuses
 if report_any_known "${ip2location[score]}" "${ip2location[risk]}";then
 headers+=("${Font_B}${Font_Cyan}IP2Location$Font_Suffix")
 scores+=("${ip2location[score]}") risks+=("${ip2location[risk]}") scales+=("0-99 potential")
+source_statuses+=("$(report_score_source_status relay ok)")
 fi
 if report_any_known "${scamalytics[score]}" "${scamalytics[risk]}";then
 headers+=("${Font_B}${Font_Cyan}Scamalytics$Font_Suffix")
 scores+=("${scamalytics[score]}") risks+=("${scamalytics[risk]}") scales+=("0-100 fraud")
+source_statuses+=("$(report_score_source_status relay ok)")
 fi
 if report_any_known "${ipapi[score]}" "${ipapi[risk]}";then
 headers+=("${Font_B}${Font_Cyan}ipapi.is$Font_Suffix")
 scores+=("${ipapi[score]}") risks+=("${ipapi[risk]}") scales+=("0-100% abuse")
+source_statuses+=("$(report_score_source_status direct ok)")
 fi
 if report_any_known "${abuseipdb[score]}" "${abuseipdb[risk]}";then
 headers+=("${Font_B}${Font_Cyan}AbuseIPDB$Font_Suffix")
 scores+=("${abuseipdb[score]}") risks+=("${abuseipdb[risk]}") scales+=("0-100 confidence")
+source_statuses+=("$(report_score_source_status relay ok)")
 fi
-if report_any_known "${ipqs[score]}" "${ipqs[risk]}";then
-headers+=("${Font_B}${Font_Cyan}IPQualityScore$Font_Suffix")
+if report_any_known "${ipqs[score]}" "${ipqs[risk]}" ||
+   [[ -n "${ipqs[source]}" || ( -n "${ipqs[status]}" && "${ipqs[status]}" != "unknown" ) ]];then
+headers+=("${Font_B}${Font_Cyan}IPQS$Font_Suffix")
 scores+=("${ipqs[score]}") risks+=("${ipqs[risk]}") scales+=("0-100 fraud")
+typeset ipqs_source_kind="relay"
+if [[ "${ipqs[source]}" == "official_api" || "${ipqs[status]}" == official_* ]];then
+ipqs_source_kind="official"
+fi
+typeset ipqs_query_status="${ipqs[status]:-unknown}"
+if report_any_known "${ipqs[score]}" "${ipqs[risk]}" && [[ "$ipqs_query_status" == "unknown" ]];then
+ipqs_query_status="ok"
+fi
+source_statuses+=("$(report_score_source_status "$ipqs_source_kind" "$ipqs_query_status")")
 fi
 (( ${#headers[@]} ))||return 0
 print -r -- "$Font_B${sscore[title]}$Font_Suffix"
@@ -270,20 +334,21 @@ typeset -a rendered_scores rendered_risks rendered_scales
 for value in "${scores[@]}";do rendered_scores+=("$(report_neutral_or_dash "$value")");done
 for value in "${risks[@]}";do rendered_risks+=("$(report_preserved_or_dash "$value")");done
 for value in "${scales[@]}";do rendered_scales+=("$(report_neutral_value "$value")");done
-typeset field_label score_label band_label scale_label note
+typeset field_label score_label band_label scale_label source_status_label note cell_width
 if [[ "$YY" == "cn" ]];then
-field_label="参数" score_label="分值" band_label="分段/标签" scale_label="量表"
+field_label="参数" score_label="分值" band_label="分段/标签" scale_label="量表" source_status_label="来源/状态" cell_width=16
 note="注：各平台量表不同；- 表示该来源本次未提供。"
 else
-field_label="Field" score_label="Score" band_label="Band / label" scale_label="Scale"
+field_label="Field" score_label="Score" band_label="Band / label" scale_label="Scale" source_status_label="Source/status" cell_width=19
 note="Note: provider scales differ; - means that source did not supply the field."
 fi
 print -r -- "$note"
-report_table_row "${Font_B}${field_label}${Font_Suffix}" 10 16 "${headers[@]}"
-report_table_rule "${#headers[@]}" 10 16
-report_table_row "$score_label" 10 16 "${rendered_scores[@]}"
-report_any_known "${risks[@]}"&&report_table_row "$band_label" 10 16 "${rendered_risks[@]}"
-report_table_row "$scale_label" 10 16 "${rendered_scales[@]}"
+report_table_row "${Font_B}${field_label}${Font_Suffix}" 10 "$cell_width" "${headers[@]}"
+report_table_rule "${#headers[@]}" 10 "$cell_width"
+report_table_row "$score_label" 10 "$cell_width" "${rendered_scores[@]}"
+report_any_known "${risks[@]}"&&report_table_row "$band_label" 10 "$cell_width" "${rendered_risks[@]}"
+report_table_row "$scale_label" 10 "$cell_width" "${rendered_scales[@]}"
+report_table_row "$source_status_label" 10 "$cell_width" "${source_statuses[@]}"
 }
 
 show_factor(){
@@ -391,11 +456,11 @@ observations+=("${Font_Cyan}RIPEstat: ${Font_Suffix}status=$(report_neutral_or_d
 fi
 fi
 
-if report_any_known "${internetdb[ports]}" "${internetdb[port_count]}" "${internetdb[vulnerability_count]}" "${internetdb[tags]}";then
+if report_any_known "${internetdb[ports]}" "${internetdb[port_count]}" "${internetdb[hostname_count]}" "${internetdb[vulnerability_count]}" "${internetdb[tags]}";then
 if [[ "$YY" == "cn" ]];then
-observations+=("${Font_Cyan}Shodan：${Font_Suffix}端口=$(report_neutral_or_dash "${internetdb[ports]}")（数量 $(report_neutral_or_dash "${internetdb[port_count]}")） | 已知漏洞=$(report_neutral_or_dash "${internetdb[vulnerability_count]}") | 标签=$(report_neutral_or_dash "${internetdb[tags]}")")
+observations+=("${Font_Cyan}Shodan：${Font_Suffix}端口=$(report_neutral_or_dash "${internetdb[ports]}")（数量 $(report_neutral_or_dash "${internetdb[port_count]}")） | 主机名数量=$(report_neutral_or_dash "${internetdb[hostname_count]}") | 已知漏洞=$(report_neutral_or_dash "${internetdb[vulnerability_count]}") | 标签=$(report_neutral_or_dash "${internetdb[tags]}")")
 else
-observations+=("${Font_Cyan}Shodan: ${Font_Suffix}ports=$(report_neutral_or_dash "${internetdb[ports]}") (count $(report_neutral_or_dash "${internetdb[port_count]}")) | known vulnerabilities=$(report_neutral_or_dash "${internetdb[vulnerability_count]}") | tags=$(report_neutral_or_dash "${internetdb[tags]}")")
+observations+=("${Font_Cyan}Shodan: ${Font_Suffix}ports=$(report_neutral_or_dash "${internetdb[ports]}") (count $(report_neutral_or_dash "${internetdb[port_count]}")) | hostnames=$(report_neutral_or_dash "${internetdb[hostname_count]}") | known vulnerabilities=$(report_neutral_or_dash "${internetdb[vulnerability_count]}") | tags=$(report_neutral_or_dash "${internetdb[tags]}")")
 fi
 elif [[ "${internetdb[status]}" == "not_found" ]];then
 if [[ "$YY" == "cn" ]];then
@@ -430,27 +495,17 @@ report_any_known "${ip2location[susetype]}" "${ip2location[scomtype]}" "${ip2loc
 report_any_known "${abuseipdb[susetype]}" "${abuseipdb[score]}"||missing+=("AbuseIPDB")
 report_any_known "${scamalytics[score]}" "${scamalytics[countrycode]}" "${scamalytics[proxy]}" "${scamalytics[vpn]}" "${scamalytics[tor]}" "${scamalytics[server]}" "${scamalytics[abuser]}" "${scamalytics[robot]}"||missing+=("Scamalytics")
 report_any_known "${ipdata[countrycode]}" "${ipdata[proxy]}" "${ipdata[tor]}" "${ipdata[server]}" "${ipdata[abuser]}"||missing+=("ipdata")
-if ! report_any_known "${ipqs[score]}" "${ipqs[countrycode]}" "${ipqs[proxy]}" "${ipqs[vpn]}" "${ipqs[tor]}" "${ipqs[server]}" "${ipqs[abuser]}" "${ipqs[robot]}";then
-case "$YY:${ipqs[status]}" in
-cn:upstream_insufficient_credits)missing+=("IPQualityScore（Check.Place 中继账户额度已用完）")
+case "$YY:${ping0[status]}" in
+cn:not_applicable_target)missing+=("Ping0（/geo 仅核对当前出口，指定目标时跳过）")
 ;;
-cn:official_insufficient_credits)missing+=("IPQualityScore（你的官方 API 额度已用完）")
+en:not_applicable_target)missing+=("Ping0 (/geo verifies the current egress only; skipped for explicit targets)")
 ;;
-cn:rate_limited)missing+=("IPQualityScore（服务限流）")
-;;
-en:upstream_insufficient_credits)missing+=("IPQualityScore (Check.Place relay account credits exhausted)")
-;;
-en:official_insufficient_credits)missing+=("IPQualityScore (your official API credits exhausted)")
-;;
-en:rate_limited)missing+=("IPQualityScore (service rate limit)")
-;;
-*)missing+=("IPQualityScore")
+*:verified|*:ip_mismatch) ;;
+*)missing+=("Ping0")
 esac
-fi
-[[ "${ping0[status]}" == "verified" || "${ping0[status]}" == "ip_mismatch" ]]||missing+=("Ping0")
 report_any_known "${ripestat[status]}" "${ripestat[prefix]}" "${ripestat[origins]}"||missing+=("RIPEstat")
 if [[ "${internetdb[status]}" != "not_found" ]] &&
-   ! report_any_known "${internetdb[ports]}" "${internetdb[port_count]}" "${internetdb[vulnerability_count]}" "${internetdb[tags]}";then
+   ! report_any_known "${internetdb[ports]}" "${internetdb[port_count]}" "${internetdb[hostname_count]}" "${internetdb[vulnerability_count]}" "${internetdb[tags]}";then
 missing+=("Shodan InternetDB")
 fi
 (( ${#missing[@]} ))||return 0

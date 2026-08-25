@@ -212,7 +212,7 @@ class IpQualityTest < Minitest::Test
       source "$3"
       response=$(<"$4")
       internetdb_parse_response "$response" "$5" || exit $?
-      print -r -- "${internetdb_parsed[ports]}|${internetdb_parsed[vulnerability_count]}"
+      print -r -- "${internetdb_parsed[ports]}|${internetdb_parsed[hostname_count]}|${internetdb_parsed[vulnerability_count]}"
     ZSH
     stdout, stderr, status = Open3.capture3(
       "/bin/zsh",
@@ -227,7 +227,7 @@ class IpQualityTest < Minitest::Test
       "198.51.100.23"
     )
     assert status.success?, stderr
-    assert_equal "198.51.100.0/24|AS64500\n22, 443|1\n", stdout
+    assert_equal "198.51.100.0/24|AS64500\n22, 443|1|1\n", stdout
     assert_empty stderr
 
     _stdout, _stderr, malformed_asn_status = Open3.capture3(
@@ -288,7 +288,7 @@ class IpQualityTest < Minitest::Test
       print -r -- "${ipregistry_parsed[usage_type]}|${ipregistry_parsed[server]}|${ipregistry_parsed[tor]}|${ipregistry_parsed[abuser]}"
       source "$4"
       ipqualityscore_parse_response "$(<"$5")" || exit 13
-      print -r -- "${ipqualityscore_parsed[score]}|${ipqualityscore_parsed[proxy]}|${ipqualityscore_parsed[tor]}|${ipqualityscore_parsed[server]}"
+      print -r -- "${ipqualityscore_parsed[score]}|${ipqualityscore_parsed[connection_type]}|${ipqualityscore_parsed[proxy]}|${ipqualityscore_parsed[tor]}|${ipqualityscore_parsed[server]}"
     ZSH
     stdout, stderr, status = Open3.capture3(
       "/bin/zsh",
@@ -304,7 +304,7 @@ class IpQualityTest < Minitest::Test
     )
 
     assert status.success?, stderr
-    assert_equal "hosting|true|false|false\n87|true|false|true\n", stdout
+    assert_equal "hosting|true|false|false\n87|Data Center|true|false|true\n", stdout
     assert_empty stderr
 
     _stdout, _stderr, mismatch_status = Open3.capture3(
@@ -461,6 +461,7 @@ class IpQualityTest < Minitest::Test
       sscore[high]="$Font_Red${Font_B}高风险$Font_Suffix"
       ipinfo[susetype]="${stype[isp]}" ipinfo[scomtype]="${stype[isp]}"
       ipregistry[susetype]="${stype[hosting]}" ipregistry[scomtype]="${stype[hosting]}"
+      ipqs[susetype]="${stype[hosting]}" ipqs[source]=official_api
       ipapi[susetype]="${stype[isp]}" ipapi[scomtype]="${stype[isp]}"
       ip2location[susetype]="${stype[mobile]}" ip2location[scomtype]="${stype[mobile]}"
       abuseipdb[susetype]="${stype[isp]}"
@@ -491,6 +492,7 @@ class IpQualityTest < Minitest::Test
     assert_includes stdout, "\e[31m"
     plain = stdout.gsub(/\e\[[0-9;]*m/, "")
     assert_match(/^分段\/标签 {2}\|/, plain)
+    assert_match(/参数\s+\|.*Ipregistry.*IPQS.*ipapi\.is/, plain)
     refute_includes plain, "分段／标签"
     refute_includes plain, "—"
     assert_match(/^分值 {7}\| 3 {16}\| 3 {16}\| 0\.00% {12}\| 0 {16}\| 87 {14}$/, plain)
@@ -532,6 +534,7 @@ class IpQualityTest < Minitest::Test
       ping0[asn]=AS64500 ping0[org]='Example Network'
       ripestat[status]=announced ripestat[prefix]='198.51.100.0/24' ripestat[origins]=AS64500
       internetdb[status]=ok internetdb[ports]='22, 443' internetdb[port_count]=2
+      internetdb[hostname_count]=1
       internetdb[vulnerability_count]=1 internetdb[tags]='vpn'
       clean_ansi(){ print -rn -- "$1" }
       source "$1"
@@ -548,23 +551,27 @@ class IpQualityTest < Minitest::Test
     assert_includes stdout, "Ping0：已核对"
     assert_includes stdout, "RIPEstat：状态=announced"
     assert_includes stdout, "Shodan：端口=22, 443"
+    assert_includes stdout, "主机名数量=1"
     refute_includes stdout, "Ping0 官方公开观测"
     refute_includes stdout, "官方路由观测（RIPEstat"
     assert_empty stderr
   end
 
-  def test_unavailable_reputation_sources_are_compacted_into_one_summary_line
+  def test_unavailable_sources_stay_compact_while_ipqs_keeps_a_visible_status_column
     report_probe = <<~'ZSH'
       setopt KSH_ARRAYS
       Font_Cyan='' Font_Suffix='' Font_B='' Font_Green='' Font_Red='' Font_Purple=''
       YY=cn
-      typeset -A maxmind ipinfo ipregistry ipapi ip2location abuseipdb scamalytics ipdata ipqs ping0 ripestat internetdb sping0
+      typeset -A maxmind ipinfo ipregistry ipapi ip2location abuseipdb scamalytics ipdata ipqs ping0 ripestat internetdb sping0 sscore
+      sscore[title]='三、风险评分'
       ipregistry[status]=not_configured
       ping0[status]=unknown
       ipqs[status]=upstream_insufficient_credits
+      ipqs[source]=check_place_relay
       internetdb[status]=not_found
       clean_ansi(){ print -rn -- "$1" }
       source "$1"
+      show_score
       show_network_context
       show_unavailable_sources
     ZSH
@@ -578,13 +585,15 @@ class IpQualityTest < Minitest::Test
     )
 
     assert status.success?, stderr
-    assert_equal 3, stdout.lines.length
+    assert_includes stdout, "IPQS"
+    assert_includes stdout, "来源/状态"
+    assert_includes stdout, "中继/额度用完"
     assert_includes stdout, "五、官方网络观测"
     assert_includes stdout, "Shodan：无公开记录（不等于无风险）"
     summary = stdout.lines.last
     assert_includes summary, "本次无可用资料（不等于低风险）"
-    assert_includes summary, "IPQualityScore（Check.Place 中继账户额度已用完）"
     assert_includes summary, "RIPEstat"
+    refute_includes summary, "IPQualityScore"
     refute_includes summary, "Shodan"
     refute_includes summary, "Ipregistry"
     refute_includes stdout, "状态：unknown"
@@ -628,6 +637,9 @@ class IpQualityTest < Minitest::Test
     assert_includes source, "Check.Place 中继；上游标注 MaxMind"
     assert_includes source, "Check.Place relay; MaxMind-labeled upstream data"
     assert_includes source, "IPinfo public demo widget"
+    assert_includes source, 'info_source="IPinfo public demo widget"'
+    assert_includes source, '--arg info_source "$info_source"'
+    refute_includes source, '--arg info_source "Check.Place upstream relay; MaxMind-labeled response"'
     refute_includes source, "/Users/zmx/gitrepos/ipquality.git"
     refute_includes source, "/Users/zmx/gitrepos/network-manager.git"
     refute_includes source, "Maxmind 数据库"
@@ -644,6 +656,41 @@ class IpQualityTest < Minitest::Test
     stdout, stderr, status = run_script("--scope", "dnsbl", "--dnsbl-concurrency", "50")
     assert status.success?, stderr
     assert_includes stdout, "DNSBL concurrency cap: 50"
+  end
+
+  def test_dnsbl_live_path_keeps_every_zone_result_with_a_fixture_dig
+    Dir.mktmpdir("ipquality-dnsbl-dig-test") do |directory|
+      fake_dig = File.join(directory, "dig")
+      File.write(fake_dig, <<~'ZSH')
+        #!/bin/zsh -f
+        case "$*" in
+          *dnsbl-3.uceprotect.net*) print -r -- 127.0.0.2 ;;
+          *bl.spamcop.net*) print -r -- 127.0.0.3 ;;
+          *.b.barracudacentral.org*) exit 9 ;;
+          *) exit 0 ;;
+        esac
+      ZSH
+      File.chmod(0o700, fake_dig)
+      stdout, stderr, status = Open3.capture3(
+        { "PATH" => "#{directory}:#{ENV.fetch("PATH")}" },
+        "/bin/zsh", "-f", SCRIPT,
+        "--confirm-network-lookup", "--scope", "dnsbl",
+        "--dnsbl-concurrency", "7", "-4", "-j", "12.217.32.68"
+      )
+
+      assert status.success?, stderr
+      dnsbl = JSON.parse(stdout).dig("Mail", "DNSBlacklist")
+      assert_equal 422, dnsbl.fetch("Total")
+      assert_equal 419, dnsbl.fetch("Clean")
+      assert_equal 1, dnsbl.fetch("Marked")
+      assert_equal 1, dnsbl.fetch("Blacklisted")
+      assert_equal 1, dnsbl.fetch("Unknown")
+      assert_equal 422, dnsbl.fetch("Results").length
+      assert_equal "Blacklisted", dnsbl.dig("Results", "dnsbl-3.uceprotect.net")
+      assert_equal "Marked", dnsbl.dig("Results", "bl.spamcop.net")
+      assert_equal "Unknown", dnsbl.dig("Results", "b.barracudacentral.org")
+      assert_includes stderr, "正在检测黑名单数据库"
+    end
   end
 
   def test_only_implemented_report_languages_are_advertised_and_accepted
@@ -695,6 +742,39 @@ class IpQualityTest < Minitest::Test
     assert_empty stderr
   end
 
+  def test_explicit_public_target_is_parsed_before_network_and_restricted_to_honest_scopes
+    stdout, stderr, status = run_script(
+      "--confirm-network-lookup",
+      "--scope",
+      "full",
+      "12.217.32.68"
+    )
+    assert_equal 62, status.exitstatus
+    assert_includes stdout, "指定公网IP仅支持信誉或DNSBL范围"
+    assert_empty stderr
+
+    stdout, stderr, status = run_script(
+      "--confirm-network-lookup",
+      "--scope",
+      "reputation",
+      "-6",
+      "12.217.32.68"
+    )
+    assert_equal 63, status.exitstatus
+    assert_includes stdout, "IPv4/IPv6类型冲突"
+    assert_empty stderr
+
+    stdout, stderr, status = run_script(
+      "--confirm-network-lookup",
+      "--scope",
+      "reputation",
+      "192.168.1.10"
+    )
+    assert_equal 2, status.exitstatus
+    assert_includes stdout, "IP地址格式错误"
+    assert_empty stderr
+  end
+
   def test_source_is_zsh_native_and_contains_no_removed_runtime_paths
     source = File.binread(SCRIPT)
 
@@ -705,6 +785,8 @@ class IpQualityTest < Minitest::Test
     assert_includes source, 'command curl -q "$@"'
     assert_includes source, '--arg score_ipqs "${ipqs[score]:-}"'
     assert_includes source, '--arg type_ipregistry_usage'
+    assert_includes source, '--arg type_ipqs_usage'
+    assert_includes source, '--arg exposure_hostname_count'
     refute_includes source, '--arg band_dbip'
     assert_includes source, '--arg info_org "$info_org"'
     refute_includes source, "shead[command]"

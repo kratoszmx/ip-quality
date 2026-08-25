@@ -25,11 +25,8 @@ ipqualityscore_parsed[vpn]=$(print -rn -- "$response"|jq -r 'if .vpn == null the
 ipqualityscore_parsed[tor]=$(print -rn -- "$response"|jq -r 'if .tor == null then empty else .tor end')
 ipqualityscore_parsed[abuser]=$(print -rn -- "$response"|jq -r 'if .recent_abuse == null then empty else .recent_abuse end')
 ipqualityscore_parsed[robot]=$(print -rn -- "$response"|jq -r 'if .bot_status == null then empty else .bot_status end')
-case "$(print -rn -- "$response"|jq -r '.connection_type // empty'|tr '[:upper:]' '[:lower:]')" in
-"data center")ipqualityscore_parsed[server]="true"
-;;
-residential|corporate|education|mobile)ipqualityscore_parsed[server]="false"
-esac
+ipqualityscore_parsed[connection_type]=$(print -rn -- "$response"|jq -r '.connection_type // empty')
+ipqualityscore_parsed[server]=$(provider_connection_type_server_flag "${ipqualityscore_parsed[connection_type]}")
 ipqualityscore_parsed[status]="ok"
 return 0
 }
