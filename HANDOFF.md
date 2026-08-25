@@ -8,13 +8,19 @@ Last validated: 2026-08-25, Asia/Shanghai.
 - Branch: `main` only
 - Online primary: `https://github.com/kratoszmx/ip-quality.git` (public; empty
   before the 2026-08-24 synchronization)
-- Online backup: `https://github.com/kratosbackup/ipquality.git` (private)
+- Configured online backup: `https://github.com/kratosbackup/ipquality.git`
+  (last confirmed remote-tracking commit `0c031f9`; current access is unavailable)
 - Branch upstream: `github-kratoszmx/main`
 
 The corrected `kratoszmx/ip-quality` target is accessible to the owner's current
-credential. GitHub reports it as public; do not change repository visibility
-without an explicit owner decision. `kratosbackup/ipquality` remains the private
-online backup. Never place a token in a remote URL or Git configuration.
+credential and is current after the 2026-08-25 push. GitHub reports it as public;
+do not change repository visibility without an explicit owner decision. The
+configured `kratosbackup/ipquality` target returns `Repository not found` with
+the available default credential, while a forced `kratosbackup` identity has no
+stored password/token available to non-interactive Git. This does not prove that
+an existing token merely lacks scope: the backup-specific push supplied no token
+at all, and repository removal/rename or missing repository selection can produce
+the same 404. Never place a token in a remote URL or Git configuration.
 
 The obsolete `origin` and `usb` remotes were disconnected. Their exact bare
 repositories, `/Users/zmx/gitrepos/ipquality.git` and
