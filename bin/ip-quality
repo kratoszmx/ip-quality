@@ -7,13 +7,16 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-08-24-standalone.5"
+script_version="v2026-08-25-standalone.6"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset REPORT_DIR="$SCRIPT_DIR/report"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
 typeset COMMON_PROVIDER_LIB="$PROVIDER_DIR/common.zsh"
+typeset CREDENTIALS_LIB="$PROVIDER_DIR/credentials.zsh"
+typeset IPREGISTRY_LIB="$PROVIDER_DIR/ipregistry.zsh"
+typeset DBIP_LIB="$PROVIDER_DIR/dbip.zsh"
 typeset IPQUALITYSCORE_LIB="$PROVIDER_DIR/ipqualityscore.zsh"
 typeset PING0_LIB="$PROVIDER_DIR/ping0.zsh"
 typeset RIPESTAT_LIB="$PROVIDER_DIR/ripestat.zsh"
@@ -21,7 +24,7 @@ typeset INTERNETDB_LIB="$PROVIDER_DIR/shodan_internetdb.zsh"
 typeset REPUTATION_REPORT_LIB="$REPORT_DIR/reputation.zsh"
 typeset REPORT_OUTPUT_LIB="$REPORT_DIR/output.zsh"
 typeset local_library
-for local_library in "$COMMON_PROVIDER_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB" "$REPORT_OUTPUT_LIB";do
+for local_library in "$COMMON_PROVIDER_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$DBIP_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB" "$REPORT_OUTPUT_LIB";do
 [[ -f "$local_library" && -r "$local_library" && ! -L "$local_library" ]]||{
 print -ru2 -- "ERROR: unsafe or missing local library: $local_library"
 exit 66
@@ -65,11 +68,13 @@ typeset YY="cn"
 typeset -A maxmind
 typeset -A ipinfo
 typeset -A scamalytics
+typeset -A ipregistry
 typeset -A ipapi
 typeset -A abuseipdb
 typeset -A ip2location
 typeset -A ipdata
 typeset -A ipqs
+typeset -A dbip
 typeset -A ping0
 typeset -A ripestat
 typeset -A internetdb
@@ -161,7 +166,6 @@ sinfo[ldnsbl]=28
 shead[title]="IP QUALITY CHECK REPORT: "
 shead[title_lite]="IP QUALITY CHECK REPORT(LITE): "
 shead[ver]="Version: $script_version"
-shead[command]="/bin/zsh -f ./bin/ip-quality --confirm-network-lookup --scope $query_scope -E"
 shead[git]="https://github.com/kratoszmx/ip-quality"
 shead[time_label]="Report Time: "
 shead[ltitle]=25
@@ -204,6 +208,7 @@ stype[usetype]="Usage:     "
 stype[comtype]="Company:   "
 sscore[verylow]="$Font_Green${Font_B}VeryLow$Font_Suffix"
 sscore[low]="$Font_Green${Font_B}Low$Font_Suffix"
+sscore[medium]="$Font_Yellow${Font_B}Medium$Font_Suffix"
 sscore[high]="$Font_Red${Font_B}High$Font_Suffix"
 sscore[veryhigh]="$Font_Red${Font_B}VeryHigh$Font_Suffix"
 sscore[elevated]="$Font_Yellow${Font_B}Elevated$Font_Suffix"
@@ -220,16 +225,7 @@ sfactor[robot]="Robot:  "
 sfactor[yes]="$Font_Red$Font_B Yes$Font_Suffix"
 sfactor[no]="$Font_Green$Font_B No $Font_Suffix"
 sfactor[na]="$Font_Green$Font_B N/A$Font_Suffix"
-sping0[title]="Ping0 public observation"
-sping0[status]="Status:                 "
-sping0[location]="Location:               "
-sping0[asn]="ASN:                    "
-sping0[org]="Organization:           "
-sping0[risk]="Risk score:             "
-sping0[match]="verified against tested IP"
-sping0[unknown]="Unknown"
 sping0[mismatch]="response IP did not match; result rejected"
-sping0[norisk]="not exposed by the official public /geo endpoint"
 smedia[yes]="  $Back_Green$Font_White Yes $Font_Suffix  "
 smedia[no]=" $Back_Red$Font_White Block $Font_Suffix "
 smedia[bad]="$Back_Red$Font_White Failed $Font_Suffix "
@@ -288,7 +284,6 @@ sinfo[ldnsbl]=21
 shead[title]="IP质量体检报告："
 shead[title_lite]="IP质量体检报告(Lite)："
 shead[ver]="脚本版本：$script_version"
-shead[command]="/bin/zsh -f ./bin/ip-quality --confirm-network-lookup --scope $query_scope"
 shead[git]="https://github.com/kratoszmx/ip-quality"
 shead[time_label]="报告时间："
 shead[ltitle]=16
@@ -331,6 +326,7 @@ stype[usetype]="使用类型： "
 stype[comtype]="公司类型： "
 sscore[verylow]="${Font_Green}${Font_B}极低风险${Font_Suffix}"
 sscore[low]="${Font_Green}${Font_B}低风险${Font_Suffix}"
+sscore[medium]="${Font_Yellow}${Font_B}中风险${Font_Suffix}"
 sscore[high]="${Font_Red}${Font_B}高风险${Font_Suffix}"
 sscore[veryhigh]="${Font_Red}${Font_B}极高风险${Font_Suffix}"
 sscore[elevated]="${Font_Yellow}${Font_B}较高风险${Font_Suffix}"
@@ -347,16 +343,7 @@ sfactor[robot]="机器人："
 sfactor[yes]="$Font_Red$Font_B 是 $Font_Suffix"
 sfactor[no]="$Font_Green$Font_B 否 $Font_Suffix"
 sfactor[na]="$Font_Green$Font_B 无 $Font_Suffix"
-sping0[title]="Ping0 官方公开观测"
-sping0[status]="状态：                  "
-sping0[location]="位置：                  "
-sping0[asn]="自治系统号：            "
-sping0[org]="组织：                  "
-sping0[risk]="风险分数：              "
-sping0[match]="已与本次测试 IP 核对一致"
-sping0[unknown]="未知"
 sping0[mismatch]="响应 IP 不一致，结果已拒绝"
-sping0[norisk]="官方公开 /geo 端点不提供风险分数"
 smedia[yes]=" $Back_Green$Font_White 解锁 $Font_Suffix  "
 smedia[no]=" $Back_Red$Font_White 屏蔽 $Font_Suffix  "
 smedia[bad]=" $Back_Red$Font_White 失败 $Font_Suffix  "
@@ -424,6 +411,47 @@ curl_safe(){
 command curl -q "$@"
 }
 
+# Feed credential-bearing curl options over stdin so API keys never appear in
+# process arguments, Git configuration, or the report. Callers validate every
+# interpolated key and IP before reaching these helpers.
+curl_with_secret_url(){
+typeset secret_url="$1"
+shift
+print -r -- "url = \"$secret_url\""|curl_safe "$@" --config -
+}
+
+curl_with_secret_header(){
+typeset header_name="$1"
+typeset header_value="$2"
+typeset endpoint="$3"
+shift 3
+{
+print -r -- "header = \"$header_name: $header_value\""
+print -r -- "url = \"$endpoint\""
+}|curl_safe "$@" --config -
+}
+
+styled_provider_type(){
+typeset raw="${1:l}"
+case "$raw" in
+business|corporate)print -rn -- "${stype[business]}"
+;;
+isp|consumer|residential)print -rn -- "${stype[isp]}"
+;;
+hosting|"data center")print -rn -- "${stype[hosting]}"
+;;
+education)print -rn -- "${stype[education]}"
+;;
+government)print -rn -- "${stype[government]}"
+;;
+inactive|reserved)print -rn -- "${stype[reserved]}"
+;;
+""|null|unknown)print -rn -- "${stype[unknown]}"
+;;
+*)print -rn -- "${stype[other]}"
+esac
+}
+
 parse_cli(){
 legacy_args=()
 while (( $# > 0 ));do
@@ -488,7 +516,7 @@ print -r -- "  scope: $query_scope"
 print -r -- "  DNSBL concurrency cap: $dnsbl_concurrency"
 print -r -- "  output: masked IP by default; local stdout/file only"
 print -r -- "  telemetry/report upload/remote code: disabled"
-scope_includes reputation&&print -r -- "  reputation sources: core official-contract sources = ipapi.is, Ping0 public geo, RIPEstat, Shodan InternetDB (IPv4)"
+scope_includes reputation&&print -r -- "  reputation sources: official-contract sources = ipapi.is, Ping0, RIPEstat, Shodan InternetDB, plus configured Ipregistry/DB-IP/IPQS APIs"
 scope_includes reputation&&print -r -- "  supplementary sources: IPinfo public demo widget plus named Check.Place relays (MaxMind-labeled, Scamalytics, AbuseIPDB, IP2Location, ipdata, IPQualityScore)"
 scope_includes reputation&&print -r -- "  Ping0 limitation: the official free /geo endpoint exposes IP/location/ASN/organization, not a risk score"
 scope_includes reputation&&print -r -- "  context-only sources: RIPEstat reports routing; Shodan InternetDB reports public exposure, not cleanliness"
@@ -524,7 +552,7 @@ print -ru2 -- "SELF-TEST FAILED: not running under zsh"
 return 1
 }
 local reference_file
-for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json" "$COMMON_PROVIDER_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json" "$COMMON_PROVIDER_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$DBIP_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$reference_file" && -r "$reference_file" && ! -L "$reference_file" ]]||{
 print -ru2 -- "SELF-TEST FAILED: unsafe or missing reference file: $reference_file"
 return 1
@@ -587,6 +615,22 @@ return 1
 }
 ipqualityscore_parse_unavailability '{"success":false,"message":"Insufficient credits"}'&&[[ "${ipqualityscore_unavailable[status]}" == "upstream_insufficient_credits" ]]||{
 print -ru2 -- "SELF-TEST FAILED: IPQualityScore quota status changed"
+return 1
+}
+provider_api_key_is_valid "fixture_key-123456"&&! provider_api_key_is_valid $'bad\nkey'||{
+print -ru2 -- "SELF-TEST FAILED: provider credential validation changed"
+return 1
+}
+ipregistry_parse_response '{"ip":"198.51.100.23","connection":{"type":"hosting"},"company":{"type":"hosting"},"location":{"country":{"code":"US"}},"security":{"is_proxy":true,"is_vpn":true,"is_tor":false,"is_tor_exit":false,"is_cloud_provider":true,"is_abuser":false,"is_attacker":false,"is_threat":false}}' "198.51.100.23"&&[[ "${ipregistry_parsed[server]}" == "true" && "${ipregistry_parsed[tor]}" == "false" ]]||{
+print -ru2 -- "SELF-TEST FAILED: Ipregistry parser contract changed"
+return 1
+}
+dbip_parse_response '{"ipAddress":"198.51.100.23","countryCode":"US","usageType":"hosting","isCrawler":false,"isProxy":true,"proxyType":"vpn","threatLevel":"medium","threatDetails":["attack-source"]}' "198.51.100.23"&&[[ "${dbip_parsed[vpn]}" == "true" && "${dbip_parsed[abuser]}" == "true" ]]||{
+print -ru2 -- "SELF-TEST FAILED: DB-IP parser contract changed"
+return 1
+}
+ipqualityscore_parse_response '{"success":true,"fraud_score":87,"country_code":"US","proxy":true,"vpn":true,"tor":false,"recent_abuse":false,"bot_status":false,"connection_type":"Data Center"}'&&[[ "${ipqualityscore_parsed[score]}" == "87" && "${ipqualityscore_parsed[server]}" == "true" ]]||{
+print -ru2 -- "SELF-TEST FAILED: official IPQualityScore parser contract changed"
 return 1
 }
 is_nonnegative_decimal "0.25"&&! is_nonnegative_decimal '0; print unsafe'||{
@@ -660,11 +704,13 @@ IPhide="198.51.*.*"
 shead[time_raw]="2026-08-23T00:00:00Z"
 maxmind=()
 ipinfo=()
+ipregistry=()
 ipapi=()
 ip2location=()
 abuseipdb=()
 scamalytics=()
 ipqs=()
+dbip=()
 ipdata=()
 ping0=()
 ripestat=()
@@ -673,9 +719,18 @@ maxmind[org]="$json_special"
 maxmind[countrycode]="US"
 maxmind[regcountrycode]="US"
 ipinfo[susetype]="${stype[hosting]}"
+ipregistry[status]="ok"
+ipregistry[susetype]="${stype[hosting]}"
+ipregistry[scomtype]="${stype[hosting]}"
+ipregistry[proxy]="false"
 ip2location[score]="3"
 ipqs[score]="100"
 ipqs[status]="ok"
+ipqs[source]="official_api"
+dbip[status]="ok"
+dbip[risk]="${sscore[medium]}"
+dbip[countrycode]="US"
+dbip[vpn]="true"
 ipapi[risk]=$'High "quoted"'
 ipqs[proxy]="true"
 ping0[status]="verified"
@@ -697,12 +752,19 @@ return 1
 print -r -- "$ipjson"|jq -e --arg expected "$json_special" '
   .Info.Organization == $expected and
   .Type.Source.IPinfo == "public demo widget" and
+  .Type.Source.Ipregistry == "official API" and
+  .Type.Status.Ipregistry == "ok" and
   .Score.IPQS == "100" and
+  .Score["DB-IP"] == null and
   .ScoreMeta.IP2LOCATION.Scale == "0-99 potential risk" and
   .ScoreMeta.ipapi.Band == "High \"quoted\"" and
   .ScoreMeta.IPQS.Band == null and
   .ScoreMeta.IPQS.Status == "ok" and
+  .ScoreMeta.IPQS.Source == "official_api" and
+  .ScoreMeta["DB-IP"].Band == "中风险" and
   .Factor.Proxy.IPQS == true and
+  .Factor.Proxy.Ipregistry == false and
+  .Factor.VPN["DB-IP"] == true and
   .Factor.VPN.IPinfo == null and
   .Ping0.Organization == $expected and
   .Routing.Prefix == "198.51.*.*/24" and
@@ -1075,6 +1137,33 @@ ipinfo[dms]="null"
 ipinfo[map]="null"
 fi
 }
+db_ipregistry(){
+ipregistry=()
+ipregistry[status]="not_configured"
+typeset api_key="${provider_credentials[IPREGISTRY_API_KEY]:-}"
+[[ -n "$api_key" ]]||return 0
+local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Ipregistry official API $Font_Suffix"
+((ibar_step+=3))
+show_progress_bar "$temp_info" $((40-15-${sinfo[ldatabase]}))
+ipregistry[status]="unknown"
+local RESPONSE=$(curl_with_secret_header "Authorization" "ApiKey $api_key" \
+  "https://api.ipregistry.co/$IP" $CurlARG -sS -$1 -m 10 \
+  --max-filesize 262144 2>/dev/null)
+if ipregistry_parse_response "$RESPONSE" "$IP";then
+ipregistry[status]="ok"
+ipregistry[source]="official_api"
+ipregistry[usetype]="${ipregistry_parsed[usage_type]}"
+ipregistry[comtype]="${ipregistry_parsed[company_type]}"
+ipregistry[susetype]=$(styled_provider_type "${ipregistry[usetype]}")
+ipregistry[scomtype]=$(styled_provider_type "${ipregistry[comtype]}")
+ipregistry[countrycode]="${ipregistry_parsed[country_code]}"
+ipregistry[proxy]="${ipregistry_parsed[proxy]}"
+ipregistry[vpn]="${ipregistry_parsed[vpn]}"
+ipregistry[tor]="${ipregistry_parsed[tor]}"
+ipregistry[server]="${ipregistry_parsed[server]}"
+ipregistry[abuser]="${ipregistry_parsed[abuser]}"
+fi
+}
 db_scamalytics(){
 local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Scamalytics $Font_Suffix"
 ((ibar_step+=3))
@@ -1308,6 +1397,39 @@ ip2location[score]=""
 fi
 ip2location[risk]=""
 }
+db_dbip(){
+dbip=()
+dbip[status]="not_configured"
+typeset api_key="${provider_credentials[DBIP_API_KEY]:-}"
+[[ -n "$api_key" ]]||return 0
+local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}DB-IP official API $Font_Suffix"
+((ibar_step+=3))
+show_progress_bar "$temp_info" $((40-11-${sinfo[ldatabase]}))
+dbip[status]="unknown"
+local RESPONSE=$(curl_with_secret_url "https://api.db-ip.com/v2/$api_key/$IP" \
+  $CurlARG -sS -$1 -m 10 --max-filesize 262144 2>/dev/null)
+if dbip_parse_response "$RESPONSE" "$IP";then
+dbip[status]="ok"
+dbip[source]="official_api"
+dbip[countrycode]="${dbip_parsed[country_code]}"
+dbip[proxy]="${dbip_parsed[proxy]}"
+dbip[vpn]="${dbip_parsed[vpn]}"
+dbip[tor]="${dbip_parsed[tor]}"
+dbip[server]="${dbip_parsed[server]}"
+dbip[abuser]="${dbip_parsed[abuser]}"
+dbip[robot]="${dbip_parsed[robot]}"
+dbip[risktext]="${dbip_parsed[threat_level]}"
+case "${dbip[risktext]:l}" in
+low)dbip[risk]="${sscore[low]}"
+;;
+medium)dbip[risk]="${sscore[medium]}"
+;;
+high)dbip[risk]="${sscore[high]}"
+;;
+*)dbip[risk]=""
+esac
+fi
+}
 db_ipdata(){
 local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}ipdata $Font_Suffix"
 ((ibar_step+=3))
@@ -1330,7 +1452,33 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}IPQS $Font_Suffix"
 show_progress_bar "$temp_info" $((40-5-${sinfo[ldatabase]}))
 ipqs=()
 ipqs[status]="unknown"
-local RESPONSE=$(curl_safe $CurlARG -sL -$1 -m 10 --max-filesize 65536 "https://ipinfo.check.place/$IP?db=ipqualityscore")
+typeset api_key="${provider_credentials[IPQS_API_KEY]:-}"
+typeset RESPONSE=""
+if [[ -n "$api_key" ]];then
+ipqs[source]="official_api"
+RESPONSE=$(curl_with_secret_url \
+  "https://www.ipqualityscore.com/api/json/ip/$api_key/$IP?strictness=0&allow_public_access_points=true" \
+  $CurlARG -sS -$1 -m 10 --max-filesize 131072 2>/dev/null)
+if ipqualityscore_parse_response "$RESPONSE";then
+ipqs[status]="ok"
+ipqs[score]="${ipqualityscore_parsed[score]}"
+ipqs[countrycode]="${ipqualityscore_parsed[country_code]}"
+ipqs[proxy]="${ipqualityscore_parsed[proxy]}"
+ipqs[tor]="${ipqualityscore_parsed[tor]}"
+ipqs[vpn]="${ipqualityscore_parsed[vpn]}"
+ipqs[server]="${ipqualityscore_parsed[server]}"
+ipqs[abuser]="${ipqualityscore_parsed[abuser]}"
+ipqs[robot]="${ipqualityscore_parsed[robot]}"
+elif ipqualityscore_parse_unavailability "$RESPONSE";then
+case "${ipqualityscore_unavailable[status]}" in
+upstream_insufficient_credits)ipqs[status]="official_insufficient_credits"
+;;
+*)ipqs[status]="${ipqualityscore_unavailable[status]}"
+esac
+fi
+else
+ipqs[source]="check_place_relay"
+RESPONSE=$(curl_safe $CurlARG -sL -$1 -m 10 --max-filesize 65536 "https://ipinfo.check.place/$IP?db=ipqualityscore")
 provider_json_is_object "$RESPONSE"||RESPONSE=""
 if ipqualityscore_parse_unavailability "$RESPONSE";then
 ipqs[status]="${ipqualityscore_unavailable[status]}"
@@ -1339,7 +1487,6 @@ ipqs[score]=$(echo "$RESPONSE"|jq -r '.fraud_score')
 if ! provider_integer_in_range "${ipqs[score]}" 0 100;then
 ipqs[score]=""
 fi
-ipqs[risk]=""
 ipqs[countrycode]=$(echo "$RESPONSE"|jq -r '.country_code')
 ipqs[proxy]=$(echo "$RESPONSE"|jq -r '.proxy')
 ipqs[tor]=$(echo "$RESPONSE"|jq -r '.tor')
@@ -1349,6 +1496,8 @@ ipqs[robot]=$(echo "$RESPONSE"|jq -r '.bot_status')
 if provider_has_observation "${ipqs[score]}" "${ipqs[countrycode]}" "${ipqs[proxy]}" "${ipqs[tor]}" "${ipqs[vpn]}" "${ipqs[abuser]}" "${ipqs[robot]}";then
 ipqs[status]="ok"
 fi
+fi
+ipqs[risk]=""
 }
 db_ping0(){
 local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Ping0 public geo $Font_Suffix"
@@ -1943,8 +2092,6 @@ echo -ne "\r$PADDING$Font_B${shead[title]}$Font_Cyan$IPhide$Font_Suffix\n"
 fi
 calc_padding "${shead[git]}" 72
 echo -ne "\r$PADDING$Font_U${shead[git]}$Font_Suffix\n"
-calc_padding "${shead[command]}" 72
-echo -ne "\r$PADDING${shead[command]}\n"
 echo -ne "\r${shead[ptime]}${shead[time]}  ${shead[ver]}\n"
 echo -ne "\r$(printf '%72s'|tr ' ' '#')\n"
 }
@@ -2282,7 +2429,6 @@ displayed_routing_prefix=$(mask_network_prefix "$displayed_routing_prefix")||dis
 fi
 ipjson=$(jq -n \
 --arg head_ip "$displayed_ip" \
---arg head_command "${shead[command]:-}" \
 --arg head_repository "${shead[git]:-}" \
 --arg head_time "${shead[time_raw]:-}" \
 --arg head_version "${script_version:-}" \
@@ -2297,10 +2443,12 @@ ipjson=$(jq -n \
 --arg info_continent "$info_continent" --arg info_regcountrycode "$info_regcountrycode" \
 --arg info_regcountry "$info_regcountry" --arg info_type "$info_type" \
 --arg type_ipinfo_usage "$(clean_ansi "${ipinfo[susetype]:-}")" \
+--arg type_ipregistry_usage "$(clean_ansi "${ipregistry[susetype]:-}")" \
 --arg type_ipapi_usage "$(clean_ansi "${ipapi[susetype]:-}")" \
 --arg type_ip2_usage "$(clean_ansi "${ip2location[susetype]:-}")" \
 --arg type_abuse_usage "$(clean_ansi "${abuseipdb[susetype]:-}")" \
 --arg type_ipinfo_company "$(clean_ansi "${ipinfo[scomtype]:-}")" \
+--arg type_ipregistry_company "$(clean_ansi "${ipregistry[scomtype]:-}")" \
 --arg type_ipapi_company "$(clean_ansi "${ipapi[scomtype]:-}")" \
 --arg type_ip2_company "$(clean_ansi "${ip2location[scomtype]:-}")" \
 --arg score_ip2 "${ip2location[score]:-}" --arg score_scam "${scamalytics[score]:-}" \
@@ -2311,26 +2459,37 @@ ipjson=$(jq -n \
 --arg band_ipapi "$(clean_ansi "${ipapi[risk]:-}")" \
 --arg band_abuse "$(clean_ansi "${abuseipdb[risk]:-}")" \
 --arg band_ipqs "$(clean_ansi "${ipqs[risk]:-}")" \
+--arg band_dbip "$(clean_ansi "${dbip[risk]:-}")" \
 --arg status_ipqs "${ipqs[status]:-unknown}" \
+--arg source_ipqs "${ipqs[source]:-unknown}" \
+--arg status_ipregistry "${ipregistry[status]:-not_configured}" \
+--arg status_dbip "${dbip[status]:-not_configured}" \
 --arg f_ip2_cc "${ip2location[countrycode]:-}" --arg f_ipapi_cc "${ipapi[countrycode]:-}" \
+--arg f_ipregistry_cc "${ipregistry[countrycode]:-}" --arg f_dbip_cc "${dbip[countrycode]:-}" \
 --arg f_ipqs_cc "${ipqs[countrycode]:-}" --arg f_scam_cc "${scamalytics[countrycode]:-}" \
 --arg f_ipdata_cc "${ipdata[countrycode]:-}" --arg f_ipinfo_cc "${ipinfo[countrycode]:-}" \
 --arg f_ip2_proxy "${ip2location[proxy]:-}" --arg f_ipapi_proxy "${ipapi[proxy]:-}" \
+--arg f_ipregistry_proxy "${ipregistry[proxy]:-}" --arg f_dbip_proxy "${dbip[proxy]:-}" \
 --arg f_ipqs_proxy "${ipqs[proxy]:-}" --arg f_scam_proxy "${scamalytics[proxy]:-}" \
 --arg f_ipdata_proxy "${ipdata[proxy]:-}" --arg f_ipinfo_proxy "${ipinfo[proxy]:-}" \
 --arg f_ip2_vpn "${ip2location[vpn]:-}" --arg f_ipapi_vpn "${ipapi[vpn]:-}" \
+--arg f_ipregistry_vpn "${ipregistry[vpn]:-}" --arg f_dbip_vpn "${dbip[vpn]:-}" \
 --arg f_ipqs_vpn "${ipqs[vpn]:-}" --arg f_scam_vpn "${scamalytics[vpn]:-}" \
 --arg f_ipdata_vpn "${ipdata[vpn]:-}" --arg f_ipinfo_vpn "${ipinfo[vpn]:-}" \
 --arg f_ip2_tor "${ip2location[tor]:-}" --arg f_ipapi_tor "${ipapi[tor]:-}" \
+--arg f_ipregistry_tor "${ipregistry[tor]:-}" --arg f_dbip_tor "${dbip[tor]:-}" \
 --arg f_ipqs_tor "${ipqs[tor]:-}" --arg f_scam_tor "${scamalytics[tor]:-}" \
 --arg f_ipdata_tor "${ipdata[tor]:-}" --arg f_ipinfo_tor "${ipinfo[tor]:-}" \
 --arg f_ip2_server "${ip2location[server]:-}" --arg f_ipapi_server "${ipapi[server]:-}" \
+--arg f_ipregistry_server "${ipregistry[server]:-}" --arg f_dbip_server "${dbip[server]:-}" \
 --arg f_ipqs_server "${ipqs[server]:-}" --arg f_scam_server "${scamalytics[server]:-}" \
 --arg f_ipdata_server "${ipdata[server]:-}" --arg f_ipinfo_server "${ipinfo[server]:-}" \
 --arg f_ip2_abuse "${ip2location[abuser]:-}" --arg f_ipapi_abuse "${ipapi[abuser]:-}" \
+--arg f_ipregistry_abuse "${ipregistry[abuser]:-}" --arg f_dbip_abuse "${dbip[abuser]:-}" \
 --arg f_ipqs_abuse "${ipqs[abuser]:-}" --arg f_scam_abuse "${scamalytics[abuser]:-}" \
 --arg f_ipdata_abuse "${ipdata[abuser]:-}" --arg f_ipinfo_abuse "${ipinfo[abuser]:-}" \
 --arg f_ip2_bot "${ip2location[robot]:-}" --arg f_ipapi_bot "${ipapi[robot]:-}" \
+--arg f_ipregistry_bot "${ipregistry[robot]:-}" --arg f_dbip_bot "${dbip[robot]:-}" \
 --arg f_ipqs_bot "${ipqs[robot]:-}" --arg f_scam_bot "${scamalytics[robot]:-}" \
 --arg f_ipdata_bot "${ipdata[robot]:-}" --arg f_ipinfo_bot "${ipinfo[robot]:-}" \
 --arg media_tiktok_status "$(clean_ansi "${tiktok[ustatus]:-}")" \
@@ -2381,7 +2540,7 @@ def list($value):
 def numberlist($value): [list($value)[] | try tonumber catch empty];
 {
   Head: {
-    IP: opt($head_ip), Command: opt($head_command), Repository: opt($head_repository),
+    IP: opt($head_ip), Repository: opt($head_repository),
     Time: opt($head_time), Version: opt($head_version)
   },
   Info: {
@@ -2394,26 +2553,28 @@ def numberlist($value): [list($value)[] | try tonumber catch empty];
     RegisteredRegion: {Code: opt($info_regcountrycode), Name: opt($info_regcountry)}
   },
   Type: {
-    Source: {IPinfo: "public demo widget", ipapi: "direct public API", IP2LOCATION: "upstream relay", AbuseIPDB: "upstream relay"},
-    Usage: {IPinfo: opt($type_ipinfo_usage), ipapi: opt($type_ipapi_usage), IP2LOCATION: opt($type_ip2_usage), AbuseIPDB: opt($type_abuse_usage)},
-    Company: {IPinfo: opt($type_ipinfo_company), ipapi: opt($type_ipapi_company), IP2LOCATION: opt($type_ip2_company), AbuseIPDB: null}
+    Source: {IPinfo: "public demo widget", Ipregistry: "official API", ipapi: "direct public API", IP2LOCATION: "upstream relay", AbuseIPDB: "upstream relay"},
+    Status: {Ipregistry: $status_ipregistry},
+    Usage: {IPinfo: opt($type_ipinfo_usage), Ipregistry: opt($type_ipregistry_usage), ipapi: opt($type_ipapi_usage), IP2LOCATION: opt($type_ip2_usage), AbuseIPDB: opt($type_abuse_usage)},
+    Company: {IPinfo: opt($type_ipinfo_company), Ipregistry: opt($type_ipregistry_company), ipapi: opt($type_ipapi_company), IP2LOCATION: opt($type_ip2_company), AbuseIPDB: null}
   },
-  Score: {IP2LOCATION: opt($score_ip2), SCAMALYTICS: opt($score_scam), ipapi: opt($score_ipapi), AbuseIPDB: opt($score_abuse), IPQS: opt($score_ipqs)},
+  Score: {IP2LOCATION: opt($score_ip2), SCAMALYTICS: opt($score_scam), ipapi: opt($score_ipapi), AbuseIPDB: opt($score_abuse), IPQS: opt($score_ipqs), "DB-IP": null},
   ScoreMeta: {
     IP2LOCATION: {Band: opt($band_ip2), Scale: "0-99 potential risk"},
     SCAMALYTICS: {Band: opt($band_scam), Scale: "0-100 fraud"},
     ipapi: {Band: opt($band_ipapi), Scale: "0-100% abuse"},
     AbuseIPDB: {Band: opt($band_abuse), Scale: "0-100 confidence"},
-    IPQS: {Band: opt($band_ipqs), Scale: "0-100 fraud", Status: $status_ipqs}
+    IPQS: {Band: opt($band_ipqs), Scale: "0-100 fraud", Status: $status_ipqs, Source: $source_ipqs},
+    "DB-IP": {Band: opt($band_dbip), Scale: "low/medium/high threat", Status: $status_dbip, Source: "official API"}
   },
   Factor: {
-    CountryCode: {IP2LOCATION: factor($f_ip2_cc), ipapi: factor($f_ipapi_cc), IPQS: factor($f_ipqs_cc), SCAMALYTICS: factor($f_scam_cc), ipdata: factor($f_ipdata_cc), IPinfo: factor($f_ipinfo_cc)},
-    Proxy: {IP2LOCATION: factor($f_ip2_proxy), ipapi: factor($f_ipapi_proxy), IPQS: factor($f_ipqs_proxy), SCAMALYTICS: factor($f_scam_proxy), ipdata: factor($f_ipdata_proxy), IPinfo: factor($f_ipinfo_proxy)},
-    VPN: {IP2LOCATION: factor($f_ip2_vpn), ipapi: factor($f_ipapi_vpn), IPQS: factor($f_ipqs_vpn), SCAMALYTICS: factor($f_scam_vpn), ipdata: factor($f_ipdata_vpn), IPinfo: factor($f_ipinfo_vpn)},
-    Tor: {IP2LOCATION: factor($f_ip2_tor), ipapi: factor($f_ipapi_tor), IPQS: factor($f_ipqs_tor), SCAMALYTICS: factor($f_scam_tor), ipdata: factor($f_ipdata_tor), IPinfo: factor($f_ipinfo_tor)},
-    Server: {IP2LOCATION: factor($f_ip2_server), ipapi: factor($f_ipapi_server), IPQS: factor($f_ipqs_server), SCAMALYTICS: factor($f_scam_server), ipdata: factor($f_ipdata_server), IPinfo: factor($f_ipinfo_server)},
-    Abuser: {IP2LOCATION: factor($f_ip2_abuse), ipapi: factor($f_ipapi_abuse), IPQS: factor($f_ipqs_abuse), SCAMALYTICS: factor($f_scam_abuse), ipdata: factor($f_ipdata_abuse), IPinfo: factor($f_ipinfo_abuse)},
-    Robot: {IP2LOCATION: factor($f_ip2_bot), ipapi: factor($f_ipapi_bot), IPQS: factor($f_ipqs_bot), SCAMALYTICS: factor($f_scam_bot), ipdata: factor($f_ipdata_bot), IPinfo: factor($f_ipinfo_bot)}
+    CountryCode: {IP2LOCATION: factor($f_ip2_cc), ipapi: factor($f_ipapi_cc), Ipregistry: factor($f_ipregistry_cc), IPQS: factor($f_ipqs_cc), "DB-IP": factor($f_dbip_cc), SCAMALYTICS: factor($f_scam_cc), ipdata: factor($f_ipdata_cc), IPinfo: factor($f_ipinfo_cc)},
+    Proxy: {IP2LOCATION: factor($f_ip2_proxy), ipapi: factor($f_ipapi_proxy), Ipregistry: factor($f_ipregistry_proxy), IPQS: factor($f_ipqs_proxy), "DB-IP": factor($f_dbip_proxy), SCAMALYTICS: factor($f_scam_proxy), ipdata: factor($f_ipdata_proxy), IPinfo: factor($f_ipinfo_proxy)},
+    VPN: {IP2LOCATION: factor($f_ip2_vpn), ipapi: factor($f_ipapi_vpn), Ipregistry: factor($f_ipregistry_vpn), IPQS: factor($f_ipqs_vpn), "DB-IP": factor($f_dbip_vpn), SCAMALYTICS: factor($f_scam_vpn), ipdata: factor($f_ipdata_vpn), IPinfo: factor($f_ipinfo_vpn)},
+    Tor: {IP2LOCATION: factor($f_ip2_tor), ipapi: factor($f_ipapi_tor), Ipregistry: factor($f_ipregistry_tor), IPQS: factor($f_ipqs_tor), "DB-IP": factor($f_dbip_tor), SCAMALYTICS: factor($f_scam_tor), ipdata: factor($f_ipdata_tor), IPinfo: factor($f_ipinfo_tor)},
+    Server: {IP2LOCATION: factor($f_ip2_server), ipapi: factor($f_ipapi_server), Ipregistry: factor($f_ipregistry_server), IPQS: factor($f_ipqs_server), "DB-IP": factor($f_dbip_server), SCAMALYTICS: factor($f_scam_server), ipdata: factor($f_ipdata_server), IPinfo: factor($f_ipinfo_server)},
+    Abuser: {IP2LOCATION: factor($f_ip2_abuse), ipapi: factor($f_ipapi_abuse), Ipregistry: factor($f_ipregistry_abuse), IPQS: factor($f_ipqs_abuse), "DB-IP": factor($f_dbip_abuse), SCAMALYTICS: factor($f_scam_abuse), ipdata: factor($f_ipdata_abuse), IPinfo: factor($f_ipinfo_abuse)},
+    Robot: {IP2LOCATION: factor($f_ip2_bot), ipapi: factor($f_ipapi_bot), Ipregistry: factor($f_ipregistry_bot), IPQS: factor($f_ipqs_bot), "DB-IP": factor($f_dbip_bot), SCAMALYTICS: factor($f_scam_bot), ipdata: factor($f_ipdata_bot), IPinfo: factor($f_ipinfo_bot)}
   },
   Ping0: {}, Routing: {}, Exposure: {},
   Media: {
@@ -2469,10 +2630,12 @@ ipjson='{
 if scope_includes reputation;then
 db_maxmind_relay $2
 db_ipinfo
+db_ipregistry $2
 db_scamalytics $2
 db_ipapi $2
 db_abuseipdb $2
 db_ip2location $2
+db_dbip $2
 db_ipdata $2
 db_ipqs $2
 db_ping0 $2
@@ -2503,9 +2666,7 @@ fi
 show_type
 show_score
 show_factor
-show_ping0
-show_routing
-show_exposure
+show_network_context
 show_unavailable_sources
 fi
 scope_includes media-ai&&show_media
@@ -2547,6 +2708,7 @@ if [[ $ERRORcode -ne 0 ]];then
 echo -ne "\r$Font_B$Font_Red${swarn[$ERRORcode]}$Font_Suffix\n"
 exit $ERRORcode
 fi
+provider_load_credentials||exit $?
 require_dependencies||exit $?
 check_reference_files||exit $?
 set_report_time

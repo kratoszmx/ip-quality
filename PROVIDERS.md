@@ -17,12 +17,14 @@ or malformed addresses are not accepted as a successful public result.
 | --- | --- | --- |
 | Check.Place relay (upstream labels the payload as MaxMind) | Upstream relay | ASN, organization, city/region, registered region, coordinates, timezone |
 | IPinfo public demo widget | Direct public demo component, not the token-authenticated API | ASN/company type, country, privacy flags, location |
+| Ipregistry IP Intelligence | Direct official API when `IPREGISTRY_API_KEY` is configured | connection/company type, country, proxy, VPN, Tor, cloud-hosting, and abuse/attack signals |
 | Scamalytics via `ipinfo.check.place` | Upstream relay | score, proxy, VPN, Tor, blacklist/bot indicators |
 | ipapi.is | Direct public API | ASN/type, provider-supplied abuser-score label, and risk factors |
 | AbuseIPDB via `ipinfo.check.place` | Upstream relay | abuse score and usage/risk factors |
 | IP2Location via `ipinfo.check.place` | Upstream relay | 0–99 potential-risk score and proxy-category factors |
+| DB-IP Extended | Direct official API when `DBIP_API_KEY` is configured | qualitative threat level, country, usage type, proxy/VPN/Tor, crawler/bot, and threat-detail signals |
 | ipdata via `ipinfo.check.place` | Upstream relay | country and threat factors |
-| IPQualityScore via `ipinfo.check.place` | Upstream relay | fraud score and proxy/VPN/Tor/bot factors |
+| IPQualityScore | Direct official API when `IPQS_API_KEY` is configured; otherwise the named Check.Place relay | fraud score and proxy/VPN/Tor/bot factors |
 | Ping0 public `/geo` | Direct official public endpoint | returned IP, location, ASN, and organization; the returned IP must exactly match the tested address |
 | RIPEstat Network Info | Direct official public API | routed prefix and origin ASN data from RIPE routing data; context only, not a reputation score |
 | Shodan InternetDB | Direct official public API, IPv4 | observed public ports, hostnames, tags, and known-vulnerability count; context only, not a reputation score |
@@ -30,10 +32,13 @@ or malformed addresses are not accepted as a successful public result.
 “Upstream relay” is intentionally visible in the report model: it is not treated
 as equivalent to a user-owned subscription to each vendor's official API. If a
 relay or direct page changes schema, its result is unknown rather than clean.
-Allowlisted provider failures are kept more specific: an exhausted upstream
-IPQualityScore credit pool is reported as such, and Shodan's documented
-no-information response is reported as no public record. Neither state is a
-clean reputation result, and arbitrary upstream error text is never echoed.
+Allowlisted provider failures are kept more specific: when the Check.Place
+relay's shared IPQualityScore account has spent its credits, the report names
+that relay account explicitly. This is not a judgment about the tested IP and
+not the user's quota; a user-owned official IPQS key bypasses that relay.
+Shodan's documented no-information response is reported as no public record.
+Neither state is a clean reputation result, and arbitrary upstream error text
+is never echoed.
 Score scales are shown per provider and are not averaged. A textual label is
 shown only when that provider explicitly returned it. The reporter does not
 invent a band from local thresholds: a missing label remains `Unknown`, even
@@ -89,8 +94,8 @@ and [Shodan InternetDB](https://internetdb.shodan.io/).
 
 The working source order is intentionally simple:
 
-1. Core official-contract observations: ipapi.is, Ping0, RIPEstat, and Shodan
-   InternetDB.
+1. Official-contract observations: ipapi.is, Ping0, RIPEstat, Shodan
+   InternetDB, and any configured Ipregistry, DB-IP, or IPQS APIs.
 2. Supplementary direct observation: IPinfo's public demo widget.
 3. Supplementary relay observations: the named Check.Place-backed rows.
 
@@ -112,9 +117,38 @@ a confidence scale rather than converted into a local low/high verdict. See the
 the [IP2Location IP2Proxy field documentation](https://www.ip2location.com/documentation/ip2proxy-libraries/lua/api),
 and [AbuseIPDB API documentation](https://docs.abuseipdb.com/).
 
-The former DB-IP HTML scraper is removed. In practice, scraping an unversioned
-page and turning qualitative labels into invented 0/50/100 values produced more
-confidence than evidence.
+The former DB-IP HTML scraper remains removed. The supported replacement uses
+the versioned official Extended API and keeps DB-IP's own `low`/`medium`/`high`
+threat level as a label. It never turns that label into an invented 0/50/100
+number.
+
+### Optional official API credentials
+
+The reporter looks for the private data file
+`~/.config/ipquality/credentials`. It accepts these exact entries:
+
+```text
+IPREGISTRY_API_KEY=...
+DBIP_API_KEY=...
+IPQS_API_KEY=...
+```
+
+In day-to-day use, a mode-`600` file works well: it is read as data rather than
+executed as shell code, and API keys are sent to curl through its standard-input
+configuration instead of appearing in process arguments, reports, or Git. A key
+can be omitted independently; its provider simply stays out of the terminal
+matrix. Saved sanitized fixtures exercise all three parsers without spending API
+credits during development.
+
+Ipregistry supports an `Authorization: ApiKey` header and exposes its API keys in
+the account dashboard. Its current free sign-up credits are enough for extensive
+testing. DB-IP's proxy, crawler, and threat fields belong to the Extended API, so
+use an Extended trial/key rather than the location-only free endpoint. IPQS
+publishes the direct JSON endpoint and provides the account key after
+registration. See [Ipregistry authentication](https://ipregistry.co/docs/authentication),
+[Ipregistry pricing and sign-up](https://ipregistry.co/pricing),
+[DB-IP Extended](https://db-ip.com/api/extended), and the
+[IPQS API overview](https://www.ipqualityscore.com/documentation/proxy-detection-api/overview).
 
 ### Candidate review
 
@@ -140,6 +174,11 @@ confidence than evidence.
   after credential handling is selected, rather than being folded into a generic
   residential-IP score. See the [GreyNoise Community API guide](https://docs.greynoise.io/docs/using-the-greynoise-community-api)
   and [VirusTotal IP object contract](https://docs.virustotal.com/reference/ip-object).
+- NodeQuality is an aggregate VPS benchmark/report project rather than an IP
+  reputation data provider. Its compact presentation is useful design input,
+  while embedding its sandbox runner would duplicate this project's lifecycle
+  and introduce remote-script/report behavior that does not improve provider
+  evidence. See [NodeQuality's project page](https://github.com/LloydAsp/NodeQuality).
 
 ## Media and AI scope
 
@@ -177,3 +216,11 @@ listed or clean. DNSBL interpretation is therefore only authoritative when the
 resolver is permitted and supported by the zone operator. See the
 [Spamhaus DNSBL usage FAQ](https://www.spamhaus.org/faqs/dnsbl-usage/) and
 [Spamhaus fair-use policy](https://www.spamhaus.org/blocklists/dnsbl-fair-use-policy/).
+
+For exact cached-subscription leaves, the menu runs the reputation scope only.
+Those leaves are isolated behind a loopback HTTP proxy; direct DNSBL, SMTP,
+ICMP, or arbitrary TCP probes would follow the host's DNS/network path and could
+falsely look like measurements of the selected leaf. HTTP-accessible abuse,
+proxy, routing, and exposure observations remain valid in the leaf report.
+Direct-route engineering runs may use the separate DNSBL/mail scopes, while the
+normal leaf menu keeps the two measurement paths distinct.

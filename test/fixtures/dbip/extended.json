@@ -1,0 +1,13 @@
+{
+  "ipAddress": "198.51.100.23",
+  "countryCode": "US",
+  "usageType": "hosting",
+  "isCrawler": false,
+  "isProxy": true,
+  "proxyType": "vpn",
+  "threatLevel": "medium",
+  "threatDetails": [
+    "anonymous-proxy",
+    "attack-source"
+  ]
+}

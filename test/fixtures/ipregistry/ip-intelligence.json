@@ -1,0 +1,25 @@
+{
+  "ip": "198.51.100.23",
+  "type": "IPv4",
+  "connection": {
+    "type": "hosting"
+  },
+  "company": {
+    "type": "hosting"
+  },
+  "location": {
+    "country": {
+      "code": "US"
+    }
+  },
+  "security": {
+    "is_proxy": true,
+    "is_vpn": true,
+    "is_tor": false,
+    "is_tor_exit": false,
+    "is_cloud_provider": true,
+    "is_abuser": false,
+    "is_attacker": false,
+    "is_threat": false
+  }
+}

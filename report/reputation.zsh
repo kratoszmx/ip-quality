@@ -35,12 +35,30 @@ fi
 }
 
 report_preserved_value(){
-if report_is_unknown "$1";then
+typeset raw="$1" plain color="${Font_Cyan:-}"
+if report_is_unknown "$raw";then
 report_unknown
-elif [[ "$1" == *$'\033['* ]];then
-print -rn -- "$1"
 else
-print -rn -- "$Font_Cyan$(clean_ansi "$1")$Font_Suffix"
+plain=$(clean_ansi "$raw")
+# Legacy provider labels include presentation padding inside their ANSI
+# background. Tables own their padding, so retain only the semantic label and
+# map its colour to a foreground highlight.
+plain="${plain#"${plain%%[![:space:]]*}"}"
+plain="${plain%"${plain##*[![:space:]]}"}"
+if [[ -n "${Back_Red:-}" && "$raw" == *"$Back_Red"* ]] ||
+   [[ -n "${Font_Red:-}" && "$raw" == *"$Font_Red"* ]];then
+color="${Font_Red:-}"
+elif [[ -n "${Back_Green:-}" && "$raw" == *"$Back_Green"* ]] ||
+     [[ -n "${Font_Green:-}" && "$raw" == *"$Font_Green"* ]];then
+color="${Font_Green:-}"
+elif [[ -n "${Back_Yellow:-}" && "$raw" == *"$Back_Yellow"* ]] ||
+     [[ -n "${Font_Yellow:-}" && "$raw" == *"$Font_Yellow"* ]];then
+color="${Font_Yellow:-}"
+elif [[ -n "${Back_Purple:-}" && "$raw" == *"$Back_Purple"* ]] ||
+     [[ -n "${Font_Purple:-}" && "$raw" == *"$Font_Purple"* ]];then
+color="${Font_Purple:-}"
+fi
+print -rn -- "$color${Font_B:-}$plain${Font_Suffix:-}"
 fi
 }
 
@@ -96,9 +114,13 @@ cn:direct)print -rn -- "直接公开 API"
 ;;
 cn:relay)print -rn -- "上游中继"
 ;;
+cn:official)print -rn -- "官方 API"
+;;
 en:ipinfo)print -rn -- "public demo widget"
 ;;
 en:direct)print -rn -- "direct public API"
+;;
+en:official)print -rn -- "official API"
 ;;
 *)print -rn -- "upstream relay"
 esac
@@ -117,7 +139,7 @@ typeset width="$2"
 typeset visible padding
 visible=$(report_display_width "$value")
 padding=$((width-visible))
-[[ $padding -lt 1 ]]&&padding=1
+[[ $padding -lt 0 ]]&&padding=0
 print -rn -- "$value"
 printf '%*s' "$padding" ''
 }
@@ -150,6 +172,13 @@ done
 print -r -- "$rule"
 }
 
+report_balanced_block_size(){
+typeset -i total="$1" maximum="$2" blocks
+(( total > 0 && maximum > 0 ))||return 1
+blocks=$(((total+maximum-1)/maximum))
+print -rn -- $(((total+blocks-1)/blocks))
+}
+
 report_factor_row(){
 typeset label="$1"
 typeset label_width="$2"
@@ -172,6 +201,12 @@ headers+=("${Font_B}${Font_Cyan}IPinfo$Font_Suffix")
 sources+=("$(report_type_source ipinfo)")
 usages+=("${ipinfo[susetype]}")
 companies+=("${ipinfo[scomtype]}")
+fi
+if report_any_known "${ipregistry[susetype]}" "${ipregistry[scomtype]}";then
+headers+=("${Font_B}${Font_Cyan}Ipregistry$Font_Suffix")
+sources+=("$(report_type_source official)")
+usages+=("${ipregistry[susetype]}")
+companies+=("${ipregistry[scomtype]}")
 fi
 if report_any_known "${ipapi[susetype]}" "${ipapi[scomtype]}";then
 headers+=("${Font_B}${Font_Cyan}ipapi.is$Font_Suffix")
@@ -204,11 +239,23 @@ field_label="参数" source_label="来源" usage_label="使用类型" company_la
 else
 field_label="Field" source_label="Source" usage_label="Usage" company_label="Company" cell_width=19
 fi
-report_table_row "${Font_B}${field_label}${Font_Suffix}" 10 "$cell_width" "${headers[@]}"
-report_table_rule "${#headers[@]}" 10 "$cell_width"
-report_table_row "$source_label" 10 "$cell_width" "${rendered_sources[@]}"
-report_table_row "$usage_label" 10 "$cell_width" "${rendered_usages[@]}"
-report_table_row "$company_label" 10 "$cell_width" "${rendered_companies[@]}"
+typeset -i start=0 count remaining max_columns
+max_columns=$(report_balanced_block_size "${#headers[@]}" 4)
+typeset -a block_headers block_sources block_usages block_companies
+while (( start < ${#headers[@]} ));do
+remaining=$((${#headers[@]}-start))
+(( count = remaining < max_columns ? remaining : max_columns ))
+block_headers=("${headers[@]:$start:$count}")
+block_sources=("${rendered_sources[@]:$start:$count}")
+block_usages=("${rendered_usages[@]:$start:$count}")
+block_companies=("${rendered_companies[@]:$start:$count}")
+report_table_row "${Font_B}${field_label}${Font_Suffix}" 10 "$cell_width" "${block_headers[@]}"
+report_table_rule "$count" 10 "$cell_width"
+report_table_row "$source_label" 10 "$cell_width" "${block_sources[@]}"
+report_table_row "$usage_label" 10 "$cell_width" "${block_usages[@]}"
+report_table_row "$company_label" 10 "$cell_width" "${block_companies[@]}"
+(( start += count ))
+done
 }
 
 show_score(){
@@ -233,6 +280,10 @@ if report_any_known "${ipqs[score]}" "${ipqs[risk]}";then
 headers+=("${Font_B}${Font_Cyan}IPQualityScore$Font_Suffix")
 scores+=("${ipqs[score]}") risks+=("${ipqs[risk]}") scales+=("0-100 fraud")
 fi
+if report_any_known "${dbip[risk]}";then
+headers+=("${Font_B}${Font_Cyan}DB-IP$Font_Suffix")
+scores+=("") risks+=("${dbip[risk]}") scales+=("low/medium/high")
+fi
 (( ${#headers[@]} ))||return 0
 print -r -- "$Font_B${sscore[title]}$Font_Suffix"
 typeset value
@@ -249,11 +300,24 @@ field_label="Field" score_label="Score" band_label="Band / label" scale_label="S
 note="Note: provider scales differ; — means that source did not supply the field."
 fi
 print -r -- "$note"
-report_table_row "${Font_B}${field_label}${Font_Suffix}" 10 16 "${headers[@]}"
-report_table_rule "${#headers[@]}" 10 16
-report_table_row "$score_label" 10 16 "${rendered_scores[@]}"
-report_any_known "${risks[@]}"&&report_table_row "$band_label" 10 16 "${rendered_risks[@]}"
-report_table_row "$scale_label" 10 16 "${rendered_scales[@]}"
+typeset -i start=0 count remaining max_columns
+max_columns=$(report_balanced_block_size "${#headers[@]}" 4)
+typeset -a block_headers block_scores block_risks block_raw_risks block_scales
+while (( start < ${#headers[@]} ));do
+remaining=$((${#headers[@]}-start))
+(( count = remaining < max_columns ? remaining : max_columns ))
+block_headers=("${headers[@]:$start:$count}")
+block_scores=("${rendered_scores[@]:$start:$count}")
+block_risks=("${rendered_risks[@]:$start:$count}")
+block_raw_risks=("${risks[@]:$start:$count}")
+block_scales=("${rendered_scales[@]:$start:$count}")
+report_table_row "${Font_B}${field_label}${Font_Suffix}" 10 16 "${block_headers[@]}"
+report_table_rule "$count" 10 16
+report_table_row "$score_label" 10 16 "${block_scores[@]}"
+report_any_known "${block_raw_risks[@]}"&&report_table_row "$band_label" 10 16 "${block_risks[@]}"
+report_table_row "$scale_label" 10 16 "${block_scales[@]}"
+(( start += count ))
+done
 }
 
 show_factor(){
@@ -272,12 +336,26 @@ vpns+=("${ipapi[vpn]}") tors+=("${ipapi[tor]}")
 servers+=("${ipapi[server]}") abusers+=("${ipapi[abuser]}")
 robots+=("${ipapi[robot]}")
 fi
+if report_any_known "${ipregistry[countrycode]}" "${ipregistry[proxy]}" "${ipregistry[vpn]}" "${ipregistry[tor]}" "${ipregistry[server]}" "${ipregistry[abuser]}";then
+headers+=("${Font_B}${Font_Cyan}Ipregistry$Font_Suffix")
+countries+=("${ipregistry[countrycode]}") proxies+=("${ipregistry[proxy]}")
+vpns+=("${ipregistry[vpn]}") tors+=("${ipregistry[tor]}")
+servers+=("${ipregistry[server]}") abusers+=("${ipregistry[abuser]}")
+robots+=("")
+fi
 if report_any_known "${ipqs[countrycode]}" "${ipqs[proxy]}" "${ipqs[vpn]}" "${ipqs[tor]}" "${ipqs[server]}" "${ipqs[abuser]}" "${ipqs[robot]}";then
 headers+=("${Font_B}${Font_Cyan}IPQS$Font_Suffix")
 countries+=("${ipqs[countrycode]}") proxies+=("${ipqs[proxy]}")
 vpns+=("${ipqs[vpn]}") tors+=("${ipqs[tor]}")
 servers+=("${ipqs[server]}") abusers+=("${ipqs[abuser]}")
 robots+=("${ipqs[robot]}")
+fi
+if report_any_known "${dbip[countrycode]}" "${dbip[proxy]}" "${dbip[vpn]}" "${dbip[tor]}" "${dbip[server]}" "${dbip[abuser]}" "${dbip[robot]}";then
+headers+=("${Font_B}${Font_Cyan}DB-IP$Font_Suffix")
+countries+=("${dbip[countrycode]}") proxies+=("${dbip[proxy]}")
+vpns+=("${dbip[vpn]}") tors+=("${dbip[tor]}")
+servers+=("${dbip[server]}") abusers+=("${dbip[abuser]}")
+robots+=("${dbip[robot]}")
 fi
 if report_any_known "${scamalytics[countrycode]}" "${scamalytics[proxy]}" "${scamalytics[vpn]}" "${scamalytics[tor]}" "${scamalytics[server]}" "${scamalytics[abuser]}" "${scamalytics[robot]}";then
 headers+=("${Font_B}${Font_Cyan}Scamalytics$Font_Suffix")
@@ -304,102 +382,137 @@ fi
 print -r -- "$Font_B${sfactor[title]}$Font_Suffix"
 typeset field_label
 [[ "$YY" == "cn" ]]&&field_label="参数"||field_label="Field"
-report_table_row "${Font_B}${field_label}${Font_Suffix}" 8 12 "${headers[@]}"
-report_table_rule "${#headers[@]}" 8 12
+typeset -i start=0 count remaining max_columns
+max_columns=$(report_balanced_block_size "${#headers[@]}" 5)
+typeset -a block_headers block_countries block_proxies block_vpns block_tors block_servers block_abusers block_robots
+while (( start < ${#headers[@]} ));do
+remaining=$((${#headers[@]}-start))
+(( count = remaining < max_columns ? remaining : max_columns ))
+block_headers=("${headers[@]:$start:$count}")
+block_countries=("${countries[@]:$start:$count}")
+block_proxies=("${proxies[@]:$start:$count}")
+block_vpns=("${vpns[@]:$start:$count}")
+block_tors=("${tors[@]:$start:$count}")
+block_servers=("${servers[@]:$start:$count}")
+block_abusers=("${abusers[@]:$start:$count}")
+block_robots=("${robots[@]:$start:$count}")
+report_table_row "${Font_B}${field_label}${Font_Suffix}" 8 12 "${block_headers[@]}"
+report_table_rule "$count" 8 12
 if [[ "$YY" == "cn" ]];then
-report_factor_row "地区" 8 12 "${countries[@]}"
-report_factor_row "代理" 8 12 "${proxies[@]}"
-report_factor_row "VPN" 8 12 "${vpns[@]}"
-report_factor_row "Tor" 8 12 "${tors[@]}"
-report_factor_row "机房" 8 12 "${servers[@]}"
-report_factor_row "滥用" 8 12 "${abusers[@]}"
-report_factor_row "机器人" 8 12 "${robots[@]}"
+report_factor_row "地区" 8 12 "${block_countries[@]}"
+report_factor_row "代理" 8 12 "${block_proxies[@]}"
+report_factor_row "VPN" 8 12 "${block_vpns[@]}"
+report_factor_row "Tor" 8 12 "${block_tors[@]}"
+report_factor_row "机房" 8 12 "${block_servers[@]}"
+report_factor_row "滥用" 8 12 "${block_abusers[@]}"
+report_factor_row "机器人" 8 12 "${block_robots[@]}"
 else
-report_factor_row "Region" 8 12 "${countries[@]}"
-report_factor_row "Proxy" 8 12 "${proxies[@]}"
-report_factor_row "VPN" 8 12 "${vpns[@]}"
-report_factor_row "Tor" 8 12 "${tors[@]}"
-report_factor_row "Hosting" 8 12 "${servers[@]}"
-report_factor_row "Abuse" 8 12 "${abusers[@]}"
-report_factor_row "Bot" 8 12 "${robots[@]}"
+report_factor_row "Region" 8 12 "${block_countries[@]}"
+report_factor_row "Proxy" 8 12 "${block_proxies[@]}"
+report_factor_row "VPN" 8 12 "${block_vpns[@]}"
+report_factor_row "Tor" 8 12 "${block_tors[@]}"
+report_factor_row "Hosting" 8 12 "${block_servers[@]}"
+report_factor_row "Abuse" 8 12 "${block_abusers[@]}"
+report_factor_row "Bot" 8 12 "${block_robots[@]}"
 fi
+(( start += count ))
+done
 }
 
-show_ping0(){
-if [[ "${ping0[status]}" == "verified" && "${ping0[match]}" == "true" ]];then
-if [[ "$YY" == "cn" ]];then
-print -r -- "$Font_B${sping0[title]}（公开端点不含风险分数）$Font_Suffix"
-print -r -- "${Font_Cyan}状态：${Font_Green}${sping0[match]}$Font_Suffix"
-print -r -- "${Font_Cyan}位置：$Font_Suffix${ping0[location]} | ${Font_Cyan}网络：$Font_Suffix${ping0[asn]} · ${ping0[org]}"
-else
-print -r -- "$Font_B${sping0[title]} (public endpoint has no risk score)$Font_Suffix"
-print -r -- "${Font_Cyan}Status: ${Font_Green}${sping0[match]}$Font_Suffix"
-print -r -- "${Font_Cyan}Location: $Font_Suffix${ping0[location]} | ${Font_Cyan}Network: $Font_Suffix${ping0[asn]} · ${ping0[org]}"
-fi
-elif [[ "${ping0[status]}" == "ip_mismatch" ]];then
-print -r -- "$Font_B${sping0[title]}$Font_Suffix"
-[[ "$YY" == "cn" ]]&&print -r -- "${Font_Cyan}状态：$Font_Red${sping0[mismatch]}$Font_Suffix"||print -r -- "${Font_Cyan}Status: $Font_Red${sping0[mismatch]}$Font_Suffix"
-fi
-}
-
-show_routing(){
-report_any_known "${ripestat[status]}" "${ripestat[prefix]}" "${ripestat[origins]}"||return 0
+show_network_context(){
+typeset -a observations
 typeset displayed_prefix="${ripestat[prefix]}"
 if [[ ${fullIP:-0} -ne 1 && -n "$displayed_prefix" ]];then
 displayed_prefix=$(mask_network_prefix "$displayed_prefix")||displayed_prefix=""
 fi
-if [[ "$YY" == "cn" ]];then
-print -r -- "${Font_B}官方路由观测（RIPEstat / RIPE RIS）${Font_Suffix}"
-print -r -- "${Font_Cyan}状态：${Font_Suffix}$(report_neutral_or_dash "${ripestat[status]}") | ${Font_Cyan}前缀：${Font_Suffix}$(report_neutral_or_dash "$displayed_prefix") | ${Font_Cyan}起源：${Font_Suffix}$(report_neutral_or_dash "${ripestat[origins]}")"
-else
-print -r -- "${Font_B}Official routing observation (RIPEstat / RIPE RIS)${Font_Suffix}"
-print -r -- "${Font_Cyan}Status: ${Font_Suffix}$(report_neutral_or_dash "${ripestat[status]}") | ${Font_Cyan}Prefix: ${Font_Suffix}$(report_neutral_or_dash "$displayed_prefix") | ${Font_Cyan}Origin: ${Font_Suffix}$(report_neutral_or_dash "${ripestat[origins]}")"
-fi
-}
 
-show_exposure(){
-report_any_known "${internetdb[ports]}" "${internetdb[port_count]}" "${internetdb[vulnerability_count]}" "${internetdb[tags]}"||return 0
+if [[ "${ping0[status]}" == "verified" && "${ping0[match]}" == "true" ]];then
 if [[ "$YY" == "cn" ]];then
-print -r -- "${Font_B}公开暴露面观测（Shodan InternetDB；非风险分数）${Font_Suffix}"
-print -r -- "${Font_Cyan}端口：${Font_Suffix}$(report_neutral_or_dash "${internetdb[ports]}")（$(report_neutral_or_dash "${internetdb[port_count]}")） | ${Font_Cyan}漏洞：${Font_Suffix}$(report_neutral_or_dash "${internetdb[vulnerability_count]}") | ${Font_Cyan}标签：${Font_Suffix}$(report_neutral_or_dash "${internetdb[tags]}")"
+observations+=("${Font_Cyan}Ping0：${Font_Green}已核对${Font_Suffix} | 位置=${ping0[location]} | 网络=${ping0[asn]} · ${ping0[org]}")
 else
-print -r -- "${Font_B}Public exposure observation (Shodan InternetDB; not a risk score)${Font_Suffix}"
-print -r -- "${Font_Cyan}Ports: ${Font_Suffix}$(report_neutral_or_dash "${internetdb[ports]}") ($(report_neutral_or_dash "${internetdb[port_count]}") ) | ${Font_Cyan}Vulnerabilities: ${Font_Suffix}$(report_neutral_or_dash "${internetdb[vulnerability_count]}") | ${Font_Cyan}Tags: ${Font_Suffix}$(report_neutral_or_dash "${internetdb[tags]}")"
+observations+=("${Font_Cyan}Ping0: ${Font_Green}verified${Font_Suffix} | location=${ping0[location]} | network=${ping0[asn]} · ${ping0[org]}")
 fi
+elif [[ "${ping0[status]}" == "ip_mismatch" ]];then
+if [[ "$YY" == "cn" ]];then
+observations+=("${Font_Cyan}Ping0：${Font_Red}${sping0[mismatch]}${Font_Suffix}")
+else
+observations+=("${Font_Cyan}Ping0: ${Font_Red}${sping0[mismatch]}${Font_Suffix}")
+fi
+fi
+
+if report_any_known "${ripestat[status]}" "${ripestat[prefix]}" "${ripestat[origins]}";then
+if [[ "$YY" == "cn" ]];then
+observations+=("${Font_Cyan}RIPEstat：${Font_Suffix}状态=$(report_neutral_or_dash "${ripestat[status]}") | 前缀=$(report_neutral_or_dash "$displayed_prefix") | 起源=$(report_neutral_or_dash "${ripestat[origins]}")")
+else
+observations+=("${Font_Cyan}RIPEstat: ${Font_Suffix}status=$(report_neutral_or_dash "${ripestat[status]}") | prefix=$(report_neutral_or_dash "$displayed_prefix") | origin=$(report_neutral_or_dash "${ripestat[origins]}")")
+fi
+fi
+
+if report_any_known "${internetdb[ports]}" "${internetdb[port_count]}" "${internetdb[vulnerability_count]}" "${internetdb[tags]}";then
+if [[ "$YY" == "cn" ]];then
+observations+=("${Font_Cyan}Shodan：${Font_Suffix}端口=$(report_neutral_or_dash "${internetdb[ports]}")（数量 $(report_neutral_or_dash "${internetdb[port_count]}")） | 已知漏洞=$(report_neutral_or_dash "${internetdb[vulnerability_count]}") | 标签=$(report_neutral_or_dash "${internetdb[tags]}")")
+else
+observations+=("${Font_Cyan}Shodan: ${Font_Suffix}ports=$(report_neutral_or_dash "${internetdb[ports]}") (count $(report_neutral_or_dash "${internetdb[port_count]}")) | known vulnerabilities=$(report_neutral_or_dash "${internetdb[vulnerability_count]}") | tags=$(report_neutral_or_dash "${internetdb[tags]}")")
+fi
+elif [[ "${internetdb[status]}" == "not_found" ]];then
+if [[ "$YY" == "cn" ]];then
+observations+=("${Font_Cyan}Shodan：${Font_Purple}无公开记录（不等于无风险）${Font_Suffix}")
+else
+observations+=("${Font_Cyan}Shodan: ${Font_Purple}no public record (not a clean result)${Font_Suffix}")
+fi
+fi
+
+(( ${#observations[@]} ))||return 0
+if [[ "$YY" == "cn" ]];then
+print -r -- "${Font_B}五、官方网络观测（地理、路由与暴露面，不是综合风险分数）${Font_Suffix}"
+else
+print -r -- "${Font_B}5. Official network observations (geo, routing, and exposure; not a composite risk score)${Font_Suffix}"
+fi
+typeset observation
+for observation in "${observations[@]}";do
+print -r -- "$observation"
+done
 }
 
 show_unavailable_sources(){
 typeset -a missing
 report_any_known "${maxmind[asn]}" "${maxmind[countrycode]}" "${maxmind[city]}"||missing+=("Check.Place/MaxMind")
 report_any_known "${ipinfo[susetype]}" "${ipinfo[scomtype]}" "${ipinfo[countrycode]}" "${ipinfo[proxy]}" "${ipinfo[vpn]}" "${ipinfo[tor]}" "${ipinfo[server]}"||missing+=("IPinfo")
+if [[ "${ipregistry[status]}" != "not_configured" ]] &&
+   ! report_any_known "${ipregistry[susetype]}" "${ipregistry[scomtype]}" "${ipregistry[countrycode]}" "${ipregistry[proxy]}" "${ipregistry[vpn]}" "${ipregistry[tor]}" "${ipregistry[server]}" "${ipregistry[abuser]}";then
+missing+=("Ipregistry")
+fi
 report_any_known "${ipapi[susetype]}" "${ipapi[scomtype]}" "${ipapi[score]}" "${ipapi[countrycode]}" "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ipapi[server]}" "${ipapi[abuser]}" "${ipapi[robot]}"||missing+=("ipapi.is")
 report_any_known "${ip2location[susetype]}" "${ip2location[scomtype]}" "${ip2location[score]}" "${ip2location[countrycode]}" "${ip2location[proxy]}" "${ip2location[vpn]}" "${ip2location[tor]}" "${ip2location[server]}" "${ip2location[abuser]}" "${ip2location[robot]}"||missing+=("IP2Location")
+if [[ "${dbip[status]}" != "not_configured" ]] &&
+   ! report_any_known "${dbip[risk]}" "${dbip[countrycode]}" "${dbip[proxy]}" "${dbip[vpn]}" "${dbip[tor]}" "${dbip[server]}" "${dbip[abuser]}" "${dbip[robot]}";then
+missing+=("DB-IP")
+fi
 report_any_known "${abuseipdb[susetype]}" "${abuseipdb[score]}"||missing+=("AbuseIPDB")
 report_any_known "${scamalytics[score]}" "${scamalytics[countrycode]}" "${scamalytics[proxy]}" "${scamalytics[vpn]}" "${scamalytics[tor]}" "${scamalytics[server]}" "${scamalytics[abuser]}" "${scamalytics[robot]}"||missing+=("Scamalytics")
 report_any_known "${ipdata[countrycode]}" "${ipdata[proxy]}" "${ipdata[tor]}" "${ipdata[server]}" "${ipdata[abuser]}"||missing+=("ipdata")
 if ! report_any_known "${ipqs[score]}" "${ipqs[countrycode]}" "${ipqs[proxy]}" "${ipqs[vpn]}" "${ipqs[tor]}" "${ipqs[server]}" "${ipqs[abuser]}" "${ipqs[robot]}";then
 case "$YY:${ipqs[status]}" in
-cn:upstream_insufficient_credits)missing+=("IPQualityScore（上游额度不足）")
+cn:upstream_insufficient_credits)missing+=("IPQualityScore（Check.Place 中继账户额度已用完）")
 ;;
-cn:rate_limited)missing+=("IPQualityScore（上游限流）")
+cn:official_insufficient_credits)missing+=("IPQualityScore（你的官方 API 额度已用完）")
 ;;
-en:upstream_insufficient_credits)missing+=("IPQualityScore (upstream credits exhausted)")
+cn:rate_limited)missing+=("IPQualityScore（服务限流）")
 ;;
-en:rate_limited)missing+=("IPQualityScore (upstream rate limit)")
+en:upstream_insufficient_credits)missing+=("IPQualityScore (Check.Place relay account credits exhausted)")
+;;
+en:official_insufficient_credits)missing+=("IPQualityScore (your official API credits exhausted)")
+;;
+en:rate_limited)missing+=("IPQualityScore (service rate limit)")
 ;;
 *)missing+=("IPQualityScore")
 esac
 fi
 [[ "${ping0[status]}" == "verified" || "${ping0[status]}" == "ip_mismatch" ]]||missing+=("Ping0")
 report_any_known "${ripestat[status]}" "${ripestat[prefix]}" "${ripestat[origins]}"||missing+=("RIPEstat")
-if ! report_any_known "${internetdb[ports]}" "${internetdb[port_count]}" "${internetdb[vulnerability_count]}" "${internetdb[tags]}";then
-case "$YY:${internetdb[status]}" in
-cn:not_found)missing+=("Shodan InternetDB（无公开记录）")
-;;
-en:not_found)missing+=("Shodan InternetDB (no public record)")
-;;
-*)missing+=("Shodan InternetDB")
-esac
+if [[ "${internetdb[status]}" != "not_found" ]] &&
+   ! report_any_known "${internetdb[ports]}" "${internetdb[port_count]}" "${internetdb[vulnerability_count]}" "${internetdb[tags]}";then
+missing+=("Shodan InternetDB")
 fi
 (( ${#missing[@]} ))||return 0
 if [[ "$YY" == "cn" ]];then

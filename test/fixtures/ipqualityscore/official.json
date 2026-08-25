@@ -1,0 +1,12 @@
+{
+  "message": "Success.",
+  "success": true,
+  "proxy": true,
+  "country_code": "US",
+  "connection_type": "Data Center",
+  "vpn": true,
+  "tor": false,
+  "recent_abuse": false,
+  "bot_status": false,
+  "fraud_score": 87
+}

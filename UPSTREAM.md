@@ -38,6 +38,8 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 - removed telemetry, run counters, advertisements, sponsor downloads, remote
   menu execution, report upload, and dynamically downloaded reference files;
 - removed the ipregistry web-key scraping flow and its embedded fallback key;
+- replaced that flow with an optional, strict, fixture-tested Ipregistry
+  official-API adapter using a user-owned key;
 - removed background spinner processes and Bash-specific runtime constructs;
 - replaced remote reference reads with fixed local regular files;
 - changed DNSBL child workers to `/bin/zsh`, bounded DNS attempts, and an
@@ -53,9 +55,20 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   without mislabeling either as a cleanliness score;
 - removed the brittle DB-IP HTML scraper and its invented 0/50/100 conversion
   of qualitative low/medium/high page text;
+- added an optional strict DB-IP Extended API adapter that retains the official
+  qualitative threat level and source-specific factor fields;
+- added an optional official IPQualityScore adapter while retaining the named
+  Check.Place relay as a keyless fallback, with separate quota attribution;
+- added a private data-only credential loader for the three official adapters;
+  values are validated and passed to curl over standard input rather than
+  command arguments;
 - replaced the fragile proportional score-text bar with explicit per-provider
   matrices with providers across the top, dimensions down the left,
-  provider-specific scales, stable `Unknown` values, and green/red factor colors;
+  provider-specific scales, per-field dashes, compact unavailable-source
+  summaries, and green/red factor colors;
+- normalized inherited ANSI label padding, balanced wide matrices into compact
+  blocks, and merged Ping0, RIPEstat, and Shodan into one official-network
+  observation section;
 - removed locally synthesized risk bands from relay scores; only a provider's
   explicitly returned text label is displayed, while absent labels stay unknown;
 - corrected the IP2Location/IP2Proxy fraud-score contract to its documented

@@ -1,6 +1,6 @@
 # IP quality standalone handoff
 
-Last validated: 2026-08-24, Asia/Shanghai.
+Last validated: 2026-08-25, Asia/Shanghai.
 
 ## Repository identity
 
@@ -49,6 +49,11 @@ without retaining parent-repository files or nested Git metadata.
 - Report stdout goes through `report/output.zsh`, which uses raw zsh `print` so
   JSON escapes such as `\n` and `\t` survive unchanged until the consumer parses
   them.
+- Optional official Ipregistry, DB-IP Extended, and IPQualityScore adapters live
+  beside their fixture-testable parsers in `providers/`. Their strict local
+  credential file is data-only, mode `600`, and never enters Git, reports, or
+  process arguments. An unconfigured optional source does not create an empty
+  table column.
 - The former generic-looking `lib/safe_snapshot.rb` is now the project-specific
   `leaf_runner/safe_snapshot.rb`.
 - The obsolete README is removed under the local AI-native documentation policy.
@@ -72,10 +77,17 @@ without retaining parent-repository files or nested Git metadata.
   usable response is shown as `—`; wholly unavailable sources are named once in a
   compact summary and never presented as clean. JSON retains every provider and
   represents unavailable values as `null`.
+- Matrix blocks are width-aware and balanced instead of leaving a single orphan
+  provider column. ANSI background padding from the inherited provider labels is
+  normalized before table padding, so every separator remains aligned in CJK
+  terminals. Ping0, RIPEstat, and Shodan now share one compact official-network
+  observation section.
 - Allowlisted unavailability is reported with a reason instead of repeated
-  unknown cells. IPQualityScore relay credit exhaustion and Shodan InternetDB's
-  no-public-record response are currently classified; arbitrary upstream error
-  messages are never echoed.
+  unknown cells. IPQualityScore relay credit exhaustion explicitly names the
+  Check.Place relay account, while a direct-key quota error names the user's
+  official API account. Shodan InternetDB's no-public-record response is shown as
+  context rather than cleanliness; arbitrary upstream error messages are never
+  echoed.
 - Risk-score labels appear only when the provider explicitly returns one. Numeric
   relay scores are never converted into locally invented low/medium/high bands.
 - IPinfo is identified as a public demo widget, ipapi.is as a direct public API,
@@ -98,7 +110,15 @@ without retaining parent-repository files or nested Git metadata.
 
 ## Validated commands
 
-Run from the repository root:
+The normal user-facing entrypoint is intentionally one command. It opens the
+route menu, keeps the live-network consent explicit, selects IPv4, and reveals
+the exact tested IP only because `-f` is present:
+
+```text
+/bin/zsh -f /Users/zmx/Projects/projects/ipquality/bin/test-clash-leaf --confirm-network-lookup -4 -f
+```
+
+Agent-only validation from the repository root:
 
 ```text
 /bin/zsh -n bin/ip-quality bin/test-clash-leaf scripts/test-offline providers/*.zsh report/*.zsh
@@ -108,19 +128,24 @@ for file in leaf_runner/*.rb; do /usr/bin/ruby -c "$file"; done
 print -r -- 1 | /bin/zsh -f bin/test-clash-leaf
 ```
 
-The full offline suite currently has 42 runs and 538 assertions. It covers raw
+The full offline suite currently has 46 runs and 651 assertions. It covers raw
 JSON stdout with embedded tab/newline/ANSI data, real green safe-factor and red
-risk-factor bytes, direct-route proxy-environment removal, exact-leaf isolation,
-and cleanup on success, failure, and signal.
+risk-factor bytes, balanced CJK/ANSI table separator positions, strict official
+provider fixtures and private data-only credential loading, direct-route
+proxy-environment removal, exact-leaf isolation, and cleanup on success, failure,
+and signal.
 
-A live, masked direct IPv4 JSON report parsed successfully with `jq`, retained
-the expected typed top-level sections, and left zero owned leaf workspaces. A
-masked terminal pass produced 47 compact lines with no repeated blank line and no
-`Unknown` cell wall; unavailable IPQualityScore and Shodan results were each
-summarized once. A read-only probe of the real Clash Verge cache also selected an
-exact inline leaf and passed Mihomo `-t` without starting a listener or making an
-IP-provider lookup. The preferred private temporary parent and `/tmp` both stayed
-at zero owned workspaces before and after that run.
+A live direct IPv4 menu run on 2026-08-25 displayed the exact IP under the
+explicit `-f` choice, produced aligned type/score/factor blocks with real green
+and red highlighting, returned an IPQS relay score of 20, and merged Ping0,
+RIPEstat, and Shodan into one compact section. An immediate masked JSON rerun
+parsed cleanly through `jq` and reached a Check.Place relay account whose IPQS
+credits were exhausted, confirming that the two allowlisted states can vary by
+relay request. No internal reporter command was printed. The preferred private
+temporary parent and `/tmp` both stayed at zero owned workspaces afterward. A
+prior read-only probe of the real Clash Verge cache
+also selected an exact inline leaf and passed Mihomo `-t` without starting a
+listener or making an IP-provider lookup.
 
 ## Completed parent extraction
 
