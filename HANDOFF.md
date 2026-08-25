@@ -85,16 +85,15 @@ without retaining parent-repository files or nested Git metadata.
 - Terminal reputation sections are compact, data-driven matrices: providers with
   usable results are across the top and dimensions are down the left. Safe boolean
   factors are green and risk factors are red. A field omitted from an otherwise
-  usable response is shown as `—`; wholly unavailable sources are named once in a
+  usable response is shown as `-`; wholly unavailable sources are named once in a
   compact summary and never presented as clean. JSON retains every provider and
   represents unavailable values as `null`.
-- Matrix blocks are width-aware and balanced instead of leaving a single orphan
-  provider column. ANSI background padding from the inherited provider labels is
-  normalized before table padding, so every separator remains aligned in CJK
-  terminals. The score-band label uses an ASCII slash so terminals that disagree
-  on full-width punctuation still place the separator identically. Ping0,
-  RIPEstat, and Shodan now share one compact official-network
-  observation section.
+- Each of the type, score, and factor matrices stays on one uninterrupted
+  provider row. ANSI background padding from inherited labels is normalized
+  before table padding. Missing cells use an ASCII hyphen and the score-band
+  label uses an ASCII slash, avoiding ambiguous-width punctuation that otherwise
+  shifts every later separator in some terminals. Ping0, RIPEstat, and Shodan
+  share one compact official-network observation section.
 - Allowlisted unavailability is reported with a reason instead of repeated
   unknown cells. IPQualityScore relay credit exhaustion explicitly names the
   Check.Place relay account, while a direct-key quota error names the user's
@@ -141,15 +140,15 @@ for file in leaf_runner/*.rb; do /usr/bin/ruby -c "$file"; done
 print -r -- 1 | /bin/zsh -f bin/test-clash-leaf
 ```
 
-The full offline suite currently has 46 runs and 647 assertions. It covers raw
+The full offline suite currently has 46 runs and 651 assertions. It covers raw
 JSON stdout with embedded tab/newline/ANSI data, real green safe-factor and red
-risk-factor bytes, balanced CJK/ANSI table separator positions, strict official
-provider fixtures and private data-only credential loading, direct-route
+risk-factor bytes, single-matrix CJK/ANSI table separator positions, strict
+official provider fixtures and private data-only credential loading, direct-route
 proxy-environment removal, exact-leaf isolation, and cleanup on success, failure,
 and signal.
 
 A live direct IPv4 menu run on 2026-08-25 displayed the exact IP under the
-explicit `-f` choice, produced aligned type/score/factor blocks with real green
+explicit `-f` choice, produced aligned type/score/factor tables with real green
 and red highlighting, returned an IPQS relay score of 20, and merged Ping0,
 RIPEstat, and Shodan into one compact section. An immediate masked JSON rerun
 parsed cleanly through `jq` and reached a Check.Place relay account whose IPQS

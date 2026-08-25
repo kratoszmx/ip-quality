@@ -23,7 +23,9 @@ print -rn -- "$Font_Purple$(report_unknown_label)$Font_Suffix"
 }
 
 report_dash(){
-print -rn -- "${Font_Purple:-}—${Font_Suffix:-}"
+# Keep the missing-value marker ASCII. U+2014 has an ambiguous terminal width:
+# some renderers use one cell while others use two, shifting every later column.
+print -rn -- "${Font_Purple:-}-${Font_Suffix:-}"
 }
 
 report_neutral_value(){
@@ -172,13 +174,6 @@ done
 print -r -- "$rule"
 }
 
-report_balanced_block_size(){
-typeset -i total="$1" maximum="$2" blocks
-(( total > 0 && maximum > 0 ))||return 1
-blocks=$(((total+maximum-1)/maximum))
-print -rn -- $(((total+blocks-1)/blocks))
-}
-
 report_factor_row(){
 typeset label="$1"
 typeset label_width="$2"
@@ -239,23 +234,11 @@ field_label="参数" source_label="来源" usage_label="使用类型" company_la
 else
 field_label="Field" source_label="Source" usage_label="Usage" company_label="Company" cell_width=19
 fi
-typeset -i start=0 count remaining max_columns
-max_columns=$(report_balanced_block_size "${#headers[@]}" 4)
-typeset -a block_headers block_sources block_usages block_companies
-while (( start < ${#headers[@]} ));do
-remaining=$((${#headers[@]}-start))
-(( count = remaining < max_columns ? remaining : max_columns ))
-block_headers=("${headers[@]:$start:$count}")
-block_sources=("${rendered_sources[@]:$start:$count}")
-block_usages=("${rendered_usages[@]:$start:$count}")
-block_companies=("${rendered_companies[@]:$start:$count}")
-report_table_row "${Font_B}${field_label}${Font_Suffix}" 10 "$cell_width" "${block_headers[@]}"
-report_table_rule "$count" 10 "$cell_width"
-report_table_row "$source_label" 10 "$cell_width" "${block_sources[@]}"
-report_table_row "$usage_label" 10 "$cell_width" "${block_usages[@]}"
-report_table_row "$company_label" 10 "$cell_width" "${block_companies[@]}"
-(( start += count ))
-done
+report_table_row "${Font_B}${field_label}${Font_Suffix}" 10 "$cell_width" "${headers[@]}"
+report_table_rule "${#headers[@]}" 10 "$cell_width"
+report_table_row "$source_label" 10 "$cell_width" "${rendered_sources[@]}"
+report_table_row "$usage_label" 10 "$cell_width" "${rendered_usages[@]}"
+report_table_row "$company_label" 10 "$cell_width" "${rendered_companies[@]}"
 }
 
 show_score(){
@@ -290,30 +273,17 @@ for value in "${scales[@]}";do rendered_scales+=("$(report_neutral_value "$value
 typeset field_label score_label band_label scale_label note
 if [[ "$YY" == "cn" ]];then
 field_label="参数" score_label="分值" band_label="分段/标签" scale_label="量表"
-note="注：各平台量表不同；— 表示该来源本次未提供。"
+note="注：各平台量表不同；- 表示该来源本次未提供。"
 else
 field_label="Field" score_label="Score" band_label="Band / label" scale_label="Scale"
-note="Note: provider scales differ; — means that source did not supply the field."
+note="Note: provider scales differ; - means that source did not supply the field."
 fi
 print -r -- "$note"
-typeset -i start=0 count remaining max_columns
-max_columns=$(report_balanced_block_size "${#headers[@]}" 4)
-typeset -a block_headers block_scores block_risks block_raw_risks block_scales
-while (( start < ${#headers[@]} ));do
-remaining=$((${#headers[@]}-start))
-(( count = remaining < max_columns ? remaining : max_columns ))
-block_headers=("${headers[@]:$start:$count}")
-block_scores=("${rendered_scores[@]:$start:$count}")
-block_risks=("${rendered_risks[@]:$start:$count}")
-block_raw_risks=("${risks[@]:$start:$count}")
-block_scales=("${rendered_scales[@]:$start:$count}")
-report_table_row "${Font_B}${field_label}${Font_Suffix}" 10 16 "${block_headers[@]}"
-report_table_rule "$count" 10 16
-report_table_row "$score_label" 10 16 "${block_scores[@]}"
-report_any_known "${block_raw_risks[@]}"&&report_table_row "$band_label" 10 16 "${block_risks[@]}"
-report_table_row "$scale_label" 10 16 "${block_scales[@]}"
-(( start += count ))
-done
+report_table_row "${Font_B}${field_label}${Font_Suffix}" 10 16 "${headers[@]}"
+report_table_rule "${#headers[@]}" 10 16
+report_table_row "$score_label" 10 16 "${rendered_scores[@]}"
+report_any_known "${risks[@]}"&&report_table_row "$band_label" 10 16 "${rendered_risks[@]}"
+report_table_row "$scale_label" 10 16 "${rendered_scales[@]}"
 }
 
 show_factor(){
@@ -371,41 +341,25 @@ fi
 print -r -- "$Font_B${sfactor[title]}$Font_Suffix"
 typeset field_label
 [[ "$YY" == "cn" ]]&&field_label="参数"||field_label="Field"
-typeset -i start=0 count remaining max_columns
-max_columns=$(report_balanced_block_size "${#headers[@]}" 5)
-typeset -a block_headers block_countries block_proxies block_vpns block_tors block_servers block_abusers block_robots
-while (( start < ${#headers[@]} ));do
-remaining=$((${#headers[@]}-start))
-(( count = remaining < max_columns ? remaining : max_columns ))
-block_headers=("${headers[@]:$start:$count}")
-block_countries=("${countries[@]:$start:$count}")
-block_proxies=("${proxies[@]:$start:$count}")
-block_vpns=("${vpns[@]:$start:$count}")
-block_tors=("${tors[@]:$start:$count}")
-block_servers=("${servers[@]:$start:$count}")
-block_abusers=("${abusers[@]:$start:$count}")
-block_robots=("${robots[@]:$start:$count}")
-report_table_row "${Font_B}${field_label}${Font_Suffix}" 8 12 "${block_headers[@]}"
-report_table_rule "$count" 8 12
+report_table_row "${Font_B}${field_label}${Font_Suffix}" 8 12 "${headers[@]}"
+report_table_rule "${#headers[@]}" 8 12
 if [[ "$YY" == "cn" ]];then
-report_factor_row "地区" 8 12 "${block_countries[@]}"
-report_factor_row "代理" 8 12 "${block_proxies[@]}"
-report_factor_row "VPN" 8 12 "${block_vpns[@]}"
-report_factor_row "Tor" 8 12 "${block_tors[@]}"
-report_factor_row "机房" 8 12 "${block_servers[@]}"
-report_factor_row "滥用" 8 12 "${block_abusers[@]}"
-report_factor_row "机器人" 8 12 "${block_robots[@]}"
+report_factor_row "地区" 8 12 "${countries[@]}"
+report_factor_row "代理" 8 12 "${proxies[@]}"
+report_factor_row "VPN" 8 12 "${vpns[@]}"
+report_factor_row "Tor" 8 12 "${tors[@]}"
+report_factor_row "机房" 8 12 "${servers[@]}"
+report_factor_row "滥用" 8 12 "${abusers[@]}"
+report_factor_row "机器人" 8 12 "${robots[@]}"
 else
-report_factor_row "Region" 8 12 "${block_countries[@]}"
-report_factor_row "Proxy" 8 12 "${block_proxies[@]}"
-report_factor_row "VPN" 8 12 "${block_vpns[@]}"
-report_factor_row "Tor" 8 12 "${block_tors[@]}"
-report_factor_row "Hosting" 8 12 "${block_servers[@]}"
-report_factor_row "Abuse" 8 12 "${block_abusers[@]}"
-report_factor_row "Bot" 8 12 "${block_robots[@]}"
+report_factor_row "Region" 8 12 "${countries[@]}"
+report_factor_row "Proxy" 8 12 "${proxies[@]}"
+report_factor_row "VPN" 8 12 "${vpns[@]}"
+report_factor_row "Tor" 8 12 "${tors[@]}"
+report_factor_row "Hosting" 8 12 "${servers[@]}"
+report_factor_row "Abuse" 8 12 "${abusers[@]}"
+report_factor_row "Bot" 8 12 "${robots[@]}"
 fi
-(( start += count ))
-done
 }
 
 show_network_context(){

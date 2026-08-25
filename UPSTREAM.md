@@ -68,9 +68,10 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   matrices with providers across the top, dimensions down the left,
   provider-specific scales, per-field dashes, compact unavailable-source
   summaries, and green/red factor colors;
-- normalized inherited ANSI label padding, balanced wide matrices into compact
-  blocks, and merged Ping0, RIPEstat, and Shodan into one official-network
-  observation section;
+- normalized inherited ANSI label padding, kept each provider matrix on one
+  uninterrupted row, replaced ambiguous-width missing markers with ASCII, and
+  merged Ping0, RIPEstat, and Shodan into one official-network observation
+  section;
 - removed locally synthesized risk bands from relay scores; only a provider's
   explicitly returned text label is displayed, while absent labels stay unknown;
 - corrected the IP2Location/IP2Proxy fraud-score contract to its documented

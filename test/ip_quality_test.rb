@@ -432,7 +432,7 @@ class IpQualityTest < Minitest::Test
     assert_includes stdout, "量表"
     assert_includes stdout, "0-99 potential"
     assert_includes stdout, "IPQS"
-    assert_includes stdout, "—"
+    assert_match(/分段\/标签\s+\|\s+-/, stdout)
     refute_includes stdout, "Scamalytics"
     refute_includes stdout, "未知"
     refute_includes stdout, "风险等级："
@@ -441,7 +441,7 @@ class IpQualityTest < Minitest::Test
     refute_includes stderr, "unrecognized modifier"
   end
 
-  def test_all_reputation_table_blocks_align_after_ansi_highlighting
+  def test_reputation_tables_stay_single_block_and_align_after_ansi_highlighting
     report_probe = <<~'ZSH'
       setopt KSH_ARRAYS
       Font_B=$'\033[1m' Font_Red=$'\033[31m' Font_Green=$'\033[32m'
@@ -456,6 +456,7 @@ class IpQualityTest < Minitest::Test
       stype[mobile]="   $Back_Green$Font_White$Font_B 手机 $Font_Suffix   "
       stype[hosting]="   $Back_Red$Font_White$Font_B 机房 $Font_Suffix   "
       sscore[low]="$Font_Green${Font_B}低风险$Font_Suffix"
+      sscore[verylow]="$Font_Green${Font_B}极低风险$Font_Suffix"
       sscore[medium]="$Font_Yellow${Font_B}中风险$Font_Suffix"
       sscore[high]="$Font_Red${Font_B}高风险$Font_Suffix"
       ipinfo[susetype]="${stype[isp]}" ipinfo[scomtype]="${stype[isp]}"
@@ -463,7 +464,8 @@ class IpQualityTest < Minitest::Test
       ipapi[susetype]="${stype[isp]}" ipapi[scomtype]="${stype[isp]}"
       ip2location[susetype]="${stype[mobile]}" ip2location[scomtype]="${stype[mobile]}"
       abuseipdb[susetype]="${stype[isp]}"
-      ip2location[score]=0 scamalytics[score]=40 ipapi[score]='0.10%' abuseipdb[score]=0
+      ip2location[score]=3 scamalytics[score]=3 ipapi[score]='0.00%' abuseipdb[score]=0
+      ipapi[risk]="${sscore[verylow]}"
       ipqs[score]=87 ipqs[risk]="${sscore[high]}"
       ip2location[countrycode]=CN ipapi[countrycode]=CN ipregistry[countrycode]=CN
       ipqs[countrycode]=CN scamalytics[countrycode]=CN
@@ -490,6 +492,8 @@ class IpQualityTest < Minitest::Test
     plain = stdout.gsub(/\e\[[0-9;]*m/, "")
     assert_match(/^分段\/标签 {2}\|/, plain)
     refute_includes plain, "分段／标签"
+    refute_includes plain, "—"
+    assert_match(/^分值 {7}\| 3 {16}\| 3 {16}\| 0\.00% {12}\| 0 {16}\| 87 {14}$/, plain)
     sections = [
       plain[/二、IP类型属性\n(.*?)三、风险评分\n/m, 1],
       plain[/三、风险评分\n(.*?)四、风险因子\n/m, 1],
@@ -499,23 +503,22 @@ class IpQualityTest < Minitest::Test
       refute_nil section
       table_lines = section.lines.map(&:chomp).select { |line| line.include?("|") }
       refute_empty table_lines
-      table_lines.group_by { |line| line.count("|") }.each_value do |same_column_count|
-        separators = same_column_count.map do |line|
-          positions = []
-          display_column = 0
-          line.each_char do |character|
-            positions << display_column if character == "|"
-            display_column += character.ascii_only? ? 1 : 2
-          end
-          positions
+      assert_equal 1, table_lines.map { |line| line.count("|") }.uniq.length, table_lines.join("\n")
+      separators = table_lines.map do |line|
+        positions = []
+        display_column = 0
+        line.each_char do |character|
+          positions << display_column if character == "|"
+          display_column += character.ascii_only? ? 1 : 2
         end
-        assert_equal 1, separators.uniq.length, same_column_count.join("\n")
+        positions
       end
+      assert_equal 1, separators.uniq.length, table_lines.join("\n")
     end
-    assert_equal 2, sections[0].lines.count { |line| line.start_with?("参数") }
-    assert_equal 2, sections[1].lines.count { |line| line.start_with?("参数") }
-    assert_equal 2, sections[2].lines.count { |line| line.start_with?("参数") }
-    assert_operator plain.lines.map { |line| line.chomp.length }.max, :<=, 90
+    assert_equal 1, sections[0].lines.count { |line| line.start_with?("参数") }
+    assert_equal 1, sections[1].lines.count { |line| line.start_with?("参数") }
+    assert_equal 1, sections[2].lines.count { |line| line.start_with?("参数") }
+    assert_operator plain.lines.map { |line| line.chomp.length }.max, :<=, 130
     assert_empty stderr
   end
 
