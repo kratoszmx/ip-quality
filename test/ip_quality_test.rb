@@ -13,7 +13,6 @@ class IpQualityTest < Minitest::Test
   COMMON_PROVIDER_LIBRARY = File.join(ROOT, "providers", "common.zsh")
   CREDENTIALS_LIBRARY = File.join(ROOT, "providers", "credentials.zsh")
   IPREGISTRY_LIBRARY = File.join(ROOT, "providers", "ipregistry.zsh")
-  DBIP_LIBRARY = File.join(ROOT, "providers", "dbip.zsh")
   IPQUALITYSCORE_LIBRARY = File.join(ROOT, "providers", "ipqualityscore.zsh")
   PING0_LIBRARY = File.join(ROOT, "providers", "ping0.zsh")
   RIPESTAT_LIBRARY = File.join(ROOT, "providers", "ripestat.zsh")
@@ -27,7 +26,6 @@ class IpQualityTest < Minitest::Test
   INTERNETDB_NO_INFORMATION_FIXTURE = File.join(ROOT, "test", "fixtures", "shodan", "no-information.json")
   IPQUALITYSCORE_CREDITS_FIXTURE = File.join(ROOT, "test", "fixtures", "ipqualityscore", "insufficient-credits.json")
   IPREGISTRY_FIXTURE = File.join(ROOT, "test", "fixtures", "ipregistry", "ip-intelligence.json")
-  DBIP_FIXTURE = File.join(ROOT, "test", "fixtures", "dbip", "extended.json")
   IPQUALITYSCORE_OFFICIAL_FIXTURE = File.join(ROOT, "test", "fixtures", "ipqualityscore", "official.json")
 
   BANNED_SOURCE_PATTERNS = {
@@ -161,7 +159,7 @@ class IpQualityTest < Minitest::Test
 
     assert status.success?, stderr
     assert_includes stdout, "official-contract sources"
-    assert_includes stdout, "configured Ipregistry/DB-IP/IPQS APIs"
+    assert_includes stdout, "configured Ipregistry/IPQS APIs"
     assert_includes stdout, "supplementary sources"
     assert_includes stdout, "Ping0"
     assert_includes stdout, "official free /geo endpoint"
@@ -289,10 +287,7 @@ class IpQualityTest < Minitest::Test
       ipregistry_parse_response "$(<"$3")" 198.51.100.23 || exit 11
       print -r -- "${ipregistry_parsed[usage_type]}|${ipregistry_parsed[server]}|${ipregistry_parsed[tor]}|${ipregistry_parsed[abuser]}"
       source "$4"
-      dbip_parse_response "$(<"$5")" 198.51.100.23 || exit 12
-      print -r -- "${dbip_parsed[threat_level]}|${dbip_parsed[vpn]}|${dbip_parsed[abuser]}|${dbip_parsed[robot]}"
-      source "$6"
-      ipqualityscore_parse_response "$(<"$7")" || exit 13
+      ipqualityscore_parse_response "$(<"$5")" || exit 13
       print -r -- "${ipqualityscore_parsed[score]}|${ipqualityscore_parsed[proxy]}|${ipqualityscore_parsed[tor]}|${ipqualityscore_parsed[server]}"
     ZSH
     stdout, stderr, status = Open3.capture3(
@@ -304,14 +299,12 @@ class IpQualityTest < Minitest::Test
       COMMON_PROVIDER_LIBRARY,
       IPREGISTRY_LIBRARY,
       IPREGISTRY_FIXTURE,
-      DBIP_LIBRARY,
-      DBIP_FIXTURE,
       IPQUALITYSCORE_LIBRARY,
       IPQUALITYSCORE_OFFICIAL_FIXTURE
     )
 
     assert status.success?, stderr
-    assert_equal "hosting|true|false|false\nmedium|true|true|false\n87|true|false|true\n", stdout
+    assert_equal "hosting|true|false|false\n87|true|false|true\n", stdout
     assert_empty stderr
 
     _stdout, _stderr, mismatch_status = Open3.capture3(
@@ -331,14 +324,14 @@ class IpQualityTest < Minitest::Test
     loader_probe = <<~'ZSH'
       source "$1"
       provider_load_credentials "$2" || exit $?
-      print -r -- "${provider_credentials[IPREGISTRY_API_KEY]}|${provider_credentials[DBIP_API_KEY]}|${provider_credentials[IPQS_API_KEY]}"
+      print -r -- "${provider_credentials[IPREGISTRY_API_KEY]}|${provider_credentials[IPQS_API_KEY]}"
     ZSH
 
     Dir.mktmpdir("ipquality-credentials-test") do |directory|
       credentials = File.join(directory, "credentials")
       File.write(
         credentials,
-        "# fixture keys only\nIPREGISTRY_API_KEY=registry123\nDBIP_API_KEY=dbip12345\nIPQS_API_KEY=ipqs12345\n"
+        "# fixture keys only\nIPREGISTRY_API_KEY=registry123\nIPQS_API_KEY=ipqs12345\n"
       )
       File.chmod(0o600, credentials)
       stdout, stderr, status = Open3.capture3(
@@ -346,7 +339,7 @@ class IpQualityTest < Minitest::Test
         "credential-loader-test", CREDENTIALS_LIBRARY, credentials
       )
       assert status.success?, stderr
-      assert_equal "registry123|dbip12345|ipqs12345\n", stdout
+      assert_equal "registry123|ipqs12345\n", stdout
       assert_empty stderr
 
       File.chmod(0o644, credentials)
@@ -407,7 +400,7 @@ class IpQualityTest < Minitest::Test
       Font_Cyan='' Font_Suffix='' Font_B='' Font_Green='' Font_Red='' Font_Purple=''
       YY=cn
       typeset -A stype sscore sfactor sping0
-      typeset -A ipinfo ipregistry ipapi ip2location abuseipdb scamalytics ipqs dbip ipdata ping0 ripestat internetdb
+      typeset -A ipinfo ipregistry ipapi ip2location abuseipdb scamalytics ipqs ipdata ping0 ripestat internetdb
       stype[title]='二、IP类型属性'
       sscore[title]='三、风险评分'
       sfactor[title]='四、风险因子'
@@ -435,7 +428,7 @@ class IpQualityTest < Minitest::Test
     assert_match(/参数\s+\|.*IP2Location.*ipapi\.is/, stdout)
     assert_includes stdout, "公开示例组件"
     assert_match(/分值\s+\|\s+21/, stdout)
-    assert_includes stdout, "分段／标签"
+    assert_includes stdout, "分段/标签"
     assert_includes stdout, "量表"
     assert_includes stdout, "0-99 potential"
     assert_includes stdout, "IPQS"
@@ -457,7 +450,7 @@ class IpQualityTest < Minitest::Test
       Back_Yellow=$'\033[43m' Back_Purple=$'\033[45m' Font_Suffix=$'\033[0m'
       YY=cn
       typeset -A stype sscore sfactor
-      typeset -A ipinfo ipregistry ipapi ip2location abuseipdb scamalytics ipqs dbip ipdata
+      typeset -A ipinfo ipregistry ipapi ip2location abuseipdb scamalytics ipqs ipdata
       stype[title]='二、IP类型属性' sscore[title]='三、风险评分' sfactor[title]='四、风险因子'
       stype[isp]="   $Back_Green$Font_White$Font_B 家宽 $Font_Suffix   "
       stype[mobile]="   $Back_Green$Font_White$Font_B 手机 $Font_Suffix   "
@@ -471,15 +464,15 @@ class IpQualityTest < Minitest::Test
       ip2location[susetype]="${stype[mobile]}" ip2location[scomtype]="${stype[mobile]}"
       abuseipdb[susetype]="${stype[isp]}"
       ip2location[score]=0 scamalytics[score]=40 ipapi[score]='0.10%' abuseipdb[score]=0
-      ipqs[score]=87 ipqs[risk]="${sscore[high]}" dbip[risk]="${sscore[medium]}"
+      ipqs[score]=87 ipqs[risk]="${sscore[high]}"
       ip2location[countrycode]=CN ipapi[countrycode]=CN ipregistry[countrycode]=CN
-      ipqs[countrycode]=CN dbip[countrycode]=CN scamalytics[countrycode]=CN
+      ipqs[countrycode]=CN scamalytics[countrycode]=CN
       ipdata[countrycode]=CN ipinfo[countrycode]=CN
       ip2location[proxy]=false ipapi[proxy]=false ipregistry[proxy]=false
-      ipqs[proxy]=true dbip[proxy]=true scamalytics[proxy]=false
+      ipqs[proxy]=true scamalytics[proxy]=false
       ipdata[proxy]=false ipinfo[proxy]=false
       ip2location[vpn]=false ipapi[vpn]=false ipregistry[vpn]=false
-      ipqs[vpn]=true dbip[vpn]=true scamalytics[vpn]=false ipinfo[vpn]=false
+      ipqs[vpn]=true scamalytics[vpn]=false ipinfo[vpn]=false
       clean_ansi(){ print -rn -- "$1" | sed $'s/\033\\[[0-9;]*m//g' }
       source "$1"
       show_type
@@ -495,6 +488,8 @@ class IpQualityTest < Minitest::Test
     assert_includes stdout, "\e[32m"
     assert_includes stdout, "\e[31m"
     plain = stdout.gsub(/\e\[[0-9;]*m/, "")
+    assert_match(/^分段\/标签 {2}\|/, plain)
+    refute_includes plain, "分段／标签"
     sections = [
       plain[/二、IP类型属性\n(.*?)三、风险评分\n/m, 1],
       plain[/三、风险评分\n(.*?)四、风险因子\n/m, 1],
@@ -560,9 +555,8 @@ class IpQualityTest < Minitest::Test
       setopt KSH_ARRAYS
       Font_Cyan='' Font_Suffix='' Font_B='' Font_Green='' Font_Red='' Font_Purple=''
       YY=cn
-      typeset -A maxmind ipinfo ipregistry ipapi ip2location abuseipdb scamalytics ipdata ipqs dbip ping0 ripestat internetdb sping0
+      typeset -A maxmind ipinfo ipregistry ipapi ip2location abuseipdb scamalytics ipdata ipqs ping0 ripestat internetdb sping0
       ipregistry[status]=not_configured
-      dbip[status]=not_configured
       ping0[status]=unknown
       ipqs[status]=upstream_insufficient_credits
       internetdb[status]=not_found
@@ -590,7 +584,6 @@ class IpQualityTest < Minitest::Test
     assert_includes summary, "RIPEstat"
     refute_includes summary, "Shodan"
     refute_includes summary, "Ipregistry"
-    refute_includes summary, "DB-IP"
     refute_includes stdout, "状态：unknown"
     refute_includes stdout, "风险分数："
     assert_empty stderr
@@ -709,7 +702,7 @@ class IpQualityTest < Minitest::Test
     assert_includes source, 'command curl -q "$@"'
     assert_includes source, '--arg score_ipqs "${ipqs[score]:-}"'
     assert_includes source, '--arg type_ipregistry_usage'
-    assert_includes source, '--arg band_dbip'
+    refute_includes source, '--arg band_dbip'
     assert_includes source, '--arg info_org "$info_org"'
     refute_includes source, "shead[command]"
     refute_includes source, "factor_updates"
@@ -736,7 +729,6 @@ class IpQualityTest < Minitest::Test
       COMMON_PROVIDER_LIBRARY,
       CREDENTIALS_LIBRARY,
       IPREGISTRY_LIBRARY,
-      DBIP_LIBRARY,
       IPQUALITYSCORE_LIBRARY,
       PING0_LIBRARY,
       RIPESTAT_LIBRARY,
@@ -748,7 +740,6 @@ class IpQualityTest < Minitest::Test
       RIPESTAT_FIXTURE,
       INTERNETDB_FIXTURE,
       IPREGISTRY_FIXTURE,
-      DBIP_FIXTURE,
       IPQUALITYSCORE_OFFICIAL_FIXTURE
     ].each do |path|
       assert File.file?(path), "missing reference: #{path}"

@@ -8,19 +8,20 @@ Last validated: 2026-08-25, Asia/Shanghai.
 - Branch: `main` only
 - Online primary: `https://github.com/kratoszmx/ip-quality.git` (public; empty
   before the 2026-08-24 synchronization)
-- Configured online backup: `https://github.com/kratosbackup/ipquality.git`
-  (last confirmed remote-tracking commit `0c031f9`; current access is unavailable)
+- Online backup: `https://github.com/kratosbackup/ipquality.git` (private;
+  backup-specific authenticated access confirmed on 2026-08-25)
 - Branch upstream: `github-kratoszmx/main`
 
 The corrected `kratoszmx/ip-quality` target is accessible to the owner's current
-credential and is current after the 2026-08-25 push. GitHub reports it as public;
-do not change repository visibility without an explicit owner decision. The
-configured `kratosbackup/ipquality` target returns `Repository not found` with
-the available default credential, while a forced `kratosbackup` identity has no
-stored password/token available to non-interactive Git. This does not prove that
-an existing token merely lacks scope: the backup-specific push supplied no token
-at all, and repository removal/rename or missing repository selection can produce
-the same 404. Never place a token in a remote URL or Git configuration.
+credential. GitHub reports it as public; do not change repository visibility
+without an explicit owner decision. The backup-specific token authenticates as
+`kratosbackup`, can access the private backup repository, and is passed only by a
+temporary askpass environment. macOS's default credential helper can otherwise
+pre-fill the primary GitHub identity and produce a misleading `Repository not
+found`; one-shot backup operations disable that helper without changing local or
+global Git configuration. Both online remotes were brought to the current `main`
+after the 2026-08-25 validation. Never place a token in a remote URL or Git
+configuration.
 
 The obsolete `origin` and `usb` remotes were disconnected. Their exact bare
 repositories, `/Users/zmx/gitrepos/ipquality.git` and
@@ -55,11 +56,15 @@ without retaining parent-repository files or nested Git metadata.
 - Report stdout goes through `report/output.zsh`, which uses raw zsh `print` so
   JSON escapes such as `\n` and `\t` survive unchanged until the consumer parses
   them.
-- Optional official Ipregistry, DB-IP Extended, and IPQualityScore adapters live
+- Optional official Ipregistry and IPQualityScore adapters live
   beside their fixture-testable parsers in `providers/`. Their strict local
   credential file is data-only, mode `600`, and never enters Git, reports, or
   process arguments. An unconfigured optional source does not create an empty
   table column.
+- DB-IP is intentionally absent: its free location endpoint duplicates existing
+  observations, while its useful proxy/crawler/threat fields require the paid
+  Extended plan. The retired scraper, parser, fixture, JSON keys, and credential
+  entry were removed together.
 - The former generic-looking `lib/safe_snapshot.rb` is now the project-specific
   `leaf_runner/safe_snapshot.rb`.
 - The obsolete README is removed under the local AI-native documentation policy.
@@ -86,7 +91,9 @@ without retaining parent-repository files or nested Git metadata.
 - Matrix blocks are width-aware and balanced instead of leaving a single orphan
   provider column. ANSI background padding from the inherited provider labels is
   normalized before table padding, so every separator remains aligned in CJK
-  terminals. Ping0, RIPEstat, and Shodan now share one compact official-network
+  terminals. The score-band label uses an ASCII slash so terminals that disagree
+  on full-width punctuation still place the separator identically. Ping0,
+  RIPEstat, and Shodan now share one compact official-network
   observation section.
 - Allowlisted unavailability is reported with a reason instead of repeated
   unknown cells. IPQualityScore relay credit exhaustion explicitly names the
@@ -134,7 +141,7 @@ for file in leaf_runner/*.rb; do /usr/bin/ruby -c "$file"; done
 print -r -- 1 | /bin/zsh -f bin/test-clash-leaf
 ```
 
-The full offline suite currently has 46 runs and 651 assertions. It covers raw
+The full offline suite currently has 46 runs and 647 assertions. It covers raw
 JSON stdout with embedded tab/newline/ANSI data, real green safe-factor and red
 risk-factor bytes, balanced CJK/ANSI table separator positions, strict official
 provider fixtures and private data-only credential loading, direct-route
@@ -152,6 +159,12 @@ temporary parent and `/tmp` both stayed at zero owned workspaces afterward. A
 prior read-only probe of the real Clash Verge cache
 also selected an exact inline leaf and passed Mihomo `-t` without starting a
 listener or making an IP-provider lookup.
+
+A separate masked live direct lookup on 2026-08-25 loaded the owner-provided
+Ipregistry key from the private data-only credential file. The official endpoint
+returned `ok`; the strict parser retained its usage/company, country, proxy, VPN,
+Tor, hosting, and abuse fields, and the resulting JSON passed typed assertions.
+The secret itself never appeared in output, process arguments, or Git.
 
 ## Completed parent extraction
 

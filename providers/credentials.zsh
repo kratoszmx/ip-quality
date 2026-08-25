@@ -66,7 +66,7 @@ return 65
 name="${line%%=*}"
 value="${line#*=}"
 case "$name" in
-IPREGISTRY_API_KEY|DBIP_API_KEY|IPQS_API_KEY) ;;
+IPREGISTRY_API_KEY|IPQS_API_KEY) ;;
 *)
 print -ru2 -- "ERROR: unsupported provider credential name in $path"
 return 65

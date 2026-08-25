@@ -1,6 +1,7 @@
 reports/
 .cache/
 tmp/
+secrets/
 .DS_Store
 *.ansi
 *.tmp

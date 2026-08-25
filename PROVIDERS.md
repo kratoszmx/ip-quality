@@ -22,7 +22,6 @@ or malformed addresses are not accepted as a successful public result.
 | ipapi.is | Direct public API | ASN/type, provider-supplied abuser-score label, and risk factors |
 | AbuseIPDB via `ipinfo.check.place` | Upstream relay | abuse score and usage/risk factors |
 | IP2Location via `ipinfo.check.place` | Upstream relay | 0–99 potential-risk score and proxy-category factors |
-| DB-IP Extended | Direct official API when `DBIP_API_KEY` is configured | qualitative threat level, country, usage type, proxy/VPN/Tor, crawler/bot, and threat-detail signals |
 | ipdata via `ipinfo.check.place` | Upstream relay | country and threat factors |
 | IPQualityScore | Direct official API when `IPQS_API_KEY` is configured; otherwise the named Check.Place relay | fraud score and proxy/VPN/Tor/bot factors |
 | Ping0 public `/geo` | Direct official public endpoint | returned IP, location, ASN, and organization; the returned IP must exactly match the tested address |
@@ -95,7 +94,7 @@ and [Shodan InternetDB](https://internetdb.shodan.io/).
 The working source order is intentionally simple:
 
 1. Official-contract observations: ipapi.is, Ping0, RIPEstat, Shodan
-   InternetDB, and any configured Ipregistry, DB-IP, or IPQS APIs.
+   InternetDB, and any configured Ipregistry or IPQS APIs.
 2. Supplementary direct observation: IPinfo's public demo widget.
 3. Supplementary relay observations: the named Check.Place-backed rows.
 
@@ -117,10 +116,11 @@ a confidence scale rather than converted into a local low/high verdict. See the
 the [IP2Location IP2Proxy field documentation](https://www.ip2location.com/documentation/ip2proxy-libraries/lua/api),
 and [AbuseIPDB API documentation](https://docs.abuseipdb.com/).
 
-The former DB-IP HTML scraper remains removed. The supported replacement uses
-the versioned official Extended API and keeps DB-IP's own `low`/`medium`/`high`
-threat level as a label. It never turns that label into an invented 0/50/100
-number.
+The former DB-IP HTML scraper remains removed. DB-IP's free endpoint provides
+location data already covered by other rows, while the distinct proxy, crawler,
+and threat fields require the paid Extended API. Keeping it out avoids a paid,
+mostly empty duplicate column. See [DB-IP's free endpoint](https://db-ip.com/api/free.php)
+and [Extended API pricing](https://db-ip.com/api/extended).
 
 ### Optional official API credentials
 
@@ -129,7 +129,6 @@ The reporter looks for the private data file
 
 ```text
 IPREGISTRY_API_KEY=...
-DBIP_API_KEY=...
 IPQS_API_KEY=...
 ```
 
@@ -137,18 +136,24 @@ In day-to-day use, a mode-`600` file works well: it is read as data rather than
 executed as shell code, and API keys are sent to curl through its standard-input
 configuration instead of appearing in process arguments, reports, or Git. A key
 can be omitted independently; its provider simply stays out of the terminal
-matrix. Saved sanitized fixtures exercise all three parsers without spending API
+matrix. Saved sanitized fixtures exercise both parsers without spending API
 credits during development.
 
 Ipregistry supports an `Authorization: ApiKey` header and exposes its API keys in
 the account dashboard. Its current free sign-up credits are enough for extensive
-testing. DB-IP's proxy, crawler, and threat fields belong to the Extended API, so
-use an Extended trial/key rather than the location-only free endpoint. IPQS
-publishes the direct JSON endpoint and provides the account key after
-registration. See [Ipregistry authentication](https://ipregistry.co/docs/authentication),
-[Ipregistry pricing and sign-up](https://ipregistry.co/pricing),
-[DB-IP Extended](https://db-ip.com/api/extended), and the
+testing. IPQS publishes the direct JSON endpoint and lets signed-in users manage
+keys in its API Keys dashboard. See
+[Ipregistry authentication](https://ipregistry.co/docs/authentication),
+[Ipregistry pricing and sign-up](https://ipregistry.co/pricing), the
+[IPQS API Keys dashboard](https://www.ipqualityscore.com/user/api-keys), and the
 [IPQS API overview](https://www.ipqualityscore.com/documentation/proxy-detection-api/overview).
+
+Exact-leaf experience also favors keeping connectivity and blacklist work out of
+this matrix. HTTP reputation requests can follow the selected leaf, while local
+DNS and raw TCP probes still measure the Mac's system route. The existing factor
+rows already preserve each provider's abuse/blacklist signals, and the separate
+`dnsbl` scope remains available for direct-route diagnostics, so a new combined
+section would duplicate evidence or mislabel which route was measured.
 
 ### Candidate review
 

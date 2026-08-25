@@ -280,10 +280,6 @@ if report_any_known "${ipqs[score]}" "${ipqs[risk]}";then
 headers+=("${Font_B}${Font_Cyan}IPQualityScore$Font_Suffix")
 scores+=("${ipqs[score]}") risks+=("${ipqs[risk]}") scales+=("0-100 fraud")
 fi
-if report_any_known "${dbip[risk]}";then
-headers+=("${Font_B}${Font_Cyan}DB-IP$Font_Suffix")
-scores+=("") risks+=("${dbip[risk]}") scales+=("low/medium/high")
-fi
 (( ${#headers[@]} ))||return 0
 print -r -- "$Font_B${sscore[title]}$Font_Suffix"
 typeset value
@@ -293,7 +289,7 @@ for value in "${risks[@]}";do rendered_risks+=("$(report_preserved_or_dash "$val
 for value in "${scales[@]}";do rendered_scales+=("$(report_neutral_value "$value")");done
 typeset field_label score_label band_label scale_label note
 if [[ "$YY" == "cn" ]];then
-field_label="参数" score_label="分值" band_label="分段／标签" scale_label="量表"
+field_label="参数" score_label="分值" band_label="分段/标签" scale_label="量表"
 note="注：各平台量表不同；— 表示该来源本次未提供。"
 else
 field_label="Field" score_label="Score" band_label="Band / label" scale_label="Scale"
@@ -349,13 +345,6 @@ countries+=("${ipqs[countrycode]}") proxies+=("${ipqs[proxy]}")
 vpns+=("${ipqs[vpn]}") tors+=("${ipqs[tor]}")
 servers+=("${ipqs[server]}") abusers+=("${ipqs[abuser]}")
 robots+=("${ipqs[robot]}")
-fi
-if report_any_known "${dbip[countrycode]}" "${dbip[proxy]}" "${dbip[vpn]}" "${dbip[tor]}" "${dbip[server]}" "${dbip[abuser]}" "${dbip[robot]}";then
-headers+=("${Font_B}${Font_Cyan}DB-IP$Font_Suffix")
-countries+=("${dbip[countrycode]}") proxies+=("${dbip[proxy]}")
-vpns+=("${dbip[vpn]}") tors+=("${dbip[tor]}")
-servers+=("${dbip[server]}") abusers+=("${dbip[abuser]}")
-robots+=("${dbip[robot]}")
 fi
 if report_any_known "${scamalytics[countrycode]}" "${scamalytics[proxy]}" "${scamalytics[vpn]}" "${scamalytics[tor]}" "${scamalytics[server]}" "${scamalytics[abuser]}" "${scamalytics[robot]}";then
 headers+=("${Font_B}${Font_Cyan}Scamalytics$Font_Suffix")
@@ -484,10 +473,6 @@ missing+=("Ipregistry")
 fi
 report_any_known "${ipapi[susetype]}" "${ipapi[scomtype]}" "${ipapi[score]}" "${ipapi[countrycode]}" "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ipapi[server]}" "${ipapi[abuser]}" "${ipapi[robot]}"||missing+=("ipapi.is")
 report_any_known "${ip2location[susetype]}" "${ip2location[scomtype]}" "${ip2location[score]}" "${ip2location[countrycode]}" "${ip2location[proxy]}" "${ip2location[vpn]}" "${ip2location[tor]}" "${ip2location[server]}" "${ip2location[abuser]}" "${ip2location[robot]}"||missing+=("IP2Location")
-if [[ "${dbip[status]}" != "not_configured" ]] &&
-   ! report_any_known "${dbip[risk]}" "${dbip[countrycode]}" "${dbip[proxy]}" "${dbip[vpn]}" "${dbip[tor]}" "${dbip[server]}" "${dbip[abuser]}" "${dbip[robot]}";then
-missing+=("DB-IP")
-fi
 report_any_known "${abuseipdb[susetype]}" "${abuseipdb[score]}"||missing+=("AbuseIPDB")
 report_any_known "${scamalytics[score]}" "${scamalytics[countrycode]}" "${scamalytics[proxy]}" "${scamalytics[vpn]}" "${scamalytics[tor]}" "${scamalytics[server]}" "${scamalytics[abuser]}" "${scamalytics[robot]}"||missing+=("Scamalytics")
 report_any_known "${ipdata[countrycode]}" "${ipdata[proxy]}" "${ipdata[tor]}" "${ipdata[server]}" "${ipdata[abuser]}"||missing+=("ipdata")

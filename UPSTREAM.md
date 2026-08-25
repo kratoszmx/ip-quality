@@ -55,13 +55,15 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   without mislabeling either as a cleanliness score;
 - removed the brittle DB-IP HTML scraper and its invented 0/50/100 conversion
   of qualitative low/medium/high page text;
-- added an optional strict DB-IP Extended API adapter that retains the official
-  qualitative threat level and source-specific factor fields;
 - added an optional official IPQualityScore adapter while retaining the named
   Check.Place relay as a keyless fallback, with separate quota attribution;
-- added a private data-only credential loader for the three official adapters;
+- added optional strict Ipregistry and IPQualityScore adapters plus a private
+  data-only credential loader for both official adapters;
   values are validated and passed to curl over standard input rather than
   command arguments;
+- evaluated and then removed the DB-IP Extended adapter because the unique
+  threat/proxy fields require a paid subscription while its free location data
+  duplicates existing sources;
 - replaced the fragile proportional score-text bar with explicit per-provider
   matrices with providers across the top, dimensions down the left,
   provider-specific scales, per-field dashes, compact unavailable-source
