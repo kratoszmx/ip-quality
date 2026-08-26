@@ -366,6 +366,48 @@ class IpQualityTest < Minitest::Test
     refute_match(/curl_safe[^\n]*\$api_key/, source)
   end
 
+  def test_private_project_secret_files_load_by_provider_name_and_override_global_defaults
+    loader_probe = <<~'ZSH'
+      source "$1"
+      provider_load_credentials "$2" "$3" || exit $?
+      print -r -- "${provider_credentials[IPREGISTRY_API_KEY]}|${provider_credentials[IPQS_API_KEY]}"
+    ZSH
+
+    Dir.mktmpdir("ipquality-project-secrets-test") do |directory|
+      credentials = File.join(directory, "credentials")
+      project_secrets = File.join(directory, "secrets")
+      Dir.mkdir(project_secrets, 0o700)
+      File.write(
+        credentials,
+        "IPREGISTRY_API_KEY=globalregistry123\nIPQS_API_KEY=globalipqs12345\n"
+      )
+      File.chmod(0o600, credentials)
+      File.write(File.join(project_secrets, "ipregistry"), "projectregistry123\n")
+      File.write(File.join(project_secrets, "ipqs"), "projectipqs12345\n")
+      File.chmod(0o600, File.join(project_secrets, "ipregistry"))
+      File.chmod(0o600, File.join(project_secrets, "ipqs"))
+
+      stdout, stderr, status = Open3.capture3(
+        "/bin/zsh", "-f", "-c", loader_probe,
+        "project-secret-loader-test", CREDENTIALS_LIBRARY, credentials, project_secrets
+      )
+      assert status.success?, stderr
+      assert_equal "projectregistry123|projectipqs12345\n", stdout
+      assert_empty stderr
+
+      File.chmod(0o644, File.join(project_secrets, "ipqs"))
+      _stdout, insecure_stderr, insecure_status = Open3.capture3(
+        "/bin/zsh", "-f", "-c", loader_probe,
+        "project-secret-mode-test", CREDENTIALS_LIBRARY, credentials, project_secrets
+      )
+      refute insecure_status.success?
+      assert_includes insecure_stderr, "mode 600"
+    end
+
+    source = File.read(SCRIPT, encoding: "UTF-8")
+    assert_includes source, 'provider_load_credentials "" "$SCRIPT_DIR/secrets"'
+  end
+
   def test_known_provider_failures_are_classified_without_echoing_upstream_messages
     parser_probe = <<~'ZSH'
       setopt KSH_ARRAYS
@@ -568,6 +610,8 @@ class IpQualityTest < Minitest::Test
       ping0[status]=unknown
       ipqs[status]=upstream_insufficient_credits
       ipqs[source]=check_place_relay
+      maxmind[status]=http_403 ip2location[status]=http_403
+      abuseipdb[status]=http_403 scamalytics[status]=http_403 ipdata[status]=http_403
       internetdb[status]=not_found
       clean_ansi(){ print -rn -- "$1" }
       source "$1"
@@ -593,11 +637,45 @@ class IpQualityTest < Minitest::Test
     summary = stdout.lines.last
     assert_includes summary, "本次无可用资料（不等于低风险）"
     assert_includes summary, "RIPEstat"
+    assert_includes summary, "Check.Place 中继 HTTP 403（MaxMind、IP2Location、AbuseIPDB、Scamalytics、ipdata）"
+    refute_includes summary, "Check.Place/MaxMind、IP2Location"
     refute_includes summary, "IPQualityScore"
     refute_includes summary, "Shodan"
     refute_includes summary, "Ipregistry"
     refute_includes stdout, "状态：unknown"
     refute_includes stdout, "风险分数："
+    assert_empty stderr
+  end
+
+  def test_ipqs_failure_status_does_not_suppress_successful_provider_results
+    report_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      Font_Cyan='' Font_Suffix='' Font_B='' Font_Green='' Font_Red='' Font_Purple=''
+      YY=cn
+      typeset -A sscore sfactor
+      typeset -A ipinfo ipregistry ipapi ip2location abuseipdb scamalytics ipqs ipdata
+      sscore[title]='三、风险评分' sfactor[title]='四、风险因子'
+      ip2location[score]=3 ip2location[countrycode]=US ip2location[proxy]=false
+      scamalytics[score]=4 scamalytics[countrycode]=US scamalytics[vpn]=false
+      abuseipdb[score]=2
+      ipdata[countrycode]=US ipdata[server]=false
+      ipqs[source]=official_api ipqs[status]=official_insufficient_credits
+      clean_ansi(){ print -rn -- "$1" }
+      source "$1"
+      show_score
+      show_factor
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", report_probe,
+      "ipqs-independent-report-test", REPUTATION_REPORT
+    )
+
+    assert status.success?, stderr
+    assert_match(/参数\s+\|.*IP2Location.*Scamalytics.*AbuseIPDB.*IPQS/, stdout)
+    assert_includes stdout, "官方/额度用完"
+    assert_match(/参数\s+\|.*IP2Location.*Scamalytics.*ipdata/, stdout)
+    assert_includes stdout, "分值"
+    assert_includes stdout, "地区"
     assert_empty stderr
   end
 

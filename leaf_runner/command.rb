@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "optparse"
+require "ipaddr"
 require_relative "network_environment"
 require_relative "profile"
 require_relative "subscription_catalog"
@@ -35,6 +36,7 @@ module IpQuality
       @list_subscriptions = false
       @list_leaves = false
       @direct = false
+      @specific_ip = nil
       @confirmed = false
       @config_test_only = false
       @mihomo_explicit = false
@@ -66,6 +68,10 @@ module IpQuality
 
       source = load_selected_source
       return run_direct_route if source == :direct
+      if source == :specific_ip
+        @specific_ip = select_specific_ip
+        return run_direct_route
+      end
 
       profile = ClashLeafProfile.new(source)
 
@@ -127,10 +133,11 @@ module IpQuality
             test-clash-leaf --profile PATH --leaf NAME --config-test-only
 
           By default, choose direct connection or one cached remote Clash Verge
-          subscription. A subscription route then asks for one exact inline leaf.
-          Direct uses the current system route with proxy environment variables
-          removed. A leaf is copied into a temporary 127.0.0.1-only Mihomo process.
-          The active Clash profile is never used or changed.
+          subscription. The menu also accepts one specific public target IP.
+          A subscription route then asks for one exact inline leaf. Direct and
+          specific-IP lookups use the current system route with proxy environment
+          variables removed. A leaf is copied into a temporary 127.0.0.1-only
+          Mihomo process. The active Clash profile is never used or changed.
         BANNER
         options.on("--list-subscriptions", "List cached remote subscription names without network access") { @list_subscriptions = true }
         options.on("--list-leaves", "List exact inline leaf names without network access") { @list_leaves = true }
@@ -201,7 +208,7 @@ module IpQuality
               else
                 select_subscription(catalog.entries)
               end
-      return :direct if entry == :direct
+      return entry if entry == :direct || entry == :specific_ip
 
       catalog.source_for(entry)
     end
@@ -222,8 +229,9 @@ module IpQuality
     def print_route_list(entries)
       @stdout.puts "Available test routes:"
       @stdout.puts "  1  Direct connection (current system route; proxy environment removed)"
+      @stdout.puts "  2  Specific IP lookup (enter one public target; current system route)"
       entries.each_with_index do |entry, index|
-        @stdout.printf("%3d  Cached subscription: %s\n", index + 2, entry.name)
+        @stdout.printf("%3d  Cached subscription: %s\n", index + 3, entry.name)
       end
     end
 
@@ -231,10 +239,30 @@ module IpQuality
       print_route_list(entries)
       @stdout.print "Select one route number: "
       @stdout.flush
-      selected = read_selection(entries.length + 1, "route")
+      selected = read_selection(entries.length + 2, "route")
       return :direct if selected.zero?
+      return :specific_ip if selected == 1
 
-      entries.fetch(selected - 1)
+      entries.fetch(selected - 2)
+    end
+
+    def select_specific_ip
+      @stdout.print "Enter one public IP address to inspect: "
+      @stdout.flush
+      answer = @stdin.gets
+      raise OptionParser::InvalidArgument, "no specific IP was entered" unless answer
+
+      candidate = answer.strip
+      unless candidate.bytesize.between?(2, 64) && candidate.match?(/\A[0-9A-Fa-f:.]+\z/)
+        raise OptionParser::InvalidArgument, "specific IP must be one valid public address"
+      end
+      address = IPAddr.new(candidate)
+      if (@family == "-4" && !address.ipv4?) || (@family == "-6" && !address.ipv6?)
+        raise OptionParser::InvalidArgument, "specific IP conflicts with the selected address family"
+      end
+      address.to_s
+    rescue IPAddr::InvalidAddressError
+      raise OptionParser::InvalidArgument, "specific IP must be one valid public address"
     end
 
     def select_subscription(entries)
@@ -291,6 +319,16 @@ module IpQuality
     end
 
     def print_direct_plan
+      if @specific_ip
+        @stdout.puts "Specific IP lookup plan (no network access has occurred)"
+        @stdout.puts "  target: #{@specific_ip}"
+        @stdout.puts "  route: current system route with inherited proxy environment removed"
+        @stdout.puts "  runtime: reporter only; no temporary Mihomo process"
+        @stdout.puts "  reporter scope: reputation only; providers receive the explicit target"
+        @stdout.puts "  Ping0: skipped because its public /geo endpoint reports only the caller's egress"
+        @stdout.puts "  start gate: add --confirm-network-lookup"
+        return
+      end
       @stdout.puts "Direct route plan (no network access has occurred)"
       @stdout.puts "  route: current system route with inherited proxy environment removed"
       @stdout.puts "  live Clash profile/selection: read only and unchanged"
@@ -306,9 +344,17 @@ module IpQuality
         return 0
       end
 
-      @stderr.puts "[route-runner] Testing direct connection through the current system route; no Mihomo process is started."
+      if @specific_ip
+        @stderr.puts "[route-runner] Inspecting specific IP #{@specific_ip} through provider target parameters over the current system route; no Mihomo process is started."
+      else
+        @stderr.puts "[route-runner] Testing direct connection through the current system route; no Mihomo process is started."
+      end
       result = run_reporter(NetworkEnvironment.without_proxy_variables, reporter_command)
-      @stderr.puts "[route-runner] Direct report finished; live Clash state was unchanged."
+      if @specific_ip
+        @stderr.puts "[route-runner] Specific-IP report finished; live Clash state was unchanged."
+      else
+        @stderr.puts "[route-runner] Direct report finished; live Clash state was unchanged."
+      end
       return 0 if result.success?
 
       result.exitstatus || 1
@@ -337,6 +383,7 @@ module IpQuality
       ]
       command << @family if @family
       command.concat(@report_arguments)
+      command << @specific_ip if @specific_ip
       command
     end
 

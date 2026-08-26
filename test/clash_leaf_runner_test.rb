@@ -32,7 +32,7 @@ class ClashLeafRunnerTest < Minitest::Test
       command = IpQuality::ClashLeafCommand.new(
         stdout: stdout,
         stderr: stderr,
-        stdin: StringIO.new("2\n2\n"),
+        stdin: StringIO.new("3\n2\n"),
         app_root: directory
       )
 
@@ -41,6 +41,7 @@ class ClashLeafRunnerTest < Minitest::Test
       assert_equal 0, exit_code
       assert_includes stdout.string, "Available test routes:"
       assert_includes stdout.string, "Direct connection"
+      assert_includes stdout.string, "Specific IP lookup"
       assert_includes stdout.string, "Cached subscription: Fixture Remote"
       assert_includes stdout.string, "Available inline leaves"
       assert_includes stdout.string, "exact leaf: TargetLeaf"
@@ -125,6 +126,74 @@ class ClashLeafRunnerTest < Minitest::Test
       assert_includes stderr.string, "no Mihomo process is started"
       assert_includes stderr.string, "live Clash state was unchanged"
       assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"))
+    end
+  end
+
+  def test_specific_ip_menu_uses_provider_target_parameters_without_starting_mihomo
+    Dir.mktmpdir("ip-quality-specific-ip-") do |directory|
+      write_clash_verge_fixture(directory)
+      fake_reporter = File.join(directory, "fake-reporter")
+      arguments_file = File.join(directory, "arguments.txt")
+      File.write(fake_reporter, <<~'ZSH')
+        [[ -z "${HTTP_PROXY+x}${https_proxy+x}${No_PrOxY+x}" ]] || exit 71
+        print -r -- "$@" > "$IPQUALITY_TEST_ARGUMENTS_FILE"
+      ZSH
+      File.chmod(0o700, fake_reporter)
+      stdout = StringIO.new
+      stderr = StringIO.new
+      command = IpQuality::ClashLeafCommand.new(
+        stdout: stdout,
+        stderr: stderr,
+        stdin: StringIO.new("2\n12.217.32.68\n"),
+        app_root: directory,
+        reporter_path: fake_reporter
+      )
+
+      exit_code = with_environment(
+        "HTTP_PROXY" => "http://127.0.0.1:1",
+        "https_proxy" => "http://127.0.0.1:2",
+        "No_PrOxY" => "fixture.invalid",
+        "IPQUALITY_TEST_ARGUMENTS_FILE" => arguments_file
+      ) do
+        command.run(["--confirm-network-lookup", "-4", "-f"])
+      end
+
+      assert_equal 0, exit_code
+      assert_equal "--confirm-network-lookup --scope reputation -4 -f 12.217.32.68\n", File.read(arguments_file)
+      assert_includes stdout.string, "Specific IP lookup"
+      assert_includes stdout.string, "Enter one public IP address"
+      refute_includes stdout.string, "Available inline leaves"
+      assert_includes stderr.string, "Inspecting specific IP 12.217.32.68"
+      assert_includes stderr.string, "Specific-IP report finished"
+      assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"))
+    end
+  end
+
+  def test_specific_ip_menu_rejects_malformed_or_family_conflicting_input_before_lookup
+    Dir.mktmpdir("ip-quality-specific-ip-reject-") do |directory|
+      write_clash_verge_fixture(directory)
+
+      malformed_stdout = StringIO.new
+      malformed_stderr = StringIO.new
+      malformed = IpQuality::ClashLeafCommand.new(
+        stdout: malformed_stdout,
+        stderr: malformed_stderr,
+        stdin: StringIO.new("2\nnot-an-ip\n"),
+        app_root: directory
+      )
+      assert_equal IpQuality::ClashLeafCommand::EX_USAGE, malformed.run([])
+      assert_includes malformed_stderr.string, "specific IP must be one valid public address"
+
+      family_stdout = StringIO.new
+      family_stderr = StringIO.new
+      family = IpQuality::ClashLeafCommand.new(
+        stdout: family_stdout,
+        stderr: family_stderr,
+        stdin: StringIO.new("2\n2001:db8::1\n"),
+        app_root: directory
+      )
+      assert_equal IpQuality::ClashLeafCommand::EX_USAGE, family.run(["-4"])
+      assert_includes family_stderr.string, "conflicts with the selected address family"
     end
   end
 

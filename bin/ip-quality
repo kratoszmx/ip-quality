@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-08-26-standalone.9"
+script_version="v2026-08-27-standalone.10"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset REPORT_DIR="$SCRIPT_DIR/report"
@@ -434,6 +434,45 @@ print -r -- "url = \"$endpoint\""
 }|curl_safe "$@" --config -
 }
 
+typeset -g PROVIDER_RESPONSE_BODY=""
+typeset -g PROVIDER_RESPONSE_STATUS="unknown"
+
+provider_fetch_public_json(){
+emulate -LR zsh
+setopt SH_WORD_SPLIT
+typeset address_family="$1"
+typeset endpoint="$2"
+typeset maximum_bytes="${3:-262144}"
+typeset wire_response curl_exit http_code response_body
+
+PROVIDER_RESPONSE_BODY=""
+PROVIDER_RESPONSE_STATUS="unknown"
+wire_response=$(curl_safe $CurlARG -sS -L -$address_family -m 10 \
+  --max-filesize "$maximum_bytes" --write-out $'\n%{http_code}' "$endpoint" 2>/dev/null)
+curl_exit=$?
+if (( curl_exit != 0 )) || [[ "$wire_response" != *$'\n'* ]];then
+PROVIDER_RESPONSE_STATUS="network_error"
+return 1
+fi
+http_code="${wire_response##*$'\n'}"
+response_body="${wire_response%$'\n'*}"
+if [[ "$http_code" != [0-9][0-9][0-9] ]] || (( 10#$http_code < 200 || 10#$http_code > 299 ));then
+if [[ "$http_code" == [0-9][0-9][0-9] && "$http_code" != "000" ]];then
+PROVIDER_RESPONSE_STATUS="http_$http_code"
+else
+PROVIDER_RESPONSE_STATUS="network_error"
+fi
+return 1
+fi
+if ! provider_json_is_object "$response_body";then
+PROVIDER_RESPONSE_STATUS="invalid_response"
+return 1
+fi
+PROVIDER_RESPONSE_BODY="$response_body"
+PROVIDER_RESPONSE_STATUS="ok"
+return 0
+}
+
 styled_provider_type(){
 typeset raw="${1:l}"
 case "$raw" in
@@ -651,6 +690,24 @@ return 1
 print -ru2 -- "SELF-TEST FAILED: provider mobile display normalization changed"
 return 1
 }
+(
+curl_safe(){ print -rn -- $'{"provider":"fixture"}\n200'; }
+CurlARG=""
+provider_fetch_public_json 4 "https://fixture.invalid" 1024&&
+  [[ "$PROVIDER_RESPONSE_STATUS" == "ok" && "$PROVIDER_RESPONSE_BODY" == '{"provider":"fixture"}' ]]
+)||{
+print -ru2 -- "SELF-TEST FAILED: provider HTTP success classification changed"
+return 1
+}
+(
+curl_safe(){ print -rn -- $'<html>forbidden</html>\n403'; }
+CurlARG=""
+! provider_fetch_public_json 4 "https://fixture.invalid" 1024&&
+  [[ "$PROVIDER_RESPONSE_STATUS" == "http_403" && -z "$PROVIDER_RESPONSE_BODY" ]]
+)||{
+print -ru2 -- "SELF-TEST FAILED: provider HTTP failure classification changed"
+return 1
+}
 is_nonnegative_decimal "0.25"&&! is_nonnegative_decimal '0; print unsafe'||{
 print -ru2 -- "SELF-TEST FAILED: decimal validation changed"
 return 1
@@ -735,6 +792,7 @@ internetdb=()
 maxmind[org]="$json_special"
 maxmind[countrycode]="US"
 maxmind[regcountrycode]="US"
+maxmind[status]="ok"
 ipinfo[susetype]="${stype[hosting]}"
 ipregistry[status]="ok"
 ipregistry[susetype]="${stype[hosting]}"
@@ -742,6 +800,10 @@ ipregistry[scomtype]="${stype[hosting]}"
 ipregistry[proxy]="false"
 ip2location[susetype]="${stype[unknown]}"
 ip2location[score]="3"
+ip2location[status]="ok"
+scamalytics[status]="invalid_response"
+abuseipdb[status]="http_403"
+ipdata[status]="network_error"
 ipqs[score]="100"
 ipqs[status]="ok"
 ipqs[source]="official_api"
@@ -786,6 +848,9 @@ print -r -- "$ipjson"|jq -e --arg expected "$json_special" '
   .ScoreMeta.IPQS.Band == null and
   .ScoreMeta.IPQS.Status == "ok" and
   .ScoreMeta.IPQS.Source == "official_api" and
+  .ProviderStatus.CheckPlaceMaxMind == "ok" and
+  .ProviderStatus.AbuseIPDB == "http_403" and
+  .ProviderStatus.ipdata == "network_error" and
   .Factor.Proxy.IPQS == true and
   .Factor.Proxy.Ipregistry == false and
   .Factor.VPN.IPinfo == null and
@@ -1087,8 +1152,9 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Check.Place / MaxMi
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-8-${sinfo[ldatabase]}))
 maxmind=()
-local RESPONSE=$(curl_safe $CurlARG -Ls -$1 -m 10 "https://ipinfo.check.place/$IP?lang=$YY")
-provider_json_is_object "$RESPONSE"||RESPONSE=""
+provider_fetch_public_json "$1" "https://ipinfo.check.place/$IP?lang=$YY" 262144||true
+maxmind[status]="$PROVIDER_RESPONSE_STATUS"
+local RESPONSE="$PROVIDER_RESPONSE_BODY"
 if [[ -z $RESPONSE ]];then
 mode_lite=1
 else
@@ -1112,9 +1178,9 @@ maxmind[countrycode]=$(echo "$RESPONSE"|jq -r '.Country.IsoCode')
 maxmind[country]=$(echo "$RESPONSE"|jq -r '.Country.Name')
 maxmind[regcountrycode]=$(echo "$RESPONSE"|jq -r '.Country.RegisteredCountry.IsoCode')
 maxmind[regcountry]=$(echo "$RESPONSE"|jq -r '.Country.RegisteredCountry.Name')
-if [[ $YY != "en" ]];then
-local backup_response=$(curl_safe $CurlARG -s -$1 -m 10 "https://ipinfo.check.place/$IP?lang=en")
-provider_json_is_object "$backup_response"||backup_response=""
+if [[ $YY != "en" && "${maxmind[status]}" == "ok" ]];then
+provider_fetch_public_json "$1" "https://ipinfo.check.place/$IP?lang=en" 262144||true
+local backup_response="$PROVIDER_RESPONSE_BODY"
 [[ ${maxmind[asn]} == "null" ]]&&maxmind[asn]=$(echo "$backup_response"|jq -r '.ASN.AutonomousSystemNumber')
 [[ ${maxmind[org]} == "null" ]]&&maxmind[org]=$(echo "$backup_response"|jq -r '.ASN.AutonomousSystemOrganization')
 [[ ${maxmind[city]} == "null" ]]&&maxmind[city]=$(echo "$backup_response"|jq -r '.City.Name')
@@ -1240,8 +1306,9 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Scamalytics $Font_S
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-12-${sinfo[ldatabase]}))
 scamalytics=()
-local RESPONSE=$(curl_safe $CurlARG -sL -$1 -m 10 "https://ipinfo.check.place/$IP?db=scamalytics")
-provider_json_is_object "$RESPONSE"||RESPONSE=""
+provider_fetch_public_json "$1" "https://ipinfo.check.place/$IP?db=scamalytics" 262144||true
+scamalytics[status]="$PROVIDER_RESPONSE_STATUS"
+local RESPONSE="$PROVIDER_RESPONSE_BODY"
 scamalytics[countrycode]=$(echo "$RESPONSE"|jq -r '.external_datasources.maxmind_geolite2.ip_country_code')
 scamalytics[proxy]=$(echo "$RESPONSE"|jq -r '.external_datasources.firehol.is_proxy')
 scamalytics[tor]=$(echo "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_tor')
@@ -1340,8 +1407,9 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}AbuseIPDB $Font_Suf
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-10-${sinfo[ldatabase]}))
 abuseipdb=()
-local RESPONSE=$(curl_safe $CurlARG -sL -$1 -m 10 "https://ipinfo.check.place/$IP?db=abuseipdb")
-provider_json_is_object "$RESPONSE"||RESPONSE=""
+provider_fetch_public_json "$1" "https://ipinfo.check.place/$IP?db=abuseipdb" 262144||true
+abuseipdb[status]="$PROVIDER_RESPONSE_STATUS"
+local RESPONSE="$PROVIDER_RESPONSE_BODY"
 abuseipdb[usetype]=$(echo "$RESPONSE"|jq -r '.data.usageType')
 case ${abuseipdb[usetype]} in
 "Commercial")abuseipdb[susetype]="${stype[business]}"
@@ -1385,8 +1453,9 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}IP2LOCATION $Font_S
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-12-${sinfo[ldatabase]}))
 ip2location=()
-local RESPONSE=$(curl_safe $CurlARG -sL -$1 -m 10 "https://ipinfo.check.place/$IP?db=ip2location")
-provider_json_is_object "$RESPONSE"||RESPONSE=""
+provider_fetch_public_json "$1" "https://ipinfo.check.place/$IP?db=ip2location" 262144||true
+ip2location[status]="$PROVIDER_RESPONSE_STATUS"
+local RESPONSE="$PROVIDER_RESPONSE_BODY"
 ip2location[usetype]=$(echo "$RESPONSE"|jq -r '.usage_type')
 ip2location[comtype]=$(echo "$RESPONSE"|jq -r '.as_info.as_usage_type')
 local first_use="${ip2location[usetype]%%/*}"
@@ -1473,8 +1542,9 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}ipdata $Font_Suffix
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-7-${sinfo[ldatabase]}))
 ipdata=()
-local RESPONSE=$(curl_safe $CurlARG -sL -$1 -m 10 "https://ipinfo.check.place/$IP?db=ipdata")
-provider_json_is_object "$RESPONSE"||RESPONSE=""
+provider_fetch_public_json "$1" "https://ipinfo.check.place/$IP?db=ipdata" 262144||true
+ipdata[status]="$PROVIDER_RESPONSE_STATUS"
+local RESPONSE="$PROVIDER_RESPONSE_BODY"
 ipdata[countrycode]=$(echo "$RESPONSE"|jq -r '.country_code')
 ipdata[proxy]=$(echo "$RESPONSE"|jq -r '.threat.is_proxy')
 ipdata[tor]=$(echo "$RESPONSE"|jq -r '.threat.is_tor')
@@ -1518,8 +1588,9 @@ esac
 fi
 else
 ipqs[source]="check_place_relay"
-RESPONSE=$(curl_safe $CurlARG -sL -$1 -m 10 --max-filesize 65536 "https://ipinfo.check.place/$IP?db=ipqualityscore")
-provider_json_is_object "$RESPONSE"||RESPONSE=""
+provider_fetch_public_json "$1" "https://ipinfo.check.place/$IP?db=ipqualityscore" 65536||true
+ipqs[status]="$PROVIDER_RESPONSE_STATUS"
+RESPONSE="$PROVIDER_RESPONSE_BODY"
 if ipqualityscore_parse_unavailability "$RESPONSE";then
 ipqs[status]="${ipqualityscore_unavailable[status]}"
 fi
@@ -2537,6 +2608,11 @@ ipjson=$(jq -n \
 --arg status_ipqs "${ipqs[status]:-unknown}" \
 --arg source_ipqs "${ipqs[source]:-unknown}" \
 --arg status_ipregistry "${ipregistry[status]:-not_configured}" \
+--arg status_maxmind "${maxmind[status]:-unknown}" \
+--arg status_scamalytics "${scamalytics[status]:-unknown}" \
+--arg status_abuseipdb "${abuseipdb[status]:-unknown}" \
+--arg status_ip2location "${ip2location[status]:-unknown}" \
+--arg status_ipdata "${ipdata[status]:-unknown}" \
 --arg f_ip2_cc "${ip2location[countrycode]:-}" --arg f_ipapi_cc "${ipapi[countrycode]:-}" \
 --arg f_ipregistry_cc "${ipregistry[countrycode]:-}" \
 --arg f_ipqs_cc "${ipqs[countrycode]:-}" --arg f_scam_cc "${scamalytics[countrycode]:-}" \
@@ -2644,6 +2720,15 @@ def dnsresults($value):
     ipapi: {Band: opt($band_ipapi), Scale: "0-100% abuse"},
     AbuseIPDB: {Band: opt($band_abuse), Scale: "0-100 confidence"},
     IPQS: {Band: opt($band_ipqs), Scale: "0-100 fraud", Status: $status_ipqs, Source: $source_ipqs}
+  },
+  ProviderStatus: {
+    CheckPlaceMaxMind: $status_maxmind,
+    Ipregistry: $status_ipregistry,
+    Scamalytics: $status_scamalytics,
+    AbuseIPDB: $status_abuseipdb,
+    IP2Location: $status_ip2location,
+    ipdata: $status_ipdata,
+    IPQS: $status_ipqs
   },
   Factor: {
     CountryCode: {IP2LOCATION: factor($f_ip2_cc), ipapi: factor($f_ipapi_cc), Ipregistry: factor($f_ipregistry_cc), IPQS: factor($f_ipqs_cc), SCAMALYTICS: factor($f_scam_cc), ipdata: factor($f_ipdata_cc), IPinfo: factor($f_ipinfo_cc)},
@@ -2793,7 +2878,7 @@ if [[ $ERRORcode -ne 0 ]];then
 echo -ne "\r$Font_B$Font_Red${swarn[$ERRORcode]}$Font_Suffix\n"
 exit $ERRORcode
 fi
-provider_load_credentials||exit $?
+provider_load_credentials "" "$SCRIPT_DIR/secrets"||exit $?
 require_dependencies||exit $?
 check_reference_files||exit $?
 set_report_time

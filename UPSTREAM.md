@@ -78,6 +78,13 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 - repaired the advertised explicit-target IP path, restricted it to honest
   reputation/DNSBL scopes, and skipped current-egress-only Ping0 observations
   for those targets;
+- added the explicit target as the second normal route-menu choice, forwarding
+  one validated address to provider target parameters over the proxy-cleared
+  system route without starting Mihomo;
+- loaded ignored project-local raw Ipregistry/IPQS secrets under the same strict
+  ownership/mode policy as the global assignment file, and retained independent
+  HTTP status for every Check.Place-backed source so one provider failure cannot
+  suppress another provider's result;
 - retained every DNSBL zone result in JSON and named marked/blacklisted zones in
   terminal output instead of collapsing all provider answers into counts;
 - removed locally synthesized risk bands from relay scores; only a provider's

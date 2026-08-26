@@ -151,6 +151,8 @@ cn:upstream_insufficient_credits|cn:official_insufficient_credits)state_label="�
 ;;
 cn:rate_limited)state_label="限流"
 ;;
+cn:http_403)state_label="HTTP 403"
+;;
 cn:not_configured)state_label="未配置"
 ;;
 cn:*)state_label="查询失败"
@@ -160,6 +162,8 @@ en:ok)state_label="available" state_color="${Font_Green:-}"
 en:upstream_insufficient_credits|en:official_insufficient_credits)state_label="no credit"
 ;;
 en:rate_limited)state_label="rate limit"
+;;
+en:http_403)state_label="HTTP 403"
 ;;
 en:not_configured)state_label="not set"
 ;;
@@ -483,18 +487,28 @@ done
 }
 
 show_unavailable_sources(){
-typeset -a missing
-report_any_known "${maxmind[asn]}" "${maxmind[countrycode]}" "${maxmind[city]}"||missing+=("Check.Place/MaxMind")
+typeset -a missing relay_http_403
+if ! report_any_known "${maxmind[asn]}" "${maxmind[countrycode]}" "${maxmind[city]}";then
+[[ "${maxmind[status]}" == "http_403" ]]&&relay_http_403+=("MaxMind")||missing+=("Check.Place/MaxMind")
+fi
 report_any_known "${ipinfo[susetype]}" "${ipinfo[scomtype]}" "${ipinfo[countrycode]}" "${ipinfo[proxy]}" "${ipinfo[vpn]}" "${ipinfo[tor]}" "${ipinfo[server]}"||missing+=("IPinfo")
 if [[ "${ipregistry[status]}" != "not_configured" ]] &&
    ! report_any_known "${ipregistry[susetype]}" "${ipregistry[scomtype]}" "${ipregistry[countrycode]}" "${ipregistry[proxy]}" "${ipregistry[vpn]}" "${ipregistry[tor]}" "${ipregistry[server]}" "${ipregistry[abuser]}";then
 missing+=("Ipregistry")
 fi
 report_any_known "${ipapi[susetype]}" "${ipapi[scomtype]}" "${ipapi[score]}" "${ipapi[countrycode]}" "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ipapi[server]}" "${ipapi[abuser]}" "${ipapi[robot]}"||missing+=("ipapi.is")
-report_any_known "${ip2location[susetype]}" "${ip2location[scomtype]}" "${ip2location[score]}" "${ip2location[countrycode]}" "${ip2location[proxy]}" "${ip2location[vpn]}" "${ip2location[tor]}" "${ip2location[server]}" "${ip2location[abuser]}" "${ip2location[robot]}"||missing+=("IP2Location")
-report_any_known "${abuseipdb[susetype]}" "${abuseipdb[score]}"||missing+=("AbuseIPDB")
-report_any_known "${scamalytics[score]}" "${scamalytics[countrycode]}" "${scamalytics[proxy]}" "${scamalytics[vpn]}" "${scamalytics[tor]}" "${scamalytics[server]}" "${scamalytics[abuser]}" "${scamalytics[robot]}"||missing+=("Scamalytics")
-report_any_known "${ipdata[countrycode]}" "${ipdata[proxy]}" "${ipdata[tor]}" "${ipdata[server]}" "${ipdata[abuser]}"||missing+=("ipdata")
+if ! report_any_known "${ip2location[susetype]}" "${ip2location[scomtype]}" "${ip2location[score]}" "${ip2location[countrycode]}" "${ip2location[proxy]}" "${ip2location[vpn]}" "${ip2location[tor]}" "${ip2location[server]}" "${ip2location[abuser]}" "${ip2location[robot]}";then
+[[ "${ip2location[status]}" == "http_403" ]]&&relay_http_403+=("IP2Location")||missing+=("IP2Location")
+fi
+if ! report_any_known "${abuseipdb[susetype]}" "${abuseipdb[score]}";then
+[[ "${abuseipdb[status]}" == "http_403" ]]&&relay_http_403+=("AbuseIPDB")||missing+=("AbuseIPDB")
+fi
+if ! report_any_known "${scamalytics[score]}" "${scamalytics[countrycode]}" "${scamalytics[proxy]}" "${scamalytics[vpn]}" "${scamalytics[tor]}" "${scamalytics[server]}" "${scamalytics[abuser]}" "${scamalytics[robot]}";then
+[[ "${scamalytics[status]}" == "http_403" ]]&&relay_http_403+=("Scamalytics")||missing+=("Scamalytics")
+fi
+if ! report_any_known "${ipdata[countrycode]}" "${ipdata[proxy]}" "${ipdata[tor]}" "${ipdata[server]}" "${ipdata[abuser]}";then
+[[ "${ipdata[status]}" == "http_403" ]]&&relay_http_403+=("ipdata")||missing+=("ipdata")
+fi
 case "$YY:${ping0[status]}" in
 cn:not_applicable_target)missing+=("Ping0（/geo 仅核对当前出口，指定目标时跳过）")
 ;;
@@ -507,6 +521,13 @@ report_any_known "${ripestat[status]}" "${ripestat[prefix]}" "${ripestat[origins
 if [[ "${internetdb[status]}" != "not_found" ]] &&
    ! report_any_known "${internetdb[ports]}" "${internetdb[port_count]}" "${internetdb[hostname_count]}" "${internetdb[vulnerability_count]}" "${internetdb[tags]}";then
 missing+=("Shodan InternetDB")
+fi
+if (( ${#relay_http_403[@]} ));then
+if [[ "$YY" == "cn" ]];then
+missing+=("Check.Place 中继 HTTP 403（${(j:、:)relay_http_403[@]}）")
+else
+missing+=("Check.Place relay HTTP 403 (${(j:, :)relay_http_403[@]})")
+fi
 fi
 (( ${#missing[@]} ))||return 0
 if [[ "$YY" == "cn" ]];then

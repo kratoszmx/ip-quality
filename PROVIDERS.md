@@ -50,6 +50,13 @@ relay's shared IPQualityScore account has spent its credits, the IPQS
 source/status cell names that state explicitly. This is not a judgment about
 the tested IP and not the user's quota; a user-owned official IPQS key bypasses
 that relay.
+Each Check.Place-backed request keeps its own HTTP outcome. A simultaneous 403
+from several endpoints is grouped compactly as a relay condition with the
+affected provider names; it is not treated as IPQS suppressing unrelated data.
+Any sibling source that returned usable JSON still keeps its normal table rows.
+JSON retains these outcomes under `ProviderStatus`, so machine consumers can
+distinguish HTTP 403, invalid responses, network failures, quota states, and
+successful observations without inferring from empty values.
 Shodan's documented no-information response is reported as no public record.
 Neither state is a clean reputation result, and arbitrary upstream error text
 is never echoed.
@@ -97,7 +104,9 @@ report explains why: that endpoint reports the caller's current egress and
 cannot truthfully validate an arbitrary target. Other reputation providers use
 their target-IP parameters. Explicit targets are restricted to the `reputation`
 and `dnsbl` scopes so media, mail, and other host-route probes are not mislabeled
-as observations of the target.
+as observations of the target. The normal route menu exposes this as its second
+`Specific IP lookup` entry, prompts for one address, and runs the reporter over
+the current system route without starting Mihomo or changing Clash state.
 
 RIPEstat's documented Network Info endpoint returns the covering prefix and
 origin ASN set using RIPE routing data. The live API may encode ASN members as
@@ -151,20 +160,31 @@ and [Extended API pricing](https://db-ip.com/api/extended).
 
 ### Optional official API credentials
 
-The reporter looks for the private data file
-`~/.config/ipquality/credentials`. It accepts these exact entries:
+The reporter accepts two private data layouts. The global fallback is
+`~/.config/ipquality/credentials`, with these exact entries:
 
 ```text
 IPREGISTRY_API_KEY=...
 IPQS_API_KEY=...
 ```
 
-In day-to-day use, a mode-`600` file works well: it is read as data rather than
-executed as shell code, and API keys are sent to curl through its standard-input
-configuration instead of appearing in process arguments, reports, or Git. A key
-can be omitted independently; its provider simply stays out of the terminal
-matrix. Saved sanitized fixtures exercise both parsers without spending API
-credits during development.
+For this checkout, ignored project-local files are also accepted:
+
+```text
+secrets/ipregistry   # raw Ipregistry key only
+secrets/ipqs         # raw IPQS key only
+```
+
+Project-local values take precedence over the corresponding global entry. This
+lets each checkout select its intended account without executing a shell file or
+copying credentials into source-controlled configuration.
+
+In day-to-day use, mode `600` on every credential file works well: files are read
+as data rather than executed as shell code, and API keys are sent to curl through
+its standard-input configuration instead of appearing in process arguments,
+reports, or Git. A key can be omitted independently; its provider simply stays
+out of the terminal matrix. Saved sanitized fixtures exercise both parsers
+without spending API credits during development.
 
 Ipregistry supports an `Authorization: ApiKey` header and exposes its API keys in
 the account dashboard. Its current free sign-up credits are enough for extensive
@@ -173,7 +193,13 @@ keys in its API Keys dashboard. See
 [Ipregistry authentication](https://ipregistry.co/docs/authentication),
 [Ipregistry pricing and sign-up](https://ipregistry.co/pricing), the
 [IPQS API Keys dashboard](https://www.ipqualityscore.com/user/api-keys), and the
-[IPQS API overview](https://www.ipqualityscore.com/documentation/proxy-detection-api/overview).
+[IPQS API overview](https://www.ipqualityscore.com/documentation/proxy-detection-api/overview),
+plus its [account credit usage API](https://www.ipqualityscore.com/documentation/account-management/usage).
+IPQS also exposes an account-usage endpoint. In practice, a successfully
+authenticated `insufficient credits` response is an account quota state rather
+than a malformed key; rotating another key under the same depleted account does
+not create additional lookups. Check the account usage/renewal state before
+regenerating credentials.
 
 Exact-leaf experience also favors keeping connectivity and blacklist work out of
 this matrix. HTTP reputation requests can follow the selected leaf, while local
