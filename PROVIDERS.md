@@ -50,13 +50,14 @@ relay's shared IPQualityScore account has spent its credits, the IPQS
 source/status cell names that state explicitly. This is not a judgment about
 the tested IP and not the user's quota; a user-owned official IPQS key bypasses
 that relay.
-Each Check.Place-backed request keeps its own HTTP outcome. A simultaneous 403
-from several endpoints is grouped compactly as a relay condition with the
+Each Check.Place-backed request keeps its own HTTP outcome. A Cloudflare block
+page is distinguished from an ordinary 403 and grouped compactly with the
 affected provider names; it is not treated as IPQS suppressing unrelated data.
 Any sibling source that returned usable JSON still keeps its normal table rows.
 JSON retains these outcomes under `ProviderStatus`, so machine consumers can
-distinguish HTTP 403, invalid responses, network failures, quota states, and
-successful observations without inferring from empty values.
+distinguish a Cloudflare block, an ordinary HTTP 403, invalid responses, network
+failures, quota states, and successful observations without inferring from empty
+values.
 Shodan's documented no-information response is reported as no public record.
 Neither state is a clean reputation result, and arbitrary upstream error text
 is never echoed.
@@ -194,12 +195,37 @@ keys in its API Keys dashboard. See
 [Ipregistry pricing and sign-up](https://ipregistry.co/pricing), the
 [IPQS API Keys dashboard](https://www.ipqualityscore.com/user/api-keys), and the
 [IPQS API overview](https://www.ipqualityscore.com/documentation/proxy-detection-api/overview),
-plus its [account credit usage API](https://www.ipqualityscore.com/documentation/account-management/usage).
-IPQS also exposes an account-usage endpoint. In practice, a successfully
-authenticated `insufficient credits` response is an account quota state rather
-than a malformed key; rotating another key under the same depleted account does
-not create additional lookups. Check the account usage/renewal state before
-regenerating credentials.
+plus its [account credit usage API](https://www.ipqualityscore.com/documentation/account-management/usage)
+and [current plans](https://www.ipqualityscore.com/plans).
+Before spending an IP reputation lookup, the reporter checks that official
+account-usage endpoint. A zero-credit or authenticated `insufficient credits`
+answer skips the paid lookup and remains visible as the official IPQS quota
+state; a positive balance proceeds to the normal IP lookup. In practice,
+rotating another key under the same depleted account does not create additional
+lookups. The dashboard usage and plan-renewal state are the useful places to
+check first.
+
+The current free plan advertises 1,000 lookups per month and 35 per day. In a
+multi-IP comparison session, the daily allowance is therefore the first balance
+to inspect. IPQS states that valid reputation lookups consume credit while
+account statistics do not, which is why the usage preflight is useful and safe
+to repeat. The API error itself does not say whether the daily or monthly cap was
+hit, so the signed-in dashboard remains the authoritative place to distinguish
+them.
+
+On 2026-08-27, the exact Check.Place URL and request shape that produced complete
+relay rows two days earlier returned a Cloudflare block page from both the
+machine's direct egress and its existing Clash proxy egress. The upstream
+project still used the same URL that day. That comparison is useful operational
+evidence: the result changed at the relay/WAF boundary rather than because the
+IPQS adapter removed sibling providers. The relay parsers remain active, so a
+later JSON response automatically restores those rows without a code change. A
+subsequent isolated cached US leaf accepted those same requests in the current
+standalone.11 build and restored MaxMind, IP2Location, AbuseIPDB, Scamalytics,
+and ipdata together. This confirms that the observed block is egress-dependent,
+not a global relay outage or parser regression.
+For durable coverage, prefer the vendors' official APIs with owner-controlled
+credentials over trying to evade the relay's Cloudflare policy.
 
 Exact-leaf experience also favors keeping connectivity and blacklist work out of
 this matrix. HTTP reputation requests can follow the selected leaf, while local

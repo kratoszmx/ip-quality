@@ -85,6 +85,9 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   ownership/mode policy as the global assignment file, and retained independent
   HTTP status for every Check.Place-backed source so one provider failure cannot
   suppress another provider's result;
+- distinguished Check.Place's explicit Cloudflare block page from an ordinary
+  HTTP 403, and added an official IPQS account-usage preflight so a known empty
+  balance does not spend another failed reputation lookup;
 - retained every DNSBL zone result in JSON and named marked/blacklisted zones in
   terminal output instead of collapsing all provider answers into counts;
 - removed locally synthesized risk bands from relay scores; only a provider's

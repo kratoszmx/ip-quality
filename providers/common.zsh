@@ -41,6 +41,22 @@ done
 return 1
 }
 
+provider_http_failure_status(){
+emulate -LR zsh
+typeset http_code="$1"
+typeset response_body="$2"
+
+if [[ "$http_code" == "403" &&
+      "$response_body" == *"Sorry, you have been blocked"* &&
+      "$response_body" == *"Cloudflare"* ]];then
+print -rn -- "cloudflare_blocked"
+elif [[ "$http_code" == [0-9][0-9][0-9] && "$http_code" != "000" ]];then
+print -rn -- "http_$http_code"
+else
+print -rn -- "network_error"
+fi
+}
+
 provider_connection_type_server_flag(){
 emulate -LR zsh
 case "${1:l}" in

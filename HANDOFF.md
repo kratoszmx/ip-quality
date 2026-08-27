@@ -65,6 +65,9 @@ without retaining parent-repository files or nested Git metadata.
   back to the named Check.Place relay and always keeps a compact source/status
   score column; an unavailable optional Ipregistry source does not create an
   empty table column.
+- The official IPQS path checks the account-usage endpoint before the reputation
+  lookup. A zero balance or authenticated insufficient-credit response stops
+  there, preserving the quota state without spending another failed lookup.
 - A positional public target address is now a working reporter input rather
   than stale help text. It is limited to reputation or DNSBL lookups. Ping0 is
   skipped with an explanation because its public `/geo` endpoint can only
@@ -113,10 +116,11 @@ without retaining parent-repository files or nested Git metadata.
   official API. Shodan InternetDB's no-public-record response is shown as
   context rather than cleanliness; arbitrary upstream error messages are never
   echoed.
-- Check.Place-backed providers retain independent HTTP outcomes. When several
-  relay endpoints return 403, the compact summary groups only those names under
-  `Check.Place relay HTTP 403`; an IPQS failure cannot suppress a successful
-  IP2Location, AbuseIPDB, Scamalytics, ipdata, or MaxMind-shaped result.
+- Check.Place-backed providers retain independent HTTP outcomes. A Cloudflare
+  block page is classified separately from an ordinary 403, and the compact
+  summary groups only the affected relay names; an IPQS failure cannot suppress
+  a successful IP2Location, AbuseIPDB, Scamalytics, ipdata, or MaxMind-shaped
+  result.
 - Risk-score labels appear only when the provider explicitly returns one. Numeric
   relay scores are never converted into locally invented low/medium/high bands.
 - IPinfo is identified as a public demo widget, ipapi.is as a direct public API,
@@ -163,13 +167,15 @@ for file in leaf_runner/*.rb; do /usr/bin/ruby -c "$file"; done
 print -r -- 1 | /bin/zsh -f bin/test-clash-leaf
 ```
 
-The full offline suite currently has 52 runs and 745 assertions. It covers raw
+The full offline suite currently has 54 runs and 766 assertions. It covers raw
 JSON stdout with embedded tab/newline/ANSI data, real green safe-factor and red
 risk-factor bytes, single-matrix CJK/ANSI table separator positions, strict
 official provider fixtures, global/project-local private data-only credential
-loading, direct/specific-IP proxy-environment removal, explicit-target
-scope/family validation, provider-failure independence, per-zone DNSBL JSON
-retention, exact-leaf isolation, and cleanup on success, failure, and signal.
+loading, IPQS quota preflight short-circuiting, direct/specific-IP
+proxy-environment removal, explicit-target scope/family validation,
+provider-failure independence, Cloudflare block-page classification, per-zone
+DNSBL JSON retention, exact-leaf isolation, and cleanup on success, failure, and
+signal.
 
 A live direct IPv4 menu run on 2026-08-25 displayed the exact IP under the
 explicit `-f` choice, produced aligned type/score/factor tables with real green
@@ -208,6 +214,18 @@ Check.Place endpoints independently returned Cloudflare HTTP 403, and the
 terminal grouped MaxMind-shaped, IP2Location, AbuseIPDB, Scamalytics, and ipdata
 under that shared relay condition while retaining the successful direct rows.
 No key or arbitrary provider error text appeared in process arguments or output.
+
+A same-day follow-up compared the Check.Place request used by standalone.8 with
+the current request and with the upstream project's current source. The endpoint
+and request shape were unchanged. The old request now received Cloudflare's
+explicit block page from both the direct egress and the existing Clash proxy
+egress, while the script-download hosts remained reachable. The reporter now
+names that WAF state instead of presenting a generic empty provider, and the
+official IPQS path preflights account usage before attempting a credit-consuming
+IP lookup. A later isolated cached US leaf accepted the same requests with the
+same standalone.11 build and restored MaxMind, IP2Location, AbuseIPDB,
+Scamalytics, and ipdata in one report, confirming that the relay result varies by
+egress rather than by parser version.
 
 ## Completed parent extraction
 

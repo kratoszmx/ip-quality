@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-08-27-standalone.10"
+script_version="v2026-08-27-standalone.11"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset REPORT_DIR="$SCRIPT_DIR/report"
@@ -457,11 +457,7 @@ fi
 http_code="${wire_response##*$'\n'}"
 response_body="${wire_response%$'\n'*}"
 if [[ "$http_code" != [0-9][0-9][0-9] ]] || (( 10#$http_code < 200 || 10#$http_code > 299 ));then
-if [[ "$http_code" == [0-9][0-9][0-9] && "$http_code" != "000" ]];then
-PROVIDER_RESPONSE_STATUS="http_$http_code"
-else
-PROVIDER_RESPONSE_STATUS="network_error"
-fi
+PROVIDER_RESPONSE_STATUS=$(provider_http_failure_status "$http_code" "$response_body")
 return 1
 fi
 if ! provider_json_is_object "$response_body";then
@@ -670,6 +666,11 @@ ipqualityscore_parse_unavailability '{"success":false,"message":"Insufficient cr
 print -ru2 -- "SELF-TEST FAILED: IPQualityScore quota status changed"
 return 1
 }
+ipqualityscore_parse_usage_response '{"success":true,"message":"Success","credits":12,"usage":7,"proxy_usage":3}'&&
+  [[ "${ipqualityscore_usage[credits]}" == "12" && "${ipqualityscore_usage[proxy_usage]}" == "3" ]]||{
+print -ru2 -- "SELF-TEST FAILED: IPQualityScore account usage parser changed"
+return 1
+}
 provider_api_key_is_valid "fixture_key-123456"&&! provider_api_key_is_valid $'bad\nkey'||{
 print -ru2 -- "SELF-TEST FAILED: provider credential validation changed"
 return 1
@@ -700,12 +701,21 @@ print -ru2 -- "SELF-TEST FAILED: provider HTTP success classification changed"
 return 1
 }
 (
+curl_safe(){ print -rn -- $'<html>Sorry, you have been blocked by Cloudflare</html>\n403'; }
+CurlARG=""
+! provider_fetch_public_json 4 "https://fixture.invalid" 1024&&
+  [[ "$PROVIDER_RESPONSE_STATUS" == "cloudflare_blocked" && -z "$PROVIDER_RESPONSE_BODY" ]]
+)||{
+print -ru2 -- "SELF-TEST FAILED: provider Cloudflare classification changed"
+return 1
+}
+(
 curl_safe(){ print -rn -- $'<html>forbidden</html>\n403'; }
 CurlARG=""
 ! provider_fetch_public_json 4 "https://fixture.invalid" 1024&&
   [[ "$PROVIDER_RESPONSE_STATUS" == "http_403" && -z "$PROVIDER_RESPONSE_BODY" ]]
 )||{
-print -ru2 -- "SELF-TEST FAILED: provider HTTP failure classification changed"
+print -ru2 -- "SELF-TEST FAILED: generic provider HTTP failure classification changed"
 return 1
 }
 is_nonnegative_decimal "0.25"&&! is_nonnegative_decimal '0; print unsafe'||{
@@ -1564,6 +1574,23 @@ typeset api_key="${provider_credentials[IPQS_API_KEY]:-}"
 typeset RESPONSE=""
 if [[ -n "$api_key" ]];then
 ipqs[source]="official_api"
+typeset usage_response=$(curl_with_secret_url \
+  "https://www.ipqualityscore.com/api/json/account/$api_key" \
+  $CurlARG -sS -$1 -m 10 --max-filesize 65536 2>/dev/null)
+if ipqualityscore_parse_usage_response "$usage_response";then
+ipqs[credits]="${ipqualityscore_usage[credits]}"
+ipqs[usage]="${ipqualityscore_usage[usage]}"
+if [[ "${ipqualityscore_usage[credits]}" == "0" ]];then
+ipqs[status]="official_insufficient_credits"
+ipqs[risk]=""
+return 0
+fi
+elif ipqualityscore_parse_unavailability "$usage_response" &&
+     [[ "${ipqualityscore_unavailable[status]}" == "upstream_insufficient_credits" ]];then
+ipqs[status]="official_insufficient_credits"
+ipqs[risk]=""
+return 0
+fi
 RESPONSE=$(curl_with_secret_url \
   "https://www.ipqualityscore.com/api/json/ip/$api_key/$IP?strictness=0&allow_public_access_points=true" \
   $CurlARG -sS -$1 -m 10 --max-filesize 131072 2>/dev/null)

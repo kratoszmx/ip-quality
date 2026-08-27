@@ -1,0 +1,8 @@
+{
+  "success": true,
+  "message": "Success",
+  "credits": 12,
+  "usage": 7,
+  "proxy_usage": 3,
+  "request_id": "fixture-request"
+}

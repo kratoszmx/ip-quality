@@ -25,8 +25,10 @@ class IpQualityTest < Minitest::Test
   INTERNETDB_FIXTURE = File.join(ROOT, "test", "fixtures", "shodan", "internetdb.json")
   INTERNETDB_NO_INFORMATION_FIXTURE = File.join(ROOT, "test", "fixtures", "shodan", "no-information.json")
   IPQUALITYSCORE_CREDITS_FIXTURE = File.join(ROOT, "test", "fixtures", "ipqualityscore", "insufficient-credits.json")
+  IPQUALITYSCORE_USAGE_FIXTURE = File.join(ROOT, "test", "fixtures", "ipqualityscore", "usage.json")
   IPREGISTRY_FIXTURE = File.join(ROOT, "test", "fixtures", "ipregistry", "ip-intelligence.json")
   IPQUALITYSCORE_OFFICIAL_FIXTURE = File.join(ROOT, "test", "fixtures", "ipqualityscore", "official.json")
+  CHECK_PLACE_CLOUDFLARE_FIXTURE = File.join(ROOT, "test", "fixtures", "check_place", "cloudflare-blocked.html")
 
   BANNED_SOURCE_PATTERNS = {
     bash_runtime: /(^|[^A-Za-z0-9_])bash([^A-Za-z0-9_]|$)/i,
@@ -289,6 +291,8 @@ class IpQualityTest < Minitest::Test
       source "$4"
       ipqualityscore_parse_response "$(<"$5")" || exit 13
       print -r -- "${ipqualityscore_parsed[score]}|${ipqualityscore_parsed[connection_type]}|${ipqualityscore_parsed[proxy]}|${ipqualityscore_parsed[tor]}|${ipqualityscore_parsed[server]}"
+      ipqualityscore_parse_usage_response "$(<"$6")" || exit 14
+      print -r -- "${ipqualityscore_usage[credits]}|${ipqualityscore_usage[usage]}|${ipqualityscore_usage[proxy_usage]}"
     ZSH
     stdout, stderr, status = Open3.capture3(
       "/bin/zsh",
@@ -300,11 +304,12 @@ class IpQualityTest < Minitest::Test
       IPREGISTRY_LIBRARY,
       IPREGISTRY_FIXTURE,
       IPQUALITYSCORE_LIBRARY,
-      IPQUALITYSCORE_OFFICIAL_FIXTURE
+      IPQUALITYSCORE_OFFICIAL_FIXTURE,
+      IPQUALITYSCORE_USAGE_FIXTURE
     )
 
     assert status.success?, stderr
-    assert_equal "hosting|true|false|false\n87|Data Center|true|false|true\n", stdout
+    assert_equal "hosting|true|false|false\n87|Data Center|true|false|true\n12|7|3\n", stdout
     assert_empty stderr
 
     _stdout, _stderr, mismatch_status = Open3.capture3(
@@ -318,6 +323,50 @@ class IpQualityTest < Minitest::Test
       IPREGISTRY_FIXTURE
     )
     refute mismatch_status.success?
+  end
+
+  def test_ipqs_account_quota_preflight_skips_a_lookup_that_would_spend_credit
+    function_match = File.read(SCRIPT, encoding: "UTF-8").match(
+      /^db_ipqs\(\)\{\n.*?^\}\n(?=db_ping0\(\)\{)/m
+    )
+    refute_nil function_match
+
+    quota_probe = <<~'ZSH'
+      setopt KSH_ARRAYS SH_WORD_SPLIT
+      source "$1"
+      source "$2"
+      eval "$3"
+      typeset -A provider_credentials ipqs sinfo stype
+      provider_credentials[IPQS_API_KEY]='fixture-key'
+      IP='198.51.100.23' CurlARG='' ibar_step=0
+      sinfo[ldatabase]=0
+      quota_fixture="$4" success_fixture="$5"
+      Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
+      show_progress_bar(){ :; }
+      styled_provider_type(){ print -rn -- "$1"; }
+      curl_with_secret_url(){
+        case "$1" in
+          */api/json/account/*) print -rn -- "$(<"$quota_fixture")" ;;
+          */api/json/ip/*) print -rn -- "$(<"$success_fixture")" ;;
+          *) return 9 ;;
+        esac
+      }
+      db_ipqs 4 || exit $?
+      print -r -- "${ipqs[status]}|${ipqs[score]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", quota_probe,
+      "ipqs-quota-preflight-test",
+      COMMON_PROVIDER_LIBRARY,
+      IPQUALITYSCORE_LIBRARY,
+      function_match[0],
+      IPQUALITYSCORE_CREDITS_FIXTURE,
+      IPQUALITYSCORE_OFFICIAL_FIXTURE
+    )
+
+    assert status.success?, stderr
+    assert_equal "official_insufficient_credits|\n", stdout
+    assert_empty stderr
   end
 
   def test_optional_credentials_are_data_only_private_and_never_curl_arguments
@@ -433,6 +482,24 @@ class IpQualityTest < Minitest::Test
     assert status.success?, stderr
     assert_equal "upstream_insufficient_credits\nnot_found\n", stdout
     refute_includes stdout, "You have insufficient credits"
+    assert_empty stderr
+  end
+
+  def test_check_place_cloudflare_block_is_distinct_from_a_generic_http_403
+    classifier_probe = <<~'ZSH'
+      source "$1"
+      print -r -- "$(provider_http_failure_status 403 "$(<"$2")")"
+      print -r -- "$(provider_http_failure_status 403 '<html>forbidden</html>')"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", classifier_probe,
+      "check-place-cloudflare-classifier-test",
+      COMMON_PROVIDER_LIBRARY,
+      CHECK_PLACE_CLOUDFLARE_FIXTURE
+    )
+
+    assert status.success?, stderr
+    assert_equal "cloudflare_blocked\nhttp_403\n", stdout
     assert_empty stderr
   end
 
@@ -610,8 +677,8 @@ class IpQualityTest < Minitest::Test
       ping0[status]=unknown
       ipqs[status]=upstream_insufficient_credits
       ipqs[source]=check_place_relay
-      maxmind[status]=http_403 ip2location[status]=http_403
-      abuseipdb[status]=http_403 scamalytics[status]=http_403 ipdata[status]=http_403
+      maxmind[status]=cloudflare_blocked ip2location[status]=cloudflare_blocked
+      abuseipdb[status]=cloudflare_blocked scamalytics[status]=cloudflare_blocked ipdata[status]=cloudflare_blocked
       internetdb[status]=not_found
       clean_ansi(){ print -rn -- "$1" }
       source "$1"
@@ -637,7 +704,7 @@ class IpQualityTest < Minitest::Test
     summary = stdout.lines.last
     assert_includes summary, "本次无可用资料（不等于低风险）"
     assert_includes summary, "RIPEstat"
-    assert_includes summary, "Check.Place 中继 HTTP 403（MaxMind、IP2Location、AbuseIPDB、Scamalytics、ipdata）"
+    assert_includes summary, "Check.Place 被 Cloudflare 阻挡（MaxMind、IP2Location、AbuseIPDB、Scamalytics、ipdata）"
     refute_includes summary, "Check.Place/MaxMind、IP2Location"
     refute_includes summary, "IPQualityScore"
     refute_includes summary, "Shodan"
@@ -903,7 +970,9 @@ class IpQualityTest < Minitest::Test
       RIPESTAT_FIXTURE,
       INTERNETDB_FIXTURE,
       IPREGISTRY_FIXTURE,
-      IPQUALITYSCORE_OFFICIAL_FIXTURE
+      IPQUALITYSCORE_OFFICIAL_FIXTURE,
+      IPQUALITYSCORE_USAGE_FIXTURE,
+      CHECK_PLACE_CLOUDFLARE_FIXTURE
     ].each do |path|
       assert File.file?(path), "missing reference: #{path}"
       refute File.symlink?(path), "symlinked reference: #{path}"

@@ -3,6 +3,27 @@
 
 typeset -gA ipqualityscore_unavailable=()
 typeset -gA ipqualityscore_parsed=()
+typeset -gA ipqualityscore_usage=()
+
+ipqualityscore_parse_usage_response(){
+emulate -LR zsh
+typeset response="$1"
+
+ipqualityscore_usage=()
+print -rn -- "$response"|jq -e '
+  type == "object" and .success == true and
+  (.credits | type == "number" and . >= 0 and floor == .) and
+  (.usage | type == "number" and . >= 0 and floor == .) and
+  (.proxy_usage == null or
+    (.proxy_usage | type == "number" and . >= 0 and floor == .))
+' >/dev/null 2>&1||return 1
+
+ipqualityscore_usage[credits]=$(print -rn -- "$response"|jq -r '.credits')
+ipqualityscore_usage[usage]=$(print -rn -- "$response"|jq -r '.usage')
+ipqualityscore_usage[proxy_usage]=$(print -rn -- "$response"|jq -r '.proxy_usage // empty')
+ipqualityscore_usage[status]="ok"
+return 0
+}
 
 ipqualityscore_parse_response(){
 emulate -LR zsh
