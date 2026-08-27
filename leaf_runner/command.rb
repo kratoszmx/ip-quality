@@ -64,20 +64,17 @@ module IpQuality
       end
 
       if @direct
+        configure_comprehensive_direct_route!
         return run_direct_route
       end
 
       source = load_selected_source
-      return run_direct_route if source == :direct
-      if source == :specific_ip
-        @specific_ip = select_specific_ip
+      if source == :direct
+        configure_comprehensive_direct_route!
         return run_direct_route
       end
-      if source == :direct_mail_dnsbl
-        raise OptionParser::InvalidArgument, "direct mail/DNSBL diagnostics require IPv4" if @family == "-6"
-
-        @family ||= "-4"
-        @route_scope = "mail-dnsbl"
+      if source == :specific_ip
+        @specific_ip = select_specific_ip
         return run_direct_route
       end
 
@@ -140,18 +137,20 @@ module IpQuality
             test-clash-leaf --subscription NAME --list-leaves
             test-clash-leaf --profile PATH --leaf NAME --config-test-only
 
-          By default, choose direct connection, one direct mail/DNSBL diagnostic,
-          or one cached remote Clash Verge subscription. The menu also accepts one
-          specific public target IP. A subscription route then asks for one exact
-          inline leaf. Direct and specific-IP lookups use the current system route
-          with proxy environment variables removed. A leaf is copied into a
-          temporary 127.0.0.1-only Mihomo process. The active Clash profile is
-          never used or changed.
+          By default, choose one comprehensive direct report or one cached remote
+          Clash Verge subscription. The menu also accepts one specific public
+          target IP. A subscription route then asks for one exact inline leaf.
+          The direct report combines reputation, media/AI, mail connectivity, and
+          DNSBL observations over the current system IPv4 route. Specific-IP
+          lookups remain reputation-only. Direct and specific-IP lookups remove
+          proxy environment variables. A leaf is copied into a temporary
+          127.0.0.1-only Mihomo process. The active Clash profile is never used or
+          changed.
         BANNER
         options.on("--list-subscriptions", "List cached remote subscription names without network access") { @list_subscriptions = true }
         options.on("--list-leaves", "List exact inline leaf names without network access") { @list_leaves = true }
         options.on("--select", "Compatibility flag; interactive selection is now the default") { nil }
-        options.on("--direct", "Use the current system route without HTTP(S) proxy environment variables") { @direct = true }
+        options.on("--direct", "Run the comprehensive report over the current system IPv4 route") { @direct = true }
         options.on("--subscription NAME", "Select one cached remote subscription by exact display name") { |value| @subscription_name = value }
         options.on("--leaf NAME", "Select one exact leaf name non-interactively") { |value| @leaf_name = value }
         options.on("--profile PATH", "Use an explicit local profile instead of a cached subscription") { |value| @profile_path = value }
@@ -217,7 +216,7 @@ module IpQuality
               else
                 select_subscription(catalog.entries)
               end
-      return entry if %i[direct specific_ip direct_mail_dnsbl].include?(entry)
+      return entry if %i[direct specific_ip].include?(entry)
 
       catalog.source_for(entry)
     end
@@ -237,11 +236,10 @@ module IpQuality
 
     def print_route_list(entries)
       @stdout.puts "Available test routes:"
-      @stdout.puts "  1  Direct connection (current system route; proxy environment removed)"
+      @stdout.puts "  1  Direct comprehensive report (reputation + media/AI + mail + DNSBL; system IPv4 route)"
       @stdout.puts "  2  Specific IP lookup (enter one public target; current system route)"
-      @stdout.puts "  3  Direct mail connectivity + DNSBL (system route only; IPv4)"
       entries.each_with_index do |entry, index|
-        @stdout.printf("%3d  Cached subscription: %s\n", index + 4, entry.name)
+        @stdout.printf("%3d  Cached subscription: %s\n", index + 3, entry.name)
       end
     end
 
@@ -249,12 +247,11 @@ module IpQuality
       print_route_list(entries)
       @stdout.print "Select one route number: "
       @stdout.flush
-      selected = read_selection(entries.length + 3, "route")
+      selected = read_selection(entries.length + 2, "route")
       return :direct if selected.zero?
       return :specific_ip if selected == 1
-      return :direct_mail_dnsbl if selected == 2
 
-      entries.fetch(selected - 3)
+      entries.fetch(selected - 2)
     end
 
     def select_specific_ip
@@ -330,16 +327,6 @@ module IpQuality
     end
 
     def print_direct_plan
-      if @route_scope == "mail-dnsbl"
-        @stdout.puts "Direct mail/DNSBL plan (no network access has occurred)"
-        @stdout.puts "  route: current system IPv4 route with inherited proxy environment removed"
-        @stdout.puts "  runtime: reporter only; no temporary Mihomo process"
-        @stdout.puts "  mail: outbound TCP/25 and public MX greeting probes"
-        @stdout.puts "  DNSBL: every vendored zone is queried with the reporter's bounded concurrency"
-        @stdout.puts "  measurement boundary: current system route only; no subscription leaf is claimed"
-        @stdout.puts "  start gate: add --confirm-network-lookup"
-        return
-      end
       if @specific_ip
         @stdout.puts "Specific IP lookup plan (no network access has occurred)"
         @stdout.puts "  target: #{@specific_ip}"
@@ -350,13 +337,23 @@ module IpQuality
         @stdout.puts "  start gate: add --confirm-network-lookup"
         return
       end
-      @stdout.puts "Direct route plan (no network access has occurred)"
-      @stdout.puts "  route: current system route with inherited proxy environment removed"
+      @stdout.puts "Comprehensive direct route plan (no network access has occurred)"
+      @stdout.puts "  route: current system IPv4 route with inherited proxy environment removed"
       @stdout.puts "  live Clash profile/selection: read only and unchanged"
       @stdout.puts "  runtime: reporter only; no temporary Mihomo process"
-      @stdout.puts "  reporter scope: reputation only"
+      @stdout.puts "  reporter scope: reputation + media/AI + mail connectivity + DNSBL"
+      @stdout.puts "  mail: outbound TCP/25 and public MX greeting probes"
+      @stdout.puts "  DNSBL: every vendored zone is queried with bounded concurrency"
+      @stdout.puts "  measurement boundary: current system route only; no subscription leaf is claimed"
       @stdout.puts "  note: an active system-level VPN or TUN can still influence the system route"
       @stdout.puts "  start gate: add --confirm-network-lookup"
+    end
+
+    def configure_comprehensive_direct_route!
+      raise OptionParser::InvalidArgument, "the comprehensive direct report requires IPv4" if @family == "-6"
+
+      @family ||= "-4"
+      @route_scope = "full"
     end
 
     def run_direct_route
@@ -365,20 +362,16 @@ module IpQuality
         return 0
       end
 
-      if @route_scope == "mail-dnsbl"
-        @stderr.puts "[route-runner] Testing direct mail connectivity and DNSBL through the current system IPv4 route; no Mihomo process is started."
-      elsif @specific_ip
+      if @specific_ip
         @stderr.puts "[route-runner] Inspecting specific IP #{@specific_ip} through provider target parameters over the current system route; no Mihomo process is started."
       else
-        @stderr.puts "[route-runner] Testing direct connection through the current system route; no Mihomo process is started."
+        @stderr.puts "[route-runner] Testing the comprehensive direct report through the current system IPv4 route; no Mihomo process is started."
       end
       result = run_reporter(NetworkEnvironment.without_proxy_variables, reporter_command)
-      if @route_scope == "mail-dnsbl"
-        @stderr.puts "[route-runner] Direct mail/DNSBL report finished; live Clash state was unchanged."
-      elsif @specific_ip
+      if @specific_ip
         @stderr.puts "[route-runner] Specific-IP report finished; live Clash state was unchanged."
       else
-        @stderr.puts "[route-runner] Direct report finished; live Clash state was unchanged."
+        @stderr.puts "[route-runner] Comprehensive direct report finished; live Clash state was unchanged."
       end
       return 0 if result.success?
 

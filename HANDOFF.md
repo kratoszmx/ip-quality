@@ -50,9 +50,10 @@ without retaining parent-repository files or nested Git metadata.
   remains.
 - Exact-leaf runtime code is under `leaf_runner/`; provider parsers, terminal
   rendering, references, fixtures, and tests have their own directories.
-- The default route selector places direct reputation first, an interactive
-  specific-public-IP lookup second, direct IPv4 mail+DNSBL diagnostics third,
-  and cached remote subscriptions afterward. Every direct mode removes inherited
+- The default route selector places a comprehensive direct IPv4 report first,
+  an interactive specific-public-IP reputation lookup second, and cached remote
+  subscriptions afterward. The direct report combines reputation, media/AI,
+  mail connectivity, and DNSBL in one output. Every direct mode removes inherited
   proxy environment variables and runs no Mihomo process; subscription mode
   retains reputation-only exact-leaf isolation.
 - Report stdout goes through `report/output.zsh`, which uses raw zsh `print` so
@@ -172,12 +173,12 @@ for file in leaf_runner/*.rb; do /usr/bin/ruby -c "$file"; done
 print -r -- 1 | /bin/zsh -f bin/test-clash-leaf
 ```
 
-The full offline suite currently has 57 runs and 815 assertions. It covers raw
+The full offline suite currently has 58 runs and 839 assertions. It covers raw
 JSON stdout with embedded tab/newline/ANSI data, real green safe-factor and red
 risk-factor bytes, single-matrix CJK/ANSI table separator positions, strict
 official provider fixtures, global/project-local private data-only credential
 loading, IPQS quota preflight short-circuiting, direct/specific-IP
-proxy-environment removal, the direct-only combined mail+DNSBL menu route,
+proxy-environment removal, the comprehensive direct `full` menu route,
 explicit-target scope/family validation, provider-failure independence,
 Cloudflare block-page classification, per-zone DNSBL JSON retention, exact-leaf
 isolation, and cleanup on success, failure, and signal.
@@ -232,14 +233,15 @@ same standalone.11 build and restored MaxMind, IP2Location, AbuseIPDB,
 Scamalytics, and ipdata in one report, confirming that the relay result varies by
 egress rather than by parser version.
 
-The supplied NodeQuality report and current `LloydAsp/NodeQuality` runner were
-reviewed on 2026-08-27. NodeQuality orchestrates a disposable VPS test
-environment, but its IP-quality step directly executes `IP.Check.Place`; it is
-therefore a useful integration/report reference, not another reputation source.
-The compact mail-connectivity plus DNSBL grouping was retained as a new
-direct-only menu route. Its VPS hardware, kernel/NAT, bulk speed, and return-path
-measurements were not mixed into an HTTP leaf reputation report because they
-describe the machine that runs the benchmark rather than the selected leaf.
+The current `LloydAsp/NodeQuality` runner was reviewed on 2026-08-27.
+NodeQuality orchestrates a disposable VPS test environment, but its IP-quality
+step directly executes `IP.Check.Place`; it is therefore a useful
+integration/report reference, not another reputation source. Its complete
+direct IP report and compact mail-connectivity plus DNSBL grouping are now
+represented by one `full` direct menu route. Its VPS hardware, kernel/NAT, bulk
+speed, and return-path measurements were not mixed into an HTTP leaf reputation
+report because they describe the machine that runs the benchmark rather than
+the selected leaf.
 
 A fresh same-minute comparison used the current one-command menu against the
 home China Mobile egress and isolated Japanese and Hong Kong leaves. The home
@@ -250,18 +252,30 @@ This makes an egress-specific WAF decision the supported diagnosis. Repeated
 development lookups are a plausible trigger, but the exact Cloudflare rule
 cannot be known without Check.Place's server-side event log.
 
-The new direct mail+DNSBL menu entry exposed and fixed one VPS-to-home-NAT
-assumption before delivery: the inherited SMTP probe tried to bind the public
-egress IP as a local source address. After letting the system route choose its
-real local address, the live run showed outbound TCP/25 was available and seven
-of twelve public MX families returned an SMTP greeting. Of 422 vendored DNSBL
-zones, 411 returned no listing, two returned the ordinary blacklisted answer,
-one returned another marked answer, and eight were unknown because their DNS
-lookups did not produce a usable result. The terminal named every listing
-instead of collapsing them into a cleanliness claim, and explains that the two
-UCEPROTECT hits are netblock/ASN-level rather than evidence that this individual
-address sent spam. No Mihomo process was started and live Clash remained
+The direct mail+DNSBL work exposed and fixed one VPS-to-home-NAT assumption
+before delivery: the inherited SMTP probe tried to bind the public egress IP as
+a local source address. After letting the system route choose its real local
+address, the live run showed outbound TCP/25 was available and seven of twelve
+public MX families returned an SMTP greeting. Of 422 vendored DNSBL zones, 411
+returned no listing, two returned the ordinary blacklisted answer, one returned
+another marked answer, and eight were unknown because their DNS lookups did not
+produce a usable result. The terminal named every listing instead of collapsing
+them into a cleanliness claim, and explains that the two UCEPROTECT hits are
+netblock/ASN-level rather than evidence that this individual address sent spam.
+These observations now follow the reputation and media/AI sections in the same
+normal direct report. No Mihomo process was started and live Clash remained
 unchanged.
+
+On 2026-08-27, standalone.13 folded the previously separate direct reputation
+and mail+DNSBL menu paths into one comprehensive `full` IPv4 report and included
+the existing media/AI scope in that same output. A live home-route validation
+continued through every section despite Check.Place's egress-specific
+Cloudflare block: direct IPinfo, Ipregistry, ipapi.is, IPQS account status,
+Ping0, RIPEstat, and Shodan remained visible; the sixth media/AI section ran all
+six probes; and the seventh mail/DNSBL section reported outbound TCP/25, twelve
+MX families, and all 422 vendored zones. This proves a reputation-source failure
+does not suppress either later section. The redundant third menu route was
+removed, no Mihomo process was started, and live Clash remained unchanged.
 
 ## Completed parent extraction
 

@@ -43,11 +43,11 @@ reporter derived from `xykt/IPQuality`.
   `unknown` result, not a clean result.
 - Default output masks the tested IP. Revealing it requires an explicit output
   option.
-- An exact-leaf selection is restricted to `reputation`. The same menu may expose
-  a separately labeled direct mail+DNSBL route that removes proxy environment
-  variables and measures the current system IPv4 route. Do not route DNSBL,
-  mail, or other direct DNS/TCP tests through an HTTP-proxy environment and
-  claim that they measured the leaf.
+- An exact-leaf selection is restricted to `reputation`. The menu's direct
+  comprehensive route uses `full`, removes proxy environment variables, and
+  measures reputation, media/AI, mail, and DNSBL over the current system IPv4
+  route in one report. Do not route DNSBL, mail, or other direct DNS/TCP tests
+  through an HTTP-proxy environment and claim that they measured the leaf.
 
 ## Source map
 

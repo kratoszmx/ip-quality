@@ -36,6 +36,9 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   `--confirm-network-lookup` live-query gate;
 - added explicit scopes, a direct-only combined mail+DNSBL scope, and a validated
   DNSBL concurrency range of 1–50;
+- made the normal direct route a single `full` report covering reputation,
+  media/AI, mail connectivity, and DNSBL while retaining reputation-only
+  exact-leaf and specific-IP routes;
 - removed telemetry, run counters, advertisements, sponsor downloads, remote
   menu execution, report upload, and dynamically downloaded reference files;
 - removed the ipregistry web-key scraping flow and its embedded fallback key;

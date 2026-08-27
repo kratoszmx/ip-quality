@@ -230,9 +230,10 @@ credentials over trying to evade the relay's Cloudflare policy.
 Exact-leaf experience favors keeping connectivity and blacklist work out of the
 leaf reputation matrix. HTTP reputation requests can follow the selected leaf,
 while local DNS and raw TCP probes still measure the Mac's system route. The
-normal menu therefore offers mail connectivity plus DNSBL as one separately
-labeled direct-only IPv4 diagnostic. It combines the two related observations
-without implying that either followed a subscription leaf.
+normal menu therefore offers one comprehensive direct IPv4 report containing
+reputation, media/AI, mail connectivity, and DNSBL observations. The route label
+and report keep that system-route boundary explicit without implying that local
+DNS or raw TCP probes followed a subscription leaf.
 
 ### Candidate review
 
@@ -261,11 +262,11 @@ without implying that either followed a subscription leaf.
 - NodeQuality is an aggregate VPS benchmark, sandbox, and report-postprocessing
   project rather than an independent IP reputation data provider. Its current
   `run_ip_quality` implementation executes `IP.Check.Place`, and its own project
-  description says the xykt scripts are its core. The supplied 2026-07-21 sample
-  confirms that the embedded IP report identifies `xykt/IPQuality`, while the
-  later network-quality blocks come from the separate xykt NetQuality workflow.
-  Its compact presentation and direct mail/DNSBL grouping are useful end-to-end
-  design references; provider authority still comes from each named API. See
+  description says the xykt scripts are its core. Its current runner launches
+  IPQuality, NetQuality, hardware, and return-path jobs as separate modules. Its
+  compact presentation, complete direct IP report, cleanup discipline, and
+  mail/DNSBL grouping are useful end-to-end design references; provider
+  authority still comes from each named API. See
   [NodeQuality's project page](https://github.com/LloydAsp/NodeQuality) and
   [its current runner](https://github.com/LloydAsp/NodeQuality/blob/main/NodeQuality.sh).
 
@@ -321,16 +322,17 @@ resolver is permitted and supported by the zone operator. See the
 [Spamhaus DNSBL usage FAQ](https://www.spamhaus.org/faqs/dnsbl-usage/) and
 [Spamhaus fair-use policy](https://www.spamhaus.org/blocklists/dnsbl-fair-use-policy/).
 
-The `mail-dnsbl` scope runs the mail and DNSBL observations together for the
-current system IPv4 route. The one-command route menu exposes this scope as a
-direct-only choice, removes inherited HTTP proxy variables, and starts no
-Mihomo process. This matches the useful NodeQuality report grouping while
-keeping the measured route explicit.
+The `mail-dnsbl` engineering scope still runs just the mail and DNSBL
+observations together for the current system IPv4 route. The one-command menu
+uses `full` for its direct route so reputation, media/AI, mail, and DNSBL appear
+in one report. It removes inherited HTTP proxy variables and starts no Mihomo
+process, matching the useful NodeQuality report grouping while keeping the
+measured route explicit.
 
 For exact cached-subscription leaves, the menu runs the reputation scope only.
 Those leaves are isolated behind a loopback HTTP proxy; direct DNSBL, SMTP,
 ICMP, or arbitrary TCP probes would follow the host's DNS/network path and could
 falsely look like measurements of the selected leaf. HTTP-accessible abuse,
 proxy, routing, and exposure observations remain valid in the leaf report.
-The menu's direct mail+DNSBL entry and the separate engineering scopes use the
-system route, while subscription selections remain reputation-only.
+The menu's comprehensive direct entry and the separate engineering scopes use
+the system route, while subscription selections remain reputation-only.

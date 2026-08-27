@@ -55,6 +55,10 @@ class IpQualityTest < Minitest::Test
     assert status.success?, stderr
     assert_includes stdout, "no network access has occurred"
     assert_includes stdout, "scope: full"
+    assert_includes stdout, "reputation sources:"
+    assert_includes stdout, "media/AI sources:"
+    assert_includes stdout, "mail sources:"
+    assert_includes stdout, "DNSBL sources:"
     assert_includes stdout, "telemetry/report upload/remote code: disabled"
     assert_includes stdout, "--confirm-network-lookup"
     assert_empty stderr
@@ -81,6 +85,17 @@ class IpQualityTest < Minitest::Test
     assert_includes stdout, "mail sources:"
     assert_includes stdout, "DNSBL sources:"
     assert_empty stderr
+  end
+
+  def test_full_report_section_titles_follow_the_reputation_context_section
+    source = File.read(SCRIPT)
+
+    assert_includes source, 'smedia[title]="6. Accessibility check for media and AI services"'
+    assert_includes source, 'smail[title]="7. Email service availability and blacklist detection"'
+    assert_includes source, 'smedia[title]="六、流媒体及AI服务解锁检测"'
+    assert_includes source, 'smail[title]="七、邮局连通性及黑名单检测"'
+    refute_includes source, 'smedia[title]="五、流媒体及AI服务解锁检测"'
+    refute_includes source, 'smail[title]="六、邮局连通性及黑名单检测"'
   end
 
   def test_explicit_plan_still_prevents_network_after_confirmation
