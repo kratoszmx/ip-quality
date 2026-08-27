@@ -34,7 +34,8 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 - removed every dependency installer and package-manager mutation;
 - added a default no-network plan and the exact
   `--confirm-network-lookup` live-query gate;
-- added explicit scopes and a validated DNSBL concurrency range of 1–50;
+- added explicit scopes, a direct-only combined mail+DNSBL scope, and a validated
+  DNSBL concurrency range of 1–50;
 - removed telemetry, run counters, advertisements, sponsor downloads, remote
   menu execution, report upload, and dynamically downloaded reference files;
 - removed the ipregistry web-key scraping flow and its embedded fallback key;
@@ -44,6 +45,8 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 - replaced remote reference reads with fixed local regular files;
 - changed DNSBL child workers to `/bin/zsh`, bounded DNS attempts, and an
   explicit `Unknown` failure class;
+- removed the VPS-only SMTP source bind to the discovered public egress address,
+  allowing the system route to select the real local source address behind NAT;
 - retained masked-IP output by default and disabled command-line proxy secrets;
 - added offline self-tests, provider disclosure documentation, and repository
   safety rules;

@@ -32,7 +32,7 @@ class ClashLeafRunnerTest < Minitest::Test
       command = IpQuality::ClashLeafCommand.new(
         stdout: stdout,
         stderr: stderr,
-        stdin: StringIO.new("3\n2\n"),
+        stdin: StringIO.new("4\n2\n"),
         app_root: directory
       )
 
@@ -42,6 +42,7 @@ class ClashLeafRunnerTest < Minitest::Test
       assert_includes stdout.string, "Available test routes:"
       assert_includes stdout.string, "Direct connection"
       assert_includes stdout.string, "Specific IP lookup"
+      assert_includes stdout.string, "Direct mail connectivity + DNSBL"
       assert_includes stdout.string, "Cached subscription: Fixture Remote"
       assert_includes stdout.string, "Available inline leaves"
       assert_includes stdout.string, "exact leaf: TargetLeaf"
@@ -166,6 +167,56 @@ class ClashLeafRunnerTest < Minitest::Test
       assert_includes stderr.string, "Inspecting specific IP 12.217.32.68"
       assert_includes stderr.string, "Specific-IP report finished"
       assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"))
+    end
+  end
+
+  def test_direct_mail_dnsbl_menu_is_ipv4_system_route_only
+    Dir.mktmpdir("ip-quality-direct-mail-dnsbl-") do |directory|
+      write_clash_verge_fixture(directory)
+      fake_reporter = File.join(directory, "fake-reporter")
+      arguments_file = File.join(directory, "arguments.txt")
+      File.write(fake_reporter, <<~'ZSH')
+        [[ -z "${HTTP_PROXY+x}${https_proxy+x}${No_PrOxY+x}" ]] || exit 71
+        print -r -- "$@" > "$IPQUALITY_TEST_ARGUMENTS_FILE"
+      ZSH
+      File.chmod(0o700, fake_reporter)
+      stdout = StringIO.new
+      stderr = StringIO.new
+      command = IpQuality::ClashLeafCommand.new(
+        stdout: stdout,
+        stderr: stderr,
+        stdin: StringIO.new("3\n"),
+        app_root: directory,
+        reporter_path: fake_reporter
+      )
+
+      exit_code = with_environment(
+        "HTTP_PROXY" => "http://127.0.0.1:1",
+        "https_proxy" => "http://127.0.0.1:2",
+        "No_PrOxY" => "fixture.invalid",
+        "IPQUALITY_TEST_ARGUMENTS_FILE" => arguments_file
+      ) do
+        command.run(["--confirm-network-lookup", "-f"])
+      end
+
+      assert_equal 0, exit_code
+      assert_equal "--confirm-network-lookup --scope mail-dnsbl -4 -f\n", File.read(arguments_file)
+      assert_includes stdout.string, "Direct mail connectivity + DNSBL"
+      assert_includes stderr.string, "current system IPv4 route"
+      assert_includes stderr.string, "Direct mail/DNSBL report finished"
+      assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"))
+
+      ipv6_stdout = StringIO.new
+      ipv6_stderr = StringIO.new
+      ipv6_command = IpQuality::ClashLeafCommand.new(
+        stdout: ipv6_stdout,
+        stderr: ipv6_stderr,
+        stdin: StringIO.new("3\n"),
+        app_root: directory,
+        reporter_path: fake_reporter
+      )
+      assert_equal IpQuality::ClashLeafCommand::EX_USAGE, ipv6_command.run(["-6"])
+      assert_includes ipv6_stderr.string, "require IPv4"
     end
   end
 

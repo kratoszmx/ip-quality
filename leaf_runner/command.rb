@@ -37,6 +37,7 @@ module IpQuality
       @list_leaves = false
       @direct = false
       @specific_ip = nil
+      @route_scope = "reputation"
       @confirmed = false
       @config_test_only = false
       @mihomo_explicit = false
@@ -70,6 +71,13 @@ module IpQuality
       return run_direct_route if source == :direct
       if source == :specific_ip
         @specific_ip = select_specific_ip
+        return run_direct_route
+      end
+      if source == :direct_mail_dnsbl
+        raise OptionParser::InvalidArgument, "direct mail/DNSBL diagnostics require IPv4" if @family == "-6"
+
+        @family ||= "-4"
+        @route_scope = "mail-dnsbl"
         return run_direct_route
       end
 
@@ -132,12 +140,13 @@ module IpQuality
             test-clash-leaf --subscription NAME --list-leaves
             test-clash-leaf --profile PATH --leaf NAME --config-test-only
 
-          By default, choose direct connection or one cached remote Clash Verge
-          subscription. The menu also accepts one specific public target IP.
-          A subscription route then asks for one exact inline leaf. Direct and
-          specific-IP lookups use the current system route with proxy environment
-          variables removed. A leaf is copied into a temporary 127.0.0.1-only
-          Mihomo process. The active Clash profile is never used or changed.
+          By default, choose direct connection, one direct mail/DNSBL diagnostic,
+          or one cached remote Clash Verge subscription. The menu also accepts one
+          specific public target IP. A subscription route then asks for one exact
+          inline leaf. Direct and specific-IP lookups use the current system route
+          with proxy environment variables removed. A leaf is copied into a
+          temporary 127.0.0.1-only Mihomo process. The active Clash profile is
+          never used or changed.
         BANNER
         options.on("--list-subscriptions", "List cached remote subscription names without network access") { @list_subscriptions = true }
         options.on("--list-leaves", "List exact inline leaf names without network access") { @list_leaves = true }
@@ -208,7 +217,7 @@ module IpQuality
               else
                 select_subscription(catalog.entries)
               end
-      return entry if entry == :direct || entry == :specific_ip
+      return entry if %i[direct specific_ip direct_mail_dnsbl].include?(entry)
 
       catalog.source_for(entry)
     end
@@ -230,8 +239,9 @@ module IpQuality
       @stdout.puts "Available test routes:"
       @stdout.puts "  1  Direct connection (current system route; proxy environment removed)"
       @stdout.puts "  2  Specific IP lookup (enter one public target; current system route)"
+      @stdout.puts "  3  Direct mail connectivity + DNSBL (system route only; IPv4)"
       entries.each_with_index do |entry, index|
-        @stdout.printf("%3d  Cached subscription: %s\n", index + 3, entry.name)
+        @stdout.printf("%3d  Cached subscription: %s\n", index + 4, entry.name)
       end
     end
 
@@ -239,11 +249,12 @@ module IpQuality
       print_route_list(entries)
       @stdout.print "Select one route number: "
       @stdout.flush
-      selected = read_selection(entries.length + 2, "route")
+      selected = read_selection(entries.length + 3, "route")
       return :direct if selected.zero?
       return :specific_ip if selected == 1
+      return :direct_mail_dnsbl if selected == 2
 
-      entries.fetch(selected - 2)
+      entries.fetch(selected - 3)
     end
 
     def select_specific_ip
@@ -319,6 +330,16 @@ module IpQuality
     end
 
     def print_direct_plan
+      if @route_scope == "mail-dnsbl"
+        @stdout.puts "Direct mail/DNSBL plan (no network access has occurred)"
+        @stdout.puts "  route: current system IPv4 route with inherited proxy environment removed"
+        @stdout.puts "  runtime: reporter only; no temporary Mihomo process"
+        @stdout.puts "  mail: outbound TCP/25 and public MX greeting probes"
+        @stdout.puts "  DNSBL: every vendored zone is queried with the reporter's bounded concurrency"
+        @stdout.puts "  measurement boundary: current system route only; no subscription leaf is claimed"
+        @stdout.puts "  start gate: add --confirm-network-lookup"
+        return
+      end
       if @specific_ip
         @stdout.puts "Specific IP lookup plan (no network access has occurred)"
         @stdout.puts "  target: #{@specific_ip}"
@@ -344,13 +365,17 @@ module IpQuality
         return 0
       end
 
-      if @specific_ip
+      if @route_scope == "mail-dnsbl"
+        @stderr.puts "[route-runner] Testing direct mail connectivity and DNSBL through the current system IPv4 route; no Mihomo process is started."
+      elsif @specific_ip
         @stderr.puts "[route-runner] Inspecting specific IP #{@specific_ip} through provider target parameters over the current system route; no Mihomo process is started."
       else
         @stderr.puts "[route-runner] Testing direct connection through the current system route; no Mihomo process is started."
       end
       result = run_reporter(NetworkEnvironment.without_proxy_variables, reporter_command)
-      if @specific_ip
+      if @route_scope == "mail-dnsbl"
+        @stderr.puts "[route-runner] Direct mail/DNSBL report finished; live Clash state was unchanged."
+      elsif @specific_ip
         @stderr.puts "[route-runner] Specific-IP report finished; live Clash state was unchanged."
       else
         @stderr.puts "[route-runner] Direct report finished; live Clash state was unchanged."
@@ -379,7 +404,7 @@ module IpQuality
         @reporter_path,
         "--confirm-network-lookup",
         "--scope",
-        "reputation"
+        @route_scope
       ]
       command << @family if @family
       command.concat(@report_arguments)

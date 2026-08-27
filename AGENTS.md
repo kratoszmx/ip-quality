@@ -35,16 +35,19 @@ reporter derived from `xykt/IPQuality`.
 
 - Preserve per-source results; do not turn conflicting provider answers into an
   unexplained single truth value.
-- Keep query scopes explicit: reputation, DNSBL, media/AI, mail, or full.
+- Keep query scopes explicit: reputation, DNSBL, media/AI, mail,
+  direct mail+DNSBL, or full.
 - Concurrency must be bounded and user-configurable. DNSBL may default to 50, but
   tests must prove that the configured cap is enforced.
 - A provider failure, rate limit, schema change, or unavailable dependency is an
   `unknown` result, not a clean result.
 - Default output masks the tested IP. Revealing it requires an explicit output
   option.
-- The exact-leaf runner is restricted to `reputation`. Do not route DNSBL, mail,
-  or other direct DNS/TCP tests through an HTTP-proxy environment and claim that
-  they measured the leaf.
+- An exact-leaf selection is restricted to `reputation`. The same menu may expose
+  a separately labeled direct mail+DNSBL route that removes proxy environment
+  variables and measures the current system IPv4 route. Do not route DNSBL,
+  mail, or other direct DNS/TCP tests through an HTTP-proxy environment and
+  claim that they measured the leaf.
 
 ## Source map
 

@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-08-27-standalone.11"
+script_version="v2026-08-27-standalone.12"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset REPORT_DIR="$SCRIPT_DIR/report"
@@ -120,7 +120,7 @@ typeset -a shelp_lines=(
 "Safe default: /bin/zsh ./bin/ip-quality [--scope SCOPE]"
 "安全默认：不加确认参数时只显示查询计划，不访问网络"
 "Live query: /bin/zsh ./bin/ip-quality --confirm-network-lookup [--scope SCOPE] [-4|-6]"
-"            --scope reputation|dnsbl|media-ai|mail|full"
+"            --scope reputation|dnsbl|media-ai|mail|mail-dnsbl|full"
 "            --dnsbl-concurrency 1..50       Bounded DNSBL workers                     DNSBL并发上限"
 "            --plan                          Print disclosure plan only                仅显示披露计划"
 "            --self-test                     Run offline source/data checks            运行离线自检"
@@ -397,7 +397,8 @@ print -ru2 -- "[ip-quality] $(clean_ansi "$1")"
 
 scope_includes(){
 local requested="$1"
-[[ "$query_scope" == "full" || "$query_scope" == "$requested" ]]
+[[ "$query_scope" == "full" || "$query_scope" == "$requested" ||
+   ( "$query_scope" == "mail-dnsbl" && ( "$requested" == "mail" || "$requested" == "dnsbl" ) ) ]]
 }
 
 is_nonnegative_decimal(){
@@ -540,7 +541,7 @@ esac
 shift
 done
 case "$query_scope" in
-reputation|dnsbl|media-ai|mail|full) ;;
+reputation|dnsbl|media-ai|mail|mail-dnsbl|full) ;;
 *)print -ru2 -- "ERROR: unsupported scope: $query_scope"
 return 64
 esac
@@ -2106,7 +2107,7 @@ smtp_probe(){
 local host="$1"
 local port="$2"
 local wait_seconds="$3"
-printf 'QUIT\r\n'|nc -s "$IP" -w "$wait_seconds" "$host" "$port" 2>&1
+printf 'QUIT\r\n'|nc -w "$wait_seconds" "$host" "$port" 2>&1
 }
 check_email_service(){
 local service=$1
@@ -2380,6 +2381,14 @@ if [[ "$YY" == "cn" ]];then
 print -r -- "${Font_Red}黑名单命中：${smail[blacklisted_zones]}${Font_Suffix}"
 else
 print -r -- "${Font_Red}Blacklisted by: ${smail[blacklisted_zones]}${Font_Suffix}"
+fi
+if [[ "${smail[blacklisted_zones]}" == *"dnsbl-2.uceprotect.net"* ||
+      "${smail[blacklisted_zones]}" == *"dnsbl-3.uceprotect.net"* ]];then
+if [[ "$YY" == "cn" ]];then
+print -r -- "${Font_Yellow}说明：UCEPROTECT Level 2/3 是网段／ASN 级记录，不等于这个单独 IP 曾发送垃圾邮件。${Font_Suffix}"
+else
+print -r -- "${Font_Yellow}Note: UCEPROTECT Level 2/3 are netblock/ASN-level listings, not proof that this individual IP sent spam.${Font_Suffix}"
+fi
 fi
 fi
 if [[ -n "${smail[marked_zones]}" ]];then
@@ -2900,7 +2909,7 @@ set_language
 if [[ -n "$requested_ip" ]];then
 prepare_explicit_target||true
 fi
-[[ $ERRORcode -eq 0 && "$query_scope" == "dnsbl" && $IPV4check -eq 0 ]]&&ERRORcode=61
+[[ $ERRORcode -eq 0 && ( "$query_scope" == "dnsbl" || "$query_scope" == "mail-dnsbl" ) && $IPV4check -eq 0 ]]&&ERRORcode=61
 if [[ $ERRORcode -ne 0 ]];then
 echo -ne "\r$Font_B$Font_Red${swarn[$ERRORcode]}$Font_Suffix\n"
 exit $ERRORcode

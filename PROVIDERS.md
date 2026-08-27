@@ -227,12 +227,12 @@ not a global relay outage or parser regression.
 For durable coverage, prefer the vendors' official APIs with owner-controlled
 credentials over trying to evade the relay's Cloudflare policy.
 
-Exact-leaf experience also favors keeping connectivity and blacklist work out of
-this matrix. HTTP reputation requests can follow the selected leaf, while local
-DNS and raw TCP probes still measure the Mac's system route. The existing factor
-rows already preserve each provider's abuse/blacklist signals, and the separate
-`dnsbl` scope remains available for direct-route diagnostics, so a new combined
-section would duplicate evidence or mislabel which route was measured.
+Exact-leaf experience favors keeping connectivity and blacklist work out of the
+leaf reputation matrix. HTTP reputation requests can follow the selected leaf,
+while local DNS and raw TCP probes still measure the Mac's system route. The
+normal menu therefore offers mail connectivity plus DNSBL as one separately
+labeled direct-only IPv4 diagnostic. It combines the two related observations
+without implying that either followed a subscription leaf.
 
 ### Candidate review
 
@@ -258,11 +258,16 @@ section would duplicate evidence or mislabel which route was measured.
   after credential handling is selected, rather than being folded into a generic
   residential-IP score. See the [GreyNoise Community API guide](https://docs.greynoise.io/docs/using-the-greynoise-community-api)
   and [VirusTotal IP object contract](https://docs.virustotal.com/reference/ip-object).
-- NodeQuality is an aggregate VPS benchmark/report project rather than an IP
-  reputation data provider. Its compact presentation is useful design input,
-  while embedding its sandbox runner would duplicate this project's lifecycle
-  and introduce remote-script/report behavior that does not improve provider
-  evidence. See [NodeQuality's project page](https://github.com/LloydAsp/NodeQuality).
+- NodeQuality is an aggregate VPS benchmark, sandbox, and report-postprocessing
+  project rather than an independent IP reputation data provider. Its current
+  `run_ip_quality` implementation executes `IP.Check.Place`, and its own project
+  description says the xykt scripts are its core. The supplied 2026-07-21 sample
+  confirms that the embedded IP report identifies `xykt/IPQuality`, while the
+  later network-quality blocks come from the separate xykt NetQuality workflow.
+  Its compact presentation and direct mail/DNSBL grouping are useful end-to-end
+  design references; provider authority still comes from each named API. See
+  [NodeQuality's project page](https://github.com/LloydAsp/NodeQuality) and
+  [its current runner](https://github.com/LloydAsp/NodeQuality/blob/main/NodeQuality.sh).
 
 ## Media and AI scope
 
@@ -281,7 +286,10 @@ not acceptable in this repository.
 The script resolves public MX records for Gmail, Outlook, Yahoo, Apple, QQ,
 Mail.ru, AOL, GMX, Mail.com, 163, Sohu, and Sina, then performs a bounded TCP/25
 SMTP greeting probe and immediately sends `QUIT`. It also probes Mailgun to
-describe local outbound port-25 reachability. No message is submitted.
+describe local outbound port-25 reachability. The socket follows the current
+system route and lets the operating system choose its real local source address;
+this works both on a directly addressed VPS and behind home NAT. No message is
+submitted.
 
 ## DNSBL scope
 
@@ -298,6 +306,13 @@ showing a count. JSON keeps a `Results` object for every queried zone alongside
 the aggregate totals, so each provider answer remains traceable and can be
 rechecked independently.
 
+When UCEPROTECT Level 2 or Level 3 appears, the terminal explains that these are
+netblock/allocation and ASN/provider-level listings rather than proof that the
+individual address sent spam. This distinction mattered in the first live home
+route run, which hit both aggregate levels without a Level 1 individual-address
+hit. See UCEPROTECT's own [level overview](https://www.uceprotect.net/en/?m=7&s=0)
+and [Level 3 policy](https://www.uceprotect.net/en/index.php?m=3&s=5UCEPROTECT-Level).
+
 The hard concurrency maximum is 50. A failed DNS command is never counted as a
 clean result. Resolver-policy answers such as Spamhaus `127.255.255.252`,
 `127.255.255.254`, and `127.255.255.255` are errors, not evidence that the IP is
@@ -306,10 +321,16 @@ resolver is permitted and supported by the zone operator. See the
 [Spamhaus DNSBL usage FAQ](https://www.spamhaus.org/faqs/dnsbl-usage/) and
 [Spamhaus fair-use policy](https://www.spamhaus.org/blocklists/dnsbl-fair-use-policy/).
 
+The `mail-dnsbl` scope runs the mail and DNSBL observations together for the
+current system IPv4 route. The one-command route menu exposes this scope as a
+direct-only choice, removes inherited HTTP proxy variables, and starts no
+Mihomo process. This matches the useful NodeQuality report grouping while
+keeping the measured route explicit.
+
 For exact cached-subscription leaves, the menu runs the reputation scope only.
 Those leaves are isolated behind a loopback HTTP proxy; direct DNSBL, SMTP,
 ICMP, or arbitrary TCP probes would follow the host's DNS/network path and could
 falsely look like measurements of the selected leaf. HTTP-accessible abuse,
 proxy, routing, and exposure observations remain valid in the leaf report.
-Direct-route engineering runs may use the separate DNSBL/mail scopes, while the
-normal leaf menu keeps the two measurement paths distinct.
+The menu's direct mail+DNSBL entry and the separate engineering scopes use the
+system route, while subscription selections remain reputation-only.

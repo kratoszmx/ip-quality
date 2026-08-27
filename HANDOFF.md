@@ -50,10 +50,11 @@ without retaining parent-repository files or nested Git metadata.
   remains.
 - Exact-leaf runtime code is under `leaf_runner/`; provider parsers, terminal
   rendering, references, fixtures, and tests have their own directories.
-- The default route selector places direct connection first, an interactive
-  specific-public-IP lookup second, and cached remote subscriptions afterward.
-  Direct/specific-IP mode removes inherited proxy environment variables and runs
-  no Mihomo process; subscription mode retains exact-leaf isolation.
+- The default route selector places direct reputation first, an interactive
+  specific-public-IP lookup second, direct IPv4 mail+DNSBL diagnostics third,
+  and cached remote subscriptions afterward. Every direct mode removes inherited
+  proxy environment variables and runs no Mihomo process; subscription mode
+  retains reputation-only exact-leaf isolation.
 - Report stdout goes through `report/output.zsh`, which uses raw zsh `print` so
   JSON escapes such as `\n` and `\t` survive unchanged until the consumer parses
   them.
@@ -110,6 +111,10 @@ without retaining parent-repository files or nested Git metadata.
   booleans in the factor matrix. Relay failure, quota, and rate-limit states no
   longer make the provider disappear. Shodan's parsed hostname count is now
   retained in terminal and JSON output.
+- The successful-IPQS fixture and aligned report test prove that region, proxy,
+  VPN, Tor, hosting, abuse, and bot observations appear in the factor matrix.
+  A quota-only response has no such observations, so it stays visible in the
+  score source/status row without creating a column full of dashes.
 - Allowlisted unavailability is reported with a reason instead of repeated
   unknown cells. IPQualityScore relay credit exhaustion is attributed in its
   score source/status row, while a direct-key quota error is attributed to the
@@ -167,15 +172,15 @@ for file in leaf_runner/*.rb; do /usr/bin/ruby -c "$file"; done
 print -r -- 1 | /bin/zsh -f bin/test-clash-leaf
 ```
 
-The full offline suite currently has 54 runs and 766 assertions. It covers raw
+The full offline suite currently has 57 runs and 815 assertions. It covers raw
 JSON stdout with embedded tab/newline/ANSI data, real green safe-factor and red
 risk-factor bytes, single-matrix CJK/ANSI table separator positions, strict
 official provider fixtures, global/project-local private data-only credential
 loading, IPQS quota preflight short-circuiting, direct/specific-IP
-proxy-environment removal, explicit-target scope/family validation,
-provider-failure independence, Cloudflare block-page classification, per-zone
-DNSBL JSON retention, exact-leaf isolation, and cleanup on success, failure, and
-signal.
+proxy-environment removal, the direct-only combined mail+DNSBL menu route,
+explicit-target scope/family validation, provider-failure independence,
+Cloudflare block-page classification, per-zone DNSBL JSON retention, exact-leaf
+isolation, and cleanup on success, failure, and signal.
 
 A live direct IPv4 menu run on 2026-08-25 displayed the exact IP under the
 explicit `-f` choice, produced aligned type/score/factor tables with real green
@@ -226,6 +231,37 @@ IP lookup. A later isolated cached US leaf accepted the same requests with the
 same standalone.11 build and restored MaxMind, IP2Location, AbuseIPDB,
 Scamalytics, and ipdata in one report, confirming that the relay result varies by
 egress rather than by parser version.
+
+The supplied NodeQuality report and current `LloydAsp/NodeQuality` runner were
+reviewed on 2026-08-27. NodeQuality orchestrates a disposable VPS test
+environment, but its IP-quality step directly executes `IP.Check.Place`; it is
+therefore a useful integration/report reference, not another reputation source.
+The compact mail-connectivity plus DNSBL grouping was retained as a new
+direct-only menu route. Its VPS hardware, kernel/NAT, bulk speed, and return-path
+measurements were not mixed into an HTTP leaf reputation report because they
+describe the machine that runs the benchmark rather than the selected leaf.
+
+A fresh same-minute comparison used the current one-command menu against the
+home China Mobile egress and isolated Japanese and Hong Kong leaves. The home
+egress again received the explicit Cloudflare block page from every
+Check.Place-backed reputation endpoint, while both isolated leaves returned the
+complete MaxMind-shaped, IP2Location, AbuseIPDB, Scamalytics, and ipdata rows.
+This makes an egress-specific WAF decision the supported diagnosis. Repeated
+development lookups are a plausible trigger, but the exact Cloudflare rule
+cannot be known without Check.Place's server-side event log.
+
+The new direct mail+DNSBL menu entry exposed and fixed one VPS-to-home-NAT
+assumption before delivery: the inherited SMTP probe tried to bind the public
+egress IP as a local source address. After letting the system route choose its
+real local address, the live run showed outbound TCP/25 was available and seven
+of twelve public MX families returned an SMTP greeting. Of 422 vendored DNSBL
+zones, 411 returned no listing, two returned the ordinary blacklisted answer,
+one returned another marked answer, and eight were unknown because their DNS
+lookups did not produce a usable result. The terminal named every listing
+instead of collapsing them into a cleanliness claim, and explains that the two
+UCEPROTECT hits are netblock/ASN-level rather than evidence that this individual
+address sent spam. No Mihomo process was started and live Clash remained
+unchanged.
 
 ## Completed parent extraction
 

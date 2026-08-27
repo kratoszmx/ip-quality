@@ -74,6 +74,13 @@ class IpQualityTest < Minitest::Test
       assert_includes stdout, marker
       assert_empty stderr
     end
+
+    stdout, stderr, status = run_script("--scope", "mail-dnsbl")
+    assert status.success?, stderr
+    assert_includes stdout, "scope: mail-dnsbl"
+    assert_includes stdout, "mail sources:"
+    assert_includes stdout, "DNSBL sources:"
+    assert_empty stderr
   end
 
   def test_explicit_plan_still_prevents_network_after_confirmation
@@ -629,6 +636,7 @@ class IpQualityTest < Minitest::Test
     assert_equal 1, sections[0].lines.count { |line| line.start_with?("参数") }
     assert_equal 1, sections[1].lines.count { |line| line.start_with?("参数") }
     assert_equal 1, sections[2].lines.count { |line| line.start_with?("参数") }
+    assert_match(/参数\s+\|.*Ipregistry.*IPQS.*Scamalytics/, sections[2])
     assert_operator plain.lines.map { |line| line.chomp.length }.max, :<=, 130
     assert_empty stderr
   end
@@ -838,6 +846,67 @@ class IpQualityTest < Minitest::Test
     end
   end
 
+  def test_smtp_probe_uses_the_system_route_without_binding_the_public_nat_address
+    function_match = File.read(SCRIPT, encoding: "UTF-8").match(
+      /^smtp_probe\(\)\{\n.*?^\}\n(?=check_email_service\(\)\{)/m
+    )
+    refute_nil function_match
+
+    Dir.mktmpdir("ipquality-smtp-route-test") do |directory|
+      fake_nc = File.join(directory, "nc")
+      arguments_file = File.join(directory, "arguments.txt")
+      File.write(fake_nc, <<~'ZSH')
+        #!/bin/zsh -f
+        print -r -- "$@" > "$IPQUALITY_NC_ARGUMENTS_FILE"
+        print -r -- "220 fixture SMTP"
+      ZSH
+      File.chmod(0o700, fake_nc)
+
+      stdout, stderr, status = Open3.capture3(
+        {
+          "PATH" => "#{directory}:#{ENV.fetch("PATH")}",
+          "IPQUALITY_NC_ARGUMENTS_FILE" => arguments_file
+        },
+        "/bin/zsh", "-f", "-c",
+        'eval "$1"; IP=198.51.100.23; smtp_probe smtp.example 25 2',
+        "smtp-system-route-test", function_match[0]
+      )
+
+      assert status.success?, stderr
+      assert_equal "-w 2 smtp.example 25\n", File.read(arguments_file)
+      assert_equal "220 fixture SMTP\n", stdout
+      refute_includes File.read(arguments_file), "198.51.100.23"
+      assert_empty stderr
+    end
+  end
+
+  def test_dnsbl_report_explains_aggregate_uceprotect_levels
+    function_match = File.read(SCRIPT, encoding: "UTF-8").match(
+      /^show_dnsbl\(\)\{\n.*?^\}\n(?=show_tail\(\)\{)/m
+    )
+    refute_nil function_match
+
+    report_probe = <<~'ZSH'
+      typeset -A smail
+      YY=cn Font_Red='' Font_Yellow='' Font_Cyan='' Font_Suffix=''
+      smail[sdnsbl]='IP地址黑名单数据库：有效 422'
+      smail[blacklisted_zones]='dnsbl-2.uceprotect.net, dnsbl-3.uceprotect.net'
+      smail[marked_zones]=''
+      eval "$1"
+      show_dnsbl
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", report_probe,
+      "dnsbl-aggregate-context-test", function_match[0]
+    )
+
+    assert status.success?, stderr
+    assert_includes stdout, "dnsbl-2.uceprotect.net, dnsbl-3.uceprotect.net"
+    assert_includes stdout, "网段／ASN 级记录"
+    assert_includes stdout, "不等于这个单独 IP 曾发送垃圾邮件"
+    assert_empty stderr
+  end
+
   def test_only_implemented_report_languages_are_advertised_and_accepted
     source = File.read(SCRIPT, encoding: "UTF-8")
     assert_includes source, "-l cn|en"
@@ -865,15 +934,17 @@ class IpQualityTest < Minitest::Test
   end
 
   def test_live_gate_rejects_incompatible_family_and_unsafe_interface_before_lookup
-    stdout, stderr, status = run_script(
-      "--confirm-network-lookup",
-      "--scope",
-      "dnsbl",
-      "-6"
-    )
-    assert_equal 61, status.exitstatus
-    assert_includes stdout, "DNSBL"
-    assert_empty stderr
+    %w[dnsbl mail-dnsbl].each do |scope|
+      stdout, stderr, status = run_script(
+        "--confirm-network-lookup",
+        "--scope",
+        scope,
+        "-6"
+      )
+      assert_equal 61, status.exitstatus
+      assert_includes stdout, "DNSBL"
+      assert_empty stderr
+    end
 
     stdout, stderr, status = run_script(
       "--confirm-network-lookup",
