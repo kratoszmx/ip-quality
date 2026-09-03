@@ -132,7 +132,7 @@ module IpQuality
         options.banner = <<~BANNER
           Usage:
             test-clash-leaf --confirm-network-lookup [-4|-6] [-f] [-j]
-            test-clash-leaf --direct --confirm-network-lookup [-4|-6] [-f] [-j]
+            test-clash-leaf --direct --confirm-network-lookup [-4] [-f] [-j]
             test-clash-leaf --list-subscriptions
             test-clash-leaf --subscription NAME --list-leaves
             test-clash-leaf --profile PATH --leaf NAME --config-test-only
@@ -159,7 +159,7 @@ module IpQuality
           @mihomo_explicit = true
         end
         options.on("--config-test-only", "Render and run Mihomo -t only; start no listener and make no lookup") { @config_test_only = true }
-        options.on("--confirm-network-lookup", "Authorize the selected route's live reputation lookup") { @confirmed = true }
+        options.on("--confirm-network-lookup", "Authorize the selected route's live network queries") { @confirmed = true }
         options.on("-4", "Test IPv4 only") { choose_family("-4") }
         options.on("-6", "Test IPv6 only") { choose_family("-6") }
         options.on("-f", "Show the full tested IP in the local report") { @report_arguments << "-f" }

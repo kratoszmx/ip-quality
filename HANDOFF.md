@@ -1,294 +1,123 @@
-# IP quality standalone handoff
+# Current handoff
 
-Last validated: 2026-08-26, Asia/Shanghai.
+Last offline validation: 2026-09-03, Asia/Shanghai.
 
-## Repository identity
+## Repository state
 
 - Worktree: `/Users/zmx/Projects/projects/ipquality`
-- Branch: `main` only
-- Online primary: `https://github.com/kratoszmx/ip-quality.git` (public; empty
-  before the 2026-08-24 synchronization)
-- Online backup: `https://github.com/kratosbackup/ipquality.git` (private;
-  backup-specific authenticated access confirmed on 2026-08-25)
+- Maintained branch: `main`
 - Branch upstream: `github-kratoszmx/main`
+- Primary remote: `https://github.com/kratoszmx/ip-quality.git`
+- Backup remote: `https://github.com/kratosbackup/ipquality.git`
 
-The corrected `kratoszmx/ip-quality` target is accessible to the owner's current
-credential. GitHub reports it as public; do not change repository visibility
-without an explicit owner decision. The backup-specific token authenticates as
-`kratosbackup`, can access the private backup repository, and is passed only by a
-temporary askpass environment. macOS's default credential helper can otherwise
-pre-fill the primary GitHub identity and produce a misleading `Repository not
-found`; one-shot backup operations disable that helper without changing local or
-global Git configuration. Both online remotes were brought to the current `main`
-after the 2026-08-25 validation. Never place a token in a remote URL or Git
-configuration.
+Only the two online remotes above are configured. The former parent-project
+subtree and its routing hooks have already been removed; maintained code lives
+only in this standalone repository. Historical extraction details remain in Git,
+while upstream source identity and licensing remain in `UPSTREAM.md`.
 
-The obsolete `origin` and `usb` remotes were disconnected. Their exact bare
-repositories, `/Users/zmx/gitrepos/ipquality.git` and
-`/Volumes/USB/gitreposbak/ipquality.git`, were moved to the macOS Trash rather
-than deleted irreversibly. The USB receive wrapper was removed with those
-remotes. This worktree now uses online remotes only.
+There is no project-specific `.agents/skills/` directory. This is intentional:
+`AGENTS.md` contains the compact operational rules, and no separate reusable
+workflow currently justifies another skill entrypoint.
 
-## Extracted history
+## Current product behavior
 
-The complete former `network-manager/ip-quality/` path was extracted with
-`git subtree split --prefix=ip-quality main`. The standalone history is:
+The reporter version is `v2026-08-27-standalone.13`.
 
-- `7d9d1f8c20e04f99277664426482f73890ecc379` — original parent commit
-  `c45a4c22a1296443d41b8bec30807698cad1c56e`
-- `835621c3852338669993992f80cdc0f38a6e0a8f` — original parent commit
-  `69acba677c662ce21ba3f5c756312dc0d3a6dc36`
-- `2879887b17f41d29ab253efdd179129cf5ea8fe7` — original parent commit
-  `b16a9fbb96159e4a04a72c1a05a2a725cb99cd2f`
+- `/bin/zsh -f bin/ip-quality` is the safest first command. It prints the
+  selected scope, provider disclosure, output policy, and network gate without
+  making a lookup.
+- `/bin/zsh -f bin/test-clash-leaf --direct` prints the comprehensive direct
+  route plan without needing a Clash cache. Adding the confirmation flag runs
+  `full` over the current system IPv4 route, removes inherited proxy variables,
+  and starts no Mihomo process.
+- Running `bin/test-clash-leaf` without `--direct` opens a route menu backed by
+  the Clash Verge cached-subscription catalog. It offers the direct report,
+  a specific-public-IP reputation lookup, then each cached remote subscription.
+  This menu therefore needs a readable Clash Verge cache even if the user later
+  selects a direct route.
+- A specific-IP menu run forwards one validated address to reputation providers
+  over the proxy-cleared system route. Ping0 is skipped because its public
+  `/geo` endpoint describes only the caller's egress. No Mihomo process starts.
+- A subscription run selects one exact inline leaf from one cached remote
+  subscription, copies only that leaf and any concrete `dialer-proxy`
+  dependencies, and runs `reputation` through a private loopback-only Mihomo.
+  Live Clash selection and configuration remain unchanged.
+- The raw reporter also supports `reputation`, `dnsbl`, `media-ai`, `mail`,
+  `mail-dnsbl`, and `full`. Exact-leaf routing intentionally stays
+  reputation-only; the route runner's normal direct report is IPv4-only and
+  uses `full`.
 
-The extraction preserves authorship, timestamps, messages, and file history
-without retaining parent-repository files or nested Git metadata.
-
-## Standalone structure and decisions
-
-- The reporter moved from the root to `bin/ip-quality`; no compatibility wrapper
-  remains.
-- Exact-leaf runtime code is under `leaf_runner/`; provider parsers, terminal
-  rendering, references, fixtures, and tests have their own directories.
-- The default route selector places a comprehensive direct IPv4 report first,
-  an interactive specific-public-IP reputation lookup second, and cached remote
-  subscriptions afterward. The direct report combines reputation, media/AI,
-  mail connectivity, and DNSBL in one output. Every direct mode removes inherited
-  proxy environment variables and runs no Mihomo process; subscription mode
-  retains reputation-only exact-leaf isolation.
-- Report stdout goes through `report/output.zsh`, which uses raw zsh `print` so
-  JSON escapes such as `\n` and `\t` survive unchanged until the consumer parses
-  them.
-- Optional official Ipregistry and IPQualityScore adapters live beside their
-  fixture-testable parsers in `providers/`. The loader accepts the global
-  assignment file and ignored project-local raw `secrets/ipregistry` / `secrets/ipqs`
-  files, with project-local values taking precedence. Every file is data-only,
-  mode `600`, and never enters Git, reports, or process arguments. IPQS falls
-  back to the named Check.Place relay and always keeps a compact source/status
-  score column; an unavailable optional Ipregistry source does not create an
-  empty table column.
-- The official IPQS path checks the account-usage endpoint before the reputation
-  lookup. A zero balance or authenticated insufficient-credit response stops
-  there, preserving the quota state without spending another failed lookup.
-- A positional public target address is now a working reporter input rather
-  than stale help text. It is limited to reputation or DNSBL lookups. Ping0 is
-  skipped with an explanation because its public `/geo` endpoint can only
-  verify the caller's current egress.
-- DB-IP is intentionally absent: its free location endpoint duplicates existing
-  observations, while its useful proxy/crawler/threat fields require the paid
-  Extended plan. The retired scraper, parser, fixture, JSON keys, and credential
-  entry were removed together.
-- The former generic-looking `lib/safe_snapshot.rb` is now the project-specific
-  `leaf_runner/safe_snapshot.rb`.
-- The obsolete README is removed under the local AI-native documentation policy.
-  Operational truth is in `AGENTS.md`, provider contracts in `PROVIDERS.md`, and
-  provenance in `UPSTREAM.md`.
-- `/Users/zmx/Projects/myutils` was inspected. Its public APIs are Python APIs;
-  this source-auditable zsh/system-Ruby runtime has no valid reusable dependency.
-  Project-specific process, cache, provider, and terminal-table policy remains
-  here instead of being forced into `myutils`.
-
-## Safety and output behavior
-
-- Default execution prints a disclosure plan and performs no network lookup.
-- Live provider access requires the exact `--confirm-network-lookup` gate.
-- Reputation sources are described in two tiers: official-contract core sources
-  and clearly attributed supplementary demo/relay sources. Browser leak pages
-  remain separate from this non-browser reputation report.
-- Terminal reputation sections are compact, data-driven matrices: providers with
-  usable results are across the top and dimensions are down the left. Safe boolean
-  factors are green and risk factors are red. A field omitted from an otherwise
-  usable response is shown as `-`; wholly unavailable sources are named once in a
-  compact summary and never presented as clean. JSON retains every provider and
-  represents unavailable values as `null`.
-- Each of the type, score, and factor matrices stays on one uninterrupted
-  provider row. ANSI background padding from inherited labels is normalized
-  before table padding. Missing cells use an ASCII hyphen and the score-band
-  label uses an ASCII slash, avoiding ambiguous-width punctuation that otherwise
-  shifts every later separator in some terminals. Ping0, RIPEstat, and Shodan
-  share one compact official-network observation section.
-- IPQS exposes connection type in the type matrix when supplied, score and
-  source/status in the score matrix on every attempted query, and returned
-  booleans in the factor matrix. Relay failure, quota, and rate-limit states no
-  longer make the provider disappear. Shodan's parsed hostname count is now
-  retained in terminal and JSON output.
-- The successful-IPQS fixture and aligned report test prove that region, proxy,
-  VPN, Tor, hosting, abuse, and bot observations appear in the factor matrix.
-  A quota-only response has no such observations, so it stays visible in the
-  score source/status row without creating a column full of dashes.
-- Allowlisted unavailability is reported with a reason instead of repeated
-  unknown cells. IPQualityScore relay credit exhaustion is attributed in its
-  score source/status row, while a direct-key quota error is attributed to the
-  official API. Shodan InternetDB's no-public-record response is shown as
-  context rather than cleanliness; arbitrary upstream error messages are never
-  echoed.
-- Check.Place-backed providers retain independent HTTP outcomes. A Cloudflare
-  block page is classified separately from an ordinary 403, and the compact
-  summary groups only the affected relay names; an IPQS failure cannot suppress
-  a successful IP2Location, AbuseIPDB, Scamalytics, ipdata, or MaxMind-shaped
-  result.
-- Risk-score labels appear only when the provider explicitly returns one. Numeric
-  relay scores are never converted into locally invented low/medium/high bands.
-- IPinfo is identified as a public demo widget, ipapi.is as a direct public API,
-  and Check.Place-backed vendor rows as upstream relays.
-- JSON is built with `jq --arg` bindings rather than source interpolation, and
-  keeps booleans, numbers, and null values typed. The basic-information source
-  follows the actual MaxMind-shaped relay/IPinfo fallback, and display labels
-  such as `未知` normalize to JSON `null`. A top-level `ProviderStatus` map keeps
-  Check.Place-backed HTTP failures separately from usable provider fields.
-- DNSBL terminal output names every marked or blacklisted zone. JSON retains a
-  per-zone `Results` map in addition to totals, so aggregate counts never erase
-  which source produced a finding.
-- User-selected output paths use an exclusive, no-follow file descriptor; existing
-  paths and symlinks are rejected.
-- Default terminal and JSON reports mask both the tested IP and a RIPEstat routed
-  prefix derived from it. `-f` is required to reveal either value.
-- The runner deletes its private Mihomo workspace on success, error, and interrupt;
-  TERM/HUP also terminate and reap the reporter process group. A later run securely
-  scavenges a dead-owner workspace left by unavoidable SIGKILL or host failure.
-- Clash Verge subscription caches are external read-only inputs and are never
-  deleted. User-requested report files are outputs, not caches.
-- The basic-information section is labeled as a Check.Place upstream relay whose
-  payload is labeled MaxMind. This repository does not claim to own a local `.mmdb`
-  or an official MaxMind subscription.
-- Only the implemented `cn` and `en` report languages are advertised.
-
-## Validated commands
-
-The normal user-facing entrypoint is intentionally one command. It opens the
-route menu, keeps the live-network consent explicit, selects IPv4, and reveals
-the exact tested IP only because `-f` is present:
+After the user has explicitly accepted the disclosure, the simplest masked live
+direct report is:
 
 ```text
-/bin/zsh -f /Users/zmx/Projects/projects/ipquality/bin/test-clash-leaf --confirm-network-lookup -4 -f
+/bin/zsh -f bin/test-clash-leaf --direct --confirm-network-lookup
 ```
 
-Agent-only validation from the repository root:
+For the interactive route/subscription menu, use this only after the same
+authorization and only when the Clash Verge cache is available:
+
+```text
+/bin/zsh -f bin/test-clash-leaf --confirm-network-lookup -4
+```
+
+Terminal and JSON output mask the tested address and RIPEstat prefix by default;
+`-f` reveals them. `-j` selects JSON stdout. `-o` exclusively creates a new
+local file and rejects existing paths and symlinks. ANSI, JSON, and plain-text
+file output are selected by the filename extension.
+
+## Provider and credential state
+
+Provider contracts, disclosure, score semantics, and route boundaries are kept
+in `PROVIDERS.md`. Availability is deliberately a per-run result: a relay block,
+rate limit, quota response, or schema change becomes an unknown/unavailable
+status rather than a clean finding. A missing required command stops explicitly
+before a report and also supplies no clean evidence.
+
+Optional official Ipregistry and IPQualityScore keys can come from the private
+global assignment file or ignored project-local raw key files. Project-local
+values take precedence. The loader validates ownership, permissions, syntax,
+and key characters before use; keys are passed to curl through standard-input
+configuration rather than process arguments. No credential value is expected in
+Git or reports.
+
+The application owns no persistent cache. Clash Verge subscription caches are
+external read-only inputs. Isolated Mihomo configuration and logs live in a
+private temporary workspace and are removed on success, ordinary failure, and
+handled interrupt; later runs can scavenge a dead-owner workspace left by an
+unavoidable process or host failure.
+
+## Validation evidence
+
+The following commands passed from the repository root on 2026-09-03 without a
+live provider, DNS, mail, or proxy lookup:
 
 ```text
 /bin/zsh -n bin/ip-quality bin/test-clash-leaf scripts/test-offline providers/*.zsh report/*.zsh
 for file in leaf_runner/*.rb; do /usr/bin/ruby -c "$file"; done
 /bin/zsh -f scripts/test-offline
 /bin/zsh -f bin/ip-quality --self-test
-print -r -- 1 | /bin/zsh -f bin/test-clash-leaf
+/bin/zsh -f bin/ip-quality --help
+/bin/zsh -f bin/test-clash-leaf --direct
 ```
 
-The full offline suite currently has 58 runs and 839 assertions. It covers raw
-JSON stdout with embedded tab/newline/ANSI data, real green safe-factor and red
-risk-factor bytes, single-matrix CJK/ANSI table separator positions, strict
-official provider fixtures, global/project-local private data-only credential
-loading, IPQS quota preflight short-circuiting, direct/specific-IP
-proxy-environment removal, the comprehensive direct `full` menu route,
-explicit-target scope/family validation, provider-failure independence,
-Cloudflare block-page classification, per-zone DNSBL JSON retention, exact-leaf
-isolation, and cleanup on success, failure, and signal.
+The complete fixture-only suite passed 58 runs and 839 assertions: reporter
+tests contributed 38 runs/687 assertions and exact-leaf tests contributed
+20 runs/152 assertions. The self-test also validated all 422 vendored DNSBL
+entries.
 
-A live direct IPv4 menu run on 2026-08-25 displayed the exact IP under the
-explicit `-f` choice, produced aligned type/score/factor tables with real green
-and red highlighting, returned an IPQS relay score of 20, and merged Ping0,
-RIPEstat, and Shodan into one compact section. An immediate masked JSON rerun
-parsed cleanly through `jq` and reached a Check.Place relay account whose IPQS
-credits were exhausted, confirming that the two allowlisted states can vary by
-relay request. No internal reporter command was printed. The preferred private
-temporary parent and `/tmp` both stayed at zero owned workspaces afterward. A
-prior read-only probe of the real Clash Verge cache
-also selected an exact inline leaf and passed Mihomo `-t` without starting a
-listener or making an IP-provider lookup.
+Coverage includes the no-network gate, every scope plan, CLI validation,
+provider parsing and failure independence, private credential loading, typed and
+masked JSON, terminal alignment, DNSBL concurrency/results, SMTP route behavior,
+direct/specific-IP proxy removal, exact-leaf dependency closure, listener
+ownership, and cleanup on success, failure, and signal.
 
-A separate masked live direct lookup on 2026-08-25 loaded the owner-provided
-Ipregistry key from the private data-only credential file. The official endpoint
-returned `ok`; the strict parser retained its usage/company, country, proxy, VPN,
-Tor, hosting, and abuse fields, and the resulting JSON passed typed assertions.
-The secret itself never appeared in output, process arguments, or Git.
+No live lookup was repeated during this documentation pass. Past provider or
+relay availability is not treated as current state; run a newly authorized live
+check when current network evidence is actually needed.
 
-Three owner-supplied public IPv4 targets were compared live on 2026-08-26 with
-reputation and all 422 vendored DNSBL zones. The direct Ipregistry, IPinfo,
-ipapi.is, RIPEstat, and Shodan paths returned usable observations; Ping0 was
-correctly skipped for explicit targets. The Check.Place vendor relays returned
-no usable JSON during this run, and IPQS stayed visible as relay/query-failed.
-One target had a single ASN-level DNSBL listing plus a Shodan `proxy` tag, one
-had the Shodan tag without a DNSBL listing, and one had neither. Raw full-IP
-JSON/ANSI reports stayed in a private directory under `/Users/zmx/tmp` and were
-not added to Git.
+## Handoff status
 
-On 2026-08-27, the real one-command menu selected its new `Specific IP` entry
-and inspected an owner-supplied public IPv4 without starting Mihomo or touching
-live Clash state. The project-local raw Ipregistry and IPQS keys loaded only
-after passing ownership/mode validation. Ipregistry returned usable official
-data; IPQS authenticated but the account reported insufficient credits. Six
-Check.Place endpoints independently returned Cloudflare HTTP 403, and the
-terminal grouped MaxMind-shaped, IP2Location, AbuseIPDB, Scamalytics, and ipdata
-under that shared relay condition while retaining the successful direct rows.
-No key or arbitrary provider error text appeared in process arguments or output.
-
-A same-day follow-up compared the Check.Place request used by standalone.8 with
-the current request and with the upstream project's current source. The endpoint
-and request shape were unchanged. The old request now received Cloudflare's
-explicit block page from both the direct egress and the existing Clash proxy
-egress, while the script-download hosts remained reachable. The reporter now
-names that WAF state instead of presenting a generic empty provider, and the
-official IPQS path preflights account usage before attempting a credit-consuming
-IP lookup. A later isolated cached US leaf accepted the same requests with the
-same standalone.11 build and restored MaxMind, IP2Location, AbuseIPDB,
-Scamalytics, and ipdata in one report, confirming that the relay result varies by
-egress rather than by parser version.
-
-The current `LloydAsp/NodeQuality` runner was reviewed on 2026-08-27.
-NodeQuality orchestrates a disposable VPS test environment, but its IP-quality
-step directly executes `IP.Check.Place`; it is therefore a useful
-integration/report reference, not another reputation source. Its complete
-direct IP report and compact mail-connectivity plus DNSBL grouping are now
-represented by one `full` direct menu route. Its VPS hardware, kernel/NAT, bulk
-speed, and return-path measurements were not mixed into an HTTP leaf reputation
-report because they describe the machine that runs the benchmark rather than
-the selected leaf.
-
-A fresh same-minute comparison used the current one-command menu against the
-home China Mobile egress and isolated Japanese and Hong Kong leaves. The home
-egress again received the explicit Cloudflare block page from every
-Check.Place-backed reputation endpoint, while both isolated leaves returned the
-complete MaxMind-shaped, IP2Location, AbuseIPDB, Scamalytics, and ipdata rows.
-This makes an egress-specific WAF decision the supported diagnosis. Repeated
-development lookups are a plausible trigger, but the exact Cloudflare rule
-cannot be known without Check.Place's server-side event log.
-
-The direct mail+DNSBL work exposed and fixed one VPS-to-home-NAT assumption
-before delivery: the inherited SMTP probe tried to bind the public egress IP as
-a local source address. After letting the system route choose its real local
-address, the live run showed outbound TCP/25 was available and seven of twelve
-public MX families returned an SMTP greeting. Of 422 vendored DNSBL zones, 411
-returned no listing, two returned the ordinary blacklisted answer, one returned
-another marked answer, and eight were unknown because their DNS lookups did not
-produce a usable result. The terminal named every listing instead of collapsing
-them into a cleanliness claim, and explains that the two UCEPROTECT hits are
-netblock/ASN-level rather than evidence that this individual address sent spam.
-These observations now follow the reputation and media/AI sections in the same
-normal direct report. No Mihomo process was started and live Clash remained
-unchanged.
-
-On 2026-08-27, standalone.13 folded the previously separate direct reputation
-and mail+DNSBL menu paths into one comprehensive `full` IPv4 report and included
-the existing media/AI scope in that same output. A live home-route validation
-continued through every section despite Check.Place's egress-specific
-Cloudflare block: direct IPinfo, Ipregistry, ipapi.is, IPQS account status,
-Ping0, RIPEstat, and Shodan remained visible; the sixth media/AI section ran all
-six probes; and the seventh mail/DNSBL section reported outbound TCP/25, twelve
-MX families, and all 422 vendored zones. This proves a reputation-source failure
-does not suppress either later section. The redundant third menu route was
-removed, no Mihomo process was started, and live Clash remained unchanged.
-
-## Completed parent extraction
-
-The original `network-manager/ip-quality/` subtree and its explicit root routing
-entries were removed in parent commit
-`e88a5c48ebd3dadea065a2d361f39fc9d5bdf793` (`refactor: extract IP quality
-project`). That commit passed the complete parent offline aggregate in a clean,
-detached worktree and was pushed to both:
-
-- `/Users/zmx/gitrepos/network-manager.git`
-- `/Volumes/USB/gitreposbak/network-manager.git`
-
-Both parent remotes resolve `refs/heads/main` to the same extraction commit. The
-current parent tree has no `ip-quality/` directory and no active `ip-quality`,
-`test-clash-leaf`, or `ip_quality` routing reference. Historical parent commits
-remain ordinary Git recovery evidence; all maintained code now lives here.
+There is no known code, documentation, migration, or test blocker. Future work
+should start with the network-free plan and offline suite, then read
+`PROVIDERS.md` before changing query semantics or adding a source.
