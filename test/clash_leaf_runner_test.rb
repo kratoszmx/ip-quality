@@ -389,6 +389,24 @@ class ClashLeafRunnerTest < Minitest::Test
     end
   end
 
+  def test_profile_parser_rejects_recursive_aliases_and_non_mapping_roots
+    Dir.mktmpdir("ip-quality-profile-parse-") do |directory|
+      {
+        "recursive.yaml" => "proxies: &loop [*loop]\n",
+        "non-mapping.yaml" => "- not-a-profile\n"
+      }.each do |filename, contents|
+        path = File.join(directory, filename)
+        File.write(path, contents)
+        File.chmod(0o600, path)
+
+        error = assert_raises(IpQuality::ClashLeafProfile::Error) do
+          IpQuality::ClashLeafProfile.from_file(path)
+        end
+        assert_match(/recursive YAML aliases|root must be a YAML mapping/, error.message)
+      end
+    end
+  end
+
   def test_configuration_workspace_is_removed_after_success_and_failure
     Dir.mktmpdir("ip-quality-cleanup-") do |directory|
       fake_mihomo = File.join(directory, "fake-mihomo")
@@ -453,6 +471,72 @@ class ClashLeafRunnerTest < Minitest::Test
     end
   end
 
+  def test_confirmed_exact_leaf_report_uses_only_the_isolated_loopback_proxy
+    Dir.mktmpdir("ip-quality-leaf-isolation-") do |directory|
+      profile_path = File.join(directory, "profile.yaml")
+      fake_mihomo = File.join(directory, "fake-mihomo")
+      fake_reporter = File.join(directory, "fake-reporter")
+      mihomo_pid_file = File.join(directory, "mihomo.pid")
+      reporter_pid_file = File.join(directory, "reporter.pid")
+      arguments_file = File.join(directory, "arguments.txt")
+      write_private_yaml(profile_path, fixture_document)
+      write_loopback_fake_mihomo(fake_mihomo)
+      File.write(fake_reporter, <<~'ZSH')
+        #!/bin/zsh
+        emulate -LR zsh
+        endpoint="${HTTP_PROXY-}"
+        [[ "$endpoint" == http://127.0.0.1:<1-65535> ]] || exit 71
+        [[ "$ALL_PROXY" == "$endpoint" && "$HTTPS_PROXY" == "$endpoint" ]] || exit 72
+        [[ "$all_proxy" == "$endpoint" && "$http_proxy" == "$endpoint" && "$https_proxy" == "$endpoint" ]] || exit 73
+        [[ "${HtTp_PrOxY+x}${No_PrOxY+x}${no_proxy+x}" == "" ]] || exit 74
+        [[ "$IPQUALITY_ISOLATED_EGRESS" == 1 ]] || exit 75
+        print -r -- $$ > "$IPQUALITY_TEST_REPORTER_PID_FILE"
+        print -r -- "$@" > "$IPQUALITY_TEST_ARGUMENTS_FILE"
+      ZSH
+      File.chmod(0o700, fake_reporter)
+
+      stdout = StringIO.new
+      stderr = StringIO.new
+      command = IpQuality::ClashLeafCommand.new(
+        stdout: stdout,
+        stderr: stderr,
+        reporter_path: fake_reporter
+      )
+      begin
+        exit_code = with_environment(
+          "HTTP_PROXY" => "http://inherited.test.invalid:1",
+          "https_proxy" => "http://inherited.test.invalid:2",
+          "HtTp_PrOxY" => "http://inherited.test.invalid:3",
+          "No_PrOxY" => "inherited.test.invalid",
+          "no_proxy" => "inherited.test.invalid",
+          "TMPDIR" => directory,
+          "IPQUALITY_TEST_MIHOMO_PID_FILE" => mihomo_pid_file,
+          "IPQUALITY_TEST_REPORTER_PID_FILE" => reporter_pid_file,
+          "IPQUALITY_TEST_ARGUMENTS_FILE" => arguments_file
+        ) do
+          command.run([
+            "--profile", profile_path,
+            "--leaf", "TargetLeaf",
+            "--mihomo", fake_mihomo,
+            "--confirm-network-lookup", "-4"
+          ])
+        end
+
+        assert_equal 0, exit_code, stderr.string
+        assert_equal "--confirm-network-lookup --scope reputation -4\n", File.read(arguments_file)
+        assert File.file?(reporter_pid_file)
+        assert File.file?(mihomo_pid_file)
+        refute process_alive?(Integer(File.read(reporter_pid_file)))
+        refute process_alive?(Integer(File.read(mihomo_pid_file)))
+        assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"), File::FNM_DOTMATCH)
+        assert_includes stderr.string, "Isolated Mihomo stopped"
+      ensure
+        stop_test_child_from_pid_file(reporter_pid_file)
+        stop_test_child_from_pid_file(mihomo_pid_file)
+      end
+    end
+  end
+
   def test_sigterm_stops_reporter_and_mihomo_then_removes_private_workspace
     Dir.mktmpdir("ip-quality-signal-cleanup-") do |directory|
       profile_path = File.join(directory, "profile.yaml")
@@ -462,33 +546,7 @@ class ClashLeafRunnerTest < Minitest::Test
       reporter_pid_file = File.join(directory, "reporter.pid")
       write_private_yaml(profile_path, fixture_document)
 
-      File.write(fake_mihomo, <<~'ZSH')
-        #!/bin/zsh
-        emulate -LR zsh
-        typeset config=''
-        typeset test_only=0
-        while (( $# > 0 )); do
-          case "$1" in
-            -f) config="$2"; shift 2 ;;
-            -t) test_only=1; shift ;;
-            *) shift ;;
-          esac
-        done
-        (( test_only == 1 )) && exit 0
-        typeset port=''
-        while IFS= read -r line; do
-          [[ "$line" == 'mixed-port: '* ]] && port="${line#mixed-port: }"
-        done < "$config"
-        [[ "$port" == <1-65535> ]] || exit 64
-        exec /usr/bin/ruby -rsocket -e '
-          File.write(ENV.fetch("IPQUALITY_TEST_MIHOMO_PID_FILE"), Process.pid.to_s)
-          Signal.trap("TERM") { exit }
-          Signal.trap("HUP") { exit }
-          TCPServer.new("127.0.0.1", Integer(ARGV.fetch(0)))
-          sleep
-        ' "$port"
-      ZSH
-      File.chmod(0o700, fake_mihomo)
+      write_loopback_fake_mihomo(fake_mihomo)
 
       File.write(fake_reporter, <<~'ZSH')
         #!/bin/zsh
@@ -553,6 +611,8 @@ class ClashLeafRunnerTest < Minitest::Test
           Process.kill("KILL", runner_pid)
           Process.waitpid(runner_pid)
         end
+        stop_test_child_from_pid_file(reporter_pid_file)
+        stop_test_child_from_pid_file(mihomo_pid_file)
       end
     end
   end
@@ -642,6 +702,36 @@ class ClashLeafRunnerTest < Minitest::Test
     File.chmod(0o600, path)
   end
 
+  def write_loopback_fake_mihomo(path)
+    File.write(path, <<~'ZSH')
+      #!/bin/zsh
+      emulate -LR zsh
+      typeset config=''
+      typeset test_only=0
+      while (( $# > 0 )); do
+        case "$1" in
+          -f) config="$2"; shift 2 ;;
+          -t) test_only=1; shift ;;
+          *) shift ;;
+        esac
+      done
+      (( test_only == 1 )) && exit 0
+      typeset port=''
+      while IFS= read -r line; do
+        [[ "$line" == 'mixed-port: '* ]] && port="${line#mixed-port: }"
+      done < "$config"
+      [[ "$port" == <1-65535> ]] || exit 64
+      exec /usr/bin/ruby -rsocket -e '
+        File.write(ENV.fetch("IPQUALITY_TEST_MIHOMO_PID_FILE"), Process.pid.to_s)
+        Signal.trap("TERM") { exit }
+        Signal.trap("HUP") { exit }
+        TCPServer.new("127.0.0.1", Integer(ARGV.fetch(0)))
+        sleep
+      ' "$port"
+    ZSH
+    File.chmod(0o700, path)
+  end
+
   def write_clash_verge_fixture(directory)
     profiles_directory = File.join(directory, "profiles")
     Dir.mkdir(profiles_directory, 0o700)
@@ -675,6 +765,22 @@ class ClashLeafRunnerTest < Minitest::Test
     true
   rescue Errno::ESRCH
     false
+  end
+
+  def stop_test_child_from_pid_file(path)
+    return unless File.file?(path)
+
+    pid = Integer(File.read(path), 10)
+    return unless process_alive?(pid)
+
+    Process.kill("TERM", pid)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2
+    until !process_alive?(pid) || Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+      sleep 0.05
+    end
+    Process.kill("KILL", pid) if process_alive?(pid)
+  rescue ArgumentError, Errno::ESRCH, Errno::EPERM
+    nil
   end
 
   def with_environment(overrides)

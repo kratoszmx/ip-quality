@@ -26,6 +26,7 @@ disclosure. A plan is not a measurement.
 | --- | --- |
 | [AGENTS.md](AGENTS.md) | Usage, safety, source map, and test entrypoints |
 | [HANDOFF.md](HANDOFF.md) | Current version, validation evidence, and pending work |
+| [TESTING.md](TESTING.md) | Offline prerequisites, complete/focused commands, suite ownership, and result interpretation |
 | [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md) | Shared APIs, definitions, callers, inputs/outputs, and examples |
 | [SERVICES.md](SERVICES.md) | No resident service; temporary process startup, shutdown, and checks |
 | [PROVIDERS.md](PROVIDERS.md) | Query scopes, source contracts, and disclosure |
@@ -161,6 +162,8 @@ live in [PROVIDERS.md](PROVIDERS.md); consult it when changing a source.
 - `report/`: provider-aware terminal output without a synthetic combined score.
 - `ref/`: vendored runtime data.
 - `test/fixtures/`: sanitized provider responses.
+- `test/*_test.rb`, `test/support/`: focused suites and test-only helpers; see
+  [TESTING.md](TESTING.md).
 - `scripts/test-offline`: complete fixture-only validation entrypoint.
 
 ## Development guidance
@@ -168,14 +171,10 @@ live in [PROVIDERS.md](PROVIDERS.md); consult it when changing a source.
 - Tests remain offline: no external DNS, HTTP, mail, SSH, browser, proxy, or paid
   route. Add a sanitized fixture and parser contract with every new provider.
 - Run the complete suite from the worktree root with
-  `/bin/zsh -f scripts/test-offline`. Focused tests use
-  `/usr/bin/ruby test/common_test.rb`,
-  `/usr/bin/ruby test/ip_quality_test.rb` and
-  `/usr/bin/ruby test/clash_leaf_runner_test.rb`; system-bundled `minitest` is the
-  only test-time default gem. Keep gems enabled for these test commands. The
-  suite covers provider/output contracts and the runner's route isolation,
-  file safety, and cleanup using fixtures and fake executables. Its pass does
-  not establish current provider availability or real-node connectivity.
+  `/bin/zsh -f scripts/test-offline`. [TESTING.md](TESTING.md) is the canonical
+  guide to prerequisites, suite responsibilities, focused runs, and failure
+  interpretation. Keep gems enabled for Minitest. A fixture pass does not
+  establish current provider availability or real-node connectivity.
 - Shared helpers and their zsh/system-Ruby boundary are documented in
   [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md). Reuse follows matching caller
   semantics; source schemas, display labels, and lifecycle state stay with

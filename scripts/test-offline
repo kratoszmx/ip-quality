@@ -6,6 +6,9 @@ unset CDPATH
 
 typeset ROOT="${0:A:h:h}"
 
-/usr/bin/ruby "$ROOT/test/common_test.rb"
-/usr/bin/ruby "$ROOT/test/ip_quality_test.rb"
-/usr/bin/ruby "$ROOT/test/clash_leaf_runner_test.rb"
+# Only maintained top-level suites are executable tests; support/ and fixtures/
+# are inputs. One Minitest run gives an aggregate result and seed for all suites.
+exec /usr/bin/ruby -e '
+  root = ARGV.shift
+  Dir.glob(File.join(root, "test", "*_test.rb")).sort.each { |path| require path }
+' -- "$ROOT" "$@"

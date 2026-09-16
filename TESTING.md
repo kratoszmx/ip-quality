@@ -1,0 +1,74 @@
+# Offline tests
+
+## Run from a fresh session
+
+Use macOS `/bin/zsh`, `/usr/bin/ruby` with its bundled `minitest`, `jq` on PATH,
+and `/usr/sbin/lsof`. Normal system utilities are also used. No package install,
+API key, Clash cache, or installed Mihomo is needed. Keep Ruby gems enabled for
+tests; `--disable-gems` is for the production route runner, not Minitest.
+
+```text
+cd /Users/zmx/Projects/projects/ipquality
+/bin/zsh -f scripts/test-offline
+```
+
+The command loads every top-level `test/*_test.rb` into one Minitest run. Success
+means exit status 0 with `0 failures, 0 errors, 0 skips`. The aggregate count and
+random seed appear in the output. A failure names its class, method, and line;
+fix the cause and rerun the affected test, then the complete suite.
+
+These tests make no external HTTP, DNS, SMTP, SSH, or paid-provider requests.
+Runner lifecycle tests briefly open a fake listener on `127.0.0.1` and inspect
+its ownership with `lsof`. A restricted environment that forbids local listeners
+cannot establish lifecycle coverage; report that limitation instead of skipping
+the tests and claiming a complete pass.
+
+## Find the right test
+
+| File | Responsibility |
+| --- | --- |
+| `test/common_test.rb` | Printable text, proxy overrides, verified-file snapshots |
+| `test/ip_quality_test.rb` | CLI plans and rejection gates, dependency failure, fixture DNSBL/SMTP execution |
+| `test/providers_test.rb` | Provider parsing, unknown/failure semantics, credentials, zero-credit preflight |
+| `test/report_test.rb` | Provider tables, ANSI/layout, JSON/file bytes, exclusive report creation |
+| `test/repository_test.rb` | Source/data safety, vendored references, provenance, removed runtime paths |
+| `test/clash_leaf_runner_test.rb` | Cached selection, YAML safety, exact leaf/dependencies, proxy isolation, process cleanup |
+| `test/support/reporter_test_case.rb` | Shared paths, named zsh function probes, isolated reporter copies and fake commands |
+| `test/fixtures/` | Sanitized provider responses; data only |
+
+Each suite can run directly. Minitest options also pass through the complete
+runner; replace the example seed with the one from a failing run:
+
+```text
+/usr/bin/ruby test/providers_test.rb
+/usr/bin/ruby test/report_test.rb --name test_report_writer_rejects_existing_files_links_and_missing_parents
+/bin/zsh -f scripts/test-offline --seed 12345
+```
+
+`bin/test-clash-leaf` is the product's route command, not a test suite. Do not
+execute every file whose name contains `test`. The canonical runner includes
+the reporter's `--self-test` once; it need not be run separately for a full pass.
+
+## Maintain the boundary
+
+- Reporter CLI tests copy only runtime source/data into an owned temporary
+  directory, use an empty credentials configuration directory, and replace
+  network commands with fixtures or rejecting tripwires. They do not copy real
+  project secrets. The tripwires cover command lookups, not arbitrary new socket
+  APIs or absolute-path executables; review any newly introduced transport.
+- Provider and rendering probes load local libraries or named reporter
+  functions. Keep source schemas, expected fields, and fixtures in their owning
+  suite; share only setup with matching semantics. The source audit reads
+  maintained source/data directories, not user reports, secrets, or caches.
+- Route tests use private profiles, fake reporters/Mihomo, and owned temporary
+  workspaces. Preserve checks for cleanup on success, failure, signals, and
+  abandoned workspaces, plus route, link, and malformed-input boundaries.
+- New suites belong at `test/*_test.rb`; helpers and data belong under
+  `test/support/` and `test/fixtures/`. Add a sanitized parser fixture with each
+  provider. Prefer observable results over exact implementation strings; keep
+  source checks for explicit provenance and prohibited-runtime constraints.
+
+Before committing, also run `git diff --check`. Record the current aggregate
+result in [HANDOFF.md](HANDOFF.md). A passing suite proves the local code against
+fixtures; provider availability and real-node connectivity require a separate
+authorized measurement under [AGENTS.md](AGENTS.md) and [PROVIDERS.md](PROVIDERS.md).

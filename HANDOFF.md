@@ -20,30 +20,37 @@ with `/usr/bin/ruby --disable-gems`; older zsh runner commands are obsolete.
 The reporter and test-suite entrypoints remain zsh. Former forwarding files and
 shared-library paths have been removed; no compatibility layer remains.
 
-The documentation audit retains API contracts in
-[COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md), adds the explicit absence of resident
-services and temporary-process ownership in [SERVICES.md](SERVICES.md), and keeps
-usage/document routing in [AGENTS.md](AGENTS.md). There is no project-specific
-skill or nested project documentation. No pending code or documentation blocker
-was identified; no runtime code, tests, credentials, or live Clash state changed
-in this documentation pass.
+The test-maintenance pass split the reporter tests into CLI, provider, report,
+and repository suites with a small shared fixture helper. The canonical runner
+discovers top-level suites and reports one aggregate result. Reporter CLI tests
+use temporary source copies, isolated credential paths, and network-command
+tripwires; source checks exclude private/user-generated directories. Behavioral
+checks now cover report-file safety/formats, DNSBL resolver-policy errors,
+missing dependencies, zero-credit lookup prevention, exact-leaf proxy forwarding,
+and malformed YAML. Existing route/signal cleanup checks remain.
+
+[TESTING.md](TESTING.md) owns prerequisites, focused commands, and test boundaries.
+API contracts remain in [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md), process
+ownership in [SERVICES.md](SERVICES.md), and usage in [AGENTS.md](AGENTS.md).
+There is no project-specific skill or nested project documentation. No production
+code, credentials, or live Clash state changed in this test-maintenance pass.
 
 ## Validation evidence
 
-The complete fixture-only suite passed 65 runs / 908 assertions, with zero
-failures, errors, or skips: common helpers 3 / 29; reporter 40 / 705; route runner
-22 / 174. Syntax, plan/help, local documentation links, and `git diff --check`
-also passed. The self-test validated all 422 vendored DNSBL entries.
+The complete fixture-only suite passed 68 runs / 1,037 assertions, with zero
+failures, errors, or skips (seed 31938). All 14 Ruby and 11 zsh source/test files
+passed syntax checks; local documentation file links and `git diff --check`
+also passed. The included self-test validated all 422 vendored DNSBL entries.
 
 Canonical checks from the worktree root:
 
 ```text
 /bin/zsh -f scripts/test-offline
-/bin/zsh -f bin/ip-quality --self-test
 git diff --check
 ```
 
-Focused suites and plan/help commands are in [AGENTS.md](AGENTS.md). Coverage
+Focused suites are in [TESTING.md](TESTING.md); plan/help commands are in
+[AGENTS.md](AGENTS.md). Coverage
 includes provider failure independence, private credentials, typed/masked
 output, DNSBL bounds/results, SMTP behavior, shared text and snapshot contracts,
 proxy removal, exact-leaf dependencies, listener ownership, and signal cleanup.

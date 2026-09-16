@@ -119,13 +119,15 @@ values to this Hash. This helper does not change system VPN/TUN routing.
 
 ## Validation and maintenance
 
-Run `/bin/zsh -f scripts/test-offline` from the worktree root. It includes the
+Run `/bin/zsh -f scripts/test-offline` from the worktree root; focused commands
+and test-only helpers are in [TESTING.md](TESTING.md). The suite includes the
 Ruby common contracts, provider/terminal fixtures, and route integration tests.
 `test/common_test.rb` checks encoding/byte/control-character boundaries, proxy
 overrides, file-size/mode limits, verification-only symlink rejection, and
 snapshot replacement. Runner tests retain cleanup, signal, link rejection, and
-route-isolation coverage. Reporter tests exercise the shared terminal functions
-and retain typed JSON and actual ANSI output checks.
+route-isolation coverage. `test/providers_test.rb` exercises shared provider
+values; `test/report_test.rb` checks terminal functions and real file/ANSI bytes.
+The CLI self-test retains typed JSON checks.
 
 Mihomo process lifecycle and cleanup remain in `leaf_runner/`; they carry
 session state, listener ownership, and recovery policy. Shared modules contain

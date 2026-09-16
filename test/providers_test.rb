@@ -1,0 +1,344 @@
+# frozen_string_literal: true
+
+require_relative "support/reporter_test_case"
+
+class ProvidersTest < ReporterTestCase
+  def test_ping0_parser_accepts_exact_four_line_geo_and_rejects_challenge_html
+    parser_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      source "$1"
+      response=$(<"$2")
+      ping0_parse_geo "$response" "$3" || exit $?
+      print -r -- "${ping0_parsed[0]}|${ping0_parsed[2]}|${ping0_parsed[3]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      parser_probe,
+      "ping0-parser-test",
+      PING0_LIBRARY,
+      PING0_GEO_FIXTURE,
+      "198.51.100.23"
+    )
+    assert status.success?, stderr
+    assert_equal "198.51.100.23|AS64500|Example Network\n", stdout
+    assert_empty stderr
+
+    _stdout, _stderr, challenge_status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      parser_probe,
+      "ping0-parser-test",
+      PING0_LIBRARY,
+      PING0_CHALLENGE_FIXTURE,
+      "198.51.100.23"
+    )
+    refute challenge_status.success?
+  end
+
+  def test_official_context_provider_parsers_reject_mismatches_and_keep_dimensions
+    parser_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      source "$1"
+      response=$(<"$2")
+      ripestat_parse_network_info "$response" || exit $?
+      print -r -- "${ripestat_parsed[prefix]}|${ripestat_parsed[origins]}"
+      source "$3"
+      response=$(<"$4")
+      internetdb_parse_response "$response" "$5" || exit $?
+      print -r -- "${internetdb_parsed[ports]}|${internetdb_parsed[hostname_count]}|${internetdb_parsed[vulnerability_count]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      parser_probe,
+      "provider-parser-test",
+      RIPESTAT_LIBRARY,
+      RIPESTAT_FIXTURE,
+      INTERNETDB_LIBRARY,
+      INTERNETDB_FIXTURE,
+      "198.51.100.23"
+    )
+    assert status.success?, stderr
+    assert_equal "198.51.100.0/24|AS64500\n22, 443|1|1\n", stdout
+    assert_empty stderr
+
+    _stdout, _stderr, malformed_asn_status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      'setopt KSH_ARRAYS; source "$1"; ripestat_parse_network_info "$2"',
+      "ripestat-malformed-asn-test",
+      RIPESTAT_LIBRARY,
+      '{"status":"ok","data":{"prefix":"198.51.100.0/24","asns":["AS64500"]}}'
+    )
+    refute malformed_asn_status.success?
+
+    _stdout, _stderr, mismatch_status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      'setopt KSH_ARRAYS; source "$1"; internetdb_parse_response "$(<"$2")" "$3"',
+      "provider-mismatch-test",
+      INTERNETDB_LIBRARY,
+      INTERNETDB_FIXTURE,
+      "198.51.100.24"
+    )
+    refute mismatch_status.success?
+  end
+
+  def test_common_provider_helpers_validate_objects_and_merge_boolean_signals_conservatively
+    helper_probe = <<~'ZSH'
+      source "$1"
+      provider_json_is_object '{"provider":"fixture"}' || exit 1
+      provider_json_is_object '[]' && exit 2
+      provider_integer_in_range 99 0 99 || exit 3
+      provider_integer_in_range 100 0 99 && exit 4
+      provider_has_observation null unknown '' && exit 5
+      provider_has_observation null false || exit 6
+      print -r -- "$(provider_merge_boolean_signals false true null)|$(provider_merge_boolean_signals false false)|$(provider_merge_boolean_signals false null)"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      helper_probe,
+      "common-provider-test",
+      COMMON_PROVIDER_LIBRARY
+    )
+
+    assert status.success?, stderr
+    assert_equal "true|false|\n", stdout
+    assert_empty stderr
+  end
+
+  def test_credentialed_provider_parsers_keep_official_dimensions_without_invented_scores
+    parser_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      source "$1"
+      source "$2"
+      ipregistry_parse_response "$(<"$3")" 198.51.100.23 || exit 11
+      print -r -- "${ipregistry_parsed[usage_type]}|${ipregistry_parsed[server]}|${ipregistry_parsed[tor]}|${ipregistry_parsed[abuser]}"
+      source "$4"
+      ipqualityscore_parse_response "$(<"$5")" || exit 13
+      print -r -- "${ipqualityscore_parsed[score]}|${ipqualityscore_parsed[connection_type]}|${ipqualityscore_parsed[proxy]}|${ipqualityscore_parsed[tor]}|${ipqualityscore_parsed[server]}"
+      ipqualityscore_parse_usage_response "$(<"$6")" || exit 14
+      print -r -- "${ipqualityscore_usage[credits]}|${ipqualityscore_usage[usage]}|${ipqualityscore_usage[proxy_usage]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      parser_probe,
+      "credentialed-provider-parser-test",
+      COMMON_PROVIDER_LIBRARY,
+      IPREGISTRY_LIBRARY,
+      IPREGISTRY_FIXTURE,
+      IPQUALITYSCORE_LIBRARY,
+      IPQUALITYSCORE_OFFICIAL_FIXTURE,
+      IPQUALITYSCORE_USAGE_FIXTURE
+    )
+
+    assert status.success?, stderr
+    assert_equal "hosting|true|false|false\n87|Data Center|true|false|true\n12|7|3\n", stdout
+    assert_empty stderr
+
+    _stdout, _stderr, mismatch_status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      'setopt KSH_ARRAYS; source "$1"; source "$2"; ipregistry_parse_response "$(<"$3")" 198.51.100.24',
+      "ipregistry-mismatch-test",
+      COMMON_PROVIDER_LIBRARY,
+      IPREGISTRY_LIBRARY,
+      IPREGISTRY_FIXTURE
+    )
+    refute mismatch_status.success?
+  end
+
+  def test_ipqs_account_quota_preflight_skips_a_lookup_that_would_spend_credit
+    function_source = reporter_functions("db_ipqs")
+
+    quota_probe = <<~'ZSH'
+      setopt KSH_ARRAYS SH_WORD_SPLIT
+      source "$1"
+      source "$2"
+      eval "$3"
+      typeset -A provider_credentials ipqs sinfo stype
+      provider_credentials[IPQS_API_KEY]='fixture-key'
+      IP='198.51.100.23' CurlARG='' ibar_step=0
+      sinfo[ldatabase]=0
+      quota_fixture="$4" calls_file="$5"
+      Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
+      show_progress_bar(){ :; }
+      styled_provider_type(){ print -rn -- "$1"; }
+      curl_with_secret_url(){
+        case "$1" in
+          */api/json/account/*)
+            print -r -- account >> "$calls_file"
+            print -rn -- "$(<"$quota_fixture")" ;;
+          */api/json/ip/*)
+            print -r -- lookup >> "$calls_file"
+            return 97 ;;
+          *) return 9 ;;
+        esac
+      }
+      db_ipqs 4 || exit $?
+      print -r -- "${ipqs[status]}|${ipqs[score]}"
+    ZSH
+    Dir.mktmpdir("ipquality-quota-") do |directory|
+      zero_balance = File.join(directory, "zero-balance.json")
+      File.write(zero_balance, JSON.generate("success" => true, "credits" => 0, "usage" => 10))
+      calls_file = File.join(directory, "calls.txt")
+      [IPQUALITYSCORE_CREDITS_FIXTURE, zero_balance].each do |quota|
+        File.write(calls_file, "")
+        stdout, stderr, status = Open3.capture3(
+          "/bin/zsh", "-f", "-c", quota_probe, "ipqs-quota-preflight-test",
+          COMMON_PROVIDER_LIBRARY, IPQUALITYSCORE_LIBRARY, function_source, quota, calls_file
+        )
+
+        assert status.success?, stderr
+        assert_equal "official_insufficient_credits|\n", stdout
+        assert_equal "account\n", File.read(calls_file), "zero credit must prevent the paid lookup"
+        assert_empty stderr
+      end
+    end
+  end
+
+  def test_optional_credentials_are_data_only_private_and_never_curl_arguments
+    loader_probe = <<~'ZSH'
+      source "$1"
+      provider_load_credentials "$2" || exit $?
+      print -r -- "${provider_credentials[IPREGISTRY_API_KEY]}|${provider_credentials[IPQS_API_KEY]}"
+    ZSH
+
+    Dir.mktmpdir("ipquality-credentials-test") do |directory|
+      credentials = File.join(directory, "credentials")
+      File.write(
+        credentials,
+        "# fixture keys only\nIPREGISTRY_API_KEY=registry123\nIPQS_API_KEY=ipqs12345\n"
+      )
+      File.chmod(0o600, credentials)
+      stdout, stderr, status = Open3.capture3(
+        "/bin/zsh", "-f", "-c", loader_probe,
+        "credential-loader-test", CREDENTIALS_LIBRARY, credentials
+      )
+      assert status.success?, stderr
+      assert_equal "registry123|ipqs12345\n", stdout
+      assert_empty stderr
+
+      File.chmod(0o644, credentials)
+      _stdout, insecure_stderr, insecure_status = Open3.capture3(
+        "/bin/zsh", "-f", "-c", loader_probe,
+        "credential-loader-mode-test", CREDENTIALS_LIBRARY, credentials
+      )
+      refute insecure_status.success?
+      assert_includes insecure_stderr, "mode 600"
+
+      marker = File.join(directory, "must-not-exist")
+      File.write(credentials, "IPQS_API_KEY=$(touch #{marker})\n")
+      File.chmod(0o600, credentials)
+      _stdout, _stderr, malicious_status = Open3.capture3(
+        "/bin/zsh", "-f", "-c", loader_probe,
+        "credential-loader-code-test", CREDENTIALS_LIBRARY, credentials
+      )
+      refute malicious_status.success?
+      refute File.exist?(marker)
+    end
+
+    source = File.read(SCRIPT, encoding: "UTF-8")
+    assert_includes source, "--config -"
+    refute_match(/curl_safe[^\n]*\$api_key/, source)
+  end
+
+  def test_known_provider_failures_are_classified_without_echoing_upstream_messages
+    parser_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      source "$1"
+      ipqualityscore_parse_unavailability "$(<"$2")" || exit $?
+      print -r -- "${ipqualityscore_unavailable[status]}"
+      source "$3"
+      internetdb_parse_unavailability "$(<"$4")" || exit $?
+      print -r -- "${internetdb_unavailable[status]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh",
+      "-f",
+      "-c",
+      parser_probe,
+      "provider-unavailability-test",
+      IPQUALITYSCORE_LIBRARY,
+      IPQUALITYSCORE_CREDITS_FIXTURE,
+      INTERNETDB_LIBRARY,
+      INTERNETDB_NO_INFORMATION_FIXTURE
+    )
+
+    assert status.success?, stderr
+    assert_equal "upstream_insufficient_credits\nnot_found\n", stdout
+    refute_includes stdout, "You have insufficient credits"
+    assert_empty stderr
+  end
+
+  def test_check_place_cloudflare_block_is_distinct_from_a_generic_http_403
+    classifier_probe = <<~'ZSH'
+      source "$1"
+      print -r -- "$(provider_http_failure_status 403 "$(<"$2")")"
+      print -r -- "$(provider_http_failure_status 403 '<html>forbidden</html>')"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", classifier_probe,
+      "check-place-cloudflare-classifier-test",
+      COMMON_PROVIDER_LIBRARY,
+      CHECK_PLACE_CLOUDFLARE_FIXTURE
+    )
+
+    assert status.success?, stderr
+    assert_equal "cloudflare_blocked\nhttp_403\n", stdout
+    assert_empty stderr
+  end
+
+  def test_private_project_secret_files_load_by_provider_name_and_override_global_defaults
+    loader_probe = <<~'ZSH'
+      source "$1"
+      provider_load_credentials "$2" "$3" || exit $?
+      print -r -- "${provider_credentials[IPREGISTRY_API_KEY]}|${provider_credentials[IPQS_API_KEY]}"
+    ZSH
+
+    Dir.mktmpdir("ipquality-project-secrets-test") do |directory|
+      credentials = File.join(directory, "credentials")
+      project_secrets = File.join(directory, "secrets")
+      Dir.mkdir(project_secrets, 0o700)
+      File.write(
+        credentials,
+        "IPREGISTRY_API_KEY=globalregistry123\nIPQS_API_KEY=globalipqs12345\n"
+      )
+      File.chmod(0o600, credentials)
+      File.write(File.join(project_secrets, "ipregistry"), "projectregistry123\n")
+      File.write(File.join(project_secrets, "ipqs"), "projectipqs12345\n")
+      File.chmod(0o600, File.join(project_secrets, "ipregistry"))
+      File.chmod(0o600, File.join(project_secrets, "ipqs"))
+
+      stdout, stderr, status = Open3.capture3(
+        "/bin/zsh", "-f", "-c", loader_probe,
+        "project-secret-loader-test", CREDENTIALS_LIBRARY, credentials, project_secrets
+      )
+      assert status.success?, stderr
+      assert_equal "projectregistry123|projectipqs12345\n", stdout
+      assert_empty stderr
+
+      File.chmod(0o644, File.join(project_secrets, "ipqs"))
+      _stdout, insecure_stderr, insecure_status = Open3.capture3(
+        "/bin/zsh", "-f", "-c", loader_probe,
+        "project-secret-mode-test", CREDENTIALS_LIBRARY, credentials, project_secrets
+      )
+      refute insecure_status.success?
+      assert_includes insecure_stderr, "mode 600"
+    end
+
+    source = File.read(SCRIPT, encoding: "UTF-8")
+    assert_includes source, 'provider_load_credentials "" "$SCRIPT_DIR/secrets"'
+  end
+end
