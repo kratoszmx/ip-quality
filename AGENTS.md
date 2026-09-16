@@ -1,34 +1,112 @@
 # AGENTS.md
 
 This repository contains a source-auditable IP reputation and quality reporter
-derived from `xykt/IPQuality`. The user-facing shell is `/bin/zsh`; a small
-exact-leaf runner uses only the system Ruby standard library.
+derived from `xykt/IPQuality`. It reports each source separately, without a
+combined quality score. The user-facing shell is `/bin/zsh`; the route runner
+uses the system Ruby standard library.
 
 ## Start here
 
-Use these network-free commands to understand the project before changing it:
+Start at the worktree root. These commands are network-free:
 
 ```text
+cd /Users/zmx/Projects/projects/ipquality
 /bin/zsh -f bin/ip-quality
 /bin/zsh -f bin/ip-quality --help
 /bin/zsh -f bin/test-clash-leaf --direct
+/bin/zsh -f bin/test-clash-leaf --help
 /bin/zsh -f scripts/test-offline
 ```
 
-The first and third commands print disclosure plans. They do not perform DNS or
-network access. A live run is intentionally a separate action and requires the
-exact `--confirm-network-lookup` flag.
+The reporter and direct-route commands print disclosure plans. A live run is a
+separate action requiring `--confirm-network-lookup` after the user accepts the
+disclosure. A plan is not a measurement.
 
 Documentation has four distinct jobs:
 
-- `AGENTS.md`: operational and safety guidance;
-- `PROVIDERS.md`: query scopes, provider contracts, and disclosure details;
-- `UPSTREAM.md`: AGPL provenance and local modification notice;
-- `HANDOFF.md`: current repository state and last validated commands.
+- [AGENTS.md](AGENTS.md): usage, safety, source map, and test entrypoints;
+- [PROVIDERS.md](PROVIDERS.md): scopes, provider contracts, and disclosure;
+- [UPSTREAM.md](UPSTREAM.md): AGPL provenance and material modifications;
+- [HANDOFF.md](HANDOFF.md): current state, validation evidence, and open issues.
 
 `README.md` is intentionally absent. There is currently no project-specific
 skill; the project guidance is short enough to keep here without duplicating it
 under `.agents/skills/`.
+
+## Choose a route
+
+| Need | Entrypoint | Measurement |
+| --- | --- | --- |
+| Current system route, including mail and DNSBL | `bin/test-clash-leaf --direct` | IPv4 `full`; clears proxy environment variables and needs no Clash cache or Mihomo |
+| One subscription node | `bin/test-clash-leaf --subscription NAME --leaf NAME -4` | `reputation` through an isolated Mihomo; names must match exactly |
+| A chosen scope or public target IP | `bin/ip-quality --scope SCOPE` | Raw reporter; see route restrictions in [PROVIDERS.md](PROVIDERS.md#consent-and-route-boundary) |
+
+For a cached node, discover its names and review the plan without a lookup:
+
+```text
+/bin/zsh -f bin/test-clash-leaf --list-subscriptions
+/bin/zsh -f bin/test-clash-leaf --subscription 'SUBSCRIPTION_NAME' --list-leaves
+/bin/zsh -f bin/test-clash-leaf --subscription 'SUBSCRIPTION_NAME' --leaf 'LEAF_NAME' -4
+```
+
+Replace the quoted placeholders with listed names. Only inline leaf proxies
+and their concrete `dialer-proxy` dependencies are supported, not proxy groups
+or remotely fetched provider definitions. `--profile PATH` can use an existing
+local profile instead of the subscription cache. `--config-test-only` runs
+Mihomo's local configuration check without a provider lookup.
+
+Without route options, the runner opens a menu for direct, specific-public-IP,
+or subscription selection. The menu needs a readable Clash Verge cache even
+when choosing direct or specific-IP lookup; use `--direct` to avoid that
+dependency. The specific-IP menu uses `reputation`, clears inherited proxy
+variables, and starts no Mihomo. A system VPN or TUN can still affect direct
+traffic.
+
+After authorization, a masked comprehensive direct report is:
+
+```text
+/bin/zsh -f bin/test-clash-leaf --direct --confirm-network-lookup
+```
+
+For an exact leaf, add the same confirmation flag to its reviewed plan command.
+The raw reporter accepts one positional public IP only with `reputation` or
+`dnsbl`; for example, this remains a plan until confirmation is added:
+
+```text
+/bin/zsh -f bin/ip-quality --scope reputation -4 8.8.8.8
+```
+
+Reports mask the tested IP and routed prefix by default; `-f` reveals them.
+`-j` writes JSON to stdout; `-E` or `-l en` selects English labels (default: `cn`).
+`-o reports/run.json` creates a new file: `.json` selects JSON, `.ansi` preserves
+terminal colors, and other extensions select plain text. Create the parent
+directory first and choose an unused filename; existing files and symlinks are
+rejected. User-requested reports remain after cleanup. The specific-IP menu's
+plan and progress messages include the entered target, so report masking does
+not make those messages private.
+
+## Runtime requirements
+
+Plan/help paths use zsh and, for the runner, `/usr/bin/ruby --disable-gems`.
+Live reporter dependencies are checked before querying:
+
+| Scope | Commands beyond normal system utilities |
+| --- | --- |
+| All scopes | `curl`, `jq` |
+| `reputation` | Also `bc` |
+| `media-ai` | Also `dig`, `nslookup`, `gunzip` |
+| `mail` | Also `dig`, `nc` |
+| `dnsbl` | Also `dig`, `xargs` |
+| `mail-dnsbl`, `full` | Union of their component requirements |
+
+Exact-leaf live runs also need `/usr/sbin/lsof` and an existing Mihomo binary
+(default: `/Applications/Clash Verge.app/Contents/MacOS/verge-mihomo`; override
+with `--mihomo PATH`). Cached subscription selection reads `profiles.yaml` and
+`profiles/` under
+`~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/`.
+Missing dependencies stop explicitly; the project installs nothing. Official
+API keys are optional; private file formats and precedence are in
+[PROVIDERS.md](PROVIDERS.md#optional-official-credentials).
 
 ## Safety invariants
 
@@ -56,29 +134,18 @@ report. Other implementation details may be chosen pragmatically.
   configuration.
 - The application creates no persistent cache. Clash Verge caches are external
   read-only inputs and must not be deleted. Owned Mihomo workspaces are removed
-  on success, ordinary failure, and interrupt; a user-requested `-o` report is an
-  output and remains in place.
+  on success, ordinary failure, and handled interrupt. A later run can remove a
+  private workspace whose owner process died after an unhandled host/process
+  failure; live-owner workspaces are retained.
 
 ## Measurement model
 
-- Keep every provider's result and scale identifiable. Conflicts stay visible;
-  they are not collapsed into one unexplained score or truth value.
-- Supported reporter scopes are `reputation`, `dnsbl`, `media-ai`, `mail`,
-  `mail-dnsbl`, and `full`. Provider failure, rate limiting, and schema drift are
-  `unknown`, never clean. A missing required command stops the run with an
-  explicit dependency error and likewise provides no clean evidence.
-- Output masks the tested IP and routed prefix by default. `-f` is the explicit
-  reveal option.
-- DNSBL concurrency is user-configurable from 1 through 50 and remains bounded
-  by tests.
-- Exact-leaf selection is reputation-only because its HTTP(S) traffic can be
-  forced through the isolated proxy. DNS, SMTP, and other direct sockets would
-  still measure the host route and must not be presented as leaf measurements.
-- The route runner's comprehensive direct mode is IPv4-only, removes inherited
-  proxy variables, starts no Mihomo process, and combines reputation, media/AI,
-  mail, and DNSBL observations over the current system route.
-
-See `PROVIDERS.md` before adding or reinterpreting a source.
+Keep provider results and scales identifiable, including conflicts. Provider
+failure, rate limiting, and schema drift are `unknown`, never clean. Missing
+dependencies likewise supply no clean evidence. Exact-leaf mode stays
+reputation-only: direct DNS/SMTP sockets cannot measure that HTTP proxy leaf.
+DNSBL concurrency stays bounded to 1–50. Scope definitions and interpretation
+live in [PROVIDERS.md](PROVIDERS.md); consult it when changing a source.
 
 ## Source map
 
@@ -101,7 +168,10 @@ See `PROVIDERS.md` before adding or reinterpreting a source.
   `/bin/zsh -f scripts/test-offline`. Focused tests use
   `/usr/bin/ruby test/ip_quality_test.rb` and
   `/usr/bin/ruby test/clash_leaf_runner_test.rb`; system-bundled `minitest` is the
-  only test-time default gem.
+  only test-time default gem. Keep gems enabled for these test commands. The
+  suite covers provider/output contracts and the runner's route isolation,
+  file safety, and cleanup using fixtures and fake executables. Its pass does
+  not establish current provider availability or real-node connectivity.
 - Preserve the upstream AGPL-3.0 license, source identity, and material
   modification notice in `UPSTREAM.md`. This directory is the worktree root; do
   not introduce nested Git metadata.

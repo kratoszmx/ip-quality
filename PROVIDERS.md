@@ -34,6 +34,15 @@ The route runner maintains two honest measurement boundaries:
   loopback Mihomo for one selected cached-subscription leaf. DNSBL, SMTP, and
   other direct sockets are excluded because they would measure the host route.
 
+The raw `bin/ip-quality` reporter retains inherited HTTP proxy variables;
+DNS and SMTP sockets still use the system route. With proxy variables set, its
+HTTP observations and direct-socket probes can therefore describe different
+egresses. Use the runner's `--direct` mode for a consistent system-route report.
+The raw reporter can attempt both address families unless `-4` or `-6` is given;
+DNSBL runs only for IPv4, so an IPv6 `full` report has no DNSBL results. Two
+successful families produce consecutive reports/JSON objects; select one family
+when a single JSON document is needed.
+
 ## Query scopes
 
 | Scope | What it measures | Route restrictions |
@@ -83,7 +92,7 @@ fields are comparable:
 - A field missing from an otherwise useful result appears as `-` in the terminal
   matrix and `null` in JSON. A wholly unavailable source is named once in a
   compact summary. IPQS remains visible with its source/status even without a
-  numeric score because it is always attempted through the official API or relay.
+  numeric score, including when an official quota preflight prevents lookup.
 - The reporter shows a provider's textual score label only when the response
   supplies it. It does not invent a band from local thresholds. Current numeric
   scales remain distinct: IP2Location 0-99 potential risk, Scamalytics 0-100
@@ -149,11 +158,12 @@ credential material.
 ## Mail scope
 
 The reporter resolves public MX records for Gmail, Outlook, Yahoo, Apple, QQ,
-Mail.ru, AOL, GMX, Mail.com, 163, Sohu, and Sina. For each, it makes a bounded
-TCP/25 connection, looks for an SMTP `220` greeting, sends `QUIT`, and submits no
-message. A separate Mailgun greeting probe describes local outbound TCP/25
-reachability. The operating system chooses the actual local source address, so
-the check works on a directly addressed host or behind NAT.
+Mail.ru, AOL, GMX, Mail.com, 163, Sohu, and Sina. For each service it selects one
+MX host with the lowest numeric preference, makes a bounded TCP/25 connection,
+looks for an SMTP `220` greeting, sends `QUIT`, and submits no message. It does
+not retry alternate MX hosts. A separate Mailgun greeting probe describes local
+outbound TCP/25 reachability. The operating system chooses the actual local
+source address, so the check works on a directly addressed host or behind NAT.
 
 ## DNSBL scope
 
@@ -182,23 +192,11 @@ to an isolated HTTP proxy leaf.
 
 ## Deliberate non-sources
 
-These names are retained only to prevent old research notes from being mistaken
-for implemented providers:
-
-- DB-IP was removed: its free location data duplicated existing observations,
-  while the distinct proxy/threat fields required a paid product.
-- IpScore has a credentialed API but no adapter or agreed score semantics here.
-- IPLeak and Whoer are interactive browser/leak tests, not non-browser reputation
-  rows.
-- Wave Broadband is an ISP, not a reputation dataset queried by this project.
-- GreyNoise and VirusTotal are plausible future threat-intelligence sources, but
-  neither has a credential choice, fixture, parser, or report section here.
-- NodeQuality is an integration/reporting reference that invokes other IP-quality
-  tools; it is not an independent data source.
-
-Do not advertise any candidate as report evidence until an implementation has a
-named access contract, sanitized fixture, conservative parser, route boundary,
-and explicit disclosure.
+DB-IP, IpScore, IPLeak, Whoer, Wave Broadband, GreyNoise, VirusTotal, and
+NodeQuality are not implemented report sources. Historical research mentions
+are not report evidence; DB-IP removal and other exclusions are recorded in
+[UPSTREAM.md](UPSTREAM.md). A new source needs a named access contract,
+sanitized fixture, conservative parser, route boundary, and disclosure.
 
 ## Official references
 
