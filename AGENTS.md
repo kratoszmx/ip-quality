@@ -22,14 +22,14 @@ The reporter and direct-route commands print disclosure plans. A live run is a
 separate action requiring `--confirm-network-lookup` after the user accepts the
 disclosure. A plan is not a measurement.
 
-Documentation is divided by responsibility:
-
-- [AGENTS.md](AGENTS.md): usage, safety, source map, and test entrypoints;
-- [PROVIDERS.md](PROVIDERS.md): scopes, provider contracts, and disclosure;
-- [UPSTREAM.md](UPSTREAM.md): AGPL provenance and material modifications;
-- [HANDOFF.md](HANDOFF.md): current state, validation evidence, and open issues;
-- [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md): project-local shared APIs, callers,
-  inputs, outputs, and reuse examples.
+| Document | Read it for |
+| --- | --- |
+| [AGENTS.md](AGENTS.md) | Usage, safety, source map, and test entrypoints |
+| [HANDOFF.md](HANDOFF.md) | Current version, validation evidence, and pending work |
+| [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md) | Shared APIs, definitions, callers, inputs/outputs, and examples |
+| [SERVICES.md](SERVICES.md) | No resident service; temporary process startup, shutdown, and checks |
+| [PROVIDERS.md](PROVIDERS.md) | Query scopes, source contracts, and disclosure |
+| [UPSTREAM.md](UPSTREAM.md) | AGPL provenance and material modifications |
 
 `README.md` is intentionally absent. There is currently no project-specific
 skill; the project guidance is short enough to keep here without duplicating it
@@ -128,19 +128,16 @@ report. Other implementation details may be chosen pragmatically.
   metadata; keep the source named and the disclosure visible.
 - Never activate, reload, restart, or rewrite live Clash/Mihomo state. An
   exact-leaf run reads one cached remote subscription independently of the active
-  profile, copies one selected inline leaf into a private temporary workspace,
-  binds a separate Mihomo process to a random `127.0.0.1` port, and verifies
-  listener ownership before querying.
+  profile and uses a private temporary Mihomo. Listener ownership, shutdown,
+  and cleanup are described in [SERVICES.md](SERVICES.md).
 - Do not upload reports, emit telemetry, show advertisements, or fetch executable
   configuration. Runtime reference data stays vendored with provenance recorded.
 - Keep reports, API keys, cookies, proxy credentials, and account data out of
   Git. Credentials are data-only private files, never command arguments or Git
   configuration.
 - The application creates no persistent cache. Clash Verge caches are external
-  read-only inputs and must not be deleted. Owned Mihomo workspaces are removed
-  on success, ordinary failure, and handled interrupt. A later run can remove a
-  private workspace whose owner process died after an unhandled host/process
-  failure; live-owner workspaces are retained.
+  read-only inputs and must not be deleted. Only owned temporary workspaces are
+  eligible for runner cleanup; user-requested reports remain in place.
 
 ## Measurement model
 
@@ -172,22 +169,17 @@ live in [PROVIDERS.md](PROVIDERS.md); consult it when changing a source.
   route. Add a sanitized fixture and parser contract with every new provider.
 - Run the complete suite from the worktree root with
   `/bin/zsh -f scripts/test-offline`. Focused tests use
+  `/usr/bin/ruby test/common_test.rb`,
   `/usr/bin/ruby test/ip_quality_test.rb` and
   `/usr/bin/ruby test/clash_leaf_runner_test.rb`; system-bundled `minitest` is the
   only test-time default gem. Keep gems enabled for these test commands. The
   suite covers provider/output contracts and the runner's route isolation,
   file safety, and cleanup using fixtures and fake executables. Its pass does
   not establish current provider availability or real-node connectivity.
-- Shared helpers have direct contracts in `/usr/bin/ruby test/common_test.rb`
-  and the reporter suite. Put logic in `common/` when multiple real callers
-  share its semantics; import it directly and remove superseded implementations.
-  Keep source schemas, display labels, and Mihomo lifecycle policy with their
-  owning components.
+- Shared helpers and their zsh/system-Ruby boundary are documented in
+  [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md). Reuse follows matching caller
+  semantics; source schemas, display labels, and lifecycle state stay with
+  their owning components.
 - Preserve the upstream AGPL-3.0 license, source identity, and material
   modification notice in `UPSTREAM.md`. This directory is the worktree root; do
   not introduce nested Git metadata.
-- `/Users/zmx/Projects/myutils` currently exposes Python APIs. Importing them or
-  adding a Conda subprocess would cross this repository's zsh/system-Ruby runtime
-  boundary. Provider schemas, report layout, Clash cache selection, and process
-  cleanup remain project-specific unless a genuinely compatible shared API is
-  introduced later.
