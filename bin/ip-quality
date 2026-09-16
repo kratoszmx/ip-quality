@@ -7,13 +7,15 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-08-27-standalone.13"
+script_version="v2026-09-16-standalone.14"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
+typeset COMMON_DIR="$SCRIPT_DIR/common"
 typeset REPORT_DIR="$SCRIPT_DIR/report"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
-typeset COMMON_PROVIDER_LIB="$PROVIDER_DIR/common.zsh"
+typeset COMMON_PROVIDER_LIB="$COMMON_DIR/provider_values.zsh"
+typeset TERMINAL_LIB="$COMMON_DIR/terminal.zsh"
 typeset CREDENTIALS_LIB="$PROVIDER_DIR/credentials.zsh"
 typeset IPREGISTRY_LIB="$PROVIDER_DIR/ipregistry.zsh"
 typeset IPQUALITYSCORE_LIB="$PROVIDER_DIR/ipqualityscore.zsh"
@@ -21,9 +23,8 @@ typeset PING0_LIB="$PROVIDER_DIR/ping0.zsh"
 typeset RIPESTAT_LIB="$PROVIDER_DIR/ripestat.zsh"
 typeset INTERNETDB_LIB="$PROVIDER_DIR/shodan_internetdb.zsh"
 typeset REPUTATION_REPORT_LIB="$REPORT_DIR/reputation.zsh"
-typeset REPORT_OUTPUT_LIB="$REPORT_DIR/output.zsh"
 typeset local_library
-for local_library in "$COMMON_PROVIDER_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB" "$REPORT_OUTPUT_LIB";do
+for local_library in "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$local_library" && -r "$local_library" && ! -L "$local_library" ]]||{
 print -ru2 -- "ERROR: unsafe or missing local library: $local_library"
 exit 66
@@ -1082,25 +1083,10 @@ else
 IPhide=""
 fi
 }
-calculate_display_width(){
-local string="$1"
-local length=0
-local char
-for ((i=0; i<${#string}; i++));do
-char=$(echo "$string"|od -An -N1 -tx1 -j $((i))|tr -d ' ')
-if [ "$(printf '%d\n' 0x$char)" -gt 127 ];then
-length=$((length+2))
-i=$((i+1))
-else
-length=$((length+1))
-fi
-done
-echo "$length"
-}
 calc_padding(){
 local input_text="$1"
 local total_width=$2
-local title_length=$(calculate_display_width "$input_text")
+local title_length=$(display_width "$input_text")
 local left_padding=$(((total_width-title_length)/2))
 if [[ $left_padding -gt 0 ]];then
 PADDING=$(printf '%*s' $left_padding)
@@ -2483,13 +2469,6 @@ show_help(){
 echo -ne "\r$shelp\n"
 exit 0
 }
-clean_ansi(){
-local input="$1"
-input=$(print -r -- "$input"|sed 's/\\033/\x1b/g')
-input=$(print -r -- "$input"|sed 's/\x1b\[[0-9;]*m//g')
-input=$(print -r -- "$input"|sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-print -rn -- "$input"
-}
 open_report_output(){
 [[ $output_fd -ge 0 ]]&&return 0
 zmodload zsh/system 2>/dev/null||{
@@ -2505,7 +2484,6 @@ fi
 return 73
 }
 }
-
 write_report_output(){
 typeset ansi_report="$1"
 typeset payload
@@ -2514,12 +2492,11 @@ case "$outputfile" in
 ;;
 *.[jJ][sS][oO][nN])payload="$ipjson"
 ;;
-*)payload=$(print -r -- "$ansi_report"|sed 's/\x1b\[[0-9;]*[mGKHF]//g')
+*)payload=$(clean_ansi "$ansi_report" preserve)
 esac
 open_report_output||return $?
 print -r -u "$output_fd" -- "$payload"||return 74
 }
-
 close_report_output(){
 if [[ $output_fd -ge 0 ]];then
 exec {output_fd}>&-
@@ -2880,8 +2857,8 @@ show_tail
 if [[ mode_json -eq 1 || mode_output -eq 1 ]];then
 save_json||return 70
 fi
-[[ mode_json -eq 0 ]]&&report_emit_stdout "$ip_report"
-[[ mode_json -eq 1 ]]&&report_emit_stdout "$ipjson"
+[[ mode_json -eq 0 ]]&&print -r -- "$ip_report"
+[[ mode_json -eq 1 ]]&&print -r -- "$ipjson"
 if [[ mode_output -eq 1 ]];then
 write_report_output "$ip_report"||return $?
 fi

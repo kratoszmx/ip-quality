@@ -1,11 +1,8 @@
 # frozen_string_literal: true
 
-# Verified local-file reads shared only by the exact-leaf runtime.
-
 # Read a local file through one already-open descriptor and reject symlinks,
-# hard links, ownership changes, and path replacement races. This helper remains
-# in the exact-leaf runtime because its ownership and mode policy is specific to
-# this repository's Clash cache and executable boundaries.
+# hard links, ownership changes, and path replacement races. Callers choose
+# allowed modes and byte limits; max_bytes: nil verifies without reading bytes.
 module IpQuality
   module SafeSnapshot
     class Error < StandardError
@@ -20,14 +17,6 @@ module IpQuality
     Snapshot = Struct.new(:path, :bytes, :stat)
 
     module_function
-
-    def read(path, allowed_modes: [0o600, 0o644], max_bytes: 16 * 1024 * 1024)
-      capture(path, allowed_modes: allowed_modes, max_bytes: max_bytes)
-    end
-
-    def verify(path, allowed_modes:)
-      capture(path, allowed_modes: allowed_modes, max_bytes: nil)
-    end
 
     def verify_directory(path)
       expanded = File.expand_path(path)
@@ -44,7 +33,7 @@ module IpQuality
       raise Error.new(:unreadable, expanded || path)
     end
 
-    def capture(path, allowed_modes:, max_bytes:)
+    def read(path, allowed_modes: [0o600, 0o644], max_bytes: 16 * 1024 * 1024)
       expanded = File.expand_path(path)
       before = File.lstat(expanded)
       validate_stat!(before, expanded, allowed_modes)
@@ -77,7 +66,6 @@ module IpQuality
     rescue Errno::EACCES, Errno::EPERM
       raise Error.new(:unreadable, expanded || path)
     end
-    private_class_method :capture
 
     def same?(left, right)
       left.bytes == right.bytes &&

@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 require "yaml"
-require_relative "safe_snapshot"
+require_relative "../common/safe_snapshot"
+require_relative "../common/text"
 
 module IpQuality
   class ClashLeafProfile
@@ -80,11 +81,6 @@ module IpQuality
     end
     private_class_method :validate_tree!
 
-    def self.safe_text?(value, max_bytes = 512)
-      value.is_a?(String) && !value.empty? && value.bytesize <= max_bytes && !value.match?(/[[:cntrl:]]/)
-    end
-    private_class_method :safe_text?
-
     attr_reader :source
 
     def initialize(source)
@@ -151,7 +147,7 @@ module IpQuality
         raise Error, "every #{label} entry must be a mapping" unless entry.is_a?(Hash)
 
         name = entry["name"]
-        unless self.class.send(:safe_text?, name)
+        unless Text.printable?(name)
           raise Error, "every #{label} entry must have a bounded, printable name"
         end
         entry

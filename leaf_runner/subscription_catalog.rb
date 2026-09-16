@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 require "yaml"
-require_relative "safe_snapshot"
+require_relative "../common/safe_snapshot"
+require_relative "../common/text"
 require_relative "profile"
 
 module IpQuality
@@ -89,7 +90,7 @@ module IpQuality
         name = item["name"]
         uid = item["uid"]
         filename = item["file"]
-        unless safe_text?(name) && safe_text?(uid) && safe_filename?(filename)
+        unless Text.printable?(name) && Text.printable?(uid) && safe_filename?(filename)
           raise Error, "remote subscription metadata is malformed"
         end
 
@@ -110,11 +111,7 @@ module IpQuality
     end
 
     def safe_filename?(value)
-      safe_text?(value) && File.basename(value) == value && value.match?(/\A[A-Za-z0-9._-]+\z/)
-    end
-
-    def safe_text?(value, max_bytes = 512)
-      value.is_a?(String) && !value.empty? && value.bytesize <= max_bytes && !value.match?(/[[:cntrl:]]/)
+      Text.printable?(value) && File.basename(value) == value && value.match?(/\A[A-Za-z0-9._-]+\z/)
     end
   end
 end

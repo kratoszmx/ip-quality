@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+# Child-process proxy overrides shared by direct and isolated routes.
+
 module IpQuality
   module NetworkEnvironment
     PROXY_VARIABLE = /\A(?:all|http|https|no)_proxy\z/i

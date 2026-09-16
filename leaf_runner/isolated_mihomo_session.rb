@@ -4,8 +4,8 @@ require "fileutils"
 require "open3"
 require "socket"
 require "tmpdir"
-require_relative "network_environment"
-require_relative "safe_snapshot"
+require_relative "../common/network_environment"
+require_relative "../common/safe_snapshot"
 
 module IpQuality
   class IsolatedMihomoSession
@@ -207,7 +207,7 @@ module IpQuality
     end
 
     def verify_executable(path)
-      snapshot = SafeSnapshot.verify(path, allowed_modes: [0o700, 0o750, 0o755])
+      snapshot = SafeSnapshot.read(path, allowed_modes: [0o700, 0o750, 0o755], max_bytes: nil)
       mode = snapshot.stat.mode
       raise Error, "Mihomo path is not executable" if (mode & 0o111).zero?
 

@@ -10,7 +10,8 @@ class IpQualityTest < Minitest::Test
   SCRIPT = File.join(ROOT, "bin", "ip-quality")
   DNSBL = File.join(ROOT, "ref", "dnsbl.list")
   ISO3166 = File.join(ROOT, "ref", "iso3166.json")
-  COMMON_PROVIDER_LIBRARY = File.join(ROOT, "providers", "common.zsh")
+  COMMON_PROVIDER_LIBRARY = File.join(ROOT, "common", "provider_values.zsh")
+  TERMINAL_LIBRARY = File.join(ROOT, "common", "terminal.zsh")
   CREDENTIALS_LIBRARY = File.join(ROOT, "providers", "credentials.zsh")
   IPREGISTRY_LIBRARY = File.join(ROOT, "providers", "ipregistry.zsh")
   IPQUALITYSCORE_LIBRARY = File.join(ROOT, "providers", "ipqualityscore.zsh")
@@ -18,7 +19,6 @@ class IpQualityTest < Minitest::Test
   RIPESTAT_LIBRARY = File.join(ROOT, "providers", "ripestat.zsh")
   INTERNETDB_LIBRARY = File.join(ROOT, "providers", "shodan_internetdb.zsh")
   REPUTATION_REPORT = File.join(ROOT, "report", "reputation.zsh")
-  REPORT_OUTPUT = File.join(ROOT, "report", "output.zsh")
   PING0_GEO_FIXTURE = File.join(ROOT, "test", "fixtures", "ping0", "public-geo.txt")
   PING0_CHALLENGE_FIXTURE = File.join(ROOT, "test", "fixtures", "ping0", "challenge.html")
   RIPESTAT_FIXTURE = File.join(ROOT, "test", "fixtures", "ripestat", "network-info.json")
@@ -124,7 +124,7 @@ class IpQualityTest < Minitest::Test
       source "$1"
       value=$'tab\tline\nterminal\033[31mred\033[0m'
       payload=$(jq -n --arg value "$value" '{value: $value}') || exit $?
-      report_emit_stdout "$payload"
+      print -r -- "$payload"
     ZSH
     stdout, stderr, status = Open3.capture3(
       "/bin/zsh",
@@ -132,13 +132,13 @@ class IpQualityTest < Minitest::Test
       "-c",
       output_probe,
       "report-output-test",
-      REPORT_OUTPUT
+      TERMINAL_LIBRARY
     )
 
     assert status.success?, stderr
     assert_equal "tab\tline\nterminal\e[31mred\e[0m", JSON.parse(stdout).fetch("value")
     assert_empty stderr
-    assert_includes File.read(SCRIPT), 'report_emit_stdout "$ipjson"'
+    assert_includes File.read(SCRIPT), 'print -r -- "$ipjson"'
     refute_match(/echo -ne "\\r\$ipjson/, File.read(SCRIPT))
     assert_includes File.read(SCRIPT), "Font_Green=$'\\033[32m'"
     assert_includes File.read(SCRIPT), "Font_Red=$'\\033[31m'"
@@ -155,11 +155,10 @@ class IpQualityTest < Minitest::Test
       sfactor[title]='四、风险因子'
       ipapi[proxy]=false
       ipapi[vpn]=true
-      clean_ansi(){ print -rn -- "$1" }
       source "$1"
       source "$2"
       report=$(show_factor)
-      report_emit_stdout "$report"
+      print -r -- "$report"
     ZSH
     stdout, stderr, status = Open3.capture3(
       "/bin/zsh",
@@ -168,13 +167,52 @@ class IpQualityTest < Minitest::Test
       output_probe,
       "report-color-output-test",
       REPUTATION_REPORT,
-      REPORT_OUTPUT
+      TERMINAL_LIBRARY
     )
 
     assert status.success?, stderr
     assert_includes stdout, "\e[32m\e[1m否"
     assert_includes stdout, "\e[31m\e[1m是"
     refute_includes stdout, "\\033["
+    assert_empty stderr
+  end
+
+  def test_shared_terminal_cleanup_preserves_layout_and_normalizes_values
+    probe = <<~'ZSH'
+      source "$1"
+      value=$' \t\\033[31m中\\033[0m \033[2K\033[3G\033[1;2H\033[F\n  next \t\n\n'
+      clean_ansi "$value" "$2"
+    ZSH
+    { "preserve" => " \t中 \n  next \t\n\n", "" => "中\nnext" }.each do |mode, expected|
+      stdout, stderr, status = Open3.capture3(
+        "/bin/zsh", "-f", "-c", probe, "terminal-cleanup-test", TERMINAL_LIBRARY, mode
+      )
+      assert status.success?, stderr
+      assert_equal expected, stdout
+      assert_empty stderr
+    end
+  end
+
+  def test_shared_display_width_aligns_ascii_unicode_ansi_and_whitespace
+    padding_function = File.read(SCRIPT)[/^calc_padding\(\)\{\n.*?^\}/m]
+    probe = padding_function + "\n" + <<~'ZSH'
+      setopt KSH_ARRAYS SH_WORD_SPLIT NO_CASE_MATCH
+      source "$1"
+      source "$2"
+      for value in 'abc' '中文' $'\033[31mA中\033[0m' ' A中 ' '\033[31mA中\033[0m'; do
+        print -r -- "$(display_width "$value")"
+      done
+      report_table_cell $'\033[31m A中 \033[0m' 8
+      print -r -- '|'
+      calc_padding ' A中 ' 11
+      print -r -- "${#PADDING}"
+      [[ -o KSH_ARRAYS && -o SH_WORD_SPLIT && -o NO_CASE_MATCH ]]
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", probe, "terminal-width-test", TERMINAL_LIBRARY, REPUTATION_REPORT
+    )
+    assert status.success?, stderr
+    assert_equal "3\n4\n3\n5\n3\n\e[31m A中 \e[0m   |\n3\n", stdout
     assert_empty stderr
   end
 
@@ -540,7 +578,7 @@ class IpQualityTest < Minitest::Test
       ipapi[risk]='High'
       ipapi[proxy]=false
       ipqs[vpn]=true
-      clean_ansi(){ print -rn -- "$1" }
+      source "$2"
       source "$1"
       show_type
       show_score
@@ -552,7 +590,8 @@ class IpQualityTest < Minitest::Test
       "-c",
       report_probe,
       "report-test",
-      REPUTATION_REPORT
+      REPUTATION_REPORT,
+      TERMINAL_LIBRARY
     )
     assert status.success?, stderr
     assert_includes stdout, "IP2Location"
@@ -607,7 +646,7 @@ class IpQualityTest < Minitest::Test
       ipdata[proxy]=false ipinfo[proxy]=false
       ip2location[vpn]=false ipapi[vpn]=false ipregistry[vpn]=false
       ipqs[vpn]=true scamalytics[vpn]=false ipinfo[vpn]=false
-      clean_ansi(){ print -rn -- "$1" | sed $'s/\033\\[[0-9;]*m//g' }
+      source "$2"
       source "$1"
       show_type
       show_score
@@ -615,7 +654,7 @@ class IpQualityTest < Minitest::Test
     ZSH
     stdout, stderr, status = Open3.capture3(
       "/bin/zsh", "-f", "-c", report_probe,
-      "report-alignment-test", REPUTATION_REPORT
+      "report-alignment-test", REPUTATION_REPORT, TERMINAL_LIBRARY
     )
 
     assert status.success?, stderr
@@ -668,13 +707,13 @@ class IpQualityTest < Minitest::Test
       internetdb[status]=ok internetdb[ports]='22, 443' internetdb[port_count]=2
       internetdb[hostname_count]=1
       internetdb[vulnerability_count]=1 internetdb[tags]='vpn'
-      clean_ansi(){ print -rn -- "$1" }
+      source "$2"
       source "$1"
       show_network_context
     ZSH
     stdout, stderr, status = Open3.capture3(
       "/bin/zsh", "-f", "-c", context_probe,
-      "network-context-report-test", REPUTATION_REPORT
+      "network-context-report-test", REPUTATION_REPORT, TERMINAL_LIBRARY
     )
 
     assert status.success?, stderr
@@ -703,7 +742,7 @@ class IpQualityTest < Minitest::Test
       maxmind[status]=cloudflare_blocked ip2location[status]=cloudflare_blocked
       abuseipdb[status]=cloudflare_blocked scamalytics[status]=cloudflare_blocked ipdata[status]=cloudflare_blocked
       internetdb[status]=not_found
-      clean_ansi(){ print -rn -- "$1" }
+      source "$2"
       source "$1"
       show_score
       show_network_context
@@ -715,7 +754,8 @@ class IpQualityTest < Minitest::Test
       "-c",
       report_probe,
       "report-unavailable-test",
-      REPUTATION_REPORT
+      REPUTATION_REPORT,
+      TERMINAL_LIBRARY
     )
 
     assert status.success?, stderr
@@ -750,14 +790,14 @@ class IpQualityTest < Minitest::Test
       abuseipdb[score]=2
       ipdata[countrycode]=US ipdata[server]=false
       ipqs[source]=official_api ipqs[status]=official_insufficient_credits
-      clean_ansi(){ print -rn -- "$1" }
+      source "$2"
       source "$1"
       show_score
       show_factor
     ZSH
     stdout, stderr, status = Open3.capture3(
       "/bin/zsh", "-f", "-c", report_probe,
-      "ipqs-independent-report-test", REPUTATION_REPORT
+      "ipqs-independent-report-test", REPUTATION_REPORT, TERMINAL_LIBRARY
     )
 
     assert status.success?, stderr
@@ -1050,7 +1090,7 @@ class IpQualityTest < Minitest::Test
       RIPESTAT_LIBRARY,
       INTERNETDB_LIBRARY,
       REPUTATION_REPORT,
-      REPORT_OUTPUT,
+      TERMINAL_LIBRARY,
       PING0_GEO_FIXTURE,
       PING0_CHALLENGE_FIXTURE,
       RIPESTAT_FIXTURE,

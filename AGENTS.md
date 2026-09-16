@@ -2,8 +2,8 @@
 
 This repository contains a source-auditable IP reputation and quality reporter
 derived from `xykt/IPQuality`. It reports each source separately, without a
-combined quality score. The user-facing shell is `/bin/zsh`; the route runner
-uses the system Ruby standard library.
+combined quality score. Shell code runs with `/bin/zsh`; the route runner is a
+direct executable using the system Ruby standard library.
 
 ## Start here
 
@@ -13,8 +13,8 @@ Start at the worktree root. These commands are network-free:
 cd /Users/zmx/Projects/projects/ipquality
 /bin/zsh -f bin/ip-quality
 /bin/zsh -f bin/ip-quality --help
-/bin/zsh -f bin/test-clash-leaf --direct
-/bin/zsh -f bin/test-clash-leaf --help
+/usr/bin/ruby --disable-gems bin/test-clash-leaf --direct
+/usr/bin/ruby --disable-gems bin/test-clash-leaf --help
 /bin/zsh -f scripts/test-offline
 ```
 
@@ -22,12 +22,14 @@ The reporter and direct-route commands print disclosure plans. A live run is a
 separate action requiring `--confirm-network-lookup` after the user accepts the
 disclosure. A plan is not a measurement.
 
-Documentation has four distinct jobs:
+Documentation is divided by responsibility:
 
 - [AGENTS.md](AGENTS.md): usage, safety, source map, and test entrypoints;
 - [PROVIDERS.md](PROVIDERS.md): scopes, provider contracts, and disclosure;
 - [UPSTREAM.md](UPSTREAM.md): AGPL provenance and material modifications;
-- [HANDOFF.md](HANDOFF.md): current state, validation evidence, and open issues.
+- [HANDOFF.md](HANDOFF.md): current state, validation evidence, and open issues;
+- [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md): project-local shared APIs, callers,
+  inputs, outputs, and reuse examples.
 
 `README.md` is intentionally absent. There is currently no project-specific
 skill; the project guidance is short enough to keep here without duplicating it
@@ -44,9 +46,9 @@ under `.agents/skills/`.
 For a cached node, discover its names and review the plan without a lookup:
 
 ```text
-/bin/zsh -f bin/test-clash-leaf --list-subscriptions
-/bin/zsh -f bin/test-clash-leaf --subscription 'SUBSCRIPTION_NAME' --list-leaves
-/bin/zsh -f bin/test-clash-leaf --subscription 'SUBSCRIPTION_NAME' --leaf 'LEAF_NAME' -4
+/usr/bin/ruby --disable-gems bin/test-clash-leaf --list-subscriptions
+/usr/bin/ruby --disable-gems bin/test-clash-leaf --subscription 'SUBSCRIPTION_NAME' --list-leaves
+/usr/bin/ruby --disable-gems bin/test-clash-leaf --subscription 'SUBSCRIPTION_NAME' --leaf 'LEAF_NAME' -4
 ```
 
 Replace the quoted placeholders with listed names. Only inline leaf proxies
@@ -65,7 +67,7 @@ traffic.
 After authorization, a masked comprehensive direct report is:
 
 ```text
-/bin/zsh -f bin/test-clash-leaf --direct --confirm-network-lookup
+/usr/bin/ruby --disable-gems bin/test-clash-leaf --direct --confirm-network-lookup
 ```
 
 For an exact leaf, add the same confirmation flag to its reviewed plan command.
@@ -88,6 +90,8 @@ not make those messages private.
 ## Runtime requirements
 
 Plan/help paths use zsh and, for the runner, `/usr/bin/ruby --disable-gems`.
+`bin/test-clash-leaf` can also be executed directly; its shebang selects that
+Ruby runtime. It contains the command implementation, so do not pass it to zsh.
 Live reporter dependencies are checked before querying:
 
 | Scope | Commands beyond normal system utilities |
@@ -150,11 +154,13 @@ live in [PROVIDERS.md](PROVIDERS.md); consult it when changing a source.
 ## Source map
 
 - `bin/ip-quality`: CLI policy, live queries, aggregation, and JSON assembly.
-- `bin/test-clash-leaf`: thin zsh entrypoint for the route runner.
-- `leaf_runner/`: verified cached-subscription snapshots, exact-leaf extraction,
-  route selection, loopback Mihomo ownership, and cleanup.
-- `providers/`: fixture-testable response parsers, credential loading, and shared
-  provider normalization.
+- `bin/test-clash-leaf`: direct Ruby entrypoint, CLI policy, and route selection.
+- `common/`: shared provider values, terminal text, printable metadata,
+  verified-file snapshots, and child-process proxy overrides; see
+  [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md).
+- `leaf_runner/`: cached-subscription selection, exact-leaf extraction,
+  loopback Mihomo ownership, and cleanup.
+- `providers/`: fixture-testable response parsers and credential loading.
 - `report/`: provider-aware terminal output without a synthetic combined score.
 - `ref/`: vendored runtime data.
 - `test/fixtures/`: sanitized provider responses.
@@ -172,6 +178,11 @@ live in [PROVIDERS.md](PROVIDERS.md); consult it when changing a source.
   suite covers provider/output contracts and the runner's route isolation,
   file safety, and cleanup using fixtures and fake executables. Its pass does
   not establish current provider availability or real-node connectivity.
+- Shared helpers have direct contracts in `/usr/bin/ruby test/common_test.rb`
+  and the reporter suite. Put logic in `common/` when multiple real callers
+  share its semantics; import it directly and remove superseded implementations.
+  Keep source schemas, display labels, and Mihomo lifecycle policy with their
+  owning components.
 - Preserve the upstream AGPL-3.0 license, source identity, and material
   modification notice in `UPSTREAM.md`. This directory is the worktree root; do
   not introduce nested Git metadata.

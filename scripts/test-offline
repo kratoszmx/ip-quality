@@ -6,5 +6,6 @@ unset CDPATH
 
 typeset ROOT="${0:A:h:h}"
 
+/usr/bin/ruby "$ROOT/test/common_test.rb"
 /usr/bin/ruby "$ROOT/test/ip_quality_test.rb"
 /usr/bin/ruby "$ROOT/test/clash_leaf_runner_test.rb"

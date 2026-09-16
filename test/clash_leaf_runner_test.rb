@@ -1,15 +1,16 @@
 # frozen_string_literal: true
 
 require "minitest/autorun"
+require "open3"
 require "stringio"
 require "tmpdir"
 require "timeout"
 require "yaml"
-require_relative "../leaf_runner/command"
+load File.expand_path("../bin/test-clash-leaf", __dir__)
 
 class ClashLeafRunnerTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
-  WRAPPER = File.join(ROOT, "bin", "test-clash-leaf")
+  RUNNER = File.join(ROOT, "bin", "test-clash-leaf")
 
   def test_cached_remote_subscription_is_resolved_without_using_the_active_profile
     Dir.mktmpdir("ip-quality-subscription-") do |directory|
@@ -319,6 +320,31 @@ class ClashLeafRunnerTest < Minitest::Test
     assert_includes error.message, "collides with Mihomo builtin"
   end
 
+  def test_profile_and_subscription_names_share_printable_byte_limits
+    ["bad\nname", "葉" * 171].each do |name|
+      document = fixture_document
+      document["proxies"].first["name"] = name
+      error = assert_raises(IpQuality::ClashLeafProfile::Error) do
+        IpQuality::ClashLeafProfile.new(
+          IpQuality::ClashLeafProfile::Source.new("fixture", "fixture.yaml", document)
+        )
+      end
+      assert_includes error.message, "bounded, printable name"
+
+      Dir.mktmpdir("ip-quality-subscription-name-") do |directory|
+        write_clash_verge_fixture(directory)
+        registry_path = File.join(directory, "profiles.yaml")
+        registry = YAML.safe_load(File.read(registry_path))
+        registry.fetch("items").last["name"] = name
+        write_private_yaml(registry_path, registry)
+        error = assert_raises(IpQuality::SubscriptionCatalog::Error) do
+          IpQuality::SubscriptionCatalog.new(app_root: directory)
+        end
+        assert_includes error.message, "metadata is malformed"
+      end
+    end
+  end
+
   def test_safe_snapshot_rejects_symlinks_and_hard_links
     Dir.mktmpdir("ip-quality-safe-snapshot-") do |directory|
       original = File.join(directory, "profile.yaml")
@@ -473,9 +499,8 @@ class ClashLeafRunnerTest < Minitest::Test
       ZSH
       File.chmod(0o700, fake_reporter)
 
-      command_library = File.join(ROOT, "leaf_runner", "command.rb")
       runner = <<~RUBY
-        require #{command_library.inspect}
+        load #{RUNNER.inspect}
         command = IpQuality::ClashLeafCommand.new(
           reporter_path: ENV.fetch("IPQUALITY_TEST_REPORTER")
         )
@@ -532,18 +557,36 @@ class ClashLeafRunnerTest < Minitest::Test
     end
   end
 
-  def test_entrypoint_is_a_thin_zsh_wrapper_and_all_runtime_code_is_source_auditable
-    wrapper = File.binread(WRAPPER)
-    sources = Dir.glob(File.join(ROOT, "{bin,leaf_runner,lib,providers,report}", "**", "*"))
+  def test_direct_ruby_entrypoint_and_all_runtime_code_are_source_auditable
+    entrypoint = File.binread(RUNNER)
+    sources = Dir.glob(File.join(ROOT, "{bin,leaf_runner,common,providers,report}", "**", "*"))
       .select { |path| File.file?(path) }
       .map { |path| File.binread(path) }
       .join("\n")
 
-    assert wrapper.start_with?("#!/bin/zsh\n")
-    assert_includes wrapper, "/usr/bin/ruby --disable-gems"
+    assert entrypoint.start_with?("#!/usr/bin/ruby --disable-gems\n")
     refute_match(/\/bin\/bash|BASH_REMATCH|\bshopt\b|\bmapfile\b/, sources)
     refute_includes sources, "external-controller"
     refute_includes sources, "secret:"
+  end
+
+  def test_executable_entrypoint_resolves_libraries_outside_the_worktree
+    Dir.mktmpdir("ip-quality-entrypoint-") do |directory|
+      stdout, stderr, status = Open3.capture3(
+        { "HOME" => directory }, RUNNER, "--direct", chdir: directory
+      )
+      assert status.success?, stderr
+      assert_includes stdout, "no network access has occurred"
+      assert_includes stdout, "current system IPv4 route"
+      assert_empty stderr
+
+      stdout, stderr, status = Open3.capture3(
+        "/usr/bin/ruby", "--disable-gems", RUNNER, "--help", chdir: directory
+      )
+      assert status.success?, stderr
+      assert_includes stdout, "--confirm-network-lookup"
+      assert_empty stderr
+    end
   end
 
   def test_leaf_runner_rejects_unimplemented_report_languages_before_network_access

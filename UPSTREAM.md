@@ -71,13 +71,16 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   and named marked/blacklisted zones in terminal output. Normalized
   `hostkarma.junkemailfilter.com[brl]` to `hostkarma.junkemailfilter.com` and
   removed duplicate DNSBL entries.
-- Added a zsh/system-Ruby runner that reads one cached remote subscription
+- Added a system-Ruby runner that reads one cached remote subscription
   independently of the active Clash profile, extracts an exact inline leaf and
   concrete dependencies, and owns temporary loopback-only Mihomo startup,
   listener verification, and cleanup.
-- Split runner, provider, and report responsibilities. Kept verified-file
-  snapshots in `leaf_runner/`; shared offline JSON validation, conservative
-  boolean merging, and connection-type normalization in `providers/common.zsh`.
+- Split runner, provider, and report responsibilities. Consolidated verified
+  file snapshots, proxy-environment overrides, printable metadata validation,
+  provider value normalization, and terminal text helpers under `common/`.
+  The route command now lives directly in `bin/test-clash-leaf`; removed the
+  shell forwarding entrypoint and report-output forwarding helper. Header and
+  table width calculations share one character-based implementation.
 - Extracted the complete `network-manager/ip-quality/` history into standalone
   `ipquality` on 2026-08-23 and removed obsolete parent routing hooks.
 

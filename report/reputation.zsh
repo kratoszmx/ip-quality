@@ -176,18 +176,11 @@ esac
 print -rn -- "${Font_Cyan:-}$source_label${Font_Suffix:-}/${state_color}$state_label${Font_Suffix:-}"
 }
 
-report_display_width(){
-typeset plain non_ascii
-plain=$(clean_ansi "$1")
-non_ascii="${plain//[[:ascii:]]/}"
-print -rn -- $((${#plain}+${#non_ascii}))
-}
-
 report_table_cell(){
 typeset value="$1"
 typeset width="$2"
 typeset visible padding
-visible=$(report_display_width "$value")
+visible=$(display_width "$value")
 padding=$((width-visible))
 [[ $padding -lt 0 ]]&&padding=0
 print -rn -- "$value"
