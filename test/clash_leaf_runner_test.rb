@@ -478,6 +478,7 @@ class ClashLeafRunnerTest < Minitest::Test
       fake_reporter = File.join(directory, "fake-reporter")
       mihomo_pid_file = File.join(directory, "mihomo.pid")
       reporter_pid_file = File.join(directory, "reporter.pid")
+      config_path_file = File.join(directory, "config-path.txt")
       arguments_file = File.join(directory, "arguments.txt")
       write_private_yaml(profile_path, fixture_document)
       write_loopback_fake_mihomo(fake_mihomo)
@@ -495,41 +496,36 @@ class ClashLeafRunnerTest < Minitest::Test
       ZSH
       File.chmod(0o700, fake_reporter)
 
-      stdout = StringIO.new
-      stderr = StringIO.new
-      command = IpQuality::ClashLeafCommand.new(
-        stdout: stdout,
-        stderr: stderr,
-        reporter_path: fake_reporter
-      )
+      environment = {
+        "HTTP_PROXY" => "http://inherited.test.invalid:1",
+        "https_proxy" => "http://inherited.test.invalid:2",
+        "HtTp_PrOxY" => "http://inherited.test.invalid:3",
+        "No_PrOxY" => "inherited.test.invalid",
+        "no_proxy" => "inherited.test.invalid",
+        "IPQUALITY_TEST_TEMP_PARENT" => directory,
+        "IPQUALITY_TEST_PROFILE" => profile_path,
+        "IPQUALITY_TEST_MIHOMO" => fake_mihomo,
+        "IPQUALITY_TEST_REPORTER" => fake_reporter,
+        "IPQUALITY_TEST_MIHOMO_PID_FILE" => mihomo_pid_file,
+        "IPQUALITY_TEST_REPORTER_PID_FILE" => reporter_pid_file,
+        "IPQUALITY_TEST_MIHOMO_CONFIG_FILE" => config_path_file,
+        "IPQUALITY_TEST_ARGUMENTS_FILE" => arguments_file
+      }
       begin
-        exit_code = with_environment(
-          "HTTP_PROXY" => "http://inherited.test.invalid:1",
-          "https_proxy" => "http://inherited.test.invalid:2",
-          "HtTp_PrOxY" => "http://inherited.test.invalid:3",
-          "No_PrOxY" => "inherited.test.invalid",
-          "no_proxy" => "inherited.test.invalid",
-          "TMPDIR" => directory,
-          "IPQUALITY_TEST_MIHOMO_PID_FILE" => mihomo_pid_file,
-          "IPQUALITY_TEST_REPORTER_PID_FILE" => reporter_pid_file,
-          "IPQUALITY_TEST_ARGUMENTS_FILE" => arguments_file
-        ) do
-          command.run([
-            "--profile", profile_path,
-            "--leaf", "TargetLeaf",
-            "--mihomo", fake_mihomo,
-            "--confirm-network-lookup", "-4"
-          ])
-        end
+        stdout, stderr, status = Open3.capture3(
+          environment, "/usr/bin/ruby", "-e", isolated_runner_program
+        )
 
-        assert_equal 0, exit_code, stderr.string
+        assert status.success?, stderr
+        assert_empty stdout
         assert_equal "--confirm-network-lookup --scope reputation -4\n", File.read(arguments_file)
         assert File.file?(reporter_pid_file)
         assert File.file?(mihomo_pid_file)
         refute process_alive?(Integer(File.read(reporter_pid_file)))
         refute process_alive?(Integer(File.read(mihomo_pid_file)))
+        assert_removed_private_workspace(directory, config_path_file)
         assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"), File::FNM_DOTMATCH)
-        assert_includes stderr.string, "Isolated Mihomo stopped"
+        assert_includes stderr, "Isolated Mihomo stopped"
       ensure
         stop_test_child_from_pid_file(reporter_pid_file)
         stop_test_child_from_pid_file(mihomo_pid_file)
@@ -544,6 +540,7 @@ class ClashLeafRunnerTest < Minitest::Test
       fake_reporter = File.join(directory, "fake-reporter")
       mihomo_pid_file = File.join(directory, "mihomo.pid")
       reporter_pid_file = File.join(directory, "reporter.pid")
+      config_path_file = File.join(directory, "config-path.txt")
       write_private_yaml(profile_path, fixture_document)
 
       write_loopback_fake_mihomo(fake_mihomo)
@@ -557,32 +554,20 @@ class ClashLeafRunnerTest < Minitest::Test
       ZSH
       File.chmod(0o700, fake_reporter)
 
-      runner = <<~RUBY
-        load #{RUNNER.inspect}
-        command = IpQuality::ClashLeafCommand.new(
-          reporter_path: ENV.fetch("IPQUALITY_TEST_REPORTER")
-        )
-        exit(command.run([
-          "--profile", ENV.fetch("IPQUALITY_TEST_PROFILE"),
-          "--leaf", "TargetLeaf",
-          "--mihomo", ENV.fetch("IPQUALITY_TEST_MIHOMO"),
-          "--confirm-network-lookup", "-4"
-        ]))
-      RUBY
       environment = {
         "IPQUALITY_TEST_PROFILE" => profile_path,
         "IPQUALITY_TEST_MIHOMO" => fake_mihomo,
         "IPQUALITY_TEST_REPORTER" => fake_reporter,
         "IPQUALITY_TEST_MIHOMO_PID_FILE" => mihomo_pid_file,
         "IPQUALITY_TEST_REPORTER_PID_FILE" => reporter_pid_file,
-        "HOME" => directory,
-        "TMPDIR" => directory
+        "IPQUALITY_TEST_MIHOMO_CONFIG_FILE" => config_path_file,
+        "IPQUALITY_TEST_TEMP_PARENT" => directory
       }
       runner_pid = Process.spawn(
         environment,
         "/usr/bin/ruby",
         "-e",
-        runner,
+        isolated_runner_program,
         out: File::NULL,
         err: File::NULL
       )
@@ -606,6 +591,7 @@ class ClashLeafRunnerTest < Minitest::Test
             sleep 0.05
           end
         end
+        assert_removed_private_workspace(directory, config_path_file)
       ensure
         if runner_pid && process_alive?(runner_pid)
           Process.kill("KILL", runner_pid)
@@ -702,6 +688,36 @@ class ClashLeafRunnerTest < Minitest::Test
     File.chmod(0o600, path)
   end
 
+  def isolated_runner_program
+    <<~RUBY
+      require "minitest/mock"
+      load #{RUNNER.inspect}
+      # TMPDIR alone cannot override the production preferred workspace.
+      # Keep the real session lifecycle, injecting only its existing temp_parent.
+      constructor = IpQuality::IsolatedMihomoSession.method(:new)
+      factory = lambda do |*arguments, **options|
+        constructor.call(*arguments, **options.merge(temp_parent: ENV.fetch("IPQUALITY_TEST_TEMP_PARENT")))
+      end
+      IpQuality::IsolatedMihomoSession.stub(:new, factory) do
+        command = IpQuality::ClashLeafCommand.new(
+          reporter_path: ENV.fetch("IPQUALITY_TEST_REPORTER")
+        )
+        exit(command.run([
+          "--profile", ENV.fetch("IPQUALITY_TEST_PROFILE"),
+          "--leaf", "TargetLeaf",
+          "--mihomo", ENV.fetch("IPQUALITY_TEST_MIHOMO"),
+          "--confirm-network-lookup", "-4"
+        ]))
+      end
+    RUBY
+  end
+
+  def assert_removed_private_workspace(directory, config_path_file)
+    workspace = File.dirname(File.read(config_path_file).strip)
+    assert_equal File.realpath(directory), File.realpath(File.dirname(workspace))
+    refute File.exist?(workspace), "the workspace actually used by Mihomo must be removed"
+  end
+
   def write_loopback_fake_mihomo(path)
     File.write(path, <<~'ZSH')
       #!/bin/zsh
@@ -715,6 +731,7 @@ class ClashLeafRunnerTest < Minitest::Test
           *) shift ;;
         esac
       done
+      print -r -- "$config" > "$IPQUALITY_TEST_MIHOMO_CONFIG_FILE"
       (( test_only == 1 )) && exit 0
       typeset port=''
       while IFS= read -r line; do

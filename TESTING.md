@@ -61,8 +61,11 @@ the reporter's `--self-test` once; it need not be run separately for a full pass
   suite; share only setup with matching semantics. The source audit reads
   maintained source/data directories, not user reports, secrets, or caches.
 - Route tests use private profiles, fake reporters/Mihomo, and owned temporary
-  workspaces. Preserve checks for cleanup on success, failure, signals, and
-  abandoned workspaces, plus route, link, and malformed-input boundaries.
+  workspaces. The lifecycle launcher injects the session's existing `temp_parent`
+  argument in its test child; setting `TMPDIR` alone cannot override the
+  production preferred directory. Cleanup checks use the configuration path
+  recorded by fake Mihomo. Preserve success, failure, signal, abandoned-workspace,
+  route, link, and malformed-input coverage.
 - New suites belong at `test/*_test.rb`; helpers and data belong under
   `test/support/` and `test/fixtures/`. Add a sanitized parser fixture with each
   provider. Prefer observable results over exact implementation strings; keep

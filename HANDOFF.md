@@ -1,6 +1,6 @@
 # Current handoff
 
-Last documentation and offline validation: 2026-09-16, Asia/Shanghai.
+Last documentation and offline validation: 2026-09-17, Asia/Shanghai.
 
 ## Current state
 
@@ -29,6 +29,11 @@ checks now cover report-file safety/formats, DNSBL resolver-policy errors,
 missing dependencies, zero-credit lookup prevention, exact-leaf proxy forwarding,
 and malformed YAML. Existing route/signal cleanup checks remain.
 
+The follow-up audit fixed a lifecycle-test isolation gap: success and signal
+cases share a child-process launcher that supplies an explicit private
+`temp_parent`. Both check the workspace path actually received by fake Mihomo,
+so an empty but unused fixture directory cannot produce a false cleanup pass.
+
 [TESTING.md](TESTING.md) owns prerequisites, focused commands, and test boundaries.
 API contracts remain in [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md), process
 ownership in [SERVICES.md](SERVICES.md), and usage in [AGENTS.md](AGENTS.md).
@@ -37,10 +42,12 @@ code, credentials, or live Clash state changed in this test-maintenance pass.
 
 ## Validation evidence
 
-The complete fixture-only suite passed 68 runs / 1,037 assertions, with zero
-failures, errors, or skips (seed 31938). All 14 Ruby and 11 zsh source/test files
+The complete fixture-only suite passed 68 runs / 1,043 assertions, with zero
+failures, errors, or skips (seed 26917). All 14 Ruby and 11 zsh source/test files
 passed syntax checks; local documentation file links and `git diff --check`
 also passed. The included self-test validated all 422 vendored DNSBL entries.
+A child-only mutation disabling workspace removal failed the actual-workspace
+assertion as expected, confirming the cleanup check detects that regression.
 
 Canonical checks from the worktree root:
 
