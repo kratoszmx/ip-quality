@@ -1,5 +1,19 @@
 # Current handoff
 
+## Current IPQS live recheck — 2026-09-22
+
+The official IPQS path is currently usable again. A bounded
+`--confirm-network-lookup --scope reputation -4 -j` run completed the account
+preflight and official lookup, returning `ProviderStatus.IPQS=ok`,
+`Type.Source.IPQS=official_api`, and IPQS fraud score **100**. The sanitized
+IPQS MCP account probe independently returned `authenticated`. This supersedes
+the older zero-credit observation as the current availability result while
+preserving that earlier restriction evidence in the historical handoff below.
+
+The complete fixture-only suite passed 71 runs / 1,074 assertions. The
+worktree stayed clean at commit `25d4860`; no credential, reporter source,
+Clash state, or persistent report was changed by the live check.
+
 Last documentation and offline validation: 2026-09-21, Asia/Shanghai.
 
 ## Current state
