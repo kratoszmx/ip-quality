@@ -1,0 +1,13 @@
+{
+  "ip": "198.51.100.23",
+  "success": true,
+  "country_code": "US",
+  "connection": {
+    "asn": 64500,
+    "org": "Example Network",
+    "isp": "Example ISP"
+  },
+  "timezone": {
+    "id": "America/Los_Angeles"
+  }
+}

@@ -268,6 +268,39 @@ class ReportTest < ReporterTestCase
     assert_empty stderr
   end
 
+  def test_additional_provider_context_stays_out_of_the_score_tables
+    context_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      Font_B='' Font_Red='' Font_Green='' Font_Purple='' Font_Cyan='' Font_Suffix=''
+      YY=cn fullIP=1
+      typeset -A ipapi ipwhois cloudflare ping0 ripestat internetdb sping0
+      ipapi[mode]=anonymous ipapi[anonymous_asn]='AS64500 Example ISP'
+      ipapi[anonymous_company]='Example ISP' ipapi[anonymous_country]='United States'
+      ipapi[anonymous_city]='Example City' ipapi[anonymous_timezone]='America/Los_Angeles'
+      ipwhois[status]=ok ipwhois[countrycode]=US ipwhois[asn]=64500
+      ipwhois[org]='Example Network' ipwhois[isp]='Example ISP' ipwhois[timezone]='America/Los_Angeles'
+      cloudflare[status]=ok cloudflare[countrycode]=US cloudflare[network]=AS64500
+      cloudflare[org]='Example Network' cloudflare[infrastructure]=hosting_provider
+      cloudflare[threats]='Phishing, Malware'
+      source "$2"
+      source "$1"
+      show_network_context
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", context_probe,
+      "additional-provider-context-test", REPUTATION_REPORT, TERMINAL_LIBRARY
+    )
+
+    assert status.success?, stderr
+    assert_equal 4, stdout.lines.length
+    assert_includes stdout, "ipapi.is：匿名最小响应 | ASN=AS64500 Example ISP"
+    assert_includes stdout, "ipwho.is：地区=US"
+    assert_includes stdout, "Cloudflare IP Intelligence：地区=US"
+    assert_includes stdout, "威胁类别=Phishing, Malware"
+    refute_includes stdout, "风险评分"
+    assert_empty stderr
+  end
+
   def test_unavailable_sources_stay_compact_while_ipqs_keeps_a_visible_status_column
     report_probe = <<~'ZSH'
       setopt KSH_ARRAYS

@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-09-21-standalone.15"
+script_version="v2026-09-22-standalone.17"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset COMMON_DIR="$SCRIPT_DIR/common"
@@ -19,13 +19,15 @@ typeset TERMINAL_LIB="$COMMON_DIR/terminal.zsh"
 typeset CREDENTIALS_LIB="$PROVIDER_DIR/credentials.zsh"
 typeset IPREGISTRY_LIB="$PROVIDER_DIR/ipregistry.zsh"
 typeset IPAPI_LIB="$PROVIDER_DIR/ipapi.zsh"
+typeset IPWHOIS_LIB="$PROVIDER_DIR/ipwhois.zsh"
+typeset CLOUDFLARE_LIB="$PROVIDER_DIR/cloudflare.zsh"
 typeset IPQUALITYSCORE_LIB="$PROVIDER_DIR/ipqualityscore.zsh"
 typeset PING0_LIB="$PROVIDER_DIR/ping0.zsh"
 typeset RIPESTAT_LIB="$PROVIDER_DIR/ripestat.zsh"
 typeset INTERNETDB_LIB="$PROVIDER_DIR/shodan_internetdb.zsh"
 typeset REPUTATION_REPORT_LIB="$REPORT_DIR/reputation.zsh"
 typeset local_library
-for local_library in "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for local_library in "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$local_library" && -r "$local_library" && ! -L "$local_library" ]]||{
 print -ru2 -- "ERROR: unsafe or missing local library: $local_library"
 exit 66
@@ -72,6 +74,8 @@ typeset -A ipinfo
 typeset -A scamalytics
 typeset -A ipregistry
 typeset -A ipapi
+typeset -A ipwhois
+typeset -A cloudflare
 typeset -A abuseipdb
 typeset -A ip2location
 typeset -A ipdata
@@ -559,10 +563,10 @@ print -r -- "  scope: $query_scope"
 print -r -- "  DNSBL concurrency cap: $dnsbl_concurrency"
 print -r -- "  output: masked IP by default; local stdout/file only"
 print -r -- "  telemetry/report upload/remote code: disabled"
-scope_includes reputation&&print -r -- "  reputation sources: official-contract sources = ipapi.is, Ping0, RIPEstat, Shodan InternetDB, plus configured Ipregistry/IPQS APIs"
+scope_includes reputation&&print -r -- "  reputation sources: official-contract sources = ipapi.is, ipwho.is, Cloudflare IP Intelligence (when configured), Ping0, RIPEstat, Shodan InternetDB, plus configured Ipregistry/IPQS APIs"
 scope_includes reputation&&print -r -- "  supplementary sources: IPinfo public demo widget plus named Check.Place relays (MaxMind-labeled, Scamalytics, AbuseIPDB, IP2Location, ipdata, IPQualityScore)"
 scope_includes reputation&&print -r -- "  Ping0 limitation: the official free /geo endpoint exposes IP/location/ASN/organization, not a risk score"
-scope_includes reputation&&print -r -- "  context-only sources: RIPEstat reports routing; Shodan InternetDB reports public exposure, not cleanliness"
+scope_includes reputation&&print -r -- "  context-only sources: ipwho.is reports geo/network/timezone; Cloudflare reports ASN infrastructure/threat categories; RIPEstat reports routing; Shodan InternetDB reports public exposure"
 scope_includes media-ai&&print -r -- "  media/AI sources: TikTok, Netflix, YouTube Premium, Prime Video, Reddit, OpenAI public endpoints"
 scope_includes mail&&print -r -- "  mail sources: public MX DNS plus bounded SMTP greeting probes"
 scope_includes dnsbl&&print -r -- "  DNSBL sources: vendored $DNSBL_FILE (up to $dnsbl_concurrency concurrent DNS lookups)"
@@ -595,7 +599,7 @@ print -ru2 -- "SELF-TEST FAILED: not running under zsh"
 return 1
 }
 local reference_file
-for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json" "$COMMON_PROVIDER_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json" "$COMMON_PROVIDER_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$reference_file" && -r "$reference_file" && ! -L "$reference_file" ]]||{
 print -ru2 -- "SELF-TEST FAILED: unsafe or missing reference file: $reference_file"
 return 1
@@ -682,12 +686,26 @@ ipregistry_parse_response '{"ip":"198.51.100.23","connection":{"type":"hosting"}
 print -ru2 -- "SELF-TEST FAILED: Ipregistry parser contract changed"
 return 1
 }
-ipapi_parse_response '{"asn":{"type":"isp"},"company":{"type":"isp","abuser_score":"0.01 (Very Low)"},"location":{"country_code":"US"},"is_proxy":false,"is_tor":false,"is_vpn":false,"is_datacenter":false,"is_abuser":false,"is_crawler":false}'&&[[ "${ipapi_parsed[usage_type]}" == "isp" && "${ipapi_parsed[score_text]}" == "0.01 (Very Low)" ]]||{
+ipapi_parse_response '{"ip":"198.51.100.23","asn":{"type":"isp"},"company":{"type":"isp","abuser_score":"0.01 (Very Low)"},"location":{"country_code":"US"},"is_proxy":false,"is_tor":false,"is_vpn":false,"is_datacenter":false,"is_abuser":false,"is_crawler":false}' "198.51.100.23"&&[[ "${ipapi_parsed[usage_type]}" == "isp" && "${ipapi_parsed[score_text]}" == "0.01 (Very Low)" ]]||{
 print -ru2 -- "SELF-TEST FAILED: ipapi parser contract changed"
 return 1
 }
 ipapi_parse_response '{"asn":"AS64500","company":"Example ISP"}'&&{
 print -ru2 -- "SELF-TEST FAILED: ipapi schema drift accepted"
+return 1
+}
+ipapi_parse_response '{"ip":"198.51.100.23","asn":"AS64500 Example ISP","company":"Example ISP","country":"United States","docs":"https://ipapi.is/free-tier.html"}' "198.51.100.23"&&[[ "${ipapi_parsed[mode]}" == "anonymous" && "${ipapi_parsed[anonymous_company]}" == "Example ISP" ]]||{
+print -ru2 -- "SELF-TEST FAILED: ipapi anonymous contract changed"
+return 1
+}
+ipwhois_parse_response '{"ip":"198.51.100.23","success":true,"country_code":"US","connection":{"asn":64500,"org":"Example Network","isp":"Example ISP"},"timezone":{"id":"America/Los_Angeles"}}' "198.51.100.23"&&
+  [[ "${ipwhois_parsed[asn]}" == "64500" && "${ipwhois_parsed[organization]}" == "Example Network" ]]||{
+print -ru2 -- "SELF-TEST FAILED: ipwho.is parser contract changed"
+return 1
+}
+cloudflare_parse_response '{"success":true,"result":[{"ip":"198.51.100.23","belongs_to_ref":{"country":"US","description":"Example Network","type":"hosting_provider","value":"AS64500"},"risk_types":[{"id":131,"name":"Phishing","super_category_id":21}]}]}' "198.51.100.23"&&
+  [[ "${cloudflare_parsed[network]}" == "AS64500" && "${cloudflare_parsed[threat_categories]}" == "Phishing" ]]||{
+print -ru2 -- "SELF-TEST FAILED: Cloudflare IP Intelligence parser contract changed"
 return 1
 }
 ipqualityscore_parse_response '{"success":true,"fraud_score":87,"country_code":"US","proxy":true,"vpn":true,"tor":false,"recent_abuse":false,"bot_status":false,"connection_type":"Data Center"}'&&[[ "${ipqualityscore_parsed[score]}" == "87" && "${ipqualityscore_parsed[connection_type]}" == "Data Center" && "${ipqualityscore_parsed[server]}" == "true" ]]||{
@@ -802,6 +820,8 @@ maxmind=()
 ipinfo=()
 ipregistry=()
 ipapi=()
+ipwhois=()
+cloudflare=()
 ip2location=()
 abuseipdb=()
 scamalytics=()
@@ -830,6 +850,23 @@ ipqs[status]="ok"
 ipqs[source]="official_api"
 ipqs[susetype]="${stype[hosting]}"
 ipapi[risk]=$'High "quoted"'
+ipapi[status]="ok"
+ipapi[mode]="full"
+ipapi[ip]="198.51.100.23"
+ipapi[countrycode]="US"
+ipwhois[status]="ok"
+ipwhois[countrycode]="US"
+ipwhois[asn]="64500"
+ipwhois[org]="Example Network"
+ipwhois[isp]="Example ISP"
+ipwhois[timezone]="America/Los_Angeles"
+cloudflare[status]="ok"
+cloudflare[ip]="198.51.100.23"
+cloudflare[countrycode]="US"
+cloudflare[network]="AS64500"
+cloudflare[org]="Example Network"
+cloudflare[infrastructure]="hosting_provider"
+cloudflare[threats]="Phishing, Malware"
 ipqs[proxy]="true"
 ping0[status]="verified"
 ping0[match]="true"
@@ -870,8 +907,15 @@ print -r -- "$ipjson"|jq -e --arg expected "$json_special" '
   .ScoreMeta.IPQS.Status == "ok" and
   .ScoreMeta.IPQS.Source == "official_api" and
   .ProviderStatus.CheckPlaceMaxMind == "ok" and
+  .ProviderStatus.ipapi == "ok" and
   .ProviderStatus.AbuseIPDB == "http_403" and
   .ProviderStatus.ipdata == "network_error" and
+  .ProviderStatus.IPWhois == "ok" and
+  .ProviderStatus.Cloudflare == "ok" and
+  .ProviderContext.IPAPI.Mode == "full" and
+  .ProviderContext.IPAPI.CountryCode == "US" and
+  .ProviderContext.IPWhois.ASN == "64500" and
+  .ProviderContext.Cloudflare.ThreatCategories == ["Phishing", "Malware"] and
   .Factor.Proxy.IPQS == true and
   .Factor.Proxy.Ipregistry == false and
   .Factor.VPN.IPinfo == null and
@@ -1337,17 +1381,42 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}ipapi $Font_Suffix"
 show_progress_bar "$temp_info" $((40-6-${sinfo[ldatabase]}))
 ipapi=()
 ipapi[status]="unknown"
-if [[ $IP == *:* ]];then
-local RESPONSE=$(curl_safe -Ls -m 10 -H 'origin: https://ipapi.is' "https://api.ipapi.is/?q=$IP")
+typeset api_key="${provider_credentials[IPAPI_API_KEY]:-}"
+typeset endpoint="https://api.ipapi.is/?q=$IP"
+[[ -n "$api_key" ]]&&endpoint="$endpoint&key=$api_key"
+typeset wire_response curl_exit http_code RESPONSE
+if [[ -n "$api_key" ]];then
+wire_response=$(curl_with_secret_url "$endpoint" $CurlARG -sS -L -$1 -m 10 \
+  --max-filesize 262144 --write-out $'\n%{http_code}' 2>/dev/null)
 else
-local RESPONSE=$(curl_safe $CurlARG -sL -m 10 -H 'origin: https://ipapi.is' "https://api.ipapi.is/?q=$IP")
+wire_response=$(curl_safe $CurlARG -sS -L -$1 -m 10 -H 'origin: https://ipapi.is' \
+  --max-filesize 262144 --write-out $'\n%{http_code}' "$endpoint" 2>/dev/null)
 fi
-if ! ipapi_parse_response "$RESPONSE";then
+curl_exit=$?
+if (( curl_exit != 0 )) || [[ "$wire_response" != *$'\n'* ]];then
+ipapi[status]="network_error"
+return 1
+fi
+http_code="${wire_response##*$'\n'}"
+RESPONSE="${wire_response%$'\n'*}"
+if [[ "$http_code" != [0-9][0-9][0-9] ]] || (( 10#$http_code < 200 || 10#$http_code > 299 ));then
+ipapi[status]=$(provider_http_failure_status "$http_code" "$RESPONSE")
+return 1
+fi
+if ! ipapi_parse_response "$RESPONSE" "$IP";then
 ipapi[status]="invalid_response"
 return 1
 fi
 ipapi[status]="ok"
 ipapi[source]="public_api"
+ipapi[mode]="${ipapi_parsed[mode]}"
+ipapi[ip]="${ipapi_parsed[ip]}"
+ipapi[anonymous_asn]="${ipapi_parsed[anonymous_asn]}"
+ipapi[anonymous_company]="${ipapi_parsed[anonymous_company]}"
+ipapi[anonymous_country]="${ipapi_parsed[anonymous_country]}"
+ipapi[anonymous_city]="${ipapi_parsed[anonymous_city]}"
+ipapi[anonymous_region]="${ipapi_parsed[anonymous_region]}"
+ipapi[anonymous_timezone]="${ipapi_parsed[anonymous_timezone]}"
 ipapi[usetype]="${ipapi_parsed[usage_type]}"
 ipapi[comtype]="${ipapi_parsed[company_type]}"
 case ${ipapi[usetype]} in
@@ -1412,6 +1481,76 @@ ipapi[vpn]="${ipapi_parsed[vpn]}"
 ipapi[server]="${ipapi_parsed[server]}"
 ipapi[abuser]="${ipapi_parsed[abuser]}"
 ipapi[robot]="${ipapi_parsed[robot]}"
+}
+db_ipwhois(){
+local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}ipwho.is public API $Font_Suffix"
+((ibar_step+=3))
+show_progress_bar "$temp_info" $((40-9-${sinfo[ldatabase]}))
+ipwhois=()
+ipwhois[status]="unknown"
+provider_fetch_public_json "$1" "https://ipwho.is/$IP" 131072||true
+ipwhois[status]="$PROVIDER_RESPONSE_STATUS"
+local RESPONSE="$PROVIDER_RESPONSE_BODY"
+[[ "${ipwhois[status]}" == "ok" ]]||return 0
+if ipwhois_parse_response "$RESPONSE" "$IP";then
+ipwhois[status]="ok"
+ipwhois[source]="public_api"
+ipwhois[countrycode]="${ipwhois_parsed[country_code]}"
+ipwhois[asn]="${ipwhois_parsed[asn]}"
+ipwhois[org]="${ipwhois_parsed[organization]}"
+ipwhois[isp]="${ipwhois_parsed[isp]}"
+ipwhois[timezone]="${ipwhois_parsed[timezone]}"
+else
+ipwhois[status]="invalid_response"
+fi
+}
+db_cloudflare(){
+local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Cloudflare IP Intelligence $Font_Suffix"
+((ibar_step+=3))
+show_progress_bar "$temp_info" $((40-12-${sinfo[ldatabase]}))
+cloudflare=()
+cloudflare[status]="not_configured"
+typeset api_token="${provider_credentials[CLOUDFLARE_API_TOKEN]:-}"
+typeset account_id="${provider_credentials[CLOUDFLARE_ACCOUNT_ID]:-}"
+[[ -n "$api_token" || -n "$account_id" ]]||return 0
+if [[ -z "$api_token" || -z "$account_id" ]];then
+cloudflare[status]="invalid_configuration"
+return 0
+fi
+cloudflare[status]="unknown"
+local query_name="ipv4"
+[[ "$IP" == *:* ]]&&query_name="ipv6"
+local endpoint="https://api.cloudflare.com/client/v4/accounts/$account_id/intel/ip?$query_name=$IP"
+local wire_response curl_exit http_code response_body
+wire_response=$(curl_with_secret_header "Authorization" "Bearer $api_token" "$endpoint" \
+  $CurlARG -sS -L -$1 -m 10 --max-filesize 131072 --write-out $'\n%{http_code}' 2>/dev/null)
+curl_exit=$?
+if (( curl_exit != 0 )) || [[ "$wire_response" != *$'\n'* ]];then
+cloudflare[status]="network_error"
+return 0
+fi
+http_code="${wire_response##*$'\n'}"
+response_body="${wire_response%$'\n'*}"
+if [[ "$http_code" != [0-9][0-9][0-9] ]] || (( 10#$http_code < 200 || 10#$http_code > 299 ));then
+cloudflare[status]=$(provider_http_failure_status "$http_code" "$response_body")
+return 0
+fi
+if ! provider_json_is_object "$response_body";then
+cloudflare[status]="invalid_response"
+return 0
+fi
+if ! cloudflare_parse_response "$response_body" "$IP";then
+cloudflare[status]="invalid_response"
+return 0
+fi
+cloudflare[status]="${cloudflare_parsed[status]}"
+cloudflare[source]="official_api"
+cloudflare[ip]="${cloudflare_parsed[ip]}"
+cloudflare[countrycode]="${cloudflare_parsed[country_code]}"
+cloudflare[network]="${cloudflare_parsed[network]}"
+cloudflare[org]="${cloudflare_parsed[organization]}"
+cloudflare[infrastructure]="${cloudflare_parsed[infrastructure_type]}"
+cloudflare[threats]="${cloudflare_parsed[threat_categories]}"
 }
 db_abuseipdb(){
 local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}AbuseIPDB $Font_Suffix"
@@ -2652,6 +2791,21 @@ ipjson=$(jq -n \
 --arg status_abuseipdb "${abuseipdb[status]:-unknown}" \
 --arg status_ip2location "${ip2location[status]:-unknown}" \
 --arg status_ipdata "${ipdata[status]:-unknown}" \
+--arg status_ipapi "${ipapi[status]:-unknown}" \
+--arg ipapi_mode "${ipapi[mode]:-}" --arg ipapi_ip "${ipapi[ip]:-}" \
+--arg ipapi_countrycode "${ipapi[countrycode]:-}" \
+--arg ipapi_asn "${ipapi[anonymous_asn]:-}" --arg ipapi_company "${ipapi[anonymous_company]:-}" \
+--arg ipapi_country "${ipapi[anonymous_country]:-}" --arg ipapi_city "${ipapi[anonymous_city]:-}" \
+--arg ipapi_region "${ipapi[anonymous_region]:-}" --arg ipapi_timezone "${ipapi[anonymous_timezone]:-}" \
+--arg status_ipwhois "${ipwhois[status]:-unknown}" \
+--arg ipwhois_countrycode "${ipwhois[countrycode]:-}" \
+--arg ipwhois_asn "${ipwhois[asn]:-}" --arg ipwhois_org "${ipwhois[org]:-}" \
+--arg ipwhois_isp "${ipwhois[isp]:-}" --arg ipwhois_timezone "${ipwhois[timezone]:-}" \
+--arg status_cloudflare "${cloudflare[status]:-not_configured}" \
+--arg cloudflare_ip "${cloudflare[ip]:-}" --arg cloudflare_countrycode "${cloudflare[countrycode]:-}" \
+--arg cloudflare_network "${cloudflare[network]:-}" --arg cloudflare_org "${cloudflare[org]:-}" \
+--arg cloudflare_infrastructure "${cloudflare[infrastructure]:-}" \
+--arg cloudflare_threats "${cloudflare[threats]:-}" \
 --arg f_ip2_cc "${ip2location[countrycode]:-}" --arg f_ipapi_cc "${ipapi[countrycode]:-}" \
 --arg f_ipregistry_cc "${ipregistry[countrycode]:-}" \
 --arg f_ipqs_cc "${ipqs[countrycode]:-}" --arg f_scam_cc "${scamalytics[countrycode]:-}" \
@@ -2767,6 +2921,9 @@ def dnsresults($value):
     AbuseIPDB: $status_abuseipdb,
     IP2Location: $status_ip2location,
     ipdata: $status_ipdata,
+    ipapi: $status_ipapi,
+    IPWhois: $status_ipwhois,
+    Cloudflare: $status_cloudflare,
     IPQS: $status_ipqs
   },
   Factor: {
@@ -2777,6 +2934,27 @@ def dnsresults($value):
     Server: {IP2LOCATION: factor($f_ip2_server), ipapi: factor($f_ipapi_server), Ipregistry: factor($f_ipregistry_server), IPQS: factor($f_ipqs_server), SCAMALYTICS: factor($f_scam_server), ipdata: factor($f_ipdata_server), IPinfo: factor($f_ipinfo_server)},
     Abuser: {IP2LOCATION: factor($f_ip2_abuse), ipapi: factor($f_ipapi_abuse), Ipregistry: factor($f_ipregistry_abuse), IPQS: factor($f_ipqs_abuse), SCAMALYTICS: factor($f_scam_abuse), ipdata: factor($f_ipdata_abuse), IPinfo: factor($f_ipinfo_abuse)},
     Robot: {IP2LOCATION: factor($f_ip2_bot), ipapi: factor($f_ipapi_bot), Ipregistry: factor($f_ipregistry_bot), IPQS: factor($f_ipqs_bot), SCAMALYTICS: factor($f_scam_bot), ipdata: factor($f_ipdata_bot), IPinfo: factor($f_ipinfo_bot)}
+  },
+  ProviderContext: {
+    IPAPI: {
+      Provider: "ipapi.is", Status: $status_ipapi, Mode: opt($ipapi_mode),
+      IP: opt($ipapi_ip), CountryCode: opt($ipapi_countrycode), ASN: opt($ipapi_asn), Organization: opt($ipapi_company),
+      Country: opt($ipapi_country), City: opt($ipapi_city), Region: opt($ipapi_region),
+      TimeZone: opt($ipapi_timezone)
+    },
+    IPWhois: {
+      Provider: "ipwho.is", Status: $status_ipwhois,
+      CountryCode: opt($ipwhois_countrycode), ASN: opt($ipwhois_asn),
+      Organization: opt($ipwhois_org), ISP: opt($ipwhois_isp),
+      TimeZone: opt($ipwhois_timezone)
+    },
+    Cloudflare: {
+      Provider: "Cloudflare Security Center IP Intelligence", Status: $status_cloudflare,
+      IP: opt($cloudflare_ip), CountryCode: opt($cloudflare_countrycode),
+      Network: opt($cloudflare_network), Organization: opt($cloudflare_org),
+      InfrastructureType: opt($cloudflare_infrastructure),
+      ThreatCategories: list($cloudflare_threats)
+    }
   },
   Ping0: {}, Routing: {}, Exposure: {},
   Media: {
@@ -2840,6 +3018,8 @@ db_ipinfo
 db_ipregistry $2
 db_scamalytics $2
 db_ipapi $2
+db_ipwhois $2
+db_cloudflare $2
 db_abuseipdb $2
 db_ip2location $2
 db_ipdata $2

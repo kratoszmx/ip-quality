@@ -449,6 +449,31 @@ observations+=("${Font_Cyan}Ping0: ${Font_Red}${sping0[mismatch]}${Font_Suffix}"
 fi
 fi
 
+if [[ "${ipapi[mode]:-}" == "anonymous" ]] &&
+   report_any_known "${ipapi[anonymous_asn]}" "${ipapi[anonymous_company]}" "${ipapi[anonymous_country]}" "${ipapi[anonymous_city]}" "${ipapi[anonymous_region]}" "${ipapi[anonymous_timezone]}";then
+if [[ "$YY" == "cn" ]];then
+observations+=("${Font_Cyan}ipapi.is：${Font_Suffix}匿名最小响应 | ASN=$(report_neutral_or_dash "${ipapi[anonymous_asn]}") | 组织=$(report_neutral_or_dash "${ipapi[anonymous_company]}") | 地区=$(report_neutral_or_dash "${ipapi[anonymous_country]}") | 城市=$(report_neutral_or_dash "${ipapi[anonymous_city]}") | 时区=$(report_neutral_or_dash "${ipapi[anonymous_timezone]}")")
+else
+observations+=("${Font_Cyan}ipapi.is: ${Font_Suffix}anonymous minimal response | ASN=$(report_neutral_or_dash "${ipapi[anonymous_asn]}") | organization=$(report_neutral_or_dash "${ipapi[anonymous_company]}") | country=$(report_neutral_or_dash "${ipapi[anonymous_country]}") | city=$(report_neutral_or_dash "${ipapi[anonymous_city]}") | timezone=$(report_neutral_or_dash "${ipapi[anonymous_timezone]}")")
+fi
+fi
+
+if report_any_known "${ipwhois[countrycode]}" "${ipwhois[asn]}" "${ipwhois[org]}" "${ipwhois[isp]}" "${ipwhois[timezone]}";then
+if [[ "$YY" == "cn" ]];then
+observations+=("${Font_Cyan}ipwho.is：${Font_Suffix}地区=$(report_neutral_or_dash "${ipwhois[countrycode]}") | ASN=$(report_neutral_or_dash "${ipwhois[asn]}") | 组织=$(report_neutral_or_dash "${ipwhois[org]}") | ISP=$(report_neutral_or_dash "${ipwhois[isp]}") | 时区=$(report_neutral_or_dash "${ipwhois[timezone]}")")
+else
+observations+=("${Font_Cyan}ipwho.is: ${Font_Suffix}country=$(report_neutral_or_dash "${ipwhois[countrycode]}") | network=$(report_neutral_or_dash "${ipwhois[asn]}") | organization=$(report_neutral_or_dash "${ipwhois[org]}") | ISP=$(report_neutral_or_dash "${ipwhois[isp]}") | timezone=$(report_neutral_or_dash "${ipwhois[timezone]}")")
+fi
+fi
+
+if report_any_known "${cloudflare[countrycode]}" "${cloudflare[network]}" "${cloudflare[org]}" "${cloudflare[infrastructure]}" "${cloudflare[threats]}";then
+if [[ "$YY" == "cn" ]];then
+observations+=("${Font_Cyan}Cloudflare IP Intelligence：${Font_Suffix}地区=$(report_neutral_or_dash "${cloudflare[countrycode]}") | 网络=$(report_neutral_or_dash "${cloudflare[network]}") | 组织=$(report_neutral_or_dash "${cloudflare[org]}") | 类型=$(report_neutral_or_dash "${cloudflare[infrastructure]}") | 威胁类别=$(report_neutral_or_dash "${cloudflare[threats]}")")
+else
+observations+=("${Font_Cyan}Cloudflare IP Intelligence: ${Font_Suffix}country=$(report_neutral_or_dash "${cloudflare[countrycode]}") | network=$(report_neutral_or_dash "${cloudflare[network]}") | organization=$(report_neutral_or_dash "${cloudflare[org]}") | infrastructure=$(report_neutral_or_dash "${cloudflare[infrastructure]}") | threat categories=$(report_neutral_or_dash "${cloudflare[threats]}")")
+fi
+fi
+
 if report_any_known "${ripestat[status]}" "${ripestat[prefix]}" "${ripestat[origins]}";then
 if [[ "$YY" == "cn" ]];then
 observations+=("${Font_Cyan}RIPEstat：${Font_Suffix}状态=$(report_neutral_or_dash "${ripestat[status]}") | 前缀=$(report_neutral_or_dash "$displayed_prefix") | 起源=$(report_neutral_or_dash "${ripestat[origins]}")")
@@ -499,7 +524,15 @@ if [[ "${ipregistry[status]}" != "not_configured" ]] &&
    ! report_any_known "${ipregistry[susetype]}" "${ipregistry[scomtype]}" "${ipregistry[countrycode]}" "${ipregistry[proxy]}" "${ipregistry[vpn]}" "${ipregistry[tor]}" "${ipregistry[server]}" "${ipregistry[abuser]}";then
 missing+=("Ipregistry")
 fi
-report_any_known "${ipapi[susetype]}" "${ipapi[scomtype]}" "${ipapi[score]}" "${ipapi[countrycode]}" "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ipapi[server]}" "${ipapi[abuser]}" "${ipapi[robot]}"||missing+=("ipapi.is")
+report_any_known "${ipapi[susetype]}" "${ipapi[scomtype]}" "${ipapi[score]}" "${ipapi[countrycode]}" "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ipapi[server]}" "${ipapi[abuser]}" "${ipapi[robot]}" "${ipapi[anonymous_asn]}" "${ipapi[anonymous_company]}" "${ipapi[anonymous_country]}" "${ipapi[anonymous_city]}" "${ipapi[anonymous_region]}" "${ipapi[anonymous_timezone]}"||missing+=("ipapi.is")
+if [[ -n "${ipwhois[status]:-}" && "${ipwhois[status]}" != "not_configured" ]] &&
+   ! report_any_known "${ipwhois[countrycode]}" "${ipwhois[asn]}" "${ipwhois[org]}" "${ipwhois[isp]}" "${ipwhois[timezone]}";then
+missing+=("ipwho.is")
+fi
+if [[ -n "${cloudflare[status]:-}" && "${cloudflare[status]}" != "not_configured" ]] &&
+   ! report_any_known "${cloudflare[countrycode]}" "${cloudflare[network]}" "${cloudflare[org]}" "${cloudflare[infrastructure]}" "${cloudflare[threats]}";then
+missing+=("Cloudflare IP Intelligence")
+fi
 if ! report_any_known "${ip2location[susetype]}" "${ip2location[scomtype]}" "${ip2location[score]}" "${ip2location[countrycode]}" "${ip2location[proxy]}" "${ip2location[vpn]}" "${ip2location[tor]}" "${ip2location[server]}" "${ip2location[abuser]}" "${ip2location[robot]}";then
 case "${ip2location[status]}" in
 cloudflare_blocked)relay_cloudflare_blocked+=("IP2Location")

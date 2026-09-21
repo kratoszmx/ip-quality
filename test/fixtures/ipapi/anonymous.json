@@ -1,0 +1,14 @@
+{
+  "ip": "198.51.100.23",
+  "asn": "AS64500 Example ISP",
+  "company": "Example ISP",
+  "city": "Example City",
+  "region": "Example Region",
+  "country": "United States",
+  "timezone": "America/Los_Angeles",
+  "docs": "https://ipapi.is/free-tier.html",
+  "is_bogon": false,
+  "is_mobile": false,
+  "is_satellite": false,
+  "is_crawler": false
+}

@@ -62,7 +62,9 @@ when a single JSON document is needed.
 | IPinfo public demo widget | Direct public demo component, not the token-authenticated API | ASN/company type, country, privacy flags, location |
 | Ipregistry IP Intelligence | Direct official API when `IPREGISTRY_API_KEY` is configured | Connection/company type, country, proxy, VPN, Tor, cloud-hosting, abuse/attack signals |
 | Scamalytics via `ipinfo.check.place` | Upstream relay | Fraud score, proxy, VPN, Tor, blacklist/bot indicators |
-| ipapi.is | Direct public API | ASN/company type, provider-supplied abuser-score label, risk factors |
+| ipapi.is | Direct public API; anonymous or optional free-tier key | Anonymous ASN/ownership/geography context, or keyed ASN/company type, provider-supplied abuser-score label, and risk factors |
+| ipwho.is | Direct public API, no key | Country, ASN, organization, ISP, timezone context; the free tier does not expose security fields |
+| Cloudflare Security Center IP Intelligence | Direct official API when both Cloudflare credentials are configured | Country, ASN/provider context, infrastructure type, named threat categories; no universal numeric score |
 | AbuseIPDB via `ipinfo.check.place` | Upstream relay | Abuse-confidence score and usage type |
 | IP2Location via `ipinfo.check.place` | Upstream relay | 0-99 potential-risk score, usage/company type, proxy-category factors |
 | ipdata via `ipinfo.check.place` | Upstream relay | Country and threat factors |
@@ -77,10 +79,10 @@ fields are comparable:
 | Destination | Sources |
 | --- | --- |
 | Basic information | Check.Place/MaxMind-shaped response, with IPinfo as fallback |
-| Type matrix | IPinfo, Ipregistry, IPQS, ipapi.is, IP2Location, AbuseIPDB when a type exists |
+| Type matrix | IPinfo, Ipregistry, IPQS, ipapi.is, IP2Location, AbuseIPDB when a type exists in the response |
 | Score matrix | IP2Location, Scamalytics, ipapi.is, AbuseIPDB, IPQS |
 | Factor matrix | IP2Location, ipapi.is, Ipregistry, IPQS, Scamalytics, ipdata, IPinfo when a factor exists |
-| Official network observations | Ping0, RIPEstat, Shodan InternetDB |
+| Official/public network observations | Ping0, RIPEstat, Shodan InternetDB, ipwho.is, Cloudflare IP Intelligence when configured |
 
 ## Interpretation rules
 
@@ -89,10 +91,18 @@ fields are comparable:
 - A provider failure, rate limit, quota response, malformed body, target mismatch,
   or schema change is `Unknown`/unavailable, not clean. A missing required command
   stops the run with an explicit dependency error before a report is produced.
-- The ipapi.is adapter validates the ASN, company, location, and boolean sections
-  before reading child fields. A scalar nested section is treated as a schema
-  change and reported unavailable, with the upstream body and jq diagnostics
-  kept out of the terminal report.
+- The ipapi.is adapter validates the returned IP and accepts both documented
+  response tiers: the flat anonymous response and the keyed nested response.
+  Anonymous data is shown as context only; it supplies no proxy, VPN, Tor,
+  hosting, abuse, type, or score evidence. Error bodies, quota responses, and
+  malformed nested sections become an explicit unavailable status, with the
+  upstream body and jq diagnostics kept out of the terminal report.
+- `ipwho.is` validates the returned target IP and retains only the free endpoint's
+  location/network/timezone fields. The absence of its paid security object is
+  not treated as a clean proxy, VPN, Tor, hosting, or abuse result.
+- Cloudflare IP Intelligence validates the target IP, ASN reference, and bounded
+  threat-category objects. Its categories remain source-specific observations;
+  they are not converted into the project's other boolean factors or a score.
 - A field missing from an otherwise useful result appears as `-` in the terminal
   matrix and `null` in JSON. A wholly unavailable source is named once in a
   compact summary. IPQS remains visible with its source/status even without a
@@ -123,14 +133,20 @@ The global data-only assignment file is
 
 ```text
 IPREGISTRY_API_KEY=...
+IPAPI_API_KEY=...
 IPQS_API_KEY=...
+CLOUDFLARE_API_TOKEN=...
+CLOUDFLARE_ACCOUNT_ID=...
 ```
 
 This checkout can instead or additionally use ignored raw-key files:
 
 ```text
 secrets/ipregistry
+secrets/ipapi
 secrets/ipqs
+secrets/cloudflare_token
+secrets/cloudflare_account_id
 ```
 
 Project-local values override the corresponding global value. Credential files
@@ -149,8 +165,21 @@ When the account preflight and the official lookup both succeed, the report mark
 IPQS as `官方/可用`; the current terminal and JSON reports do not expose the
 account's remaining credit balance. The preflight value is used only to gate the
 paid lookup.
-No plan price, free allowance, or account-specific balance belongs in this
-repository because those values can change independently of the code.
+The anonymous `ipapi.is` path requires no key, is limited to 100 lookups per
+client IPv4 or IPv6 `/64` per UTC day, and returns a minimal response. A free
+ipapi.is account key raises the documented allowance to 1,000 lookups per day
+and unlocks the complete response used by the type, score, and factor tables.
+The reporter reads that optional key from `IPAPI_API_KEY` or `secrets/ipapi`.
+The free `ipwho.is` endpoint requires no key and documents a limit of 1,000
+requests per client IP per day; its free response has no security data. Cloudflare
+Security Center's IP Intelligence endpoint requires an account ID and an API
+token with Intel Read (or Intel Write) permission. Cloudflare documents 100
+Threat Intelligence API calls per month on Free, Pro, and Business plans; calls
+made by other Security Center features also consume that monthly quota. The
+reporter does not attempt to estimate remaining provider quota.
+The similarly named `ipapi.co` is a different product with a contact-gated free
+trial. This project currently uses the no-key `ipapi.is` API listed above; the two
+providers must not be silently combined.
 
 ## Media and AI scope
 
@@ -203,17 +232,23 @@ to an isolated HTTP proxy leaf.
 ## Deliberate non-sources
 
 DB-IP, IpScore, IPLeak, Whoer, Wave Broadband, GreyNoise, VirusTotal, and
-NodeQuality are not implemented report sources. Historical research mentions
-are not report evidence; DB-IP removal and other exclusions are recorded in
+NodeQuality are not implemented report sources. NodeQuality's disk, CPU, memory,
+and iperf sections are host benchmarks rather than IP reputation observations;
+they remain outside this reporter's scope. Historical research mentions are not
+report evidence; DB-IP removal and other exclusions are recorded in
 [UPSTREAM.md](UPSTREAM.md). A new source needs a named access contract,
 sanitized fixture, conservative parser, route boundary, and disclosure.
 
 ## Official references
 
-Links last checked on 2026-09-03:
+Links last checked on 2026-09-22:
 
 - [IPinfo developer documentation](https://ipinfo.io/developers)
 - [ipapi.is developer documentation](https://ipapi.is/developers.html)
+- [ipwho.is API documentation](https://ipwhois.io/documentation)
+- [Cloudflare IP Intelligence API](https://developers.cloudflare.com/api/resources/intel/subresources/ips/methods/get/)
+- [Cloudflare Threat Intelligence API limits](https://developers.cloudflare.com/security-center/intel-apis/limits/)
+- [ipapi.co pricing and free-trial terms](https://ipapi.co/pricing/)
 - [Ipregistry authentication](https://ipregistry.co/docs/authentication)
 - [IPQualityScore API overview](https://www.ipqualityscore.com/documentation/proxy-detection-api/overview),
   [response parameters](https://www.ipqualityscore.com/documentation/proxy-detection-api/response-parameters),

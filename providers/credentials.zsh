@@ -70,7 +70,7 @@ return 65
 credential_name="${credential_line%%=*}"
 credential_value="${credential_line#*=}"
 case "$credential_name" in
-IPREGISTRY_API_KEY|IPQS_API_KEY) ;;
+IPAPI_API_KEY|IPREGISTRY_API_KEY|IPQS_API_KEY|CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID) ;;
 *)
 print -ru2 -- "ERROR: unsupported provider credential name in $credential_path"
 return 65
@@ -131,8 +131,20 @@ if [[ -e "$project_secrets_dir/ipregistry" || -L "$project_secrets_dir/ipregistr
 provider_load_named_secret IPREGISTRY_API_KEY "$project_secrets_dir/ipregistry"||return $?
 loaded_any=1
 fi
+if [[ -e "$project_secrets_dir/ipapi" || -L "$project_secrets_dir/ipapi" ]];then
+provider_load_named_secret IPAPI_API_KEY "$project_secrets_dir/ipapi"||return $?
+loaded_any=1
+fi
 if [[ -e "$project_secrets_dir/ipqs" || -L "$project_secrets_dir/ipqs" ]];then
 provider_load_named_secret IPQS_API_KEY "$project_secrets_dir/ipqs"||return $?
+loaded_any=1
+fi
+if [[ -e "$project_secrets_dir/cloudflare_token" || -L "$project_secrets_dir/cloudflare_token" ]];then
+provider_load_named_secret CLOUDFLARE_API_TOKEN "$project_secrets_dir/cloudflare_token"||return $?
+loaded_any=1
+fi
+if [[ -e "$project_secrets_dir/cloudflare_account_id" || -L "$project_secrets_dir/cloudflare_account_id" ]];then
+provider_load_named_secret CLOUDFLARE_ACCOUNT_ID "$project_secrets_dir/cloudflare_account_id"||return $?
 loaded_any=1
 fi
 fi

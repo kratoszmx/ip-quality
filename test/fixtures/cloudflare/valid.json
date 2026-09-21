@@ -1,0 +1,19 @@
+{
+  "success": true,
+  "result": [
+    {
+      "ip": "198.51.100.23",
+      "belongs_to_ref": {
+        "id": "autonomous-system--fixture",
+        "country": "US",
+        "description": "Example Network",
+        "type": "hosting_provider",
+        "value": "AS64500"
+      },
+      "risk_types": [
+        {"id": 131, "name": "Phishing", "super_category_id": 21},
+        {"id": 132, "name": "Malware", "super_category_id": 21}
+      ]
+    }
+  ]
+}

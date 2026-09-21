@@ -159,26 +159,34 @@ class ProvidersTest < ReporterTestCase
     refute mismatch_status.success?
   end
 
-  def test_ipapi_parser_rejects_schema_drift_without_jq_diagnostics
+  def test_ipapi_parser_distinguishes_full_and_anonymous_responses
     parser_probe = <<~'ZSH'
       setopt KSH_ARRAYS
       source "$1"
       response=$(<"$2")
-      ipapi_parse_response "$response" || exit $?
-      print -r -- "${ipapi_parsed[usage_type]}|${ipapi_parsed[company_type]}|${ipapi_parsed[score_text]}|${ipapi_parsed[country_code]}|${ipapi_parsed[proxy]}"
+      ipapi_parse_response "$response" "$3" || exit $?
+      print -r -- "${ipapi_parsed[mode]}|${ipapi_parsed[usage_type]}|${ipapi_parsed[company_type]}|${ipapi_parsed[score_text]}|${ipapi_parsed[country_code]}|${ipapi_parsed[proxy]}"
     ZSH
     stdout, stderr, status = Open3.capture3(
       "/bin/zsh", "-f", "-c", parser_probe,
-      "ipapi-parser-test", IPAPI_LIBRARY, IPAPI_FIXTURE
+      "ipapi-parser-test", IPAPI_LIBRARY, IPAPI_FIXTURE, "198.51.100.23"
     )
     assert status.success?, stderr
-    assert_equal "isp|isp|0.01 (Very Low)|US|false\n", stdout
+    assert_equal "full|isp|isp|0.01 (Very Low)|US|false\n", stdout
     assert_empty stderr
+
+    anonymous_stdout, anonymous_stderr, anonymous_status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", parser_probe,
+      "ipapi-anonymous-test", IPAPI_LIBRARY, IPAPI_ANONYMOUS_FIXTURE, "198.51.100.23"
+    )
+    assert anonymous_status.success?, anonymous_stderr
+    assert_equal "anonymous|||||\n", anonymous_stdout
+    assert_empty anonymous_stderr
 
     _stdout, malformed_stderr, malformed_status = Open3.capture3(
       "/bin/zsh", "-f", "-c",
-      'setopt KSH_ARRAYS; source "$1"; ipapi_parse_response "$(<"$2")"',
-      "ipapi-schema-drift-test", IPAPI_LIBRARY, IPAPI_NESTED_SECTIONS_STRINGS_FIXTURE
+      'setopt KSH_ARRAYS; source "$1"; ipapi_parse_response "$(<"$2")" "198.51.100.23"',
+      "ipapi-schema-drift-test", IPAPI_LIBRARY, IPAPI_MALFORMED_FIXTURE
     )
     refute malformed_status.success?
     assert_empty malformed_stderr
@@ -195,7 +203,7 @@ class ProvidersTest < ReporterTestCase
       sinfo[database]=0 sinfo[ldatabase]=0
       Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
       show_progress_bar(){ :; }
-      curl_safe(){ cat "$fixture"; }
+      curl_safe(){ cat "$fixture"; print -r -- 200; }
       db_ipapi 4
       exit_code=$?
       print -r -- "$exit_code|${ipapi[status]:-missing}|${ipapi[usetype]:-}|${ipapi[score]:-}"
@@ -203,10 +211,240 @@ class ProvidersTest < ReporterTestCase
     stdout, stderr, status = Open3.capture3(
       "/bin/zsh", "-f", "-c", probe,
       "ipapi-runtime-schema-drift-test", IPAPI_LIBRARY, function_source,
-      IPAPI_NESTED_SECTIONS_STRINGS_FIXTURE
+      IPAPI_MALFORMED_FIXTURE
     )
     assert status.success?, stderr
     assert_equal "1|invalid_response||\n", stdout
+    assert_empty stderr
+  end
+
+  def test_ipapi_free_account_key_uses_secret_url_configuration
+    function_source = reporter_functions("db_ipapi")
+    probe = <<~'ZSH'
+      setopt KSH_ARRAYS SH_WORD_SPLIT
+      source "$1"
+      eval "$2"
+      typeset -A provider_credentials ipapi sinfo stype sscore
+      provider_credentials[IPAPI_API_KEY]='fixture-ipapi-key'
+      IP='198.51.100.23' CurlARG='' ibar_step=0 fixture="$3"
+      sinfo[database]=0 sinfo[ldatabase]=0
+      Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
+      stype[isp]='ISP' stype[unknown]='Unknown'
+      sscore[verylow]='Very Low'
+      is_nonnegative_decimal(){ [[ "$1" =~ '^[0-9]+([.][0-9]+)?$' ]]; }
+      show_progress_bar(){ :; }
+      curl_with_secret_url(){ print -r -- "$(<"$fixture")"; print -r -- 200; }
+      db_ipapi 4
+      print -r -- "${ipapi[status]}|${ipapi[usetype]}|${ipapi[score]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", probe,
+      "ipapi-key-runtime-test", IPAPI_LIBRARY, function_source, IPAPI_FIXTURE
+    )
+    assert status.success?, stderr
+    assert_equal "ok|isp|1.00%\n", stdout
+    assert_empty stderr
+
+    source = File.read(SCRIPT, encoding: "UTF-8")
+    refute_match(/curl_safe[^\n]*\$api_key/, source)
+  end
+
+  def test_ipapi_anonymous_runtime_keeps_minimal_context_without_fake_risk
+    function_source = reporter_functions("db_ipapi")
+    probe = <<~'ZSH'
+      setopt KSH_ARRAYS SH_WORD_SPLIT
+      source "$1"
+      eval "$2"
+      typeset -A ipapi sinfo stype sscore
+      IP='198.51.100.23' CurlARG='' ibar_step=0 fixture="$3"
+      sinfo[database]=0 sinfo[ldatabase]=0
+      Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
+      stype[unknown]='Unknown'
+      is_nonnegative_decimal(){ [[ "$1" =~ '^[0-9]+([.][0-9]+)?$' ]]; }
+      show_progress_bar(){ :; }
+      curl_safe(){ cat "$fixture"; print -r -- 200; }
+      db_ipapi 4
+      print -r -- "${ipapi[status]}|${ipapi[mode]}|${ipapi[anonymous_asn]}|${ipapi[anonymous_company]}|${ipapi[score]:-missing}|${ipapi[proxy]:-missing}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", probe,
+      "ipapi-anonymous-runtime-test", IPAPI_LIBRARY, function_source, IPAPI_ANONYMOUS_FIXTURE
+    )
+    assert status.success?, stderr
+    assert_equal "ok|anonymous|AS64500 Example ISP|Example ISP|missing|missing\n", stdout
+    assert_empty stderr
+  end
+
+  def test_ipapi_runtime_exposes_rate_limit_status_without_parsing_error_json
+    function_source = reporter_functions("db_ipapi")
+    probe = <<~'ZSH'
+      setopt KSH_ARRAYS SH_WORD_SPLIT
+      source "$1"
+      eval "$2"
+      typeset -A ipapi sinfo
+      IP='198.51.100.23' CurlARG='' ibar_step=0 fixture="$3"
+      sinfo[database]=0 sinfo[ldatabase]=0
+      Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
+      provider_http_failure_status(){ print -r -- "http_$1"; }
+      show_progress_bar(){ :; }
+      curl_safe(){ cat "$fixture"; print -r -- 429; }
+      db_ipapi 4
+      print -r -- "$?|${ipapi[status]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", probe,
+      "ipapi-rate-limit-runtime-test", IPAPI_LIBRARY, function_source, IPAPI_RATE_LIMIT_FIXTURE
+    )
+    assert status.success?, stderr
+    assert_equal "1|http_429\n", stdout
+    assert_empty stderr
+  end
+
+  def test_ipwhois_parser_keeps_free_context_and_rejects_target_mismatch
+    parser_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      source "$1"
+      ipwhois_parse_response "$(<"$2")" "$3" || exit $?
+      print -r -- "${ipwhois_parsed[country_code]}|${ipwhois_parsed[asn]}|${ipwhois_parsed[organization]}|${ipwhois_parsed[isp]}|${ipwhois_parsed[timezone]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", parser_probe,
+      "ipwhois-parser-test", IPWHOIS_LIBRARY, IPWHOIS_FIXTURE, "198.51.100.23"
+    )
+    assert status.success?, stderr
+    assert_equal "US|64500|Example Network|Example ISP|America/Los_Angeles\n", stdout
+    assert_empty stderr
+
+    _stdout, mismatch_stderr, mismatch_status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", parser_probe,
+      "ipwhois-mismatch-test", IPWHOIS_LIBRARY, IPWHOIS_MISMATCH_FIXTURE, "198.51.100.23"
+    )
+    refute mismatch_status.success?
+    assert_empty mismatch_stderr
+  end
+
+  def test_cloudflare_parser_keeps_threat_categories_and_rejects_schema_drift
+    parser_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      source "$1"
+      cloudflare_parse_response "$(<"$2")" "$3" || exit $?
+      print -r -- "${cloudflare_parsed[status]}|${cloudflare_parsed[country_code]}|${cloudflare_parsed[network]}|${cloudflare_parsed[organization]}|${cloudflare_parsed[infrastructure_type]}|${cloudflare_parsed[threat_categories]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", parser_probe,
+      "cloudflare-parser-test", CLOUDFLARE_LIBRARY, CLOUDFLARE_FIXTURE, "198.51.100.23"
+    )
+    assert status.success?, stderr
+    assert_equal "ok|US|AS64500|Example Network|hosting_provider|Phishing, Malware\n", stdout
+    assert_empty stderr
+
+    empty_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      source "$1"
+      cloudflare_parse_response "$(<"$2")" "$3" || exit $?
+      print -r -- "${cloudflare_parsed[status]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", empty_probe,
+      "cloudflare-empty-test", CLOUDFLARE_LIBRARY, CLOUDFLARE_EMPTY_FIXTURE, "198.51.100.23"
+    )
+    assert status.success?, stderr
+    assert_equal "not_found\n", stdout
+    assert_empty stderr
+
+    _stdout, malformed_stderr, malformed_status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", empty_probe,
+      "cloudflare-schema-drift-test", CLOUDFLARE_LIBRARY, CLOUDFLARE_INVALID_RISK_FIXTURE, "198.51.100.23"
+    )
+    refute malformed_status.success?
+    assert_empty malformed_stderr
+  end
+
+  def test_ipwhois_runtime_classifies_valid_public_response
+    function_source = reporter_functions("db_ipwhois")
+    probe = <<~'ZSH'
+      setopt KSH_ARRAYS SH_WORD_SPLIT
+      source "$1"
+      eval "$2"
+      typeset -A ipwhois sinfo
+      IP='198.51.100.23' CurlARG='' ibar_step=0 fixture="$3"
+      sinfo[database]=0 sinfo[ldatabase]=0
+      Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
+      show_progress_bar(){ :; }
+      provider_fetch_public_json(){
+        PROVIDER_RESPONSE_STATUS=ok
+        PROVIDER_RESPONSE_BODY="$(<"$fixture")"
+      }
+      db_ipwhois 4
+      print -r -- "${ipwhois[status]}|${ipwhois[countrycode]}|${ipwhois[asn]}|${ipwhois[org]}|${ipwhois[isp]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", probe,
+      "ipwhois-runtime-test", IPWHOIS_LIBRARY, function_source, IPWHOIS_FIXTURE
+    )
+    assert status.success?, stderr
+    assert_equal "ok|US|64500|Example Network|Example ISP\n", stdout
+    assert_empty stderr
+  end
+
+  def test_ipwhois_runtime_marks_target_mismatch_unavailable
+    function_source = reporter_functions("db_ipwhois")
+    probe = <<~'ZSH'
+      setopt KSH_ARRAYS SH_WORD_SPLIT
+      source "$1"
+      eval "$2"
+      typeset -A ipwhois sinfo
+      IP='198.51.100.23' CurlARG='' ibar_step=0 fixture="$3"
+      sinfo[database]=0 sinfo[ldatabase]=0
+      Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
+      show_progress_bar(){ :; }
+      provider_fetch_public_json(){
+        PROVIDER_RESPONSE_STATUS=ok
+        PROVIDER_RESPONSE_BODY="$(<"$fixture")"
+      }
+      db_ipwhois 4
+      print -r -- "$?|${ipwhois[status]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", probe,
+      "ipwhois-mismatch-runtime-test", IPWHOIS_LIBRARY, function_source, IPWHOIS_MISMATCH_FIXTURE
+    )
+    assert status.success?, stderr
+    assert_equal "0|invalid_response\n", stdout
+    assert_empty stderr
+  end
+
+  def test_cloudflare_runtime_requires_both_credentials_and_uses_official_response
+    function_source = reporter_functions("db_cloudflare")
+    probe = <<~'ZSH'
+      setopt KSH_ARRAYS SH_WORD_SPLIT
+      source "$1"
+      source "$2"
+      eval "$3"
+      typeset -A cloudflare provider_credentials sinfo
+      IP='198.51.100.23' CurlARG='' ibar_step=0 fixture="$4"
+      sinfo[database]=0 sinfo[ldatabase]=0
+      Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
+      show_progress_bar(){ :; }
+      curl_with_secret_header(){
+        print -r -- "$(<"$fixture")"
+        print -r -- 200
+      }
+      provider_credentials[CLOUDFLARE_API_TOKEN]='fixture-token'
+      provider_credentials[CLOUDFLARE_ACCOUNT_ID]='fixture-account'
+      db_cloudflare 4
+      print -r -- "${cloudflare[status]}|${cloudflare[network]}|${cloudflare[threats]}"
+      provider_credentials[CLOUDFLARE_ACCOUNT_ID]=''
+      db_cloudflare 4
+      print -r -- "${cloudflare[status]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", probe,
+      "cloudflare-runtime-test", COMMON_PROVIDER_LIBRARY, CLOUDFLARE_LIBRARY,
+      function_source, CLOUDFLARE_FIXTURE
+    )
+    assert status.success?, stderr
+    assert_equal "ok|AS64500|Phishing, Malware\ninvalid_configuration\n", stdout
     assert_empty stderr
   end
 
@@ -303,6 +541,26 @@ class ProvidersTest < ReporterTestCase
     source = File.read(SCRIPT, encoding: "UTF-8")
     assert_includes source, "--config -"
     refute_match(/curl_safe[^\n]*\$api_key/, source)
+  end
+
+  def test_optional_provider_credentials_are_loaded_from_the_private_assignment_file
+    loader_probe = <<~'ZSH'
+      source "$1"
+      provider_load_credentials "$2" || exit $?
+      print -r -- "${provider_credentials[IPAPI_API_KEY]}|${provider_credentials[CLOUDFLARE_API_TOKEN]}|${provider_credentials[CLOUDFLARE_ACCOUNT_ID]}"
+    ZSH
+    Dir.mktmpdir("ipquality-cloudflare-credentials-test") do |directory|
+      credentials = File.join(directory, "credentials")
+      File.write(credentials, "IPAPI_API_KEY=ipapi_fixture_123\nCLOUDFLARE_API_TOKEN=token_fixture_123\nCLOUDFLARE_ACCOUNT_ID=account_fixture_123\n")
+      File.chmod(0o600, credentials)
+      stdout, stderr, status = Open3.capture3(
+        "/bin/zsh", "-f", "-c", loader_probe,
+        "optional-provider-credential-loader-test", CREDENTIALS_LIBRARY, credentials
+      )
+      assert status.success?, stderr
+      assert_equal "ipapi_fixture_123|token_fixture_123|account_fixture_123\n", stdout
+      assert_empty stderr
+    end
   end
 
   def test_known_provider_failures_are_classified_without_echoing_upstream_messages

@@ -1,0 +1,5 @@
+{
+  "ip": "198.51.100.23",
+  "asn": {"type": ["not-a-string"]},
+  "company": "Example ISP"
+}

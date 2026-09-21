@@ -10,16 +10,41 @@ IPQS MCP account probe independently returned `authenticated`. This supersedes
 the older zero-credit observation as the current availability result while
 preserving that earlier restriction evidence in the historical handoff below.
 
-The complete fixture-only suite passed 71 runs / 1,074 assertions. The
-worktree stayed clean at commit `25d4860`; no credential, reporter source,
-Clash state, or persistent report was changed by the live check.
+The complete fixture-only suite passed 81 runs / 1,184 assertions. The live
+check itself ran against clean commit `114ba6c`; the provider expansion below
+is the subsequent source change. No credential, Clash state, or persistent
+report was changed by the live check.
 
-Last documentation and offline validation: 2026-09-21, Asia/Shanghai.
+Last documentation and offline validation: 2026-09-22, Asia/Shanghai.
+
+## Provider context expansion — 2026-09-22
+
+The reputation route now includes two independently reported context sources.
+The no-key `ipwho.is` free endpoint contributes country, ASN, organization, ISP,
+and timezone data; its missing paid security fields stay unknown. `ipapi.is`
+anonymous lookups remain supported at 100 per client IPv4/IPv6 `/64` per UTC
+day; an optional free-account `IPAPI_API_KEY` raises that to 1,000/day and
+restores its complete risk response. Cloudflare
+Security Center IP Intelligence is available when `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` are supplied through the private credential workflow;
+its ASN infrastructure and named threat categories remain outside the score and
+factor matrices. Cloudflare documents 100 Threat Intelligence API calls per
+month on Free, Pro, and Business plans, while ipwho.is documents 1,000 free
+requests per client IP per day. The report does not estimate remaining quota.
+
+The similarly named `ipapi.co` was reviewed but not silently added: it is a
+different contact-gated free-trial product. This project already uses the
+upstream-listed no-key `ipapi.is` source and keeps that identity explicit.
+
+The ipapi.is adapter also accepts the documented anonymous flat response and
+keeps its ASN/ownership/geography as context without manufacturing risk fields.
+It classifies the documented anonymous-quota `429` as `http_429` instead of
+parsing the error body as a successful result.
 
 ## Current state
 
 - Worktree: `/Users/zmx/Projects/projects/ipquality`; branch: `main`.
-- Reporter version: `v2026-09-21-standalone.15`.
+- Reporter version: `v2026-09-22-standalone.17`.
 - Primary/upstream: `github-kratoszmx/main` at `https://github.com/kratoszmx/ip-quality.git`.
 - Backup: `github-kratosbackup` at `https://github.com/kratosbackup/ipquality.git`.
 
@@ -50,8 +75,9 @@ so an empty but unused fixture directory cannot produce a false cleanup pass.
 
 The 2026-09-21 live-log follow-up isolated two report defects. The ipapi.is
 response had scalar `asn`/`company` sections, so direct child-field jq reads
-emitted diagnostics; its adapter now validates the nested schema and marks that
-source unavailable without leaking parser errors. ChatGPT's Cloudflare trace
+emitted diagnostics; its adapter now recognizes the documented anonymous form,
+keeps its context, and marks malformed/error bodies unavailable without leaking
+parser errors. ChatGPT's Cloudflare trace
 region now accepts only a standalone two-letter `loc=XX` line, preventing page
 script text from appearing as a fake region. Exact cached-leaf routes remain
 `reputation` only; the direct route remains the comprehensive `full` scope.
@@ -65,8 +91,8 @@ credentials or live Clash state were changed.
 
 ## Validation evidence
 
-The complete fixture-only suite passed 71 runs / 1,074 assertions, with zero
-failures, errors, or skips (seed 46826). All 14 Ruby and 12 zsh source/test files
+The complete fixture-only suite passed 81 runs / 1,184 assertions, with zero
+failures, errors, or skips (seed 39163). All Ruby and zsh source/test files
 passed syntax checks; local documentation file links and `git diff --check`
 also passed. The included self-test validated all 422 vendored DNSBL entries.
 A child-only mutation disabling workspace removal failed the actual-workspace

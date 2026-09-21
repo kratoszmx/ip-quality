@@ -1,4 +1,5 @@
 {
+  "ip": "198.51.100.23",
   "asn": {"type": "isp"},
   "company": {"type": "isp", "abuser_score": "0.01 (Very Low)"},
   "location": {"country_code": "US"},

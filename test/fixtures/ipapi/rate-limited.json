@@ -1,0 +1,4 @@
+{
+  "error": "Anonymous daily quota exhausted",
+  "error_code": "ERR_FREE_TIER_EXHAUSTED"
+}

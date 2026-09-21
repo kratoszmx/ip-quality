@@ -1,0 +1,9 @@
+{
+  "success": true,
+  "result": [
+    {
+      "ip": "198.51.100.23",
+      "risk_types": [{"id": "not-a-number", "name": "Phishing"}]
+    }
+  ]
+}
