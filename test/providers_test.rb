@@ -159,6 +159,57 @@ class ProvidersTest < ReporterTestCase
     refute mismatch_status.success?
   end
 
+  def test_ipapi_parser_rejects_schema_drift_without_jq_diagnostics
+    parser_probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      source "$1"
+      response=$(<"$2")
+      ipapi_parse_response "$response" || exit $?
+      print -r -- "${ipapi_parsed[usage_type]}|${ipapi_parsed[company_type]}|${ipapi_parsed[score_text]}|${ipapi_parsed[country_code]}|${ipapi_parsed[proxy]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", parser_probe,
+      "ipapi-parser-test", IPAPI_LIBRARY, IPAPI_FIXTURE
+    )
+    assert status.success?, stderr
+    assert_equal "isp|isp|0.01 (Very Low)|US|false\n", stdout
+    assert_empty stderr
+
+    _stdout, malformed_stderr, malformed_status = Open3.capture3(
+      "/bin/zsh", "-f", "-c",
+      'setopt KSH_ARRAYS; source "$1"; ipapi_parse_response "$(<"$2")"',
+      "ipapi-schema-drift-test", IPAPI_LIBRARY, IPAPI_NESTED_SECTIONS_STRINGS_FIXTURE
+    )
+    refute malformed_status.success?
+    assert_empty malformed_stderr
+  end
+
+  def test_ipapi_runtime_marks_schema_drift_unavailable_without_writing_jq_errors
+    function_source = reporter_functions("db_ipapi")
+    probe = <<~'ZSH'
+      setopt KSH_ARRAYS SH_WORD_SPLIT
+      source "$1"
+      eval "$2"
+      typeset -A ipapi sinfo stype sscore
+      IP='198.51.100.23' CurlARG='' ibar_step=0 fixture="$3"
+      sinfo[database]=0 sinfo[ldatabase]=0
+      Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
+      show_progress_bar(){ :; }
+      curl_safe(){ cat "$fixture"; }
+      db_ipapi 4
+      exit_code=$?
+      print -r -- "$exit_code|${ipapi[status]:-missing}|${ipapi[usetype]:-}|${ipapi[score]:-}"
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", probe,
+      "ipapi-runtime-schema-drift-test", IPAPI_LIBRARY, function_source,
+      IPAPI_NESTED_SECTIONS_STRINGS_FIXTURE
+    )
+    assert status.success?, stderr
+    assert_equal "1|invalid_response||\n", stdout
+    assert_empty stderr
+  end
+
   def test_ipqs_account_quota_preflight_skips_a_lookup_that_would_spend_credit
     function_source = reporter_functions("db_ipqs")
 

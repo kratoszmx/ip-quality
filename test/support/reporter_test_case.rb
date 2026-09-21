@@ -16,6 +16,7 @@ class ReporterTestCase < Minitest::Test
   TERMINAL_LIBRARY = File.join(ROOT, "common", "terminal.zsh")
   CREDENTIALS_LIBRARY = File.join(ROOT, "providers", "credentials.zsh")
   IPREGISTRY_LIBRARY = File.join(ROOT, "providers", "ipregistry.zsh")
+  IPAPI_LIBRARY = File.join(ROOT, "providers", "ipapi.zsh")
   IPQUALITYSCORE_LIBRARY = File.join(ROOT, "providers", "ipqualityscore.zsh")
   PING0_LIBRARY = File.join(ROOT, "providers", "ping0.zsh")
   RIPESTAT_LIBRARY = File.join(ROOT, "providers", "ripestat.zsh")
@@ -29,6 +30,8 @@ class ReporterTestCase < Minitest::Test
   IPQUALITYSCORE_CREDITS_FIXTURE = File.join(ROOT, "test", "fixtures", "ipqualityscore", "insufficient-credits.json")
   IPQUALITYSCORE_USAGE_FIXTURE = File.join(ROOT, "test", "fixtures", "ipqualityscore", "usage.json")
   IPREGISTRY_FIXTURE = File.join(ROOT, "test", "fixtures", "ipregistry", "ip-intelligence.json")
+  IPAPI_FIXTURE = File.join(ROOT, "test", "fixtures", "ipapi", "valid.json")
+  IPAPI_NESTED_SECTIONS_STRINGS_FIXTURE = File.join(ROOT, "test", "fixtures", "ipapi", "nested-sections-strings.json")
   IPQUALITYSCORE_OFFICIAL_FIXTURE = File.join(ROOT, "test", "fixtures", "ipqualityscore", "official.json")
   CHECK_PLACE_CLOUDFLARE_FIXTURE = File.join(ROOT, "test", "fixtures", "check_place", "cloudflare-blocked.html")
 

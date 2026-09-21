@@ -75,6 +75,25 @@ class IpQualityTest < ReporterTestCase
     assert_empty stderr
   end
 
+  def test_chatgpt_trace_region_accepts_only_a_standalone_two_letter_loc_line
+    function_source = reporter_functions("media_trace_country_code")
+    probe = <<~'ZSH'
+      eval "$1"
+      good=$(media_trace_country_code $'fl=on\nloc=us\ned=on') || exit 1
+      print -r -- "$good"
+      media_trace_country_code '<script>loc=us</script>' && exit 2
+      media_trace_country_code 'loc=usa' && exit 3
+      :
+    ZSH
+    stdout, stderr, status = Open3.capture3(
+      "/bin/zsh", "-f", "-c", probe,
+      "chatgpt-trace-region-test", function_source
+    )
+    assert status.success?, stderr
+    assert_equal "US\n", stdout
+    assert_empty stderr
+  end
+
   def test_concurrency_is_hard_bounded
     %w[0 51 nope].each do |value|
       _stdout, stderr, status = run_script("--scope", "dnsbl", "--dnsbl-concurrency", value)

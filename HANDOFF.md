@@ -1,11 +1,11 @@
 # Current handoff
 
-Last documentation and offline validation: 2026-09-17, Asia/Shanghai.
+Last documentation and offline validation: 2026-09-21, Asia/Shanghai.
 
 ## Current state
 
 - Worktree: `/Users/zmx/Projects/projects/ipquality`; branch: `main`.
-- Reporter version: `v2026-09-16-standalone.14`.
+- Reporter version: `v2026-09-21-standalone.15`.
 - Primary/upstream: `github-kratoszmx/main` at `https://github.com/kratoszmx/ip-quality.git`.
 - Backup: `github-kratosbackup` at `https://github.com/kratosbackup/ipquality.git`.
 
@@ -34,16 +34,25 @@ cases share a child-process launcher that supplies an explicit private
 `temp_parent`. Both check the workspace path actually received by fake Mihomo,
 so an empty but unused fixture directory cannot produce a false cleanup pass.
 
+The 2026-09-21 live-log follow-up isolated two report defects. The ipapi.is
+response had scalar `asn`/`company` sections, so direct child-field jq reads
+emitted diagnostics; its adapter now validates the nested schema and marks that
+source unavailable without leaking parser errors. ChatGPT's Cloudflare trace
+region now accepts only a standalone two-letter `loc=XX` line, preventing page
+script text from appearing as a fake region. Exact cached-leaf routes remain
+`reputation` only; the direct route remains the comprehensive `full` scope.
+
 [TESTING.md](TESTING.md) owns prerequisites, focused commands, and test boundaries.
 API contracts remain in [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md), process
 ownership in [SERVICES.md](SERVICES.md), and usage in [AGENTS.md](AGENTS.md).
-There is no project-specific skill or nested project documentation. No production
-code, credentials, or live Clash state changed in this test-maintenance pass.
+There is no project-specific skill or nested project documentation. This follow-up
+changed the reporter/provider parser, tests, and contract documentation; no
+credentials or live Clash state were changed.
 
 ## Validation evidence
 
-The complete fixture-only suite passed 68 runs / 1,043 assertions, with zero
-failures, errors, or skips (seed 26917). All 14 Ruby and 11 zsh source/test files
+The complete fixture-only suite passed 71 runs / 1,074 assertions, with zero
+failures, errors, or skips (seed 46826). All 14 Ruby and 12 zsh source/test files
 passed syntax checks; local documentation file links and `git diff --check`
 also passed. The included self-test validated all 422 vendored DNSBL entries.
 A child-only mutation disabling workspace removal failed the actual-workspace

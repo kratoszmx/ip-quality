@@ -1,0 +1,11 @@
+{
+  "asn": "AS7018",
+  "company": "AT&T Enterprises, LLC",
+  "location": {"country_code": "US"},
+  "is_proxy": false,
+  "is_tor": false,
+  "is_vpn": false,
+  "is_datacenter": false,
+  "is_abuser": false,
+  "is_crawler": false
+}

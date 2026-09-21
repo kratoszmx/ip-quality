@@ -89,6 +89,10 @@ fields are comparable:
 - A provider failure, rate limit, quota response, malformed body, target mismatch,
   or schema change is `Unknown`/unavailable, not clean. A missing required command
   stops the run with an explicit dependency error before a report is produced.
+- The ipapi.is adapter validates the ASN, company, location, and boolean sections
+  before reading child fields. A scalar nested section is treated as a schema
+  change and reported unavailable, with the upstream body and jq diagnostics
+  kept out of the terminal report.
 - A field missing from an otherwise useful result appears as `-` in the terminal
   matrix and `null` in JSON. A wholly unavailable source is named once in a
   compact summary. IPQS remains visible with its source/status even without a
@@ -141,6 +145,10 @@ the reporter uses the named Check.Place relay and records that source. With an
 IPQS key, it first calls the account-usage endpoint; a confirmed zero balance or
 insufficient-credit response stops before the reputation request. Other failures
 remain attributed to the official path rather than being described as a clean IP.
+When the account preflight and the official lookup both succeed, the report marks
+IPQS as `官方/可用`; the current terminal and JSON reports do not expose the
+account's remaining credit balance. The preflight value is used only to gate the
+paid lookup.
 No plan price, free allowance, or account-specific balance belongs in this
 repository because those values can change independently of the code.
 
@@ -150,6 +158,8 @@ The reporter performs public accessibility probes for TikTok, Netflix, YouTube
 Premium, Prime Video, Reddit, and OpenAI/ChatGPT endpoints. Results describe
 those particular unauthenticated flows and any region signal they expose. They
 do not log in, purchase, modify an account, or prove that every feature works.
+The ChatGPT trace contributes a region only when it contains a standalone
+two-letter `loc=XX` line; an absent or malformed trace is shown as no region.
 
 The upstream Disney+ check remains excluded because its supporting bundle mixed
 request examples with historical third-party cookie, session, identity, and

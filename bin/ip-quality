@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-09-16-standalone.14"
+script_version="v2026-09-21-standalone.15"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset COMMON_DIR="$SCRIPT_DIR/common"
@@ -18,13 +18,14 @@ typeset COMMON_PROVIDER_LIB="$COMMON_DIR/provider_values.zsh"
 typeset TERMINAL_LIB="$COMMON_DIR/terminal.zsh"
 typeset CREDENTIALS_LIB="$PROVIDER_DIR/credentials.zsh"
 typeset IPREGISTRY_LIB="$PROVIDER_DIR/ipregistry.zsh"
+typeset IPAPI_LIB="$PROVIDER_DIR/ipapi.zsh"
 typeset IPQUALITYSCORE_LIB="$PROVIDER_DIR/ipqualityscore.zsh"
 typeset PING0_LIB="$PROVIDER_DIR/ping0.zsh"
 typeset RIPESTAT_LIB="$PROVIDER_DIR/ripestat.zsh"
 typeset INTERNETDB_LIB="$PROVIDER_DIR/shodan_internetdb.zsh"
 typeset REPUTATION_REPORT_LIB="$REPORT_DIR/reputation.zsh"
 typeset local_library
-for local_library in "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for local_library in "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$local_library" && -r "$local_library" && ! -L "$local_library" ]]||{
 print -ru2 -- "ERROR: unsafe or missing local library: $local_library"
 exit 66
@@ -594,7 +595,7 @@ print -ru2 -- "SELF-TEST FAILED: not running under zsh"
 return 1
 }
 local reference_file
-for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json" "$COMMON_PROVIDER_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json" "$COMMON_PROVIDER_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$reference_file" && -r "$reference_file" && ! -L "$reference_file" ]]||{
 print -ru2 -- "SELF-TEST FAILED: unsafe or missing reference file: $reference_file"
 return 1
@@ -679,6 +680,14 @@ return 1
 }
 ipregistry_parse_response '{"ip":"198.51.100.23","connection":{"type":"hosting"},"company":{"type":"hosting"},"location":{"country":{"code":"US"}},"security":{"is_proxy":true,"is_vpn":true,"is_tor":false,"is_tor_exit":false,"is_cloud_provider":true,"is_abuser":false,"is_attacker":false,"is_threat":false}}' "198.51.100.23"&&[[ "${ipregistry_parsed[server]}" == "true" && "${ipregistry_parsed[tor]}" == "false" ]]||{
 print -ru2 -- "SELF-TEST FAILED: Ipregistry parser contract changed"
+return 1
+}
+ipapi_parse_response '{"asn":{"type":"isp"},"company":{"type":"isp","abuser_score":"0.01 (Very Low)"},"location":{"country_code":"US"},"is_proxy":false,"is_tor":false,"is_vpn":false,"is_datacenter":false,"is_abuser":false,"is_crawler":false}'&&[[ "${ipapi_parsed[usage_type]}" == "isp" && "${ipapi_parsed[score_text]}" == "0.01 (Very Low)" ]]||{
+print -ru2 -- "SELF-TEST FAILED: ipapi parser contract changed"
+return 1
+}
+ipapi_parse_response '{"asn":"AS64500","company":"Example ISP"}'&&{
+print -ru2 -- "SELF-TEST FAILED: ipapi schema drift accepted"
 return 1
 }
 ipqualityscore_parse_response '{"success":true,"fraud_score":87,"country_code":"US","proxy":true,"vpn":true,"tor":false,"recent_abuse":false,"bot_status":false,"connection_type":"Data Center"}'&&[[ "${ipqualityscore_parsed[score]}" == "87" && "${ipqualityscore_parsed[connection_type]}" == "Data Center" && "${ipqualityscore_parsed[server]}" == "true" ]]||{
@@ -1327,14 +1336,20 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}ipapi $Font_Suffix"
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-6-${sinfo[ldatabase]}))
 ipapi=()
+ipapi[status]="unknown"
 if [[ $IP == *:* ]];then
 local RESPONSE=$(curl_safe -Ls -m 10 -H 'origin: https://ipapi.is' "https://api.ipapi.is/?q=$IP")
 else
 local RESPONSE=$(curl_safe $CurlARG -sL -m 10 -H 'origin: https://ipapi.is' "https://api.ipapi.is/?q=$IP")
 fi
-provider_json_is_object "$RESPONSE"||RESPONSE=""
-ipapi[usetype]=$(echo "$RESPONSE"|jq -r '.asn.type')
-ipapi[comtype]=$(echo "$RESPONSE"|jq -r '.company.type')
+if ! ipapi_parse_response "$RESPONSE";then
+ipapi[status]="invalid_response"
+return 1
+fi
+ipapi[status]="ok"
+ipapi[source]="public_api"
+ipapi[usetype]="${ipapi_parsed[usage_type]}"
+ipapi[comtype]="${ipapi_parsed[company_type]}"
 case ${ipapi[usetype]} in
 "business")ipapi[susetype]="${stype[business]}"
 ;;
@@ -1369,8 +1384,7 @@ case ${ipapi[comtype]} in
 ;;
 *)ipapi[scomtype]="${stype[other]}"
 esac
-[[ -z $RESPONSE ]]&&return 1
-ipapi[scoretext]=$(echo "$RESPONSE"|jq -r '.company.abuser_score')
+ipapi[scoretext]="${ipapi_parsed[score_text]}"
 ipapi[scorenum]=$(echo "${ipapi[scoretext]}"|awk '{print $1}')
 ipapi[risktext]=$(echo "${ipapi[scoretext]}"|awk -F'[()]' '{print $2}')
 if is_nonnegative_decimal "${ipapi[scorenum]}";then
@@ -1391,13 +1405,13 @@ ipapi[scorenum]=""
 ipapi[score]=""
 ipapi[risk]=""
 fi
-ipapi[countrycode]=$(echo "$RESPONSE"|jq -r '.location.country_code')
-ipapi[proxy]=$(echo "$RESPONSE"|jq -r '.is_proxy')
-ipapi[tor]=$(echo "$RESPONSE"|jq -r '.is_tor')
-ipapi[vpn]=$(echo "$RESPONSE"|jq -r '.is_vpn')
-ipapi[server]=$(echo "$RESPONSE"|jq -r '.is_datacenter')
-ipapi[abuser]=$(echo "$RESPONSE"|jq -r '.is_abuser')
-ipapi[robot]=$(echo "$RESPONSE"|jq -r '.is_crawler')
+ipapi[countrycode]="${ipapi_parsed[country_code]}"
+ipapi[proxy]="${ipapi_parsed[proxy]}"
+ipapi[tor]="${ipapi_parsed[tor]}"
+ipapi[vpn]="${ipapi_parsed[vpn]}"
+ipapi[server]="${ipapi_parsed[server]}"
+ipapi[abuser]="${ipapi_parsed[abuser]}"
+ipapi[robot]="${ipapi_parsed[robot]}"
 }
 db_abuseipdb(){
 local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}AbuseIPDB $Font_Suffix"
@@ -2054,10 +2068,14 @@ code=$(curl_safe $CurlARG -$1 -o /dev/null -sS --max-time 10 \
 -w "%{http_code}" 2>&1)
 [[ $code != "403" ]]&&result1=""
 fi
-local countryCode="$(curl_safe $CurlARG --max-time 10 -sS https://chat.openai.com/cdn-cgi/trace 2>&1|grep "loc="|awk -F= '{print $2}')"
+local countryCode=""
+local trace_response="$(curl_safe $CurlARG --max-time 10 -sS https://chat.openai.com/cdn-cgi/trace 2>&1)"
+countryCode="$(media_trace_country_code "$trace_response" 2>/dev/null)"
+local chat_region="${smedia[nodata]}"
+[[ -n "$countryCode" ]]&&chat_region="  [$countryCode]   "
 if [ -z "$result2" ]&&[ -z "$result1" ]&&[[ $tmpresult1 != "curl"* ]]&&[[ $tmpresult2 != "curl"* ]];then
 chatgpt[ustatus]="${smedia[yes]}"
-chatgpt[uregion]="  [$countryCode]   "
+chatgpt[uregion]="$chat_region"
 chatgpt[utype]="$resultunlocktype"
 elif [ -n "$result2" ]&&[ -n "$result1" ];then
 chatgpt[ustatus]="${smedia[no]}"
@@ -2065,11 +2083,11 @@ chatgpt[uregion]="${smedia[nodata]}"
 chatgpt[utype]="${smedia[nodata]}"
 elif [ -z "$result1" ]&&[ -n "$result2" ]&&[[ $tmpresult1 != "curl"* ]];then
 chatgpt[ustatus]="${smedia[web]}"
-chatgpt[uregion]="  [$countryCode]   "
+chatgpt[uregion]="$chat_region"
 chatgpt[utype]="$resultunlocktype"
 elif [ -n "$result1" ]&&[ -z "$result2" ];then
 chatgpt[ustatus]="${smedia[app]}"
-chatgpt[uregion]="  [$countryCode]   "
+chatgpt[uregion]="$chat_region"
 chatgpt[utype]="$resultunlocktype"
 elif [[ $tmpresult1 == "curl"* ]]&&[ -n "$result2" ];then
 chatgpt[ustatus]="${smedia[no]}"
@@ -2077,13 +2095,21 @@ chatgpt[uregion]="${smedia[nodata]}"
 chatgpt[utype]="${smedia[nodata]}"
 elif [[ $1 -eq 6 ]]&&[ -z "$result2" ]&&[[ $tmpresult2 != "curl"* ]];then
 chatgpt[ustatus]="${smedia[yes]}"
-chatgpt[uregion]="  [$countryCode]   "
+chatgpt[uregion]="$chat_region"
 chatgpt[utype]="$resultunlocktype"
 else
 chatgpt[ustatus]="${smedia[bad]}"
 chatgpt[uregion]="${smedia[nodata]}"
 chatgpt[utype]="${smedia[nodata]}"
 fi
+}
+media_trace_country_code(){
+emulate -LR zsh
+typeset trace="$1"
+typeset code
+code=$(printf '%s\n' "$trace"|tr -d '\r'|sed -nE 's/^loc=([A-Za-z]{2})$/\1/p'|sed -n '1p')
+[[ "$code" == [A-Za-z][A-Za-z] ]]||return 1
+print -rn -- "${code:u}"
 }
 get_sorted_mx_records(){
 local domain=$1

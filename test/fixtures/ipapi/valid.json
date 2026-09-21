@@ -1,0 +1,11 @@
+{
+  "asn": {"type": "isp"},
+  "company": {"type": "isp", "abuser_score": "0.01 (Very Low)"},
+  "location": {"country_code": "US"},
+  "is_proxy": false,
+  "is_tor": false,
+  "is_vpn": false,
+  "is_datacenter": false,
+  "is_abuser": false,
+  "is_crawler": false
+}
