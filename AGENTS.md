@@ -30,6 +30,7 @@ disclosure. A plan is not a measurement.
 | [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md) | Shared APIs, definitions, callers, inputs/outputs, and examples |
 | [SERVICES.md](SERVICES.md) | No resident service; temporary process startup, shutdown, and checks |
 | [PROVIDERS.md](PROVIDERS.md) | Query scopes, source contracts, and disclosure |
+| [CREDENTIALS.md](CREDENTIALS.md) | Private account/API/TOTP path and format index |
 | [UPSTREAM.md](UPSTREAM.md) | AGPL provenance and material modifications |
 
 `README.md` is intentionally absent. There is currently no project-specific
@@ -40,7 +41,7 @@ under `.agents/skills/`.
 
 | Need | Entrypoint | Measurement |
 | --- | --- | --- |
-| Current system route, including mail and DNSBL | `bin/test-clash-leaf --direct` | IPv4 `full`; clears proxy environment variables and needs no Clash cache or Mihomo |
+| Current system route | `bin/test-clash-leaf --direct` | `reputation`, default IPv4 (`-6` selects IPv6); clears proxy variables and needs no Clash cache or Mihomo |
 | One subscription node | `bin/test-clash-leaf --subscription NAME --leaf NAME -4` | `reputation` through an isolated Mihomo; names must match exactly |
 | A chosen scope or public target IP | `bin/ip-quality --scope SCOPE` | Raw reporter; see route restrictions in [PROVIDERS.md](PROVIDERS.md#consent-and-route-boundary) |
 
@@ -65,7 +66,7 @@ dependency. The specific-IP menu uses `reputation`, clears inherited proxy
 variables, and starts no Mihomo. A system VPN or TUN can still affect direct
 traffic.
 
-After authorization, a masked comprehensive direct report is:
+After authorization, a masked direct IP reputation report is:
 
 ```text
 /usr/bin/ruby --disable-gems bin/test-clash-leaf --direct --confirm-network-lookup
@@ -99,7 +100,6 @@ Live reporter dependencies are checked before querying:
 | --- | --- |
 | All scopes | `curl`, `jq` |
 | `reputation` | Also `bc` |
-| `media-ai` | Also `dig`, `nslookup`, `gunzip` |
 | `mail` | Also `dig`, `nc` |
 | `dnsbl` | Also `dig`, `xargs` |
 | `mail-dnsbl`, `full` | Union of their component requirements |
@@ -113,6 +113,23 @@ Missing dependencies stop explicitly; the project installs nothing. Official
 API keys are optional; private file formats and precedence are in
 [PROVIDERS.md](PROVIDERS.md#optional-official-credentials).
 
+## Provider account MCPs
+
+- [mcp/ipqs/AGENTS.md](mcp/ipqs/AGENTS.md) owns the migrated IPQS dashboard,
+  account probe, API integration and private browser profile. Reporter and MCP
+  share the same private `secrets/ipqs` key.
+- [mcp/provider-accounts/AGENTS.md](mcp/provider-accounts/AGENTS.md) owns free
+  ipapi/Cloudflare account setup with dedicated profiles. It reuses the external
+  `mcps/common/shared` browser, HTTP, MCP and secret-file APIs.
+- Node dependencies and MCP commands are separate from the zsh/Ruby reporter.
+  Build with `npm --prefix mcp/ipqs run build`; start either MCP through its
+  package's `npm start`. Account mutations require explicit task intent.
+
+The default reporter and every route-runner choice use `reputation`. Media/AI
+unlock tests were removed because accessibility does not establish IP reputation.
+The raw reporter retains optional `mail`, `dnsbl`, `mail-dnsbl`, and `full`
+(reputation + mail + DNSBL) scopes for system-route investigations.
+
 ## Safety invariants
 
 These constraints protect credentials, live proxy state, and the meaning of the
@@ -121,8 +138,9 @@ report. Other implementation details may be chosen pragmatically.
 - Run shell code with `/bin/zsh`; do not install or invoke a newer Bash. The
   exact-leaf runner may use `/usr/bin/ruby --disable-gems` and the bundled
   standard library, but no gems or language installer.
-- Do not run third-party installers, package managers, downloaded shell
-  fragments, or dynamically downloaded code from this repository.
+- Reporter and route-runner runtime installs nothing and executes no downloaded
+  code. MCP development uses its reviewed lockfiles; local dependency restoration
+  can use `npm install --offline --ignore-scripts` without third-party installers.
 - Keep the default reporter and route-runner invocations network-free. Only the
   exact `--confirm-network-lookup` flag authorizes live provider, DNS, or TCP
   queries. Each live source can observe the tested egress IP and request
@@ -136,7 +154,8 @@ report. Other implementation details may be chosen pragmatically.
 - Keep reports, API keys, cookies, proxy credentials, and account data out of
   Git. Credentials are data-only private files, never command arguments or Git
   configuration.
-- The application creates no persistent cache. Clash Verge caches are external
+- The reporter creates no persistent cache. Account MCPs retain only their
+  private account/browser state. Clash Verge caches are external
   read-only inputs and must not be deleted. Only owned temporary workspaces are
   eligible for runner cleanup; user-requested reports remain in place.
 
@@ -160,6 +179,8 @@ live in [PROVIDERS.md](PROVIDERS.md); consult it when changing a source.
   loopback Mihomo ownership, and cleanup.
 - `providers/`: fixture-testable response parsers and credential loading.
 - `report/`: provider-aware terminal output without a synthetic combined score.
+- `mcp/`: IPQS and free provider-account integrations; private `.state/`,
+  `node_modules/` and `dist/` stay out of Git.
 - `ref/`: vendored runtime data.
 - `test/fixtures/`: sanitized provider responses.
 - `test/*_test.rb`, `test/support/`: focused suites and test-only helpers; see

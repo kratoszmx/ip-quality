@@ -1,0 +1,53 @@
+{
+  "name": "codex-ipqs-mcp",
+  "version": "0.1.0",
+  "description": "Private local MCP for IPQS dashboard account management and secret-backed read-only API access.",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "codex-ipqs-mcp": "dist/src/server.js",
+    "ipqs-mcp": "dist/src/server.js"
+  },
+  "scripts": {
+    "dev": "npm run build && node dist/src/server.js",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/server.js",
+    "login": "npm run build && node dist/scripts/login.js",
+    "login:saved": "npm run build && node dist/scripts/login-saved.js",
+    "doctor": "tsx scripts/doctor.ts",
+    "probe:sanitized": "tsx scripts/probe.ts",
+    "auth:check": "node dist/scripts/browser-probe.js",
+    "test:offline:raw": "tsx --test tests/*.test.ts",
+    "test:offline": "npm run build && npm run test:offline:raw",
+    "test:browser-text": "npm run build && node dist/scripts/test-browser-text.js",
+    "smoke:offline": "npm run test:offline",
+    "check": "npm run test:offline && npm run doctor",
+    "audit:prod": "npm audit --omit=dev"
+  },
+  "keywords": [
+    "mcp",
+    "ipqs",
+    "ipqualityscore",
+    "fraud-detection",
+    "browser"
+  ],
+  "author": "",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@codex-mcp/shared-browser-session": "file:../../../../mcps/common/shared/browser-session",
+    "@codex-mcp/shared-mcp-server": "file:../../../../mcps/common/shared/mcp-server",
+    "@codex-mcp/shared-one-use-token": "file:../../../../mcps/common/shared/one-use-token",
+    "@codex-mcp/shared-secret-file": "file:../../../../mcps/common/shared/secret-file",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "playwright-core": "^1.61.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}

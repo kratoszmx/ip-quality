@@ -27,8 +27,8 @@ arbitrary address.
 
 The route runner maintains two honest measurement boundaries:
 
-- Comprehensive direct mode removes inherited proxy variables, starts no
-  Mihomo process, forces IPv4, and runs `full` over the current system route. A
+- Direct mode removes inherited proxy variables, starts no
+  Mihomo process, defaults to IPv4, and runs `reputation` over the system route. A
   system-level VPN or TUN can still affect that route.
 - Exact-leaf mode runs only `reputation`. Its HTTP(S) requests use a verified
   loopback Mihomo for one selected cached-subscription leaf. DNSBL, SMTP, and
@@ -49,10 +49,14 @@ when a single JSON document is needed.
 | --- | --- | --- |
 | `reputation` | Named IP type, score, risk-factor, routing, and exposure observations | Supports automatic egress or one positional public IP; exact-leaf mode uses this scope only |
 | `dnsbl` | Every vendored DNSBL zone | IPv4 only; automatic egress or one positional public IPv4 |
-| `media-ai` | Public accessibility probes for six named services | Current execution route; no positional target |
 | `mail` | Public MX lookup, SMTP greeting probes, and outbound TCP/25 | Current system route; no positional target |
 | `mail-dnsbl` | `mail` and `dnsbl` together | Current system IPv4 route |
-| `full` | `reputation`, `media-ai`, `mail`, and `dnsbl` | The normal route-runner entry uses the proxy-cleared system IPv4 route |
+| `full` | `reputation`, `mail`, and `dnsbl` | Explicit raw-reporter scope; SMTP and DNS use the system route |
+
+`reputation` is the default for both entrypoints. Media/AI unlock tests and the
+`Media` JSON section have been removed. `--scope media-ai` now reports an invalid
+scope before any network access. Mail and DNSBL remain opt-in because their
+many DNS/TCP probes add latency and cannot describe an HTTP-proxied leaf.
 
 ## Reputation providers
 
@@ -103,6 +107,15 @@ fields are comparable:
 - Cloudflare IP Intelligence validates the target IP, ASN reference, and bounded
   threat-category objects. Its categories remain source-specific observations;
   they are not converted into the project's other boolean factors or a score.
+  A live response on 2026-09-22 supplied a numeric ASN despite the documentation's
+  string example; valid 32-bit numeric ASNs are normalized to `AS<number>`.
+  Missing `risk_types` stays `null` in JSON, while an explicitly empty array stays
+  `[]`. A null `threat_summary` supplies no clean-IP evidence.
+- The three additional providers always have a visible source-status line.
+  Anonymous ipapi explicitly explains the free-key requirement; missing
+  Cloudflare credentials are shown as unconfigured. Context IP fields use the
+  same masking as `Head.IP`. Cloudflare category names remain intact JSON strings,
+  including names containing commas.
 - A field missing from an otherwise useful result appears as `-` in the terminal
   matrix and `null` in JSON. A wholly unavailable source is named once in a
   compact summary. IPQS remains visible with its source/status even without a
@@ -180,19 +193,6 @@ reporter does not attempt to estimate remaining provider quota.
 The similarly named `ipapi.co` is a different product with a contact-gated free
 trial. This project currently uses the no-key `ipapi.is` API listed above; the two
 providers must not be silently combined.
-
-## Media and AI scope
-
-The reporter performs public accessibility probes for TikTok, Netflix, YouTube
-Premium, Prime Video, Reddit, and OpenAI/ChatGPT endpoints. Results describe
-those particular unauthenticated flows and any region signal they expose. They
-do not log in, purchase, modify an account, or prove that every feature works.
-The ChatGPT trace contributes a region only when it contains a standalone
-two-letter `loc=XX` line; an absent or malformed trace is shown as no region.
-
-The upstream Disney+ check remains excluded because its supporting bundle mixed
-request examples with historical third-party cookie, session, identity, and
-credential material.
 
 ## Mail scope
 

@@ -1,0 +1,19 @@
+{
+  "success": true,
+  "errors": [],
+  "messages": [],
+  "result": [{
+    "ip": "198.51.100.23",
+    "belongs_to_ref": {
+      "id": "autonomous-system--fixture",
+      "value": 64500,
+      "type": "isp",
+      "country": "US",
+      "description": "Example Network"
+    },
+    "ip_lists": null,
+    "ptr_lookup": {"ptr_domains": [], "ptr_lookup_errors": ""},
+    "iana_reservations": [],
+    "threat_summary": null
+  }]
+}

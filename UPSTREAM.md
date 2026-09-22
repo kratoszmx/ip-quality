@@ -37,8 +37,8 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 - Removed telemetry, counters, advertisements, sponsor downloads, remote menus,
   report uploads, command-line proxy secrets, and runtime reference downloads.
   Reference data is now vendored as regular local files.
-- Made the direct route a proxy-cleared IPv4 `full` report (reputation,
-  media/AI, mail, DNSBL), with `mail-dnsbl` also available separately. Removed
+- Made direct and leaf routes reputation-only by default; retained opt-in
+  mail/DNSBL scopes and removed media/AI unlock probes and their JSON section. Removed
   the SMTP bind to the discovered public address so NAT hosts use the actual
   system-selected source address.
 - Repaired explicit-target validation and limited it to reputation/DNSBL;

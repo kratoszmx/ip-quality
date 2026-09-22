@@ -41,7 +41,7 @@ class ClashLeafRunnerTest < Minitest::Test
 
       assert_equal 0, exit_code
       assert_includes stdout.string, "Available test routes:"
-      assert_includes stdout.string, "Direct comprehensive report"
+      assert_includes stdout.string, "Direct IP reputation report"
       assert_includes stdout.string, "Specific IP lookup"
       assert_includes stdout.string, "Cached subscription: Fixture Remote"
       assert_includes stdout.string, "Available inline leaves"
@@ -67,8 +67,8 @@ class ClashLeafRunnerTest < Minitest::Test
 
       assert_equal 0, exit_code
       assert_includes stdout.string, "Available test routes:"
-      assert_includes stdout.string, "Comprehensive direct route plan"
-      assert_includes stdout.string, "reputation + media/AI + mail connectivity + DNSBL"
+      assert_includes stdout.string, "Direct reputation route plan"
+      assert_includes stdout.string, "reputation only"
       assert_includes stdout.string, "no temporary Mihomo process"
       refute_includes stdout.string, "Available inline leaves"
       assert_empty stderr.string
@@ -88,10 +88,10 @@ class ClashLeafRunnerTest < Minitest::Test
       exit_code = command.run(["--direct", "-4"])
 
       assert_equal 0, exit_code
-      assert_includes stdout.string, "Comprehensive direct route plan"
+      assert_includes stdout.string, "Direct reputation route plan"
       assert_includes stdout.string, "current system route"
-      assert_includes stdout.string, "media/AI"
-      assert_includes stdout.string, "DNSBL"
+      refute_includes stdout.string, "media/AI"
+      refute_includes stdout.string, "DNSBL"
       assert_includes stdout.string, "system-level VPN or TUN"
       assert_empty stderr.string
     end
@@ -125,7 +125,7 @@ class ClashLeafRunnerTest < Minitest::Test
       end
 
       assert_equal 0, exit_code
-      assert_equal "--confirm-network-lookup --scope full -4 -j\n", File.read(arguments_file)
+      assert_equal "--confirm-network-lookup --scope reputation -4 -j\n", File.read(arguments_file)
       assert_empty stdout.string
       assert_includes stderr.string, "no Mihomo process is started"
       assert_includes stderr.string, "live Clash state was unchanged"
@@ -173,7 +173,7 @@ class ClashLeafRunnerTest < Minitest::Test
     end
   end
 
-  def test_direct_comprehensive_menu_is_ipv4_system_route_only
+  def test_direct_menu_defaults_to_ipv4_and_allows_explicit_ipv6
     Dir.mktmpdir("ip-quality-direct-comprehensive-") do |directory|
       write_clash_verge_fixture(directory)
       fake_reporter = File.join(directory, "fake-reporter")
@@ -203,10 +203,10 @@ class ClashLeafRunnerTest < Minitest::Test
       end
 
       assert_equal 0, exit_code
-      assert_equal "--confirm-network-lookup --scope full -4 -f\n", File.read(arguments_file)
-      assert_includes stdout.string, "Direct comprehensive report"
+      assert_equal "--confirm-network-lookup --scope reputation -4 -f\n", File.read(arguments_file)
+      assert_includes stdout.string, "Direct IP reputation report"
       assert_includes stderr.string, "current system IPv4 route"
-      assert_includes stderr.string, "Comprehensive direct report finished"
+      assert_includes stderr.string, "Direct reputation report finished"
       assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"))
 
       ipv6_stdout = StringIO.new
@@ -218,8 +218,8 @@ class ClashLeafRunnerTest < Minitest::Test
         app_root: directory,
         reporter_path: fake_reporter
       )
-      assert_equal IpQuality::ClashLeafCommand::EX_USAGE, ipv6_command.run(["-6"])
-      assert_includes ipv6_stderr.string, "requires IPv4"
+      assert_equal 0, ipv6_command.run(["-6"])
+      assert_includes ipv6_stdout.string, "IPv6 route"
     end
   end
 

@@ -8,7 +8,11 @@ typeset ROOT="${0:A:h:h}"
 
 # Only maintained top-level suites are executable tests; support/ and fixtures/
 # are inputs. One Minitest run gives an aggregate result and seed for all suites.
-exec /usr/bin/ruby -e '
+/usr/bin/ruby -e '
   root = ARGV.shift
   Dir.glob(File.join(root, "test", "*_test.rb")).sort.each { |path| require path }
 ' -- "$ROOT" "$@"
+
+# Both owned MCP packages validate without provider requests or account access.
+npm --prefix "$ROOT/mcp/ipqs" run check
+npm --prefix "$ROOT/mcp/provider-accounts" test

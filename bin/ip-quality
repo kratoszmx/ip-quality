@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-09-22-standalone.17"
+script_version="v2026-09-22-standalone.18"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset COMMON_DIR="$SCRIPT_DIR/common"
@@ -34,7 +34,7 @@ exit 66
 }
 source "$local_library"
 done
-typeset query_scope="full"
+typeset query_scope="reputation"
 typeset network_lookup_confirmed=0
 typeset plan_only=0
 typeset self_test_requested=0
@@ -83,12 +83,6 @@ typeset -A ipqs
 typeset -A ping0
 typeset -A ripestat
 typeset -A internetdb
-typeset -A tiktok
-typeset -A netflix
-typeset -A youtube
-typeset -A amazon
-typeset -A reddit
-typeset -A chatgpt
 typeset IPV4
 typeset IPV6
 typeset IPV4check=1
@@ -105,7 +99,6 @@ typeset -A stype
 typeset -A sscore
 typeset -A sfactor
 typeset -A sping0
-typeset -A smedia
 typeset -A smail
 typeset -A smailstatus
 typeset -A smail_response
@@ -126,7 +119,7 @@ typeset -a shelp_lines=(
 "Safe default: /bin/zsh ./bin/ip-quality [--scope SCOPE]"
 "安全默认：不加确认参数时只显示查询计划，不访问网络"
 "Live query: /bin/zsh ./bin/ip-quality --confirm-network-lookup [--scope SCOPE] [-4|-6]"
-"            --scope reputation|dnsbl|media-ai|mail|mail-dnsbl|full"
+"            --scope reputation|dnsbl|mail|mail-dnsbl|full"
 "            --dnsbl-concurrency 1..50       Bounded DNSBL workers                     DNSBL并发上限"
 "            --plan                          Print disclosure plan only                仅显示披露计划"
 "            --self-test                     Run offline source/data checks            运行离线自检"
@@ -161,12 +154,10 @@ swarn[61]="ERROR: DNSBL scope supports IPv4 only!"
 swarn[62]="ERROR: an explicit target IP supports reputation or DNSBL scope only!"
 swarn[63]="ERROR: the explicit target IP conflicts with the selected address family!"
 sinfo[database]="Checking IP database "
-sinfo[media]="Checking stream media "
 sinfo[ai]="Checking AI provider "
 sinfo[mail]="Connecting Email server "
 sinfo[dnsbl]="Checking Blacklist database "
 sinfo[ldatabase]=21
-sinfo[lmedia]=22
 sinfo[lai]=21
 sinfo[lmail]=24
 sinfo[ldnsbl]=28
@@ -233,25 +224,7 @@ sfactor[yes]="$Font_Red$Font_B Yes$Font_Suffix"
 sfactor[no]="$Font_Green$Font_B No $Font_Suffix"
 sfactor[na]="$Font_Green$Font_B N/A$Font_Suffix"
 sping0[mismatch]="response IP did not match; result rejected"
-smedia[yes]="  $Back_Green$Font_White Yes $Font_Suffix  "
-smedia[no]=" $Back_Red$Font_White Block $Font_Suffix "
-smedia[bad]="$Back_Red$Font_White Failed $Font_Suffix "
-smedia[pending]="$Back_Yellow$Font_White Pending $Font_Suffix"
-smedia[cn]=" $Back_Red$Font_White China $Font_Suffix "
-smedia[noprem]="$Back_Red$Font_White NoPrem. $Font_Suffix"
-smedia[org]="$Back_Yellow$Font_White NF.Only $Font_Suffix"
-smedia[web]="$Back_Yellow$Font_White WebOnly $Font_Suffix"
-smedia[app]="$Back_Yellow$Font_White APPOnly $Font_Suffix"
-smedia[idc]="  $Back_Yellow$Font_White IDC $Font_Suffix  "
-smedia[native]="$Back_Green$Font_White Native $Font_Suffix "
-smedia[dns]="$Back_Yellow$Font_White ViaDNS $Font_Suffix "
-smedia[nodata]="         "
-smedia[title]="6. Accessibility check for media and AI services"
-smedia[meida]="Service: "
-smedia[status]="Status:  "
-smedia[region]="Region:  "
-smedia[type]="Type:    "
-smail[title]="7. Email service availability and blacklist detection"
+smail[title]="6. Email service availability and blacklist detection"
 smail[port]="Local Port 25 Outbound: "
 smail[yes]="${Font_Green}Available$Font_Suffix"
 smail[no]="${Font_Red}Blocked$Font_Suffix"
@@ -281,12 +254,10 @@ swarn[61]="错误：DNSBL范围仅支持IPv4！"
 swarn[62]="错误：指定公网IP仅支持信誉或DNSBL范围！"
 swarn[63]="错误：指定公网IP与选择的IPv4/IPv6类型冲突！"
 sinfo[database]="正在检测IP数据库 "
-sinfo[media]="正在检测流媒体服务商 "
 sinfo[ai]="正在检测AI服务商 "
 sinfo[mail]="正在连接邮件服务商 "
 sinfo[dnsbl]="正在检测黑名单数据库 "
 sinfo[ldatabase]=17
-sinfo[lmedia]=21
 sinfo[lai]=17
 sinfo[lmail]=19
 sinfo[ldnsbl]=21
@@ -353,25 +324,7 @@ sfactor[yes]="$Font_Red$Font_B 是 $Font_Suffix"
 sfactor[no]="$Font_Green$Font_B 否 $Font_Suffix"
 sfactor[na]="$Font_Green$Font_B 无 $Font_Suffix"
 sping0[mismatch]="响应 IP 不一致，结果已拒绝"
-smedia[yes]=" $Back_Green$Font_White 解锁 $Font_Suffix  "
-smedia[no]=" $Back_Red$Font_White 屏蔽 $Font_Suffix  "
-smedia[bad]=" $Back_Red$Font_White 失败 $Font_Suffix  "
-smedia[pending]="$Back_Yellow$Font_White 待支持 $Font_Suffix "
-smedia[cn]=" $Back_Red$Font_White 中国 $Font_Suffix  "
-smedia[noprem]="$Back_Red$Font_White 禁会员 $Font_Suffix "
-smedia[org]="$Back_Yellow$Font_White 仅自制 $Font_Suffix "
-smedia[web]="$Back_Yellow$Font_White 仅网页 $Font_Suffix "
-smedia[app]=" $Back_Yellow$Font_White 仅APP $Font_Suffix "
-smedia[idc]=" $Back_Yellow$Font_White 机房 $Font_Suffix  "
-smedia[native]=" $Back_Green$Font_White 原生 $Font_Suffix  "
-smedia[dns]="  $Back_Yellow$Font_White DNS $Font_Suffix  "
-smedia[nodata]="         "
-smedia[title]="六、流媒体及AI服务解锁检测"
-smedia[meida]="服务商： "
-smedia[status]="状态：   "
-smedia[region]="地区：   "
-smedia[type]="方式：   "
-smail[title]="七、邮局连通性及黑名单检测"
+smail[title]="六、邮局连通性及黑名单检测"
 smail[port]="本地25端口出站："
 smail[yes]="${Font_Green}可用${Font_Suffix}"
 smail[no]="${Font_Red}阻断${Font_Suffix}"
@@ -547,7 +500,7 @@ esac
 shift
 done
 case "$query_scope" in
-reputation|dnsbl|media-ai|mail|mail-dnsbl|full) ;;
+reputation|dnsbl|mail|mail-dnsbl|full) ;;
 *)print -ru2 -- "ERROR: unsupported scope: $query_scope"
 return 64
 esac
@@ -567,7 +520,6 @@ scope_includes reputation&&print -r -- "  reputation sources: official-contract 
 scope_includes reputation&&print -r -- "  supplementary sources: IPinfo public demo widget plus named Check.Place relays (MaxMind-labeled, Scamalytics, AbuseIPDB, IP2Location, ipdata, IPQualityScore)"
 scope_includes reputation&&print -r -- "  Ping0 limitation: the official free /geo endpoint exposes IP/location/ASN/organization, not a risk score"
 scope_includes reputation&&print -r -- "  context-only sources: ipwho.is reports geo/network/timezone; Cloudflare reports ASN infrastructure/threat categories; RIPEstat reports routing; Shodan InternetDB reports public exposure"
-scope_includes media-ai&&print -r -- "  media/AI sources: TikTok, Netflix, YouTube Premium, Prime Video, Reddit, OpenAI public endpoints"
 scope_includes mail&&print -r -- "  mail sources: public MX DNS plus bounded SMTP greeting probes"
 scope_includes dnsbl&&print -r -- "  DNSBL sources: vendored $DNSBL_FILE (up to $dnsbl_concurrency concurrent DNS lookups)"
 print -r -- ""
@@ -578,7 +530,6 @@ print -r -- "Run live only with: --confirm-network-lookup"
 require_dependencies(){
 local -a required=(curl jq)
 scope_includes reputation&&required+=(bc)
-scope_includes media-ai&&required+=(dig nslookup gunzip)
 scope_includes mail&&required+=(dig nc)
 scope_includes dnsbl&&required+=(dig xargs)
 local -a missing=()
@@ -867,6 +818,7 @@ cloudflare[network]="AS64500"
 cloudflare[org]="Example Network"
 cloudflare[infrastructure]="hosting_provider"
 cloudflare[threats]="Phishing, Malware"
+cloudflare[threats_json]='["Phishing", "Malware"]'
 ipqs[proxy]="true"
 ping0[status]="verified"
 ping0[match]="true"
@@ -913,6 +865,10 @@ print -r -- "$ipjson"|jq -e --arg expected "$json_special" '
   .ProviderStatus.IPWhois == "ok" and
   .ProviderStatus.Cloudflare == "ok" and
   .ProviderContext.IPAPI.Mode == "full" and
+  .ProviderContext.IPAPI.IP == .Head.IP and
+  .ProviderContext.Cloudflare.IP == .Head.IP and
+  (. | tostring | contains("198.51.100.23") | not) and
+  (has("Media") | not) and
   .ProviderContext.IPAPI.CountryCode == "US" and
   .ProviderContext.IPWhois.ASN == "64500" and
   .ProviderContext.Cloudflare.ThreatCategories == ["Phishing", "Malware"] and
@@ -928,6 +884,12 @@ print -r -- "$ipjson"|jq -e --arg expected "$json_special" '
   .Mail.Port25 == null
 ' >/dev/null||{
 print -ru2 -- "SELF-TEST FAILED: JSON escaping or typing changed"
+return 1
+}
+cloudflare[threats_json]=null
+save_json || return 1
+print -r -- "$ipjson" | jq -e '.ProviderContext.Cloudflare.ThreatCategories == null' >/dev/null || {
+print -ru2 -- "SELF-TEST FAILED: missing Cloudflare threats became an empty result"
 return 1
 }
 print -r -- "SELF-TEST OK: zsh runtime, validators, provider parsers, and ${#dnsbl_zones[@]} DNSBL entries"
@@ -1551,6 +1513,7 @@ cloudflare[network]="${cloudflare_parsed[network]}"
 cloudflare[org]="${cloudflare_parsed[organization]}"
 cloudflare[infrastructure]="${cloudflare_parsed[infrastructure_type]}"
 cloudflare[threats]="${cloudflare_parsed[threat_categories]}"
+cloudflare[threats_json]="${cloudflare_parsed[threat_categories_json]:-null}"
 }
 db_abuseipdb(){
 local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}AbuseIPDB $Font_Suffix"
@@ -1846,410 +1809,6 @@ elif internetdb_parse_unavailability "$RESPONSE";then
 internetdb[status]="${internetdb_unavailable[status]}"
 fi
 }
-function check_ip_valide(){
-local IPPattern='^(\<([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\>\.){3}\<([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\>$'
-IP="$1"
-if [[ $IP =~ $IPPattern ]];then
-return 0
-else
-return 1
-fi
-}
-function calc_ip_net(){
-sip="$1"
-snetmask="$2"
-check_ip_valide "$sip"
-if [ $? -ne 0 ];then
-echo ""
-return 1
-fi
-local ipFIELD1=$(echo "$sip"|cut -d. -f1)
-local ipFIELD2=$(echo "$sip"|cut -d. -f2)
-local ipFIELD3=$(echo "$sip"|cut -d. -f3)
-local ipFIELD4=$(echo "$sip"|cut -d. -f4)
-local netmaskFIELD1=$(echo "$snetmask"|cut -d. -f1)
-local netmaskFIELD2=$(echo "$snetmask"|cut -d. -f2)
-local netmaskFIELD3=$(echo "$snetmask"|cut -d. -f3)
-local netmaskFIELD4=$(echo "$snetmask"|cut -d. -f4)
-local tmpret1=$((ipFIELD1&netmaskFIELD1))
-local tmpret2=$((ipFIELD2&netmaskFIELD2))
-local tmpret3=$((ipFIELD3&netmaskFIELD3))
-local tmpret4=$((ipFIELD4&netmaskFIELD4))
-echo "$tmpret1.$tmpret2.$tmpret3.$tmpret4"
-}
-function Check_DNS_IP(){
-if [ "$1" != "${1#*[0-9].[0-9]}" ];then
-if [ "$(calc_ip_net "$1" 255.0.0.0)" == "10.0.0.0" ];then
-echo 0
-elif [ "$(calc_ip_net "$1" 255.240.0.0)" == "172.16.0.0" ];then
-echo 0
-elif [ "$(calc_ip_net "$1" 255.255.0.0)" == "169.254.0.0" ];then
-echo 0
-elif [ "$(calc_ip_net "$1" 255.255.0.0)" == "192.168.0.0" ];then
-echo 0
-elif [ "$(calc_ip_net "$1" 255.255.255.0)" == "$(calc_ip_net "$2" 255.255.255.0)" ];then
-echo 0
-else
-echo 1
-fi
-elif [ "$1" != "${1#*[0-9a-fA-F]:*}" ];then
-if [ "${1:0:3}" == "fe8" ];then
-echo 0
-elif [ "${1:0:3}" == "FE8" ];then
-echo 0
-elif [ "${1:0:2}" == "fc" ];then
-echo 0
-elif [ "${1:0:2}" == "FC" ];then
-echo 0
-elif [ "${1:0:2}" == "fd" ];then
-echo 0
-elif [ "${1:0:2}" == "FD" ];then
-echo 0
-elif [ "${1:0:2}" == "ff" ];then
-echo 0
-elif [ "${1:0:2}" == "FF" ];then
-echo 0
-else
-echo 1
-fi
-else
-echo 0
-fi
-}
-function Check_DNS_1(){
-local resultdns=$(nslookup $1)
-local resultinlines=(${resultdns//$'\n'/ })
-for i in ${resultinlines[*]};do
-if [[ $i == "Name:" ]];then
-local resultdnsindex=$((resultindex+3))
-break
-fi
-local resultindex=$((resultindex+1))
-done
-echo $(Check_DNS_IP ${resultinlines[$resultdnsindex]} ${resultinlines[1]})
-}
-function Check_DNS_2(){
-local resultdnstext=$(dig $1|grep "ANSWER:")
-local resultdnstext=${resultdnstext#*"ANSWER: "}
-local resultdnstext=${resultdnstext%", AUTHORITY:"*}
-if [ "$resultdnstext" == "0" ]||[ "$resultdnstext" == "1" ]||[ "$resultdnstext" == "2" ];then
-echo 0
-else
-echo 1
-fi
-}
-function Check_DNS_3(){
-local resultdnstext=$(dig "test$RANDOM$RANDOM.$1"|grep "ANSWER:")
-local resultdnstext=${resultdnstext#*"ANSWER: "}
-local resultdnstext=${resultdnstext%", AUTHORITY:"*}
-if [ "$resultdnstext" == "0" ];then
-echo 1
-else
-echo 0
-fi
-}
-function Get_Unlock_Type(){
-while [ $# -ne 0 ];do
-if [ "$1" = "0" ];then
-echo "${smedia[dns]}"
-return
-fi
-shift
-done
-echo "${smedia[native]}"
-}
-function MediaUnlockTest_TikTok(){
-local temp_info="$Font_Cyan$Font_B${sinfo[media]}${Font_I}TikTok $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-7-${sinfo[lmedia]}))
-tiktok=()
-local checkunlockurl="tiktok.com"
-local result1=$(Check_DNS_1 $checkunlockurl)
-local result3=$(Check_DNS_3 $checkunlockurl)
-local resultunlocktype=$(Get_Unlock_Type $result1 $result3)
-local Ftmpresult=$(curl_safe $CurlARG -$1 --user-agent "$UA_Browser" -sL -m 10 "https://www.tiktok.com/")
-[[ $Ftmpresult == *"Please wait..."* ]]&&Ftmpresult=$(curl_safe $CurlARG --user-agent "$UA_Browser" -sL -m 10 "https://www.tiktok.com/explore")
-if [[ $Ftmpresult == "curl"* ]];then
-tiktok[ustatus]="${smedia[no]}"
-tiktok[uregion]="${smedia[nodata]}"
-tiktok[utype]="${smedia[nodata]}"
-return
-fi
-local FRegion=$(echo $Ftmpresult|grep '"region":'|sed 's/.*"region"//'|cut -f2 -d'"')
-if [ -n "$FRegion" ];then
-tiktok[ustatus]="${smedia[yes]}"
-local ttpadding=$((7-${#FRegion}))
-local ttleft=$((ttpadding/2))
-local ttright=$((ttpadding-ttleft))
-tiktok[uregion]="$(printf "%*s%s%*s" "$ttleft" "" "[$FRegion]" "$ttright" "")"
-tiktok[utype]="$resultunlocktype"
-return
-fi
-local STmpresult=$(curl_safe $CurlARG -$1 --user-agent "$UA_Browser" -sL -m 10 -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9" -H "Accept-Encoding: gzip" -H "Accept-Language: en" "https://www.tiktok.com"|gunzip 2>/dev/null)
-[[ $Ftmpresult == *"Please wait..."* ]]&&STmpresult=$(curl_safe $CurlARG --user-agent "$UA_Browser" -sL -m 10 -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9" -H "Accept-Encoding: gzip" -H "Accept-Language: en" "https://www.tiktok.com/explore"|gunzip 2>/dev/null)
-local SRegion=$(echo $STmpresult|grep '"region":'|sed 's/.*"region"//'|cut -f2 -d'"')
-if [ -n "$SRegion" ];then
-tiktok[ustatus]="${smedia[idc]}"
-local ttWidth=7
-local ttpadding=$((7-${#SRegion}))
-local ttleft=$((ttpadding/2))
-local ttright=$((ttpadding-ttleft))
-tiktok[uregion]="$(printf "%*s%s%*s" "$ttleft" "" "[$SRegion]" "$ttright" "")"
-tiktok[utype]="$resultunlocktype"
-return
-else
-tiktok[ustatus]="${smedia[bad]}"
-tiktok[uregion]="${smedia[nodata]}"
-tiktok[utype]="${smedia[nodata]}"
-return
-fi
-}
-function MediaUnlockTest_Netflix(){
-local temp_info="$Font_Cyan$Font_B${sinfo[media]}${Font_I}Netflix $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-8-${sinfo[lmedia]}))
-netflix=()
-local checkunlockurl="netflix.com"
-local result1=$(Check_DNS_1 $checkunlockurl)
-local result2=$(Check_DNS_2 $checkunlockurl)
-local result3=$(Check_DNS_3 $checkunlockurl)
-local resultunlocktype=$(Get_Unlock_Type $result1 $result2 $result3)
-local result1=$(curl_safe $CurlARG -$1 --user-agent "$UA_Browser" -fsL -X GET --max-time 10 --tlsv1.3 "https://www.netflix.com/title/81280792" 2>&1)
-local result2=$(curl_safe $CurlARG -$1 --user-agent "$UA_Browser" -fsL -X GET --max-time 10 --tlsv1.3 "https://www.netflix.com/title/70143836" 2>&1)
-if [ -z "$result1" ]||[ -z "$result2" ];then
-netflix[ustatus]="${smedia[bad]}"
-netflix[uregion]="${smedia[nodata]}"
-netflix[utype]="${smedia[nodata]}"
-return
-fi
-region=$(echo "$result1"|sed -n 's/.*"id":"\([^"]*\)".*"countryName":"[^"]*".*/\1/p'|head -n1)
-[[ -n $region ]]&&region=$(echo "$result2"|sed -n 's/.*"id":"\([^"]*\)".*"countryName":"[^"]*".*/\1/p'|head -n1)
-result1=$(echo $result1|grep 'Oh no!')
-result2=$(echo $result2|grep 'Oh no!')
-if [ -n "$result1" ]&&[ -n "$result2" ];then
-netflix[ustatus]="${smedia[org]}"
-netflix[uregion]="  [$region]   "
-netflix[utype]="$resultunlocktype"
-return
-fi
-if [ -z "$result1" ]||[ -z "$result2" ];then
-netflix[ustatus]="${smedia[yes]}"
-netflix[uregion]="  [$region]   "
-netflix[utype]="$resultunlocktype"
-return
-fi
-netflix[ustatus]="${smedia[no]}"
-netflix[uregion]="${smedia[nodata]}"
-netflix[utype]="${smedia[nodata]}"
-}
-function MediaUnlockTest_YouTube_Premium(){
-local temp_info="$Font_Cyan$Font_B${sinfo[media]}${Font_I}Youtube $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-8-${sinfo[lmedia]}))
-youtube=()
-local checkunlockurl="www.youtube.com"
-local result1=$(Check_DNS_1 $checkunlockurl)
-local result3=$(Check_DNS_3 $checkunlockurl)
-local resultunlocktype=$(Get_Unlock_Type $result1 $result3)
-local tmpresult=$(curl_safe $CurlARG -$1 --max-time 10 -sSL -H "Accept-Language: en" "https://www.youtube.com/premium" 2>&1)
-if [[ $tmpresult == "curl"* ]];then
-youtube[ustatus]="${smedia[bad]}"
-youtube[uregion]="${smedia[nodata]}"
-youtube[utype]="${smedia[nodata]}"
-return
-fi
-local isCN=$(echo $tmpresult|grep 'www.google.cn')
-if [ -n "$isCN" ];then
-youtube[ustatus]="${smedia[cn]}"
-youtube[uregion]="  $Font_Red[CN]$Font_Green   "
-youtube[utype]="${smedia[nodata]}"
-return
-fi
-local isNotAvailable=$(echo $tmpresult|grep 'Premium is not available in your country')
-local region=$(echo $tmpresult|sed -n 's/.*"contentRegion":"\([^"]*\)".*/\1/p')
-local isAvailable=$(echo $tmpresult|grep 'ad-free')
-if [ -n "$isNotAvailable" ];then
-youtube[ustatus]="${smedia[noprem]}"
-youtube[uregion]="${smedia[nodata]}"
-youtube[utype]="${smedia[nodata]}"
-return
-elif [ -n "$isAvailable" ]&&[ -n "$region" ];then
-youtube[ustatus]="${smedia[yes]}"
-youtube[uregion]="  [$region]   "
-youtube[utype]="$resultunlocktype"
-return
-elif [ -z "$region" ]&&[ -n "$isAvailable" ];then
-youtube[ustatus]="${smedia[yes]}"
-youtube[uregion]="${smedia[nodata]}"
-youtube[utype]="$resultunlocktype"
-return
-else
-youtube[ustatus]="${smedia[bad]}"
-youtube[uregion]="${smedia[nodata]}"
-youtube[utype]="${smedia[nodata]}"
-fi
-}
-function MediaUnlockTest_PrimeVideo_Region(){
-local temp_info="$Font_Cyan$Font_B${sinfo[media]}${Font_I}Amazon $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-7-${sinfo[lmedia]}))
-amazon=()
-local checkunlockurl="www.primevideo.com"
-local result1=$(Check_DNS_1 $checkunlockurl)
-local result3=$(Check_DNS_3 $checkunlockurl)
-local resultunlocktype=$(Get_Unlock_Type $result1 $result3)
-local tmpresult=$(curl_safe $CurlARG -$1 --user-agent "$UA_Browser" -sL --max-time 10 "https://www.primevideo.com" 2>&1)
-if [[ $tmpresult == "curl"* ]];then
-amazon[ustatus]="${smedia[bad]}"
-amazon[uregion]="${smedia[nodata]}"
-amazon[utype]="${smedia[nodata]}"
-return
-fi
-local result=$(echo $tmpresult|grep '"currentTerritory":'|sed 's/.*currentTerritory//'|cut -f3 -d'"'|head -n 1)
-if [ -n "$result" ];then
-amazon[ustatus]="${smedia[yes]}"
-amazon[uregion]="  [$result]   "
-amazon[utype]="$resultunlocktype"
-return
-else
-amazon[ustatus]="${smedia[no]}"
-amazon[uregion]="${smedia[nodata]}"
-amazon[utype]="${smedia[nodata]}"
-return
-fi
-}
-function MediaUnlockTest_Reddit(){
-local temp_info="$Font_Cyan$Font_B${sinfo[media]}${Font_I}Reddit $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-7-${sinfo[lmedia]}))
-reddit=()
-local checkunlockurl="reddit.com"
-local result1=$(Check_DNS_1 $checkunlockurl)
-local result2=$(Check_DNS_2 $checkunlockurl)
-local resultunlocktype=$(Get_Unlock_Type $result1 $result2)
-local resp http_code html region
-local resolve_opt=""
-if [ "$1" = "6" ];then
-local dual_ipv6
-dual_ipv6=$(dig AAAA reddit.com +short|head -n 1)
-[[ -z $dual_ipv6 ]]&&dual_ipv6=$(dig AAAA dualstack.reddit.map.fastly.net +short|head -n 1)
-if [ -n "$dual_ipv6" ];then
-resolve_opt="--resolve www.reddit.com:443:[$dual_ipv6]"
-else
-reddit[ustatus]="${smedia[bad]}"
-reddit[uregion]="${smedia[nodata]}"
-reddit[utype]="${smedia[nodata]}"
-return
-fi
-fi
-resp=$(curl_safe $CurlARG -$1 -fsL --user-agent "$UA_Browser" --max-time 10 $resolve_opt --write-out '\n%{http_code}' "https://www.reddit.com/")
-http_code=$(printf '%s' "$resp"|tail -n 1|tr -d '\r')
-html=$(printf '%s' "$resp"|sed '$d')
-if [ "$http_code" = "200" ];then
-region=$(printf '%s' "$html"|tr '\n' ' '|sed -n 's/.*country="\([^"]*\)".*/\1/p'|head -n 1)
-fi
-case "$http_code" in
-000)reddit[ustatus]="${smedia[bad]}"
-reddit[uregion]="${smedia[nodata]}"
-reddit[utype]="${smedia[nodata]}"
-;;
-403)reddit[ustatus]="${smedia[no]}"
-reddit[uregion]="${smedia[nodata]}"
-reddit[utype]="${smedia[nodata]}"
-;;
-200)reddit[ustatus]="${smedia[yes]}"
-reddit[uregion]="  [$region]   "
-reddit[utype]="$resultunlocktype"
-;;
-*)reddit[ustatus]="${smedia[bad]}"
-reddit[uregion]="${smedia[nodata]}"
-reddit[utype]="${smedia[nodata]}"
-esac
-}
-function OpenAITest(){
-local temp_info="$Font_Cyan$Font_B${sinfo[ai]}${Font_I}ChatGPT $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-8-${sinfo[lai]}))
-chatgpt=()
-local checkunlockurl="chat.openai.com"
-local result1=$(Check_DNS_1 $checkunlockurl)
-local result2=$(Check_DNS_2 $checkunlockurl)
-local result3=$(Check_DNS_3 $checkunlockurl)
-local checkunlockurl="ios.chat.openai.com"
-local result4=$(Check_DNS_1 $checkunlockurl)
-local result5=$(Check_DNS_2 $checkunlockurl)
-local result6=$(Check_DNS_3 $checkunlockurl)
-local checkunlockurl="api.openai.com"
-local result7=$(Check_DNS_1 $checkunlockurl)
-local result8=$(Check_DNS_3 $checkunlockurl)
-local resultunlocktype=$(Get_Unlock_Type $result1 $result2 $result3 $result4 $result5 $result6 $result7 $result8)
-local tmpresult1=$(curl_safe $CurlARG -$1 -sS --max-time 10 'https://api.openai.com/compliance/cookie_requirements' -H 'authority: api.openai.com' -H 'accept: */*' -H 'accept-language: zh-CN,zh;q=0.9' -H 'content-type: application/json' -H 'origin: https://platform.openai.com' -H 'referer: https://platform.openai.com/' -H 'sec-ch-ua: "Microsoft Edge";v="119", "Chromium";v="119", "Not?A_Brand";v="24"' -H 'sec-ch-ua-mobile: ?0' -H 'sec-ch-ua-platform: "Windows"' -H 'sec-fetch-dest: empty' -H 'sec-fetch-mode: cors' -H 'sec-fetch-site: same-site' -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0' 2>&1)
-local tmpresult2=$(curl_safe $CurlARG -$1 -sS --max-time 10 'https://ios.chat.openai.com/' -H 'authority: ios.chat.openai.com' -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7' -H 'accept-language: zh-CN,zh;q=0.9' -H 'sec-ch-ua: "Microsoft Edge";v="119", "Chromium";v="119", "Not?A_Brand";v="24"' -H 'sec-ch-ua-mobile: ?0' -H 'sec-ch-ua-platform: "Windows"' -H 'sec-fetch-dest: document' -H 'sec-fetch-mode: navigate' -H 'sec-fetch-site: none' -H 'sec-fetch-user: ?1' -H 'upgrade-insecure-requests: 1' -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0' 2>&1)
-local result1=$(echo $tmpresult1|grep unsupported_country)
-local result2=$(echo $tmpresult2|grep VPN)
-if [ -n "$result1" ];then
-code=$(curl_safe $CurlARG -$1 -o /dev/null -sS --max-time 10 \
-'https://chatgpt.com/favicon.ico' \
--H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
--H 'authority: chatgpt.com' \
--H 'accept: */*' \
--H 'accept-language: zh-CN,zh;q=0.9' \
--H 'content-type: application/json' \
--H 'origin: https://chatgpt.com' \
--H 'referer: https://chatgpt.com/' \
--H 'sec-ch-ua: "Microsoft Edge";v="119", "Chromium";v="119", "Not?A_Brand";v="24"' \
--H 'sec-ch-ua-mobile: ?0' \
--H 'sec-ch-ua-platform: "Windows"' \
--H 'sec-fetch-dest: empty' \
--H 'sec-fetch-mode: cors' \
--H 'sec-fetch-site: same-site' \
--H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0' \
--w "%{http_code}" 2>&1)
-[[ $code != "403" ]]&&result1=""
-fi
-local countryCode=""
-local trace_response="$(curl_safe $CurlARG --max-time 10 -sS https://chat.openai.com/cdn-cgi/trace 2>&1)"
-countryCode="$(media_trace_country_code "$trace_response" 2>/dev/null)"
-local chat_region="${smedia[nodata]}"
-[[ -n "$countryCode" ]]&&chat_region="  [$countryCode]   "
-if [ -z "$result2" ]&&[ -z "$result1" ]&&[[ $tmpresult1 != "curl"* ]]&&[[ $tmpresult2 != "curl"* ]];then
-chatgpt[ustatus]="${smedia[yes]}"
-chatgpt[uregion]="$chat_region"
-chatgpt[utype]="$resultunlocktype"
-elif [ -n "$result2" ]&&[ -n "$result1" ];then
-chatgpt[ustatus]="${smedia[no]}"
-chatgpt[uregion]="${smedia[nodata]}"
-chatgpt[utype]="${smedia[nodata]}"
-elif [ -z "$result1" ]&&[ -n "$result2" ]&&[[ $tmpresult1 != "curl"* ]];then
-chatgpt[ustatus]="${smedia[web]}"
-chatgpt[uregion]="$chat_region"
-chatgpt[utype]="$resultunlocktype"
-elif [ -n "$result1" ]&&[ -z "$result2" ];then
-chatgpt[ustatus]="${smedia[app]}"
-chatgpt[uregion]="$chat_region"
-chatgpt[utype]="$resultunlocktype"
-elif [[ $tmpresult1 == "curl"* ]]&&[ -n "$result2" ];then
-chatgpt[ustatus]="${smedia[no]}"
-chatgpt[uregion]="${smedia[nodata]}"
-chatgpt[utype]="${smedia[nodata]}"
-elif [[ $1 -eq 6 ]]&&[ -z "$result2" ]&&[[ $tmpresult2 != "curl"* ]];then
-chatgpt[ustatus]="${smedia[yes]}"
-chatgpt[uregion]="$chat_region"
-chatgpt[utype]="$resultunlocktype"
-else
-chatgpt[ustatus]="${smedia[bad]}"
-chatgpt[uregion]="${smedia[nodata]}"
-chatgpt[utype]="${smedia[nodata]}"
-fi
-}
-media_trace_country_code(){
-emulate -LR zsh
-typeset trace="$1"
-typeset code
-code=$(printf '%s\n' "$trace"|tr -d '\r'|sed -nE 's/^loc=([A-Za-z]{2})$/\1/p'|sed -n '1p')
-[[ "$code" == [A-Za-z][A-Za-z] ]]||return 1
-print -rn -- "${code:u}"
-}
 get_sorted_mx_records(){
 local domain=$1
 dig +short MX $domain|sort -n|head -1|awk '{print $2}'
@@ -2498,13 +2057,6 @@ else
 echo -ne "\r$Font_Cyan${sbasic[type]}$Back_Red$Font_B$Font_White${sbasic[type1]}$Font_Suffix\n"
 fi
 fi
-}
-show_media(){
-echo -ne "\r${smedia[title]}\n"
-echo -ne "\r$Font_Cyan${smedia[meida]}$Font_I TikTok   Netflix Youtube  AmazonPV  Reddit   ChatGPT $Font_Suffix\n"
-echo -ne "\r$Font_Cyan${smedia[status]}${tiktok[ustatus]}${netflix[ustatus]}${youtube[ustatus]}${amazon[ustatus]}${reddit[ustatus]}${chatgpt[ustatus]}$Font_Suffix\n"
-echo -ne "\r$Font_Cyan${smedia[region]}$Font_Green${tiktok[uregion]}${netflix[uregion]}${youtube[uregion]}${amazon[uregion]}${reddit[uregion]}${chatgpt[uregion]}$Font_Suffix\n"
-echo -ne "\r$Font_Cyan${smedia[type]}${tiktok[utype]}${netflix[utype]}${youtube[utype]}${amazon[utype]}${reddit[utype]}${chatgpt[utype]}$Font_Suffix\n"
 }
 show_mail(){
 echo -ne "\r${smail[title]}\n"
@@ -2792,7 +2344,7 @@ ipjson=$(jq -n \
 --arg status_ip2location "${ip2location[status]:-unknown}" \
 --arg status_ipdata "${ipdata[status]:-unknown}" \
 --arg status_ipapi "${ipapi[status]:-unknown}" \
---arg ipapi_mode "${ipapi[mode]:-}" --arg ipapi_ip "${ipapi[ip]:-}" \
+--arg ipapi_mode "${ipapi[mode]:-}" --arg ipapi_ip "${ipapi[ip]:+$displayed_ip}" \
 --arg ipapi_countrycode "${ipapi[countrycode]:-}" \
 --arg ipapi_asn "${ipapi[anonymous_asn]:-}" --arg ipapi_company "${ipapi[anonymous_company]:-}" \
 --arg ipapi_country "${ipapi[anonymous_country]:-}" --arg ipapi_city "${ipapi[anonymous_city]:-}" \
@@ -2802,10 +2354,10 @@ ipjson=$(jq -n \
 --arg ipwhois_asn "${ipwhois[asn]:-}" --arg ipwhois_org "${ipwhois[org]:-}" \
 --arg ipwhois_isp "${ipwhois[isp]:-}" --arg ipwhois_timezone "${ipwhois[timezone]:-}" \
 --arg status_cloudflare "${cloudflare[status]:-not_configured}" \
---arg cloudflare_ip "${cloudflare[ip]:-}" --arg cloudflare_countrycode "${cloudflare[countrycode]:-}" \
+--arg cloudflare_ip "${cloudflare[ip]:+$displayed_ip}" --arg cloudflare_countrycode "${cloudflare[countrycode]:-}" \
 --arg cloudflare_network "${cloudflare[network]:-}" --arg cloudflare_org "${cloudflare[org]:-}" \
 --arg cloudflare_infrastructure "${cloudflare[infrastructure]:-}" \
---arg cloudflare_threats "${cloudflare[threats]:-}" \
+--argjson cloudflare_threats "${cloudflare[threats_json]:-null}" \
 --arg f_ip2_cc "${ip2location[countrycode]:-}" --arg f_ipapi_cc "${ipapi[countrycode]:-}" \
 --arg f_ipregistry_cc "${ipregistry[countrycode]:-}" \
 --arg f_ipqs_cc "${ipqs[countrycode]:-}" --arg f_scam_cc "${scamalytics[countrycode]:-}" \
@@ -2834,24 +2386,6 @@ ipjson=$(jq -n \
 --arg f_ipregistry_bot "${ipregistry[robot]:-}" \
 --arg f_ipqs_bot "${ipqs[robot]:-}" --arg f_scam_bot "${scamalytics[robot]:-}" \
 --arg f_ipdata_bot "${ipdata[robot]:-}" --arg f_ipinfo_bot "${ipinfo[robot]:-}" \
---arg media_tiktok_status "$(clean_ansi "${tiktok[ustatus]:-}")" \
---arg media_netflix_status "$(clean_ansi "${netflix[ustatus]:-}")" \
---arg media_youtube_status "$(clean_ansi "${youtube[ustatus]:-}")" \
---arg media_amazon_status "$(clean_ansi "${amazon[ustatus]:-}")" \
---arg media_reddit_status "$(clean_ansi "${reddit[ustatus]:-}")" \
---arg media_chatgpt_status "$(clean_ansi "${chatgpt[ustatus]:-}")" \
---arg media_tiktok_region "$(clean_ansi "${tiktok[uregion]//[][]/}")" \
---arg media_netflix_region "$(clean_ansi "${netflix[uregion]//[][]/}")" \
---arg media_youtube_region "$(clean_ansi "${youtube[uregion]//[][]/}")" \
---arg media_amazon_region "$(clean_ansi "${amazon[uregion]//[][]/}")" \
---arg media_reddit_region "$(clean_ansi "${reddit[uregion]//[][]/}")" \
---arg media_chatgpt_region "$(clean_ansi "${chatgpt[uregion]//[][]/}")" \
---arg media_tiktok_type "$(clean_ansi "${tiktok[utype]:-}")" \
---arg media_netflix_type "$(clean_ansi "${netflix[utype]:-}")" \
---arg media_youtube_type "$(clean_ansi "${youtube[utype]:-}")" \
---arg media_amazon_type "$(clean_ansi "${amazon[utype]:-}")" \
---arg media_reddit_type "$(clean_ansi "${reddit[utype]:-}")" \
---arg media_chatgpt_type "$(clean_ansi "${chatgpt[utype]:-}")" \
 --arg mail_port25 "$mail_port25" --argjson mail_services "$mail_services" \
 --arg dns_total "${smail[t]:-}" --arg dns_clean "${smail[c]:-}" \
 --arg dns_marked "${smail[m]:-}" --arg dns_blacklisted "${smail[b]:-}" \
@@ -2953,18 +2487,10 @@ def dnsresults($value):
       IP: opt($cloudflare_ip), CountryCode: opt($cloudflare_countrycode),
       Network: opt($cloudflare_network), Organization: opt($cloudflare_org),
       InfrastructureType: opt($cloudflare_infrastructure),
-      ThreatCategories: list($cloudflare_threats)
+      ThreatCategories: $cloudflare_threats
     }
   },
   Ping0: {}, Routing: {}, Exposure: {},
-  Media: {
-    TikTok: {Status: opt($media_tiktok_status), Region: opt($media_tiktok_region), Type: opt($media_tiktok_type)},
-    Netflix: {Status: opt($media_netflix_status), Region: opt($media_netflix_region), Type: opt($media_netflix_type)},
-    Youtube: {Status: opt($media_youtube_status), Region: opt($media_youtube_region), Type: opt($media_youtube_type)},
-    AmazonPrimeVideo: {Status: opt($media_amazon_status), Region: opt($media_amazon_region), Type: opt($media_amazon_type)},
-    Reddit: {Status: opt($media_reddit_status), Region: opt($media_reddit_region), Type: opt($media_reddit_type)},
-    ChatGPT: {Status: opt($media_chatgpt_status), Region: opt($media_chatgpt_region), Type: opt($media_chatgpt_type)}
-  },
   Mail: ({Port25: boolnull($mail_port25)} + $mail_services + {
     DNSBlacklist: {
       Total: intnull($dns_total), Clean: intnull($dns_clean), Marked: intnull($dns_marked),
@@ -3007,7 +2533,6 @@ ipjson='{
       "Ping0": {},
       "Routing": {},
       "Exposure": {},
-      "Media": {},
       "Mail": {}
     }'
 [[ $2 -eq 4 ]]&&hide_ipv4 $IP
@@ -3028,14 +2553,6 @@ db_ping0 $2
 db_ripestat $2
 db_shodan_internetdb $2
 fi
-if scope_includes media-ai;then
-MediaUnlockTest_TikTok $2
-MediaUnlockTest_Netflix $2
-MediaUnlockTest_YouTube_Premium $2
-MediaUnlockTest_PrimeVideo_Region $2
-MediaUnlockTest_Reddit $2
-OpenAITest $2
-fi
 scope_includes mail&&check_mail
 if scope_includes dnsbl&&[[ $2 -eq 4 ]];then
 check_dnsbl "$IP" "$dnsbl_concurrency"
@@ -3055,7 +2572,6 @@ show_factor
 show_network_context
 show_unavailable_sources
 fi
-scope_includes media-ai&&show_media
 scope_includes mail&&show_mail $2
 scope_includes dnsbl&&[[ $2 -eq 4 ]]&&show_dnsbl
 show_tail

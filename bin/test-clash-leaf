@@ -65,13 +65,13 @@ module IpQuality
       end
 
       if @direct
-        configure_comprehensive_direct_route!
+        configure_direct_route!
         return run_direct_route
       end
 
       source = load_selected_source
       if source == :direct
-        configure_comprehensive_direct_route!
+        configure_direct_route!
         return run_direct_route
       end
       if source == :specific_ip
@@ -138,12 +138,11 @@ module IpQuality
             test-clash-leaf --subscription NAME --list-leaves
             test-clash-leaf --profile PATH --leaf NAME --config-test-only
 
-          By default, choose one comprehensive direct report or one cached remote
+          By default, choose one direct reputation report or one cached remote
           Clash Verge subscription. The menu also accepts one specific public
           target IP. A subscription route then asks for one exact inline leaf.
-          The direct report combines reputation, media/AI, mail connectivity, and
-          DNSBL observations over the current system IPv4 route. Specific-IP
-          lookups remain reputation-only. Direct and specific-IP lookups remove
+          Direct, specific-IP and leaf routes all measure IP reputation.
+          The default direct route is IPv4; -6 selects IPv6. Direct and specific-IP lookups remove
           proxy environment variables. A leaf is copied into a temporary
           127.0.0.1-only Mihomo process. The active Clash profile is never used or
           changed.
@@ -151,7 +150,7 @@ module IpQuality
         options.on("--list-subscriptions", "List cached remote subscription names without network access") { @list_subscriptions = true }
         options.on("--list-leaves", "List exact inline leaf names without network access") { @list_leaves = true }
         options.on("--select", "Compatibility flag; interactive selection is now the default") { nil }
-        options.on("--direct", "Run the comprehensive report over the current system IPv4 route") { @direct = true }
+        options.on("--direct", "Run the reputation report over the current system route (default IPv4)") { @direct = true }
         options.on("--subscription NAME", "Select one cached remote subscription by exact display name") { |value| @subscription_name = value }
         options.on("--leaf NAME", "Select one exact leaf name non-interactively") { |value| @leaf_name = value }
         options.on("--profile PATH", "Use an explicit local profile instead of a cached subscription") { |value| @profile_path = value }
@@ -237,7 +236,7 @@ module IpQuality
 
     def print_route_list(entries)
       @stdout.puts "Available test routes:"
-      @stdout.puts "  1  Direct comprehensive report (reputation + media/AI + mail + DNSBL; system IPv4 route)"
+      @stdout.puts "  1  Direct IP reputation report (system IPv4 route)"
       @stdout.puts "  2  Specific IP lookup (enter one public target; current system route)"
       entries.each_with_index do |entry, index|
         @stdout.printf("%3d  Cached subscription: %s\n", index + 3, entry.name)
@@ -338,23 +337,19 @@ module IpQuality
         @stdout.puts "  start gate: add --confirm-network-lookup"
         return
       end
-      @stdout.puts "Comprehensive direct route plan (no network access has occurred)"
-      @stdout.puts "  route: current system IPv4 route with inherited proxy environment removed"
+      @stdout.puts "Direct reputation route plan (no network access has occurred)"
+      @stdout.puts "  route: current system IPv#{@family == "-6" ? "6" : "4"} route with inherited proxy environment removed"
       @stdout.puts "  live Clash profile/selection: read only and unchanged"
       @stdout.puts "  runtime: reporter only; no temporary Mihomo process"
-      @stdout.puts "  reporter scope: reputation + media/AI + mail connectivity + DNSBL"
-      @stdout.puts "  mail: outbound TCP/25 and public MX greeting probes"
-      @stdout.puts "  DNSBL: every vendored zone is queried with bounded concurrency"
+      @stdout.puts "  reporter scope: reputation only"
       @stdout.puts "  measurement boundary: current system route only; no subscription leaf is claimed"
       @stdout.puts "  note: an active system-level VPN or TUN can still influence the system route"
       @stdout.puts "  start gate: add --confirm-network-lookup"
     end
 
-    def configure_comprehensive_direct_route!
-      raise OptionParser::InvalidArgument, "the comprehensive direct report requires IPv4" if @family == "-6"
-
+    def configure_direct_route!
       @family ||= "-4"
-      @route_scope = "full"
+      @route_scope = "reputation"
     end
 
     def run_direct_route
@@ -366,13 +361,13 @@ module IpQuality
       if @specific_ip
         @stderr.puts "[route-runner] Inspecting specific IP #{@specific_ip} through provider target parameters over the current system route; no Mihomo process is started."
       else
-        @stderr.puts "[route-runner] Testing the comprehensive direct report through the current system IPv4 route; no Mihomo process is started."
+        @stderr.puts "[route-runner] Testing IP reputation through the current system IPv#{@family == "-6" ? "6" : "4"} route; no Mihomo process is started."
       end
       result = run_reporter(NetworkEnvironment.without_proxy_variables, reporter_command)
       if @specific_ip
         @stderr.puts "[route-runner] Specific-IP report finished; live Clash state was unchanged."
       else
-        @stderr.puts "[route-runner] Comprehensive direct report finished; live Clash state was unchanged."
+        @stderr.puts "[route-runner] Direct reputation report finished; live Clash state was unchanged."
       end
       return 0 if result.success?
 

@@ -8,11 +8,11 @@ class IpQualityTest < ReporterTestCase
 
     assert status.success?, stderr
     assert_includes stdout, "no network access has occurred"
-    assert_includes stdout, "scope: full"
+    assert_includes stdout, "scope: reputation"
     assert_includes stdout, "reputation sources:"
-    assert_includes stdout, "media/AI sources:"
-    assert_includes stdout, "mail sources:"
-    assert_includes stdout, "DNSBL sources:"
+    refute_includes stdout, "media/AI sources:"
+    refute_includes stdout, "mail sources:"
+    refute_includes stdout, "DNSBL sources:"
     assert_includes stdout, "telemetry/report upload/remote code: disabled"
     assert_includes stdout, "--confirm-network-lookup"
     assert_empty stderr
@@ -22,7 +22,6 @@ class IpQualityTest < ReporterTestCase
     {
       "reputation" => "reputation sources:",
       "dnsbl" => "DNSBL sources:",
-      "media-ai" => "media/AI sources:",
       "mail" => "mail sources:"
     }.each do |scope, marker|
       stdout, stderr, status = run_script("--scope", scope)
@@ -75,24 +74,16 @@ class IpQualityTest < ReporterTestCase
     assert_empty stderr
   end
 
-  def test_chatgpt_trace_region_accepts_only_a_standalone_two_letter_loc_line
-    function_source = reporter_functions("media_trace_country_code")
-    probe = <<~'ZSH'
-      eval "$1"
-      good=$(media_trace_country_code $'fl=on\nloc=us\ned=on') || exit 1
-      print -r -- "$good"
-      media_trace_country_code '<script>loc=us</script>' && exit 2
-      media_trace_country_code 'loc=usa' && exit 3
-      :
-    ZSH
-    stdout, stderr, status = Open3.capture3(
-      "/bin/zsh", "-f", "-c", probe,
-      "chatgpt-trace-region-test", function_source
-    )
-    assert status.success?, stderr
-    assert_equal "US\n", stdout
-    assert_empty stderr
-  end
+def test_full_scope_keeps_optional_mail_and_dnsbl_but_rejects_retired_media
+  stdout, stderr, status = run_script("--scope", "full")
+  assert status.success?, stderr
+  assert_includes stdout, "mail sources:"
+  assert_includes stdout, "DNSBL sources:"
+  refute_includes stdout, "media/AI"
+  _stdout, stderr, status = run_script("--scope", "media-ai")
+  assert_equal 64, status.exitstatus
+  assert_includes stderr, "unsupported scope"
+end
 
   def test_concurrency_is_hard_bounded
     %w[0 51 nope].each do |value|

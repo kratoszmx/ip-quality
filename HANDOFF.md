@@ -1,115 +1,97 @@
 # Current handoff
 
-## Current IPQS live recheck — 2026-09-22
+## 2026-09-22 reputation-only default and provider ownership
 
-The official IPQS path is currently usable again. A bounded
-`--confirm-network-lookup --scope reputation -4 -j` run completed the account
-preflight and official lookup, returning `ProviderStatus.IPQS=ok`,
-`Type.Source.IPQS=official_api`, and IPQS fraud score **100**. The sanitized
-IPQS MCP account probe independently returned `authenticated`. This supersedes
-the older zero-credit observation as the current availability result while
-preserving that earlier restriction evidence in the historical handoff below.
+Worktree: /Users/zmx/Projects/projects/ipquality, branch main, reporter
+v2026-09-22-standalone.18. The raw reporter and all route-menu choices now use
+reputation by default. Media/AI unlock probes and the Media JSON section were
+removed. Optional raw-reporter mail, dnsbl, mail-dnsbl and full scopes remain;
+full means reputation + mail + DNSBL. Exact-node requests still use an isolated
+Mihomo and never change live Clash configuration.
 
-The complete fixture-only suite passed 81 runs / 1,184 assertions. The live
-check itself ran against clean commit `114ba6c`; the provider expansion below
-is the subsequent source change. No credential, Clash state, or persistent
-report was changed by the live check.
+A bare invocation remains a disclosure plan. The interactive live entrypoint is:
 
-Last documentation and offline validation: 2026-09-22, Asia/Shanghai.
+    /usr/bin/ruby --disable-gems bin/test-clash-leaf --confirm-network-lookup
 
-## Provider context expansion — 2026-09-22
+The project-local common Ruby/zsh APIs remain in common/ and are documented in
+[COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md). No old forwarding entrypoint remains.
 
-The reputation route now includes two independently reported context sources.
-The no-key `ipwho.is` free endpoint contributes country, ASN, organization, ISP,
-and timezone data; its missing paid security fields stay unknown. `ipapi.is`
-anonymous lookups remain supported at 100 per client IPv4/IPv6 `/64` per UTC
-day; an optional free-account `IPAPI_API_KEY` raises that to 1,000/day and
-restores its complete risk response. Cloudflare
-Security Center IP Intelligence is available when `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID` are supplied through the private credential workflow;
-its ASN infrastructure and named threat categories remain outside the score and
-factor matrices. Cloudflare documents 100 Threat Intelligence API calls per
-month on Free, Pro, and Business plans, while ipwho.is documents 1,000 free
-requests per client IP per day. The report does not estimate remaining quota.
+## Real report evidence
 
-The similarly named `ipapi.co` was reviewed but not silently added: it is a
-different contact-gated free-trial product. This project already uses the
-upstream-listed no-key `ipapi.is` source and keeps that identity explicit.
+A masked direct reputation report on 2026-09-22 completed in **19.5 seconds**,
+exit 0, with **zero jq diagnostics**. All ten entries in ProviderStatus returned
+ok, including IPQS, ipapi, IPWhois and Cloudflare. IPQS used official_api after
+its credit preflight. ipapi was the anonymous context tier; it supplied no risk
+flags. Cloudflare supplied ASN/organization/infrastructure context and no threat
+categories, which remain null. This timing describes that direct run only.
 
-The ipapi.is adapter also accepts the documented anonymous flat response and
-keeps its ASN/ownership/geography as context without manufacturing risk fields.
-It classifies the documented anonymous-quota `429` as `http_429` instead of
-parsing the error body as a successful result.
+The private, ignored local report is reports/validation-20260922-195035.json.
+Its Mail fields are null compatibility fields; no SMTP/DNSBL probes ran.
+The report has no Media section. No report was uploaded.
 
-## Current state
+## Provider setup
 
-- Worktree: `/Users/zmx/Projects/projects/ipquality`; branch: `main`.
-- Reporter version: `v2026-09-22-standalone.17`.
-- Primary/upstream: `github-kratoszmx/main` at `https://github.com/kratoszmx/ip-quality.git`.
-- Backup: `github-kratosbackup` at `https://github.com/kratosbackup/ipquality.git`.
+- ipapi.is: free account registration was rejected on the existing proxy,
+  direct route, and explicitly authorized isolated ATT route. All returned the
+  same connection-policy message; no account/key is confirmed and no 2FA was
+  created. Existing anonymous queries work. The documented free key would enable
+  the full response and 1,000/day; anonymous access is 100/day per client route.
+- ipwho.is: the no-key endpoint works and appears in the report. Its documented
+  1,000/day allowance provides network/geography context, without free security
+  fields. No account or 2FA is needed.
+- Cloudflare: the new free account and email verification succeeded. An
+  account-scoped Intel Read token is saved privately and the official IP
+  Intelligence API returned useful data. The documented free allowance is 100
+  Threat Intelligence calls/month; the program does not invent remaining quota.
+  API availability was established before starting TOTP setup. Current enrollment
+  evidence is maintained in [the account MCP guide](mcp/provider-accounts/AGENTS.md).
 
-These are the only configured remotes. Authenticated reads reached both on
-2026-09-16 using their account-specific private credential files and the existing
-HTTP proxy at `127.0.0.1:7897` through command-scoped Git settings. Local tracking
-refs alone do not establish remote synchronization.
+Cloudflare TOTP enrollment, server-side enabled status, and a fresh independent
+password/TOTP login all succeeded. Eight initial recovery codes and the seed are
+stored privately. The fresh Chrome profile and both owned setup browsers were
+closed after verification; the retained account profile remains on disk. No
+ipapi 2FA was created. The new-login six-cell widget automatically submitted a
+complete code, so a missing later Verify button was checked as a possible
+successful navigation rather than triggering another authentication attempt.
 
-The shared-library refactor is complete: production helpers live in `common/`,
-and `bin/test-clash-leaf` is now the Ruby command itself. Execute it directly or
-with `/usr/bin/ruby --disable-gems`; older zsh runner commands are obsolete.
-The reporter and test-suite entrypoints remain zsh. Former forwarding files and
-shared-library paths have been removed; no compatibility layer remains.
+A live Cloudflare response exposed a schema difference: belongs_to_ref.value was
+an integer ASN while the documentation showed a string. The parser accepts a
+bounded numeric ASN and renders AS<number>. Missing risk_types stays unknown,
+including a null threat_summary; an explicitly empty risk array remains [].
+The corresponding sanitized fixture and regression are in test/fixtures/cloudflare
+and test/providers_test.rb. Category names containing commas remain whole JSON
+strings. Context IP fields follow the same masking as Head.IP.
 
-The test-maintenance pass split the reporter tests into CLI, provider, report,
-and repository suites with a small shared fixture helper. The canonical runner
-discovers top-level suites and reports one aggregate result. Reporter CLI tests
-use temporary source copies, isolated credential paths, and network-command
-tripwires; source checks exclude private/user-generated directories. Behavioral
-checks now cover report-file safety/formats, DNSBL resolver-policy errors,
-missing dependencies, zero-credit lookup prevention, exact-leaf proxy forwarding,
-and malformed YAML. Existing route/signal cleanup checks remain.
+Anonymous ipapi responses cannot populate risk flags, even when unexpected
+boolean fields are present. Mixed flat/nested schemas fail explicitly. All three
+new sources have visible status lines and credential/tier explanations.
 
-The follow-up audit fixed a lifecycle-test isolation gap: success and signal
-cases share a child-process launcher that supplies an explicit private
-`temp_parent`. Both check the workspace path actually received by fake Mihomo,
-so an empty but unused fixture directory cannot produce a false cleanup pass.
+## MCP migration
 
-The 2026-09-21 live-log follow-up isolated two report defects. The ipapi.is
-response had scalar `asn`/`company` sections, so direct child-field jq reads
-emitted diagnostics; its adapter now recognizes the documented anonymous form,
-keeps its context, and marks malformed/error bodies unavailable without leaking
-parser errors. ChatGPT's Cloudflare trace
-region now accepts only a standalone two-letter `loc=XX` line, preventing page
-script text from appearing as a fake region. Exact cached-leaf routes remain
-`reputation` only; the direct route remains the comprehensive `full` scope.
+The entire former mcps/security/ipqs-mcp package, including its private Chrome
+profile and support receipts, now lives in mcp/ipqs. It reads the same flat
+secrets/ipqs file as the reporter; the redundant old key and package directory
+were removed. Shared JavaScript helpers remain direct dependencies on the sibling
+mcps/common/shared packages. The mcps manifest, account probes and Supervisor
+API/test paths now point to this owner. No live Codex configuration was edited.
 
-[TESTING.md](TESTING.md) owns prerequisites, focused commands, and test boundaries.
-API contracts remain in [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md), process
-ownership in [SERVICES.md](SERVICES.md), and usage in [AGENTS.md](AGENTS.md).
-There is no project-specific skill or nested project documentation. This follow-up
-changed the reporter/provider parser, tests, and contract documentation; no
-credentials or live Clash state were changed.
+The migrated official account probe returned authenticated, the relocated browser
+auth check returned authenticated, and the real reporter completed its official
+IPQS lookup. API credits and browser authentication remain separate evidence.
+The provider-account MCP is in mcp/provider-accounts; it keeps account selectors,
+free-plan policy, one-submit receipts and private credential handling local.
 
-## Validation evidence
+## Validation and Git
 
-The complete fixture-only suite passed 81 runs / 1,184 assertions, with zero
-failures, errors, or skips (seed 39163). All Ruby and zsh source/test files
-passed syntax checks; local documentation file links and `git diff --check`
-also passed. The included self-test validated all 422 vendored DNSBL entries.
-A child-only mutation disabling workspace removal failed the actual-workspace
-assertion as expected, confirming the cleanup check detects that regression.
+[TESTING.md](TESTING.md) owns complete/focused commands. The complete entrypoint
+runs reporter fixtures plus both owned MCP packages without provider requests.
+The complete check passed **84 reporter tests / 1,216 assertions**, **22 IPQS
+tests**, and **18 provider-account tests**, with no failures. The reporter's
+self-test covers the missing-threat JSON value as well as the 422 vendored DNSBL
+entries. Parent mcps manifest validation and 13 authentication-probe tests passed;
+Supervisor's focused migration/IPQS tests passed all 40 cases.
 
-Canonical checks from the worktree root:
-
-```text
-/bin/zsh -f scripts/test-offline
-git diff --check
-```
-
-Focused suites are in [TESTING.md](TESTING.md); plan/help commands are in
-[AGENTS.md](AGENTS.md). Coverage
-includes provider failure independence, private credentials, typed/masked
-output, DNSBL bounds/results, SMTP behavior, shared text and snapshot contracts,
-proxy removal, exact-leaf dependencies, listener ownership, and signal cleanup.
-Tests use fixtures and fake processes; no live provider, external DNS, mail,
-paid-route, or real-node measurement was performed. Git remote checks are
-separate from those measurement boundaries.
+The configured GitHub destinations are kratoszmx/ip-quality (the existing remote
+name) and kratosbackup/ipquality. Fresh authenticated API reads confirmed access
+to the former; kratoszmx/ipquality returned 404. The local worktree is correctly
+named ipquality. No GitHub repository was renamed or created.

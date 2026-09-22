@@ -430,6 +430,15 @@ fi
 
 show_network_context(){
 typeset -a observations
+if [[ "$YY" == "cn" ]];then
+observations+=("来源状态：ipapi.is=$(report_score_source_status official "${ipapi[status]:-unknown}") | ipwhois=$(report_score_source_status official "${ipwhois[status]:-unknown}") | Cloudflare=$(report_score_source_status official "${cloudflare[status]:-not_configured}")")
+[[ "${ipapi[mode]:-}" == "anonymous" ]]&&observations+=("ipapi.is 匿名接口仅提供地理与归属信息；免费 API key 可启用代理、VPN 和滥用判断。")
+[[ "${cloudflare[status]:-not_configured}" == "not_configured" ]]&&observations+=("Cloudflare 尚未配置：需要账号 ID 和具有 Intel Read 权限的 API token。")
+else
+observations+=("Source status: ipapi.is=$(report_score_source_status official "${ipapi[status]:-unknown}") | ipwhois=$(report_score_source_status official "${ipwhois[status]:-unknown}") | Cloudflare=$(report_score_source_status official "${cloudflare[status]:-not_configured}")")
+[[ "${ipapi[mode]:-}" == "anonymous" ]]&&observations+=("ipapi.is anonymous access provides geo/ownership only; a free API key enables proxy, VPN and abuse flags.")
+[[ "${cloudflare[status]:-not_configured}" == "not_configured" ]]&&observations+=("Cloudflare is not configured: an account ID and an Intel Read API token are required.")
+fi
 typeset displayed_prefix="${ripestat[prefix]}"
 if [[ ${fullIP:-0} -ne 1 && -n "$displayed_prefix" ]];then
 displayed_prefix=$(mask_network_prefix "$displayed_prefix")||displayed_prefix=""

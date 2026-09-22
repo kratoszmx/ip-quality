@@ -5,10 +5,11 @@ repository. Load the needed file directly; there is no forwarding layer or
 compatibility copy at the former paths. Loading these modules performs no
 network access, credential read, or environment mutation.
 
-Runtime dependencies remain zsh and system Ruby. `provider_json_is_object`
+Reporter runtime dependencies remain zsh and system Ruby. `provider_json_is_object`
 uses the existing `jq` dependency; terminal text cleanup uses system `sed`.
 The public APIs in `/Users/zmx/Projects/myutils` are Python imports, so none can
-be reused directly within this runtime without adding a new dependency.
+be reused directly within this runtime without adding a new dependency. The
+separately owned Node account MCPs reuse the existing mcps JavaScript library.
 
 ## File and caller map
 
@@ -116,6 +117,33 @@ case-insensitively. Ruby's process APIs interpret those values as removals.
 Other variables are omitted from the override Hash; the input and parent
 environment are unchanged. Isolated routes add their verified loopback proxy
 values to this Hash. This helper does not change system VPN/TUN routing.
+
+## Account MCP shared APIs
+
+`mcp/ipqs` and `mcp/provider-accounts` reference the sibling repository
+`/Users/zmx/Projects/mcps/common/shared` through direct local package dependencies.
+They do not copy those implementations or leave forwarding packages in mcps.
+
+| Shared package | Callers and use |
+| --- | --- |
+| `browser-session` | Both MCPs: dedicated Chrome lifecycle, verified profile binding, operation leases |
+| `secret-file` | Both MCPs: inspect/read/write private data-only files; reporter and IPQS share `secrets/ipqs` |
+| `mcp-server` | Both MCPs: tool descriptions and structured text results |
+| `one-use-token` | IPQS: prepared setting-change reservation and expiry |
+| `http-read` | Provider accounts: bounded API reads with no redirects or automatic retries |
+| `totp` | Cloudflare account setup: validate a textual provisioning URI and generate a short-lived RFC 6238 code |
+
+Provider origins, form selectors, account identity, API contracts and registration
+receipts remain inside their owning MCP. Shared helpers do not decide whether an
+account is usable. A successful free API lookup is required before 2FA setup.
+
+Inside `mcp/provider-accounts`, `accounts.mjs::withSession` owns the shared
+provider profile binding and lease, `privateAccount` validates saved identities,
+and `proxyServer` validates a task-scoped browser/API proxy. `cloudflare.mjs`
+owns its fixed account paths, server identity check and token policy; its TOTP
+consumer reuses these directly. `cloudflare-policy.mjs` contains fixture-testable
+identity, token scope, response and API-before-MFA decisions. MCP action entrypoints
+return metadata only; secrets stay inside their private-file and HTTP/form calls.
 
 ## Validation and maintenance
 

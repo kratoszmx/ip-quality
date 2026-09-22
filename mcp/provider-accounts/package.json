@@ -1,0 +1,24 @@
+{
+  "name": "ipquality-provider-accounts-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.5"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "check": "npm test"
+  },
+  "dependencies": {
+    "@codex-mcp/shared-totp": "file:../../../../mcps/common/shared/totp",
+    "@codex-mcp/shared-browser-session": "file:../../../../mcps/common/shared/browser-session",
+    "@codex-mcp/shared-mcp-server": "file:../../../../mcps/common/shared/mcp-server",
+    "@codex-mcp/shared-secret-file": "file:../../../../mcps/common/shared/secret-file",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "playwright-core": "^1.61.1",
+    "zod": "^4.4.3",
+    "@codex-mcp/shared-http-read": "file:../../../../mcps/common/shared/http-read"
+  }
+}

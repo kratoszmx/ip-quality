@@ -7,3 +7,6 @@ secrets/
 *.tmp
 *.report.json
 *.report.txt
+node_modules/
+dist/
+.state/

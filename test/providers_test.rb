@@ -192,6 +192,33 @@ class ProvidersTest < ReporterTestCase
     assert_empty malformed_stderr
   end
 
+  def test_anonymous_ipapi_never_supplies_risk_flags_and_rejects_mixed_contracts
+    response = JSON.parse(File.read(IPAPI_ANONYMOUS_FIXTURE))
+    response["is_proxy"] = false
+    response["is_abuser"] = false
+    probe = <<~'ZSH'
+      source "$1"
+      ipapi_parse_response "$2" "198.51.100.23" || exit 1
+      print -r -- "${ipapi_parsed[mode]}|${ipapi_parsed[proxy]}|${ipapi_parsed[abuser]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "anonymous-flags", IPAPI_LIBRARY, JSON.generate(response))
+    assert status.success?, stderr
+    assert_equal "anonymous||\n", stdout
+    response["location"] = { "country_code" => "US" }
+    _stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "mixed-contract", IPAPI_LIBRARY, JSON.generate(response))
+    refute status.success?
+    assert_empty stderr
+  end
+
+  def test_cloudflare_category_names_preserve_commas_in_json
+    response = { "success" => true, "result" => [{ "ip" => "198.51.100.23", "risk_types" => [{ "name" => "Malware, command and control" }] }] }
+    probe = 'source "$1"; cloudflare_parse_response "$2" "198.51.100.23" || exit 1; print -r -- "${cloudflare_parsed[threat_categories_json]}"'
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "threat-categories", CLOUDFLARE_LIBRARY, JSON.generate(response))
+    assert status.success?, stderr
+    assert_equal ["Malware, command and control"], JSON.parse(stdout)
+    assert_empty stderr
+  end
+
   def test_ipapi_runtime_marks_schema_drift_unavailable_without_writing_jq_errors
     function_source = reporter_functions("db_ipapi")
     probe = <<~'ZSH'
@@ -358,6 +385,25 @@ class ProvidersTest < ReporterTestCase
     )
     refute malformed_status.success?
     assert_empty malformed_stderr
+  end
+
+  def test_cloudflare_numeric_asn_and_missing_threats_remain_useful_but_unknown
+    fixture = JSON.parse(File.read(File.join(File.dirname(CLOUDFLARE_FIXTURE), "numeric-asn.json")))
+    probe = 'source "$1"; cloudflare_parse_response "$2" "198.51.100.23" || exit 1; print -r -- "${cloudflare_parsed[network]}|${cloudflare_parsed[threat_categories_json]}"'
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "cloudflare-live-shape", CLOUDFLARE_LIBRARY, JSON.generate(fixture))
+    assert status.success?, stderr
+    assert_equal "AS64500|null\n", stdout
+    assert_empty stderr
+    fixture["result"][0]["risk_types"] = []
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "cloudflare-empty-risks", CLOUDFLARE_LIBRARY, JSON.generate(fixture))
+    assert status.success?, stderr
+    assert_equal "AS64500|[]\n", stdout
+    [-1, 1.5, 4294967296].each do |invalid_asn|
+      fixture["result"][0]["belongs_to_ref"]["value"] = invalid_asn
+      _stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "cloudflare-invalid-asn", CLOUDFLARE_LIBRARY, JSON.generate(fixture))
+      refute status.success?
+      assert_empty stderr
+    end
   end
 
   def test_ipwhois_runtime_classifies_valid_public_response

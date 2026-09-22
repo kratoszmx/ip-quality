@@ -3,16 +3,12 @@
 require_relative "support/reporter_test_case"
 
 class ReportTest < ReporterTestCase
-  def test_full_report_section_titles_follow_the_reputation_context_section
-    source = File.read(SCRIPT)
-
-    assert_includes source, 'smedia[title]="6. Accessibility check for media and AI services"'
-    assert_includes source, 'smail[title]="7. Email service availability and blacklist detection"'
-    assert_includes source, 'smedia[title]="六、流媒体及AI服务解锁检测"'
-    assert_includes source, 'smail[title]="七、邮局连通性及黑名单检测"'
-    refute_includes source, 'smedia[title]="五、流媒体及AI服务解锁检测"'
-    refute_includes source, 'smail[title]="六、邮局连通性及黑名单检测"'
-  end
+def test_optional_mail_section_follows_reputation_context
+  source = File.read(SCRIPT)
+  assert_includes source, 'smail[title]="6. Email service availability and blacklist detection"'
+  assert_includes source, 'smail[title]="六、邮局连通性及黑名单检测"'
+  refute_match(/MediaUnlockTest|OpenAITest|media_trace_country_code/, source)
+end
 
   def test_report_files_preserve_json_escapes_ansi_bytes_and_plain_layout
     value = "tab\tline\nterminal\e[31mred\e[0m"
@@ -257,8 +253,10 @@ class ReportTest < ReporterTestCase
     )
 
     assert status.success?, stderr
-    assert_equal 4, stdout.lines.length
+    assert_equal 6, stdout.lines.length
     assert_equal 1, stdout.scan("五、官方网络观测").length
+    assert_includes stdout, "Cloudflare 尚未配置"
+    assert_includes stdout, "ipwhois="
     assert_includes stdout, "Ping0：已核对"
     assert_includes stdout, "RIPEstat：状态=announced"
     assert_includes stdout, "Shodan：端口=22, 443"
@@ -292,7 +290,8 @@ class ReportTest < ReporterTestCase
     )
 
     assert status.success?, stderr
-    assert_equal 4, stdout.lines.length
+    assert_equal 6, stdout.lines.length
+    assert_includes stdout, "免费 API key 可启用"
     assert_includes stdout, "ipapi.is：匿名最小响应 | ASN=AS64500 Example ISP"
     assert_includes stdout, "ipwho.is：地区=US"
     assert_includes stdout, "Cloudflare IP Intelligence：地区=US"

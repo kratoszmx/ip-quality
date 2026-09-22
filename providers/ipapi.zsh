@@ -47,13 +47,13 @@ print -rn -- "$response"|jq -e --arg expected "$expected_ip" '
   def valid_ip:
     (.ip | type == "string" and length <= 128 and (contains("\u0000") | not));
   def valid_full_response:
-    valid_asn_object(.asn) and
+    .docs == null and valid_asn_object(.asn) and
     valid_company_object(.company) and
     valid_location(.location) and
     valid_boolean_fields and
     ((.asn | type) == "object" or (.company | type) == "object" or (.location | type) == "object");
   def valid_anonymous_response:
-    valid_ip and
+    valid_ip and .location == null and
     ((.asn == null) or text_or_null(.asn; 256) or integer_or_null(.asn)) and
     ((.company == null) or text_or_null(.company; 256)) and
     text_or_null(.city; 128) and
@@ -86,6 +86,10 @@ ipapi_parsed[anonymous_country]=$(print -rn -- "$response"|jq -r 'if (.country|t
 ipapi_parsed[anonymous_city]=$(print -rn -- "$response"|jq -r 'if (.city|type) == "string" then .city else empty end')
 ipapi_parsed[anonymous_region]=$(print -rn -- "$response"|jq -r 'if (.region|type) == "string" then .region else empty end')
 ipapi_parsed[anonymous_timezone]=$(print -rn -- "$response"|jq -r 'if (.timezone|type) == "string" then .timezone else empty end')
+if [[ "${ipapi_parsed[mode]}" == "anonymous" ]];then
+ipapi_parsed[status]="ok"
+return 0
+fi
 ipapi_parsed[proxy]=$(print -rn -- "$response"|jq -r 'if .is_proxy == null then empty else .is_proxy end')
 ipapi_parsed[tor]=$(print -rn -- "$response"|jq -r 'if .is_tor == null then empty else .is_tor end')
 ipapi_parsed[vpn]=$(print -rn -- "$response"|jq -r 'if .is_vpn == null then empty else .is_vpn end')
