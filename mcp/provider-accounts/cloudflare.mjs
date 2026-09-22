@@ -3,8 +3,8 @@ import { Agent } from 'node:https';
 import { requestHttpRead } from '@codex-mcp/shared-http-read';
 import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@codex-mcp/shared-secret-file';
 import { withLoopbackOperationLease, requestBinaryWithBrowserContext } from '@codex-mcp/shared-browser-session';
-import { SECRETS, withSession, privateAccount, proxyServer } from './accounts.mjs';
-import { assertAccountOrigin, validApiKey } from './policy.mjs';
+import { SECRETS, withSession, privateAccount } from './accounts.mjs';
+import { accountNetworkOptions, assertAccountOrigin, validApiKey } from './policy.mjs';
 import { cloudflareIdentity, cloudflareApiUsable, intelReadPolicy } from './cloudflare-policy.mjs';
 
 const ORIGIN = 'https://dash.cloudflare.com';
@@ -104,7 +104,7 @@ export async function verifyCloudflareApi(confirmation) {
   return withLoopbackOperationLease({ port: 19604 }, async () => {
     const key = await readPrivateSecretFile(keyPath, keyPolicy);
     const accountId = (await readPrivateSecretFile(accountPath, accountPolicy)).secret;
-    const proxy = proxyServer();
+    const proxy = accountNetworkOptions().proxyServer;
     const agent = new Agent({ proxyEnv: proxy ? { https_proxy: proxy } : {} });
     try {
       const response = await requestHttpRead({ url: `https://api.cloudflare.com/client/v4/accounts/${accountId}/intel/ip?ipv4=1.1.1.1`, headers: { Authorization: `Bearer ${key.secret}`, Accept: 'application/json' }, agent, maxBytes: 131072, timeoutMs: 15000, maxRedirects: 0 });

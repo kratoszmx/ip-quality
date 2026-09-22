@@ -2,11 +2,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { Agent } from 'node:https';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { chromium } from 'playwright-core';
 import { connectOrLaunchChromeOverCDP, ensurePrivateDirectoryStrict, verifyChromeProfileBinding, withLoopbackOperationLease } from '@codex-mcp/shared-browser-session';
 import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@codex-mcp/shared-secret-file';
 import { requestHttpRead } from '@codex-mcp/shared-http-read';
-import { providerConfig, accountUrl, accountPagePath, assertAccountOrigin, redactAccountText, classifyAccountPage, validApiKey, ipapiKeyAccepted } from './policy.mjs';
+import { providerConfig, accountUrl, accountPagePath, accountNetworkOptions, accountRouteMatches, assertAccountOrigin, redactAccountText, classifyAccountPage, ipapiDashboardAccepted, validApiKey, ipapiKeyAccepted } from './policy.mjs';
 import { submitReviewedSignup } from './signup.mjs';
 
 export const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -15,26 +17,29 @@ const secret = (provider, name) => path.join(SECRETS, 'accounts', providerConfig
 const keyFile = provider => path.join(SECRETS, provider === 'ipapi' ? 'ipapi' : 'cloudflare_token');
 const keyPolicy = { minBytes: 8, maxBytes: 256, validate: validApiKey };
 
-export function proxyServer() {
-  const value = process.env.PROVIDER_ACCOUNTS_PROXY || process.env.HTTPS_PROXY || process.env.https_proxy;
-  if (!value) return undefined;
-  const url = new URL(value);
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error('Invalid credential-free proxy URL.');
-  return value;
-}
-
 export async function withSession(provider, operation, { foreground = false } = {}) {
   const config = providerConfig(provider);
   return withLoopbackOperationLease({ port: config.port + 100 }, async () => {
     const profileDir = path.join(ROOT, '.state', provider);
     await ensurePrivateDirectoryStrict(profileDir);
+    const routing = accountNetworkOptions();
     const session = await connectOrLaunchChromeOverCDP(chromium, {
-      profileDir, cdpPort: config.port, proxyServer: proxyServer(), startUrl: 'about:blank',
+      profileDir, cdpPort: config.port, proxyServer: routing.proxyServer, extraArgs: routing.chromeArgs, startUrl: 'about:blank',
       background: !foreground, hidden: !foreground, detached: true, unref: true,
       preserveContextSettings: true, timeoutMs: 20_000, killLaunchedProcessOnClose: false,
     });
     try {
       await verifyChromeProfileBinding(session.browser, profileDir);
+      if (routing.proxyServer || routing.chromeArgs.length) {
+        const cdp = await session.browser.newBrowserCDPSession();
+        try {
+          const { processInfo } = await cdp.send('SystemInfo.getProcessInfo');
+          const processes = processInfo.filter(value => value.type === 'browser');
+          if (processes.length !== 1 || !Number.isSafeInteger(processes[0].id) || processes[0].id <= 0) throw new Error('Cannot verify account browser route.');
+          const { stdout } = await promisify(execFile)('/bin/ps', ['-ww', '-p', String(processes[0].id), '-o', 'command='], { timeout: 2000, maxBuffer: 262144 });
+          if (!accountRouteMatches(stdout, routing)) throw new Error('The retained account browser has a different route; close that owned browser before changing routes.');
+        } finally { await cdp.detach().catch(() => {}); }
+      }
       if (session.browser.contexts().length !== 1 || session.context.pages().length !== 1) throw new Error('Expected one dedicated account page.');
       if (foreground) await session.page.bringToFront();
       return await operation(session.page);
@@ -60,11 +65,17 @@ async function snapshot(provider, page, submitted = false) {
       tag: e.tagName.toLowerCase(), type: e.type, name: e.name.slice(0, 80),
       ...(e.tagName === 'BUTTON' ? { label: e.innerText.trim().slice(0, 80) } : {}),
     }));
-    return { text, controls, hasPassword: controls.some(e => e.type === 'password'), challenge };
+    const hasPassword = controls.some(e => e.type === 'password');
+    // ipapi's logout is an icon, with no visible "Sign out" text. Bind its
+    // server-rendered dashboard to the saved identity before importing a key.
+    const account = { url: location.href, email: document.querySelector('input[name="email"]')?.value,
+      logoutUrl: document.querySelector('a[href="/app/logout"]')?.href,
+      keyCount: [...document.querySelectorAll('input[name="key"]')].filter(visible).length, hasPassword };
+    return { text, controls, hasPassword, challenge, account };
   });
   const account = await privateAccount(provider).catch(() => null);
   return { provider, page: accountPagePath(provider, page.url()),
-    state: classifyAccountPage({ ...view, submitted }),
+    state: classifyAccountPage({ ...view, submitted, allowTextAuthentication: provider !== 'ipapi', authenticatedAccount: provider === 'ipapi' && ipapiDashboardAccepted(view.account, account?.email) }),
     text: /two.factor|2FA|recovery codes|authenticator|secret key/i.test(view.text)
       ? '[security values omitted; inspect value-free controls]' : redactAccountText(view.text, account ? [account.email, account.password] : []),
     controls: view.controls.map(e => ({ ...e, ...(e.label ? { label: redactAccountText(e.label) } : {}) })),
@@ -136,7 +147,7 @@ export async function importIpapiKey(confirmation) {
     if (keys.length !== 1) throw new Error('Expected one visible labelled API key.');
     const url = new URL('https://api.ipapi.is/');
     url.searchParams.set('q', '1.1.1.1'); url.searchParams.set('key', keys[0]);
-    const proxy = proxyServer();
+    const proxy = accountNetworkOptions().proxyServer;
     const agent = new Agent({ proxyEnv: proxy ? { https_proxy: proxy } : {} });
     try {
       const response = await requestHttpRead({ url: url.href, agent, maxBytes: 131072, timeoutMs: 15_000, maxRedirects: 0 });

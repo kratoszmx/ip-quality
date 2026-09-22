@@ -9,7 +9,7 @@ The reporter's accepted names and precedence are documented in
 | --- | --- |
 | Shared IPQS API key | `secrets/ipqs`, one raw key shared by reporter and `mcp/ipqs` |
 | Existing IPQS login | Fixed private two-line bundle under `/Users/zmx/codexworkspace/secrets/infrastructure/network/ipqs/`; discovered by `mcp/ipqs/src/credentials.ts` |
-| ipapi full API key | `secrets/ipapi`, optional raw key; currently not acquired |
+| ipapi full API key | `secrets/ipapi`, verified free-plan raw key shared by reporter and account MCP |
 | Cloudflare Intel token | `secrets/cloudflare_token`, one account-scoped Intel Read token |
 | Cloudflare account ID | `secrets/cloudflare_account_id`, 32 lowercase hexadecimal characters |
 | Registration identity | `secrets/accounts/registration-email`, the email confirmed by the user |

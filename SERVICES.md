@@ -32,6 +32,10 @@ only the owned browser receives `Browser.close`. Registration through a temporar
 ATT proxy closes the owned signup browser before the temporary Mihomo exits, so
 it cannot retain a dead proxy route. Loopback CDP traffic must remain direct;
 `PROVIDER_ACCOUNTS_PROXY` configures the account browser's external route.
+Use `PROVIDER_ACCOUNTS_PROXY=DIRECT` for explicit direct browser/API access;
+clearing environment variables alone leaves Chrome's macOS system proxy active.
+An existing browser with different routing arguments is rejected before account
+actions, and only its verified owner should close it before changing routes.
 
 There is no resident health endpoint or restart command. For a network-free
 check, run `/usr/bin/ruby --disable-gems bin/test-clash-leaf --direct` and

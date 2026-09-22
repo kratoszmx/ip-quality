@@ -30,6 +30,13 @@ changed account/key or stale proof stops before authenticator enrollment. Existi
 factors and different saved seeds/keys are preserved. Missing threat data remains
 unknown even when the network-context API is useful.
 
+ipapi's observed dashboard is /app/home. Its logout is an icon, so the account
+check uses the exact saved email, one visible labelled key and the same-origin
+logout link, without relying on visible "Sign out" text. Its current account
+page exposes no 2FA entry; the security surface therefore stops locally instead
+of navigating to a guessed settings path. An activation notice remains pending
+email verification even when a password form is present.
+
 Cloudflare account reads use the shared active-browser-context HTTP helper:
 one fixed GET to /api/v4/user, no redirects/retries, bounded body, exact saved-email
 comparison and suspended-account rejection. Browser-side fetch sometimes timed out
@@ -46,7 +53,11 @@ flat secrets/ipapi and secrets/cloudflare_token paths.
 
 Profiles are .state/ipapi and .state/cloudflare, bound to CDP 19503/19504 with
 exclusive operation leases at 19603/19604. PROVIDER_ACCOUNTS_PROXY chooses a
-credential-free HTTP proxy only for this package. Local CDP traffic stays direct;
+credential-free HTTP proxy only for this package. Set it to DIRECT for explicit
+direct access: Chrome receives --no-proxy-server and bypasses macOS system proxy
+preferences. The bound process's actual routing flags are verified before reuse;
+changing the requested route requires closing that owned browser first.
+Local CDP traffic stays direct;
 when launching a child through an isolated ATT session, pass its proxy with that
 variable and retain localhost in NO_PROXY. No live Clash setting changes.
 Browser shutdown verifies profile binding before Browser.close. The temporary
@@ -62,10 +73,14 @@ seeds, cookies, account IDs or verification URL tokens.
 
 ## Current evidence — 2026-09-22
 
-The user selected the existing IPQS email and Hong Kong. ipapi rejected the
-existing proxy, direct, and isolated vps+yyssr18 / ATT routes with the same
-connection-policy message. No ipapi account/key or 2FA is confirmed. Its anonymous
-API worked in the direct report. ipwho.is worked without registration.
+The user selected the existing IPQS email and Hong Kong. ipapi signup and email
+activation succeeded on verified explicit DIRECT. Earlier proxy/system-route and
+isolated vps+yyssr18 / ATT attempts were rejected. Clearing proxy environment
+variables alone had left Chrome using macOS system proxy preferences; the new
+direct flag and retained-process route check fix that bug. The dashboard confirms
+a 1,000/day free plan. The private key passed a full-response 1.1.1.1 API lookup
+and the reporter returned ipapi=ok / Mode=full. No 2FA entry was present on the
+account page, so no ipapi factor was created. ipwho.is worked without registration.
 
 Cloudflare free signup and email verification succeeded. The saved account token
 has only Intel Read for the configured account, with no expiration. The official
@@ -83,6 +98,6 @@ six-digit code. Inspect navigation/identity before clicking a Verify button that
 may already have disappeared. Both owned setup browsers and the temporary proof
 profile were closed/removed after validation; the normal account profile remains.
 
-Validation passed 18 offline tests plus the stdio contract within that count.
+Validation passed 22 offline tests plus the stdio contract within that count.
 The full repository command also passed 84 reporter tests / 1,216 assertions and
 22 IPQS tests. These fixture counts and the live account/API evidence are separate.

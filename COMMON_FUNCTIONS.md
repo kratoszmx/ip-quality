@@ -139,11 +139,19 @@ account is usable. A successful free API lookup is required before 2FA setup.
 
 Inside `mcp/provider-accounts`, `accounts.mjs::withSession` owns the shared
 provider profile binding and lease, `privateAccount` validates saved identities,
-and `proxyServer` validates a task-scoped browser/API proxy. `cloudflare.mjs`
+and `policy.mjs::accountNetworkOptions` validates a task-scoped browser/API route.
+Its explicit `DIRECT` mode emits Chrome's `--no-proxy-server`, overriding macOS
+system proxy preferences; `accountRouteMatches` checks the actual bound process
+before reusing it for an explicitly chosen route. `cloudflare.mjs`
 owns its fixed account paths, server identity check and token policy; its TOTP
 consumer reuses these directly. `cloudflare-policy.mjs` contains fixture-testable
 identity, token scope, response and API-before-MFA decisions. MCP action entrypoints
 return metadata only; secrets stay inside their private-file and HTTP/form calls.
+
+ipapi dashboard identity and full-key response validation remain provider-local
+pure policies. The observed icon-only logout is checked together with the saved
+email and labelled key; generic page text cannot substitute for that account
+evidence. No unverified security-page URL is exposed for ipapi.
 
 ## Validation and maintenance
 

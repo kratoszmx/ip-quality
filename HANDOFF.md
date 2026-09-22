@@ -11,31 +11,33 @@ Mihomo and never change live Clash configuration.
 
 A bare invocation remains a disclosure plan. The interactive live entrypoint is:
 
-    /usr/bin/ruby --disable-gems bin/test-clash-leaf --confirm-network-lookup
+    /usr/bin/ruby --disable-gems bin/test-clash-leaf --confirm-network-lookup -4
 
 The project-local common Ruby/zsh APIs remain in common/ and are documented in
 [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md). No old forwarding entrypoint remains.
 
 ## Real report evidence
 
-A masked direct reputation report on 2026-09-22 completed in **19.5 seconds**,
+A masked direct reputation report on 2026-09-22 completed in **19.0 seconds**,
 exit 0, with **zero jq diagnostics**. All ten entries in ProviderStatus returned
 ok, including IPQS, ipapi, IPWhois and Cloudflare. IPQS used official_api after
-its credit preflight. ipapi was the anonymous context tier; it supplied no risk
-flags. Cloudflare supplied ASN/organization/infrastructure context and no threat
+its credit preflight. ipapi used its new free key and returned **Mode=full**,
+including the type, score and risk-factor data. Cloudflare supplied
+ASN/organization/infrastructure context and no threat
 categories, which remain null. This timing describes that direct run only.
 
-The private, ignored local report is reports/validation-20260922-195035.json.
+The private, ignored local report is reports/validation-keyed-20260922-203808.json.
 Its Mail fields are null compatibility fields; no SMTP/DNSBL probes ran.
 The report has no Media section. No report was uploaded.
 
 ## Provider setup
 
-- ipapi.is: free account registration was rejected on the existing proxy,
-  direct route, and explicitly authorized isolated ATT route. All returned the
-  same connection-policy message; no account/key is confirmed and no 2FA was
-  created. Existing anonymous queries work. The documented free key would enable
-  the full response and 1,000/day; anonymous access is 100/day per client route.
+- ipapi.is: free signup and email activation succeeded over explicitly verified
+  direct Chrome access. The account uses the existing IPQS email and Hong Kong;
+  its dashboard confirms the free 1,000/day plan. The key passed a complete API
+  lookup and the real reporter returned Mode=full. The current account page has
+  no native 2FA entry; none was created. Anonymous access remains 100/day per
+  client route when no key is configured.
 - ipwho.is: the no-key endpoint works and appears in the report. Its documented
   1,000/day allowance provides network/geography context, without free security
   fields. No account or 2FA is needed.
@@ -53,6 +55,14 @@ closed after verification; the retained account profile remains on disk. No
 ipapi 2FA was created. The new-login six-cell widget automatically submitted a
 complete code, so a missing later Verify button was checked as a possible
 successful navigation rather than triggering another authentication attempt.
+
+The account browser's direct route needed a correction: clearing proxy environment
+variables did not bypass macOS's enabled system proxy. Explicit DIRECT now passes
+--no-proxy-server and verifies the bound Chrome process before reusing it. Prior
+system-route/proxy and isolated ATT attempts were rejected; the corrected direct
+attempt succeeded. The account parser also recognizes ipapi's activation notice
+and icon-only logout, and binds its actual /app/home dashboard to the saved email
+before importing a key. Regressions cover each of these cases.
 
 A live Cloudflare response exposed a schema difference: belongs_to_ref.value was
 an integer ASN while the documentation showed a string. The parser accepts a
@@ -86,7 +96,7 @@ free-plan policy, one-submit receipts and private credential handling local.
 [TESTING.md](TESTING.md) owns complete/focused commands. The complete entrypoint
 runs reporter fixtures plus both owned MCP packages without provider requests.
 The complete check passed **84 reporter tests / 1,216 assertions**, **22 IPQS
-tests**, and **18 provider-account tests**, with no failures. The reporter's
+tests**, and **22 provider-account tests**, with no failures. The reporter's
 self-test covers the missing-threat JSON value as well as the 422 vendored DNSBL
 entries. Parent mcps manifest validation and 13 authentication-probe tests passed;
 Supervisor's focused migration/IPQS tests passed all 40 cases.

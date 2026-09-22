@@ -25,6 +25,6 @@ export async function submitReviewedSignup(page, provider, account, country, res
   // Cloudflare submits asynchronously without a document load. Wait for a
   // changed route or a concrete outcome, never resubmit on an ambiguous timeout.
   await page.waitForFunction(initialPath => location.pathname !== initialPath ||
-    /could not complete your registration|verify (?:your )?email|check your inbox|already (?:registered|exists)|invalid|incorrect|unable to/i.test(document.body?.innerText || ''),
+    /could not complete your registration|verify (?:your )?email|check your inbox|activation link|activate your account|already (?:registered|exists)|invalid|incorrect|unable to/i.test(document.body?.innerText || ''),
   config.signup, { timeout: 15_000 }).catch(() => {});
 }

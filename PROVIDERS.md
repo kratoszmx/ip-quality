@@ -191,7 +191,7 @@ Threat Intelligence API calls per month on Free, Pro, and Business plans; calls
 made by other Security Center features also consume that monthly quota. The
 reporter does not attempt to estimate remaining provider quota.
 The similarly named `ipapi.co` is a different product with a contact-gated free
-trial. This project currently uses the no-key `ipapi.is` API listed above; the two
+trial. This project uses `ipapi.is`, with a free key when configured; the two
 providers must not be silently combined.
 
 ## Mail scope
