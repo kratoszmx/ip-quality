@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-09-22-standalone.18"
+script_version="v2026-09-24-standalone.19"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset COMMON_DIR="$SCRIPT_DIR/common"
@@ -20,6 +20,7 @@ typeset CREDENTIALS_LIB="$PROVIDER_DIR/credentials.zsh"
 typeset IPREGISTRY_LIB="$PROVIDER_DIR/ipregistry.zsh"
 typeset IPAPI_LIB="$PROVIDER_DIR/ipapi.zsh"
 typeset IPWHOIS_LIB="$PROVIDER_DIR/ipwhois.zsh"
+typeset DBIP_LIB="$PROVIDER_DIR/dbip.zsh"
 typeset CLOUDFLARE_LIB="$PROVIDER_DIR/cloudflare.zsh"
 typeset IPQUALITYSCORE_LIB="$PROVIDER_DIR/ipqualityscore.zsh"
 typeset PING0_LIB="$PROVIDER_DIR/ping0.zsh"
@@ -27,7 +28,7 @@ typeset RIPESTAT_LIB="$PROVIDER_DIR/ripestat.zsh"
 typeset INTERNETDB_LIB="$PROVIDER_DIR/shodan_internetdb.zsh"
 typeset REPUTATION_REPORT_LIB="$REPORT_DIR/reputation.zsh"
 typeset local_library
-for local_library in "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for local_library in "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$DBIP_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$local_library" && -r "$local_library" && ! -L "$local_library" ]]||{
 print -ru2 -- "ERROR: unsafe or missing local library: $local_library"
 exit 66
@@ -75,6 +76,7 @@ typeset -A scamalytics
 typeset -A ipregistry
 typeset -A ipapi
 typeset -A ipwhois
+typeset -A dbip
 typeset -A cloudflare
 typeset -A abuseipdb
 typeset -A ip2location
@@ -516,10 +518,10 @@ print -r -- "  scope: $query_scope"
 print -r -- "  DNSBL concurrency cap: $dnsbl_concurrency"
 print -r -- "  output: masked IP by default; local stdout/file only"
 print -r -- "  telemetry/report upload/remote code: disabled"
-scope_includes reputation&&print -r -- "  reputation sources: official-contract sources = ipapi.is, ipwho.is, Cloudflare IP Intelligence (when configured), Ping0, RIPEstat, Shodan InternetDB, plus configured Ipregistry/IPQS APIs"
+scope_includes reputation&&print -r -- "  reputation sources: official-contract sources = ipapi.is, ipwho.is, DB-IP free, Cloudflare IP Intelligence (when configured), Ping0, RIPEstat, Shodan InternetDB, plus configured Ipregistry/IPQS APIs"
 scope_includes reputation&&print -r -- "  supplementary sources: IPinfo public demo widget plus named Check.Place relays (MaxMind-labeled, Scamalytics, AbuseIPDB, IP2Location, ipdata, IPQualityScore)"
 scope_includes reputation&&print -r -- "  Ping0 limitation: the official free /geo endpoint exposes IP/location/ASN/organization, not a risk score"
-scope_includes reputation&&print -r -- "  context-only sources: ipwho.is reports geo/network/timezone; Cloudflare reports ASN infrastructure/threat categories; RIPEstat reports routing; Shodan InternetDB reports public exposure"
+scope_includes reputation&&print -r -- "  context-only sources: ipwho.is reports geo/network/timezone; DB-IP free reports geography (500 requests/day, no security fields); Cloudflare reports ASN infrastructure/threat categories, not a numeric score; RIPEstat reports routing; Shodan InternetDB reports public exposure"
 scope_includes mail&&print -r -- "  mail sources: public MX DNS plus bounded SMTP greeting probes"
 scope_includes dnsbl&&print -r -- "  DNSBL sources: vendored $DNSBL_FILE (up to $dnsbl_concurrency concurrent DNS lookups)"
 print -r -- ""
@@ -773,6 +775,7 @@ ipregistry=()
 ipapi=()
 ipwhois=()
 cloudflare=()
+dbip=()
 ip2location=()
 abuseipdb=()
 scamalytics=()
@@ -811,6 +814,8 @@ ipwhois[asn]="64500"
 ipwhois[org]="Example Network"
 ipwhois[isp]="Example ISP"
 ipwhois[timezone]="America/Los_Angeles"
+dbip[status]="ok" dbip[ip]="198.51.100.23" dbip[countrycode]="US"
+dbip[country]="United States" dbip[region]="California" dbip[city]="Example City"
 cloudflare[status]="ok"
 cloudflare[ip]="198.51.100.23"
 cloudflare[countrycode]="US"
@@ -864,6 +869,14 @@ print -r -- "$ipjson"|jq -e --arg expected "$json_special" '
   .ProviderStatus.ipdata == "network_error" and
   .ProviderStatus.IPWhois == "ok" and
   .ProviderStatus.Cloudflare == "ok" and
+  .ProviderStatus.DBIP == "ok" and
+  .ProviderContext.DBIP.IP == .Head.IP and
+  .ProviderContext.DBIP.City == "Example City" and
+  .Score.Cloudflare == null and .Score.DBIP == null and
+  .ScoreMeta.Cloudflare.Reason == "numeric_score_not_provided" and
+  .ScoreMeta.DBIP.Reason == "free_tier_geography_only" and
+  .Factor.CountryCode.IPWhois == "US" and .Factor.Proxy.IPWhois == null and
+  .FactorMeta.IPWhois.Reason == "free_tier_security_not_provided" and
   .ProviderContext.IPAPI.Mode == "full" and
   .ProviderContext.IPAPI.IP == .Head.IP and
   .ProviderContext.Cloudflare.IP == .Head.IP and
@@ -1464,6 +1477,25 @@ ipwhois[isp]="${ipwhois_parsed[isp]}"
 ipwhois[timezone]="${ipwhois_parsed[timezone]}"
 else
 ipwhois[status]="invalid_response"
+fi
+}
+db_dbip(){
+local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}DB-IP free API $Font_Suffix"
+((ibar_step+=3))
+show_progress_bar "$temp_info" $((40-9-${sinfo[ldatabase]}))
+dbip=()
+provider_fetch_public_json "$1" "https://api.db-ip.com/v2/free/$IP" 65536||true
+dbip[status]="$PROVIDER_RESPONSE_STATUS"
+[[ "${dbip[status]}" == "ok" ]]||return 0
+if dbip_parse_response "$PROVIDER_RESPONSE_BODY" "$IP";then
+dbip[source]="public_api"
+dbip[ip]="${dbip_parsed[ip]}"
+dbip[countrycode]="${dbip_parsed[country_code]}"
+dbip[country]="${dbip_parsed[country]}"
+dbip[region]="${dbip_parsed[region]}"
+dbip[city]="${dbip_parsed[city]}"
+else
+dbip[status]="invalid_response"
 fi
 }
 db_cloudflare(){
@@ -2350,6 +2382,9 @@ ipjson=$(jq -n \
 --arg ipapi_country "${ipapi[anonymous_country]:-}" --arg ipapi_city "${ipapi[anonymous_city]:-}" \
 --arg ipapi_region "${ipapi[anonymous_region]:-}" --arg ipapi_timezone "${ipapi[anonymous_timezone]:-}" \
 --arg status_ipwhois "${ipwhois[status]:-unknown}" \
+--arg status_dbip "${dbip[status]:-unknown}" --arg dbip_ip "${dbip[ip]:+$displayed_ip}" \
+--arg dbip_countrycode "${dbip[countrycode]:-}" --arg dbip_country "${dbip[country]:-}" \
+--arg dbip_region "${dbip[region]:-}" --arg dbip_city "${dbip[city]:-}" \
 --arg ipwhois_countrycode "${ipwhois[countrycode]:-}" \
 --arg ipwhois_asn "${ipwhois[asn]:-}" --arg ipwhois_org "${ipwhois[org]:-}" \
 --arg ipwhois_isp "${ipwhois[isp]:-}" --arg ipwhois_timezone "${ipwhois[timezone]:-}" \
@@ -2440,13 +2475,15 @@ def dnsresults($value):
     Usage: {IPinfo: opt($type_ipinfo_usage), Ipregistry: opt($type_ipregistry_usage), IPQS: opt($type_ipqs_usage), ipapi: opt($type_ipapi_usage), IP2LOCATION: opt($type_ip2_usage), AbuseIPDB: opt($type_abuse_usage)},
     Company: {IPinfo: opt($type_ipinfo_company), Ipregistry: opt($type_ipregistry_company), IPQS: null, ipapi: opt($type_ipapi_company), IP2LOCATION: opt($type_ip2_company), AbuseIPDB: null}
   },
-  Score: {IP2LOCATION: opt($score_ip2), SCAMALYTICS: opt($score_scam), ipapi: opt($score_ipapi), AbuseIPDB: opt($score_abuse), IPQS: opt($score_ipqs)},
+  Score: {IP2LOCATION: opt($score_ip2), SCAMALYTICS: opt($score_scam), ipapi: opt($score_ipapi), AbuseIPDB: opt($score_abuse), IPQS: opt($score_ipqs), Cloudflare: null, DBIP: null},
   ScoreMeta: {
     IP2LOCATION: {Band: opt($band_ip2), Scale: "0-99 potential risk"},
     SCAMALYTICS: {Band: opt($band_scam), Scale: "0-100 fraud"},
     ipapi: {Band: opt($band_ipapi), Scale: "0-100% abuse"},
     AbuseIPDB: {Band: opt($band_abuse), Scale: "0-100 confidence"},
-    IPQS: {Band: opt($band_ipqs), Scale: "0-100 fraud", Status: $status_ipqs, Source: $source_ipqs}
+    IPQS: {Band: opt($band_ipqs), Scale: "0-100 fraud", Status: $status_ipqs, Source: $source_ipqs},
+    Cloudflare: {Band: null, Scale: null, Status: $status_cloudflare, Source: "official_api", Reason: "numeric_score_not_provided", ThreatCategories: $cloudflare_threats},
+    DBIP: {Band: null, Scale: null, Status: $status_dbip, Source: "public_api", Reason: "free_tier_geography_only"}
   },
   ProviderStatus: {
     CheckPlaceMaxMind: $status_maxmind,
@@ -2457,6 +2494,7 @@ def dnsresults($value):
     ipdata: $status_ipdata,
     ipapi: $status_ipapi,
     IPWhois: $status_ipwhois,
+    DBIP: $status_dbip,
     Cloudflare: $status_cloudflare,
     IPQS: $status_ipqs
   },
@@ -2469,7 +2507,13 @@ def dnsresults($value):
     Abuser: {IP2LOCATION: factor($f_ip2_abuse), ipapi: factor($f_ipapi_abuse), Ipregistry: factor($f_ipregistry_abuse), IPQS: factor($f_ipqs_abuse), SCAMALYTICS: factor($f_scam_abuse), ipdata: factor($f_ipdata_abuse), IPinfo: factor($f_ipinfo_abuse)},
     Robot: {IP2LOCATION: factor($f_ip2_bot), ipapi: factor($f_ipapi_bot), Ipregistry: factor($f_ipregistry_bot), IPQS: factor($f_ipqs_bot), SCAMALYTICS: factor($f_scam_bot), ipdata: factor($f_ipdata_bot), IPinfo: factor($f_ipinfo_bot)}
   },
+  FactorMeta: {IPWhois: {Status: $status_ipwhois, Source: "public_api", Reason: "free_tier_security_not_provided"}},
   ProviderContext: {
+    DBIP: {
+      Provider: "DB-IP", Status: $status_dbip, Mode: "free_geolocation", IP: opt($dbip_ip),
+      CountryCode: opt($dbip_countrycode), Country: opt($dbip_country), Region: opt($dbip_region), City: opt($dbip_city),
+      Attribution: "IP geolocation by DB-IP (https://db-ip.com/)"
+    },
     IPAPI: {
       Provider: "ipapi.is", Status: $status_ipapi, Mode: opt($ipapi_mode),
       IP: opt($ipapi_ip), CountryCode: opt($ipapi_countrycode), ASN: opt($ipapi_asn), Organization: opt($ipapi_company),
@@ -2498,6 +2542,8 @@ def dnsresults($value):
     }
   })
 }
+| .Factor |= with_entries(.value.IPWhois = null)
+| .Factor.CountryCode.IPWhois = factor($ipwhois_countrycode)
 | if $reputation_enabled then
     .Ping0 = {
       Status: $ping_status, IPMatch: boolnull($ping_match), Location: opt($ping_location),
@@ -2544,6 +2590,7 @@ db_ipregistry $2
 db_scamalytics $2
 db_ipapi $2
 db_ipwhois $2
+db_dbip $2
 db_cloudflare $2
 db_abuseipdb $2
 db_ip2location $2

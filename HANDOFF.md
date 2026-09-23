@@ -1,9 +1,9 @@
 # Current handoff
 
-## 2026-09-22 reputation-only default and provider ownership
+## 2026-09-24 visible provider coverage and permanent free DB-IP
 
 Worktree: /Users/zmx/Projects/projects/ipquality, branch main, reporter
-v2026-09-22-standalone.18. The raw reporter and all route-menu choices now use
+v2026-09-24-standalone.19. The raw reporter and all route-menu choices now use
 reputation by default. Media/AI unlock probes and the Media JSON section were
 removed. Optional raw-reporter mail, dnsbl, mail-dnsbl and full scopes remain;
 full means reputation + mail + DNSBL. Exact-node requests still use an isolated
@@ -18,17 +18,25 @@ The project-local common Ruby/zsh APIs remain in common/ and are documented in
 
 ## Real report evidence
 
-A masked direct reputation report on 2026-09-22 completed in **19.0 seconds**,
-exit 0, with **zero jq diagnostics**. All ten entries in ProviderStatus returned
-ok, including IPQS, ipapi, IPWhois and Cloudflare. IPQS used official_api after
+A masked direct reputation report on 2026-09-24 completed in **19.9 seconds**,
+exit 0, with **zero jq diagnostics**. All eleven entries in ProviderStatus returned
+ok, including IPQS, ipapi, IPWhois, DBIP and Cloudflare. IPQS used official_api after
 its credit preflight. ipapi used its new free key and returned **Mode=full**,
 including the type, score and risk-factor data. Cloudflare supplied
 ASN/organization/infrastructure context and no threat
 categories, which remain null. This timing describes that direct run only.
 
-The private, ignored local report is reports/validation-keyed-20260922-203808.json.
+The private, ignored local report is reports/providers-20260924-004804.json;
+the matching .txt file contains the terminal output from the same lookup.
 Its Mail fields are null compatibility fields; no SMTP/DNSBL probes ran.
 The report has no Media section. No report was uploaded.
+
+Section 3 now names Cloudflare with query status and threat categories, even
+though its IP API has no numeric score. Missing categories remain "not supplied".
+DB-IP also appears there with the free geography-only limitation. Section 4
+contains ipwho.is with its country and unavailable security fields; the note and
+JSON FactorMeta explain that missing free flags do not mean false. These are
+visible capability distinctions, not locally synthesized risk ratings.
 
 ## Provider setup
 
@@ -41,6 +49,11 @@ The report has no Media section. No report was uploaded.
 - ipwho.is: the no-key endpoint works and appears in the report. Its documented
   1,000/day allowance provides network/geography context, without free security
   fields. No account or 2FA is needed.
+- DB-IP: official documentation and a live free 1.1.1.1 query confirm the
+  permanent 500/day geography endpoint. The real report also returned DBIP=ok.
+  No signup, key, 2FA or paid trial is needed. Threat levels and proxy detection
+  belong to the paid Extended API, which remains excluded. Attribution is kept
+  in terminal and JSON output; injected premium flags are ignored by fixtures.
 - Cloudflare: the new free account and email verification succeeded. An
   account-scoped Intel Read token is saved privately and the official IP
   Intelligence API returned useful data. The documented free allowance is 100
@@ -91,15 +104,29 @@ IPQS lookup. API credits and browser authentication remain separate evidence.
 The provider-account MCP is in mcp/provider-accounts; it keeps account selectors,
 free-plan policy, one-submit receipts and private credential handling local.
 
+The 2026-09-24 mcps audit found no old IPQS package, duplicate credential,
+private profile or temporary IPQS artifact in its current package/state/temp
+locations. The remaining empty security/ directory was removed. Useful central
+manifest, account-probe orchestration and documentation point directly here;
+they contain no duplicate provider implementation. Current mcps manifest
+validation passed; concurrent mcps edits were preserved, with no mcps commit.
+
+The existing provider-account MCP now exposes public_provider_verify_free_api
+for DB-IP/ipwho.is. It reuses shared HTTP reads, performs one fixed free lookup,
+validates useful context, and reports that these APIs have no account/MFA or
+free risk fields. Both live probes passed. No new provider account or factor
+was created; Cloudflare's 2026-09-22 verified factor remains in place.
+
 ## Validation and Git
 
 [TESTING.md](TESTING.md) owns complete/focused commands. The complete entrypoint
 runs reporter fixtures plus both owned MCP packages without provider requests.
-The complete check passed **84 reporter tests / 1,216 assertions**, **22 IPQS
-tests**, and **22 provider-account tests**, with no failures. The reporter's
+The complete check passed **88 reporter tests / 1,303 assertions**, **22 IPQS
+tests**, and **25 provider-account tests**, with no failures. The reporter's
 self-test covers the missing-threat JSON value as well as the 422 vendored DNSBL
-entries. Parent mcps manifest validation and 13 authentication-probe tests passed;
-Supervisor's focused migration/IPQS tests passed all 40 cases.
+entries. Parent mcps manifest validation passed again on 2026-09-24. The prior
+2026-09-22 migration validation passed 13 parent authentication-probe cases and
+40 Supervisor migration/IPQS cases; no parent/Supervisor source changed this turn.
 
 The configured GitHub destinations are kratoszmx/ip-quality (the existing remote
 name) and kratosbackup/ipquality. Fresh authenticated API reads confirmed access

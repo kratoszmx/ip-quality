@@ -60,6 +60,10 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 - Removed DB-IP's HTML scraper and invented 0/50/100 scores. A later Extended
   adapter was also removed: at evaluation time its free location data duplicated
   existing sources while the distinct threat/proxy fields required payment.
+  On 2026-09-24, added the requested permanent free geography API with explicit
+  attribution and no account or paid trial. Its risk score stays null. Cloudflare
+  threat categories and ipwho.is free-tier limitations now appear in the score
+  and factor sections, without turning unavailable fields into clean results.
 - Replaced score bars with aligned per-provider type/score/factor matrices,
   provider-specific scales, ASCII missing-field markers, colored risk factors,
   and compact unavailable-source summaries. IPQS keeps a source/status row;

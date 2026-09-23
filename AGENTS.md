@@ -121,6 +121,8 @@ API keys are optional; private file formats and precedence are in
 - [mcp/provider-accounts/AGENTS.md](mcp/provider-accounts/AGENTS.md) owns free
   ipapi/Cloudflare account setup with dedicated profiles. It reuses the external
   `mcps/common/shared` browser, HTTP, MCP and secret-file APIs.
+  Its public-provider probe also validates DB-IP and ipwho.is without creating
+  accounts or 2FA. Both free endpoints provide context rather than security flags.
 - Node dependencies and MCP commands are separate from the zsh/Ruby reporter.
   Build with `npm --prefix mcp/ipqs run build`; start either MCP through its
   package's `npm start`. Account mutations require explicit task intent.

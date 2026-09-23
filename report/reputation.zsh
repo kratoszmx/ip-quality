@@ -292,6 +292,16 @@ report_table_row "$usage_label" 10 "$cell_width" "${rendered_usages[@]}"
 report_table_row "$company_label" 10 "$cell_width" "${rendered_companies[@]}"
 }
 
+report_cloudflare_threats(){
+if [[ "${cloudflare[status]:-}" == "ok" && -n "${cloudflare[threats]:-}" ]];then
+report_neutral_value "${cloudflare[threats]}"
+elif [[ "${cloudflare[status]:-}" == "ok" && "${cloudflare[threats_json]:-null}" == '[]' ]];then
+[[ "$YY" == "cn" ]]&&print -rn -- "本次未列出类别（不代表无风险）"||print -rn -- "none listed (not a clean result)"
+else
+[[ "$YY" == "cn" ]]&&print -rn -- "未提供"||print -rn -- "not supplied"
+fi
+}
+
 show_score(){
 typeset -a headers scores risks scales source_statuses
 if report_any_known "${ip2location[score]}" "${ip2location[risk]}";then
@@ -328,8 +338,9 @@ ipqs_query_status="ok"
 fi
 source_statuses+=("$(report_score_source_status "$ipqs_source_kind" "$ipqs_query_status")")
 fi
-(( ${#headers[@]} ))||return 0
+(( ${#headers[@]} )) || [[ -n "${cloudflare[status]:-}${dbip[status]:-}" ]] || return 0
 print -r -- "$Font_B${sscore[title]}$Font_Suffix"
+if (( ${#headers[@]} ));then
 typeset value
 typeset -a rendered_scores rendered_risks rendered_scales
 for value in "${scores[@]}";do rendered_scores+=("$(report_neutral_or_dash "$value")");done
@@ -350,6 +361,21 @@ report_table_row "$score_label" 10 "$cell_width" "${rendered_scores[@]}"
 report_any_known "${risks[@]}"&&report_table_row "$band_label" 10 "$cell_width" "${rendered_risks[@]}"
 report_table_row "$scale_label" 10 "$cell_width" "${rendered_scales[@]}"
 report_table_row "$source_status_label" 10 "$cell_width" "${source_statuses[@]}"
+fi
+if [[ -n "${cloudflare[status]:-}" ]];then
+if [[ "$YY" == "cn" ]];then
+print -r -- "Cloudflare：$(report_score_source_status official "${cloudflare[status]}") | 不提供数值风险分数；威胁类别=$(report_cloudflare_threats)"
+else
+print -r -- "Cloudflare: $(report_score_source_status official "${cloudflare[status]}") | no numeric IP risk score; threat categories=$(report_cloudflare_threats)"
+fi
+fi
+if [[ -n "${dbip[status]:-}" ]];then
+if [[ "$YY" == "cn" ]];then
+print -r -- "DB-IP：$(report_score_source_status official "${dbip[status]}") | 免费方案仅提供地理资料；风险等级属于付费 Extended API。"
+else
+print -r -- "DB-IP: $(report_score_source_status official "${dbip[status]}") | free geography only; threat levels require the paid Extended API."
+fi
+fi
 }
 
 show_factor(){
@@ -403,6 +429,11 @@ vpns+=("${ipinfo[vpn]}") tors+=("${ipinfo[tor]}")
 servers+=("${ipinfo[server]}") abusers+=("${ipinfo[abuser]}")
 robots+=("${ipinfo[robot]}")
 fi
+if [[ -n "${ipwhois[status]:-}" ]];then
+headers+=("${Font_B}${Font_Cyan}ipwho.is$Font_Suffix")
+countries+=("${ipwhois[countrycode]}")
+proxies+=("") vpns+=("") tors+=("") servers+=("") abusers+=("") robots+=("")
+fi
 (( ${#headers[@]} ))||return 0
 print -r -- "$Font_B${sfactor[title]}$Font_Suffix"
 typeset field_label
@@ -426,18 +457,34 @@ report_factor_row "Hosting" 8 12 "${servers[@]}"
 report_factor_row "Abuse" 8 12 "${abusers[@]}"
 report_factor_row "Bot" 8 12 "${robots[@]}"
 fi
+if [[ -n "${ipwhois[status]:-}" ]];then
+if [[ "$YY" == "cn" ]];then
+print -r -- "ipwho.is：$(report_score_source_status official "${ipwhois[status]}") | 免费版不提供代理/VPN/Tor/机房等风险因子；- 表示未提供，不是“否”。"
+else
+print -r -- "ipwho.is: $(report_score_source_status official "${ipwhois[status]}") | free API has no proxy/VPN/Tor/hosting flags; - means not supplied, not No."
+fi
+fi
 }
 
 show_network_context(){
 typeset -a observations
 if [[ "$YY" == "cn" ]];then
 observations+=("来源状态：ipapi.is=$(report_score_source_status official "${ipapi[status]:-unknown}") | ipwhois=$(report_score_source_status official "${ipwhois[status]:-unknown}") | Cloudflare=$(report_score_source_status official "${cloudflare[status]:-not_configured}")")
+[[ -n "${dbip[status]:-}" ]]&&observations+=("DB-IP 免费地理：$(report_score_source_status official "${dbip[status]}") | 资料来源 https://db-ip.com/")
 [[ "${ipapi[mode]:-}" == "anonymous" ]]&&observations+=("ipapi.is 匿名接口仅提供地理与归属信息；免费 API key 可启用代理、VPN 和滥用判断。")
 [[ "${cloudflare[status]:-not_configured}" == "not_configured" ]]&&observations+=("Cloudflare 尚未配置：需要账号 ID 和具有 Intel Read 权限的 API token。")
 else
 observations+=("Source status: ipapi.is=$(report_score_source_status official "${ipapi[status]:-unknown}") | ipwhois=$(report_score_source_status official "${ipwhois[status]:-unknown}") | Cloudflare=$(report_score_source_status official "${cloudflare[status]:-not_configured}")")
+[[ -n "${dbip[status]:-}" ]]&&observations+=("DB-IP free geography: $(report_score_source_status official "${dbip[status]}") | IP geolocation by https://db-ip.com/")
 [[ "${ipapi[mode]:-}" == "anonymous" ]]&&observations+=("ipapi.is anonymous access provides geo/ownership only; a free API key enables proxy, VPN and abuse flags.")
 [[ "${cloudflare[status]:-not_configured}" == "not_configured" ]]&&observations+=("Cloudflare is not configured: an account ID and an Intel Read API token are required.")
+fi
+if [[ "${dbip[status]:-}" == "ok" ]];then
+if [[ "$YY" == "cn" ]];then
+observations+=("DB-IP：地区=$(report_neutral_or_dash "${dbip[countrycode]}") | 国家=$(report_neutral_or_dash "${dbip[country]}") | 省/州=$(report_neutral_or_dash "${dbip[region]}") | 城市=$(report_neutral_or_dash "${dbip[city]}")")
+else
+observations+=("DB-IP: country=$(report_neutral_or_dash "${dbip[countrycode]}") | name=$(report_neutral_or_dash "${dbip[country]}") | region=$(report_neutral_or_dash "${dbip[region]}") | city=$(report_neutral_or_dash "${dbip[city]}")")
+fi
 fi
 typeset displayed_prefix="${ripestat[prefix]}"
 if [[ ${fullIP:-0} -ne 1 && -n "$displayed_prefix" ]];then

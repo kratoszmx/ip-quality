@@ -1,7 +1,7 @@
 # Provider accounts MCP
 
 Owns free ipapi.is and Cloudflare account setup for the IPQuality reporter.
-ipwho.is needs no account or key for its free network/geography API. This package
+ipwho.is and DB-IP need no account or key for their free context APIs. This package
 reuses mcps/common/shared browser-session, http-read, secret-file, totp and
 mcp-server directly. Provider state, selectors, quotas and API contracts stay here.
 
@@ -18,6 +18,7 @@ Dependency restoration uses npm install --offline --ignore-scripts.
 | provider_account_read | Redacted existing-page text and value-free controls; DOM state alone may be inconclusive |
 | provider_account_create_free | One free signup after CREATE_FREE_ACCOUNT; uses the confirmed private email/country |
 | ipapi_import_free_key | Import a labelled key after one full-response free lookup and IMPORT_FREE_API_KEY |
+| public_provider_verify_free_api | VERIFY_FREE_API performs one fixed 1.1.1.1 DB-IP/ipwho.is query; returns validated context, quota and capability metadata, without an account or browser |
 | cloudflare_account_check | Current server identity, email and 2FA state; no Intel credit |
 | cloudflare_prepare_intel_token | Prepare an account-scoped Intel Read token and validate the dashboard's JSON review |
 | cloudflare_create_intel_token | Revalidate and submit that exact policy once after CREATE_INTEL_READ_TOKEN; save its value privately |
@@ -29,6 +30,13 @@ The user requires API usability before 2FA. A missing key, unavailable API,
 changed account/key or stale proof stops before authenticator enrollment. Existing
 factors and different saved seeds/keys are preserved. Missing threat data remains
 unknown even when the network-context API is useful.
+
+`public-api.mjs` maintains the account-free DB-IP/ipwho.is contracts. Its shared
+HTTP reader rejects redirects, bounds time/bytes and never retries. Only approved
+context fields reach the result; unexpected security fields cannot establish
+free risk coverage. DB-IP's 500/day geography API is permanent and needs no paid
+trial. Its Extended security API is paid and has no integration/account/profile
+here. The no-account endpoints have no MFA factor to enroll.
 
 ipapi's observed dashboard is /app/home. Its logout is an icon, so the account
 check uses the exact saved email, one visible labelled key and the same-origin
@@ -98,6 +106,7 @@ six-digit code. Inspect navigation/identity before clicking a Verify button that
 may already have disappeared. Both owned setup browsers and the temporary proof
 profile were closed/removed after validation; the normal account profile remains.
 
-Validation passed 22 offline tests plus the stdio contract within that count.
-The full repository command also passed 84 reporter tests / 1,216 assertions and
+On 2026-09-24 both public-provider probes returned usable context for 1.1.1.1.
+Validation passed 25 offline tests plus the stdio contract within that count.
+The full repository command also passed 88 reporter tests / 1,303 assertions and
 22 IPQS tests. These fixture counts and the live account/API evidence are separate.

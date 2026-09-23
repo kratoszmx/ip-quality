@@ -3,6 +3,55 @@
 require_relative "support/reporter_test_case"
 
 class ReportTest < ReporterTestCase
+  def test_context_sources_are_visible_in_score_and_factor_sections_without_fake_risk
+    probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      source "$1"
+      source "$2"
+      YY=cn
+      typeset -A sscore sfactor cloudflare dbip ipwhois ipapi
+      sscore[title]='三、风险评分' sfactor[title]='四、风险因子'
+      cloudflare[status]=ok cloudflare[threats]='Phishing, Malware'
+      cloudflare[threats_json]='["Phishing","Malware"]' dbip[status]=ok
+      ipwhois[status]=ok ipwhois[countrycode]=US ipapi[proxy]=true
+      show_score
+      show_factor
+    ZSH
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "source-sections", REPUTATION_REPORT, TERMINAL_LIBRARY)
+    assert status.success?, stderr
+    assert_empty stderr
+    score, factors = stdout.split("四、风险因子", 2)
+    assert_includes score, "三、风险评分"
+    assert_includes score, "Cloudflare：官方/可用"
+    assert_includes score, "不提供数值风险分数；威胁类别=Phishing, Malware"
+    assert_includes score, "DB-IP：官方/可用"
+    assert_includes score, "风险等级属于付费 Extended API"
+    refute_includes score, "低风险"
+    assert_includes factors, "ipwho.is"
+    assert_match(/代理\s+\|\s+是\s+\|\s+-/, factors)
+    assert_includes factors, "免费版不提供代理/VPN/Tor/机房等风险因子"
+  end
+
+  def test_cloudflare_missing_and_empty_threats_never_imply_a_clean_ip
+    probe = <<~'ZSH'
+      source "$1"
+      source "$2"
+      YY=en
+      typeset -A sscore cloudflare
+      sscore[title]='3. Risk Score'
+      cloudflare[status]="$3" cloudflare[threats_json]="$4"
+      show_score
+    ZSH
+    { ["ok", "null"] => "not supplied", ["ok", "[]"] => "none listed (not a clean result)", ["rate_limited", "null"] => "official/rate limit" }.each do |(state, threats), expected|
+      stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "threat-absence", REPUTATION_REPORT, TERMINAL_LIBRARY, state, threats)
+      assert status.success?, stderr
+      assert_empty stderr
+      assert_includes stdout, "3. Risk Score"
+      assert_includes stdout, expected
+      refute_includes stdout, "Low"
+    end
+  end
+
 def test_optional_mail_section_follows_reputation_context
   source = File.read(SCRIPT)
   assert_includes source, 'smail[title]="6. Email service availability and blacklist detection"'

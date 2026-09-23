@@ -153,6 +153,15 @@ pure policies. The observed icon-only logout is checked together with the saved
 email and labelled key; generic page text cannot substitute for that account
 evidence. No unverified security-page URL is exposed for ipapi.
 
+The same MCP owns `public-api.mjs::verifyPublicProvider(provider, confirmation)`
+for DB-IP/ipwho.is. It uses shared `http-read` for one fixed 1.1.1.1 request,
+then applies the provider-local `publicProviderContext` schema and field projection.
+Results carry query status, geography/network context, documented daily quota
+and explicit account/MFA/risk-field capabilities. No HTTP 200 alone establishes
+usefulness; redirects, rate limits, mismatches and malformed data remain failures.
+Reporter and Node fixture suites share sanitized JSON inputs; their language-
+specific parsers remain local and do not invoke one another through wrappers.
+
 ## Validation and maintenance
 
 Run `/bin/zsh -f scripts/test-offline` from the worktree root; focused commands
