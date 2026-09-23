@@ -57,13 +57,17 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 - Added strict Ping0 `/geo`, RIPEstat Network Info, and Shodan InternetDB parsers
   for location, routing, and exposure context. Ping0 requires an exact returned
   IP match and exposes no public risk score; Shodan retains hostname counts.
-- Removed DB-IP's HTML scraper and invented 0/50/100 scores. A later Extended
-  adapter was also removed: at evaluation time its free location data duplicated
-  existing sources while the distinct threat/proxy fields required payment.
-  On 2026-09-24, added the requested permanent free geography API with explicit
-  attribution and no account or paid trial. Its risk score stays null. Cloudflare
-  threat categories and ipwho.is free-tier limitations now appear in the score
-  and factor sections, without turning unavailable fields into clean results.
+- Removed DB-IP's invented 0/50/100 scores and the paid Extended adapter.
+  On 2026-09-24, compared historical upstream commit
+  `b3ad433931db9882673e070f59edaf17d56e05ac` (v2025-03-13) with today's provider
+  websites. Restored the public homepage DB-IP demo for original threat labels,
+  and use IPWHOIS's current `/demo` for actual security booleans. The explicit
+  permanent free API contracts remain MCP context probes. Demo HTTP 200 quota
+  errors stay unavailable; no scraped key, account or paid plan is required.
+  DB-IP's numeric score remains null. Cloudflare/IPWHOIS/DB-IP now appear in
+  sections 3/4 and are removed from terminal section 5. Cloudflare's retired,
+  now constant-zero Threat Score is explicitly excluded from clean-IP evidence;
+  its current IP Intelligence threat categories remain identifiable.
 - Replaced score bars with aligned per-provider type/score/factor matrices,
   provider-specific scales, ASCII missing-field markers, colored risk factors,
   and compact unavailable-source summaries. IPQS keeps a source/status row;
@@ -82,6 +86,8 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 - Split runner, provider, and report responsibilities. Consolidated verified
   file snapshots, proxy-environment overrides, printable metadata validation,
   provider value normalization, and terminal text helpers under `common/`.
+  Shared bounded text/integer jq predicates now serve four provider parsers;
+  IPQS-only connection-type classification lives back in its provider module.
   The route command now lives directly in `bin/test-clash-leaf`; removed the
   shell forwarding entrypoint and report-output forwarding helper. Header and
   table width calculations share one character-based implementation.

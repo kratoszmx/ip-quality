@@ -1,0 +1,11 @@
+{
+  "status": "ok",
+  "demoInfo": {
+    "ipAddress": "198.51.100.23",
+    "countryCode": "US",
+    "countryName": "United States",
+    "stateProv": "California",
+    "city": "Example City",
+    "threatLevel": "low"
+  }
+}

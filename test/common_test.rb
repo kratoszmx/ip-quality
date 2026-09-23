@@ -2,11 +2,29 @@
 
 require "minitest/autorun"
 require "tmpdir"
+require "open3"
+require "json"
 require_relative "../common/network_environment"
 require_relative "../common/safe_snapshot"
 require_relative "../common/text"
 
 class CommonTest < Minitest::Test
+  def test_shared_json_values_enforce_types_bounds_and_printable_text
+    filter = <<~'JQ'
+      include "json_values";
+      {
+        text: [null, "", "香港", "abc", "abcd", false, [], {}, "\u0000", "\n", "\u001b[31m", "\u007f"] | map(text_or_null(.; 3)),
+        integer: [null, 0, 3, -1, 4, 1.5, "1", false, [], {}] | map(integer_or_null(.; 0; 3))
+      }
+    JQ
+    stdout, stderr, status = Open3.capture3("jq", "-n", "-L", File.expand_path("../common", __dir__), filter)
+    assert status.success?, stderr
+    assert_empty stderr
+    result = JSON.parse(stdout)
+    assert_equal [true, true, true, true, false, false, false, false, false, false, false, false], result["text"]
+    assert_equal [true, true, true, false, false, false, false, false, false, false], result["integer"]
+  end
+
   def test_printable_text_checks_bytes_encoding_and_control_characters
     assert IpQuality::Text.printable?("香港 Leaf")
     assert IpQuality::Text.printable?("葉" * 170)

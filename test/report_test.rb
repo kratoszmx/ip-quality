@@ -3,7 +3,7 @@
 require_relative "support/reporter_test_case"
 
 class ReportTest < ReporterTestCase
-  def test_context_sources_are_visible_in_score_and_factor_sections_without_fake_risk
+  def test_demo_risk_fields_are_visible_in_the_requested_sections_without_fake_scores
     probe = <<~'ZSH'
       setopt KSH_ARRAYS
       source "$1"
@@ -12,8 +12,9 @@ class ReportTest < ReporterTestCase
       typeset -A sscore sfactor cloudflare dbip ipwhois ipapi
       sscore[title]='三、风险评分' sfactor[title]='四、风险因子'
       cloudflare[status]=ok cloudflare[threats]='Phishing, Malware'
-      cloudflare[threats_json]='["Phishing","Malware"]' dbip[status]=ok
-      ipwhois[status]=ok ipwhois[countrycode]=US ipapi[proxy]=true
+      cloudflare[threats_json]='["Phishing","Malware"]' dbip[status]=ok dbip[risk_status]=ok dbip[risk]=低风险
+      ipwhois[status]=ok ipwhois[risk_status]=ok ipwhois[countrycode]=US ipapi[proxy]=true
+      ipwhois[proxy]=false ipwhois[vpn]=true ipwhois[server]=true
       show_score
       show_factor
     ZSH
@@ -22,14 +23,16 @@ class ReportTest < ReporterTestCase
     assert_empty stderr
     score, factors = stdout.split("四、风险因子", 2)
     assert_includes score, "三、风险评分"
-    assert_includes score, "Cloudflare：官方/可用"
-    assert_includes score, "不提供数值风险分数；威胁类别=Phishing, Malware"
-    assert_includes score, "DB-IP：官方/可用"
-    assert_includes score, "风险等级属于付费 Extended API"
-    refute_includes score, "低风险"
-    assert_includes factors, "ipwho.is"
-    assert_match(/代理\s+\|\s+是\s+\|\s+-/, factors)
-    assert_includes factors, "免费版不提供代理/VPN/Tor/机房等风险因子"
+    assert_match(/参数\s+\|.*Cloudflare.*DB-IP/, score)
+    assert_match(/分值\s+\|\s+-\s+\|\s+-/, score)
+    assert_includes score, "威胁类别=Phishing, Malware"
+    assert_includes score, "旧 Threat Score 已停用并固定为 0"
+    assert_match(/分段\/标签\s+\|\s+-\s+\|\s+低风险/, score)
+    assert_includes score, "公开示例/可用"
+    assert_includes factors, "IPWHOIS"
+    assert_match(/代理\s+\|\s+是\s+\|\s+否/, factors)
+    assert_match(/VPN\s+\|\s+-\s+\|\s+是/, factors)
+    assert_includes factors, "- 表示本次未取得，不是“否”"
   end
 
   def test_cloudflare_missing_and_empty_threats_never_imply_a_clean_ip
@@ -49,6 +52,55 @@ class ReportTest < ReporterTestCase
       assert_includes stdout, "3. Risk Score"
       assert_includes stdout, expected
       refute_includes stdout, "Low"
+    end
+  end
+
+  def test_demo_limitations_are_visible_in_risk_sections_without_clean_claims
+    probe = <<~'ZSH'
+      source "$1"
+      source "$2"
+      YY=cn
+      typeset -A sscore sfactor dbip ipwhois
+      sscore[title]='三、风险评分' sfactor[title]='四、风险因子'
+      dbip[status]=rate_limited ipwhois[status]=rate_limited
+      show_score
+      show_factor
+    ZSH
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "demo-limits", REPUTATION_REPORT, TERMINAL_LIBRARY)
+    assert status.success?, stderr
+    assert_empty stderr
+    assert_includes stdout, "DB-IP"
+    assert_includes stdout, "IPWHOIS：公开示例/限流"
+    assert_match(/来源\/状态\s+\|\s+公开示例\/限流/, stdout)
+    refute_match(/低风险|\|\s+否/, stdout)
+  end
+
+  def test_score_columns_expand_together_for_long_scales_and_demo_statuses
+    probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      source "$1"
+      source "$2"
+      YY="$3"
+      typeset -A sscore cloudflare dbip
+      sscore[title]=Scores
+      cloudflare[status]=ok dbip[status]=ok dbip[risk_status]=not_provided
+      show_score
+    ZSH
+    %w[cn en].each do |language|
+      stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "long-score-cells", REPUTATION_REPORT, TERMINAL_LIBRARY, language)
+      assert status.success?, stderr
+      assert_empty stderr
+      rows = stdout.lines.select { |line| line.include?(" | ") }
+      assert_operator rows.length, :>=, 4
+      positions = rows.map do |line|
+        column = 0
+        line.each_char.map do |char|
+          current = column
+          column += char.ascii_only? ? 1 : 2
+          current if char == "|"
+        end.compact
+      end
+      assert_equal 1, positions.uniq.length, rows.join
     end
   end
 
@@ -302,10 +354,10 @@ end
     )
 
     assert status.success?, stderr
-    assert_equal 6, stdout.lines.length
+    assert_equal 4, stdout.lines.length
     assert_equal 1, stdout.scan("五、官方网络观测").length
-    assert_includes stdout, "Cloudflare 尚未配置"
-    assert_includes stdout, "ipwhois="
+    refute_includes stdout, "Cloudflare"
+    refute_includes stdout, "IPWHOIS"
     assert_includes stdout, "Ping0：已核对"
     assert_includes stdout, "RIPEstat：状态=announced"
     assert_includes stdout, "Shodan：端口=22, 443"
@@ -315,12 +367,13 @@ end
     assert_empty stderr
   end
 
-  def test_additional_provider_context_stays_out_of_the_score_tables
+  def test_cloudflare_dbip_and_ipwhois_stay_out_of_section_five
     context_probe = <<~'ZSH'
       setopt KSH_ARRAYS
       Font_B='' Font_Red='' Font_Green='' Font_Purple='' Font_Cyan='' Font_Suffix=''
       YY=cn fullIP=1
-      typeset -A ipapi ipwhois cloudflare ping0 ripestat internetdb sping0
+      typeset -A ipapi ipwhois cloudflare dbip ping0 ripestat internetdb sping0
+      dbip[status]=ok dbip[countrycode]=US dbip[city]='Example City'
       ipapi[mode]=anonymous ipapi[anonymous_asn]='AS64500 Example ISP'
       ipapi[anonymous_company]='Example ISP' ipapi[anonymous_country]='United States'
       ipapi[anonymous_city]='Example City' ipapi[anonymous_timezone]='America/Los_Angeles'
@@ -339,12 +392,12 @@ end
     )
 
     assert status.success?, stderr
-    assert_equal 6, stdout.lines.length
-    assert_includes stdout, "免费 API key 可启用"
+    assert_equal 2, stdout.lines.length
     assert_includes stdout, "ipapi.is：匿名最小响应 | ASN=AS64500 Example ISP"
-    assert_includes stdout, "ipwho.is：地区=US"
-    assert_includes stdout, "Cloudflare IP Intelligence：地区=US"
-    assert_includes stdout, "威胁类别=Phishing, Malware"
+    refute_includes stdout, "ipwho.is"
+    refute_includes stdout, "IPWHOIS"
+    refute_includes stdout, "Cloudflare"
+    refute_includes stdout, "DB-IP"
     refute_includes stdout, "风险评分"
     assert_empty stderr
   end

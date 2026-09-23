@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-09-24-standalone.19"
+script_version="v2026-09-24-standalone.20"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset COMMON_DIR="$SCRIPT_DIR/common"
@@ -28,12 +28,12 @@ typeset RIPESTAT_LIB="$PROVIDER_DIR/ripestat.zsh"
 typeset INTERNETDB_LIB="$PROVIDER_DIR/shodan_internetdb.zsh"
 typeset REPUTATION_REPORT_LIB="$REPORT_DIR/reputation.zsh"
 typeset local_library
-for local_library in "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$DBIP_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for local_library in "$COMMON_DIR/json_values.jq" "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$DBIP_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$local_library" && -r "$local_library" && ! -L "$local_library" ]]||{
 print -ru2 -- "ERROR: unsafe or missing local library: $local_library"
 exit 66
 }
-source "$local_library"
+[[ "${local_library:e}" == zsh ]]&&source "$local_library"
 done
 typeset query_scope="reputation"
 typeset network_lookup_confirmed=0
@@ -518,10 +518,11 @@ print -r -- "  scope: $query_scope"
 print -r -- "  DNSBL concurrency cap: $dnsbl_concurrency"
 print -r -- "  output: masked IP by default; local stdout/file only"
 print -r -- "  telemetry/report upload/remote code: disabled"
-scope_includes reputation&&print -r -- "  reputation sources: official-contract sources = ipapi.is, ipwho.is, DB-IP free, Cloudflare IP Intelligence (when configured), Ping0, RIPEstat, Shodan InternetDB, plus configured Ipregistry/IPQS APIs"
+scope_includes reputation&&print -r -- "  reputation sources: ipapi.is, Cloudflare IP Intelligence (when configured), Ping0, RIPEstat, Shodan InternetDB, plus configured Ipregistry/IPQS APIs"
+scope_includes reputation&&print -r -- "  public website demos: DB-IP threat labels and IPWHOIS security flags; one target lookup each, no account/key, no guaranteed quota or availability"
 scope_includes reputation&&print -r -- "  supplementary sources: IPinfo public demo widget plus named Check.Place relays (MaxMind-labeled, Scamalytics, AbuseIPDB, IP2Location, ipdata, IPQualityScore)"
 scope_includes reputation&&print -r -- "  Ping0 limitation: the official free /geo endpoint exposes IP/location/ASN/organization, not a risk score"
-scope_includes reputation&&print -r -- "  context-only sources: ipwho.is reports geo/network/timezone; DB-IP free reports geography (500 requests/day, no security fields); Cloudflare reports ASN infrastructure/threat categories, not a numeric score; RIPEstat reports routing; Shodan InternetDB reports public exposure"
+scope_includes reputation&&print -r -- "  Cloudflare: IP Intelligence threat categories, no numeric IP score; legacy Threat Score is retired (constant zero). RIPEstat reports routing; Shodan InternetDB reports public exposure"
 scope_includes mail&&print -r -- "  mail sources: public MX DNS plus bounded SMTP greeting probes"
 scope_includes dnsbl&&print -r -- "  DNSBL sources: vendored $DNSBL_FILE (up to $dnsbl_concurrency concurrent DNS lookups)"
 print -r -- ""
@@ -665,7 +666,7 @@ ipqualityscore_parse_response '{"success":true,"fraud_score":87,"country_code":"
 print -ru2 -- "SELF-TEST FAILED: official IPQualityScore parser contract changed"
 return 1
 }
-[[ "$(provider_connection_type_server_flag 'Data Center')" == "true" && "$(provider_connection_type_server_flag 'Residential')" == "false" && -z "$(provider_connection_type_server_flag 'Unknown')" ]]||{
+[[ "$(ipqualityscore_connection_type_server_flag 'Data Center')" == "true" && "$(ipqualityscore_connection_type_server_flag 'Residential')" == "false" && -z "$(ipqualityscore_connection_type_server_flag 'Unknown')" ]]||{
 print -ru2 -- "SELF-TEST FAILED: provider connection-type normalization changed"
 return 1
 }
@@ -814,7 +815,9 @@ ipwhois[asn]="64500"
 ipwhois[org]="Example Network"
 ipwhois[isp]="Example ISP"
 ipwhois[timezone]="America/Los_Angeles"
+ipwhois[risk_status]=ok ipwhois[proxy]=false ipwhois[vpn]=true ipwhois[tor]=false ipwhois[server]=true
 dbip[status]="ok" dbip[ip]="198.51.100.23" dbip[countrycode]="US"
+dbip[risk_status]=ok dbip[threat_level]=low
 dbip[country]="United States" dbip[region]="California" dbip[city]="Example City"
 cloudflare[status]="ok"
 cloudflare[ip]="198.51.100.23"
@@ -874,9 +877,11 @@ print -r -- "$ipjson"|jq -e --arg expected "$json_special" '
   .ProviderContext.DBIP.City == "Example City" and
   .Score.Cloudflare == null and .Score.DBIP == null and
   .ScoreMeta.Cloudflare.Reason == "numeric_score_not_provided" and
-  .ScoreMeta.DBIP.Reason == "free_tier_geography_only" and
-  .Factor.CountryCode.IPWhois == "US" and .Factor.Proxy.IPWhois == null and
-  .FactorMeta.IPWhois.Reason == "free_tier_security_not_provided" and
+  .ScoreMeta.Cloudflare.LegacyThreatScore == "retired_constant_zero" and
+  .ScoreMeta.DBIP.Band == "low" and .ScoreMeta.DBIP.Source == "public_demo" and
+  .Factor.CountryCode.IPWhois == "US" and .Factor.Proxy.IPWhois == false and
+  .Factor.VPN.IPWhois == true and .Factor.Abuser.IPWhois == null and
+  .FactorMeta.IPWhois.Source == "public_demo" and
   .ProviderContext.IPAPI.Mode == "full" and
   .ProviderContext.IPAPI.IP == .Head.IP and
   .ProviderContext.Cloudflare.IP == .Head.IP and
@@ -1458,44 +1463,56 @@ ipapi[abuser]="${ipapi_parsed[abuser]}"
 ipapi[robot]="${ipapi_parsed[robot]}"
 }
 db_ipwhois(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}ipwho.is public API $Font_Suffix"
+local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}IPWHOIS public demo $Font_Suffix"
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-9-${sinfo[ldatabase]}))
 ipwhois=()
 ipwhois[status]="unknown"
-provider_fetch_public_json "$1" "https://ipwho.is/$IP" 131072||true
+ipwhois[source]="public_demo"
+provider_fetch_public_json "$1" "https://ipwhois.io/demo?ip=$IP" 131072||true
 ipwhois[status]="$PROVIDER_RESPONSE_STATUS"
 local RESPONSE="$PROVIDER_RESPONSE_BODY"
 [[ "${ipwhois[status]}" == "ok" ]]||return 0
 if ipwhois_parse_response "$RESPONSE" "$IP";then
 ipwhois[status]="ok"
-ipwhois[source]="public_api"
+ipwhois[risk_status]="${ipwhois_parsed[risk_status]}"
 ipwhois[countrycode]="${ipwhois_parsed[country_code]}"
 ipwhois[asn]="${ipwhois_parsed[asn]}"
 ipwhois[org]="${ipwhois_parsed[organization]}"
 ipwhois[isp]="${ipwhois_parsed[isp]}"
 ipwhois[timezone]="${ipwhois_parsed[timezone]}"
+ipwhois[proxy]="${ipwhois_parsed[proxy]}"
+ipwhois[vpn]="${ipwhois_parsed[vpn]}"
+ipwhois[tor]="${ipwhois_parsed[tor]}"
+ipwhois[server]="${ipwhois_parsed[hosting]}"
 else
-ipwhois[status]="invalid_response"
+ipwhois[status]="${ipwhois_parsed[status]:-invalid_response}"
 fi
 }
 db_dbip(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}DB-IP free API $Font_Suffix"
+local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}DB-IP public demo $Font_Suffix"
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-9-${sinfo[ldatabase]}))
 dbip=()
-provider_fetch_public_json "$1" "https://api.db-ip.com/v2/free/$IP" 65536||true
+dbip[source]="public_demo"
+provider_fetch_public_json "$1" "https://db-ip.com/demo/home.php?s=$IP" 65536||true
 dbip[status]="$PROVIDER_RESPONSE_STATUS"
 [[ "${dbip[status]}" == "ok" ]]||return 0
 if dbip_parse_response "$PROVIDER_RESPONSE_BODY" "$IP";then
-dbip[source]="public_api"
+dbip[risk_status]="${dbip_parsed[risk_status]}"
+dbip[threat_level]="${dbip_parsed[threat_level]}"
+case "${dbip[threat_level]}" in
+low)dbip[risk]="${sscore[low]}" ;;
+medium)dbip[risk]="${sscore[medium]}" ;;
+high)dbip[risk]="${sscore[high]}" ;;
+esac
 dbip[ip]="${dbip_parsed[ip]}"
 dbip[countrycode]="${dbip_parsed[country_code]}"
 dbip[country]="${dbip_parsed[country]}"
 dbip[region]="${dbip_parsed[region]}"
 dbip[city]="${dbip_parsed[city]}"
 else
-dbip[status]="invalid_response"
+dbip[status]="${dbip_parsed[status]:-invalid_response}"
 fi
 }
 db_cloudflare(){
@@ -1766,7 +1783,7 @@ ipqs[susetype]=$(styled_provider_type "${ipqs[usetype]}")
 ipqs[proxy]=$(echo "$RESPONSE"|jq -r '.proxy')
 ipqs[tor]=$(echo "$RESPONSE"|jq -r '.tor')
 ipqs[vpn]=$(echo "$RESPONSE"|jq -r '.vpn')
-ipqs[server]=$(provider_connection_type_server_flag "${ipqs[usetype]}")
+ipqs[server]=$(ipqualityscore_connection_type_server_flag "${ipqs[usetype]}")
 ipqs[abuser]=$(echo "$RESPONSE"|jq -r '.recent_abuse')
 ipqs[robot]=$(echo "$RESPONSE"|jq -r '.bot_status')
 if provider_has_observation "${ipqs[score]}" "${ipqs[countrycode]}" "${ipqs[proxy]}" "${ipqs[tor]}" "${ipqs[vpn]}" "${ipqs[abuser]}" "${ipqs[robot]}";then
@@ -2383,11 +2400,15 @@ ipjson=$(jq -n \
 --arg ipapi_region "${ipapi[anonymous_region]:-}" --arg ipapi_timezone "${ipapi[anonymous_timezone]:-}" \
 --arg status_ipwhois "${ipwhois[status]:-unknown}" \
 --arg status_dbip "${dbip[status]:-unknown}" --arg dbip_ip "${dbip[ip]:+$displayed_ip}" \
+--arg dbip_risk_status "${dbip[risk_status]:-${dbip[status]:-unknown}}" --arg band_dbip "${dbip[threat_level]:-}" \
 --arg dbip_countrycode "${dbip[countrycode]:-}" --arg dbip_country "${dbip[country]:-}" \
 --arg dbip_region "${dbip[region]:-}" --arg dbip_city "${dbip[city]:-}" \
 --arg ipwhois_countrycode "${ipwhois[countrycode]:-}" \
 --arg ipwhois_asn "${ipwhois[asn]:-}" --arg ipwhois_org "${ipwhois[org]:-}" \
 --arg ipwhois_isp "${ipwhois[isp]:-}" --arg ipwhois_timezone "${ipwhois[timezone]:-}" \
+--arg ipwhois_risk_status "${ipwhois[risk_status]:-${ipwhois[status]:-unknown}}" \
+--arg ipwhois_proxy "${ipwhois[proxy]:-}" --arg ipwhois_vpn "${ipwhois[vpn]:-}" \
+--arg ipwhois_tor "${ipwhois[tor]:-}" --arg ipwhois_server "${ipwhois[server]:-}" \
 --arg status_cloudflare "${cloudflare[status]:-not_configured}" \
 --arg cloudflare_ip "${cloudflare[ip]:+$displayed_ip}" --arg cloudflare_countrycode "${cloudflare[countrycode]:-}" \
 --arg cloudflare_network "${cloudflare[network]:-}" --arg cloudflare_org "${cloudflare[org]:-}" \
@@ -2482,8 +2503,8 @@ def dnsresults($value):
     ipapi: {Band: opt($band_ipapi), Scale: "0-100% abuse"},
     AbuseIPDB: {Band: opt($band_abuse), Scale: "0-100 confidence"},
     IPQS: {Band: opt($band_ipqs), Scale: "0-100 fraud", Status: $status_ipqs, Source: $source_ipqs},
-    Cloudflare: {Band: null, Scale: null, Status: $status_cloudflare, Source: "official_api", Reason: "numeric_score_not_provided", ThreatCategories: $cloudflare_threats},
-    DBIP: {Band: null, Scale: null, Status: $status_dbip, Source: "public_api", Reason: "free_tier_geography_only"}
+    Cloudflare: {Band: null, Scale: null, Status: $status_cloudflare, Source: "official_api", Reason: "numeric_score_not_provided", LegacyThreatScore: "retired_constant_zero", ThreatCategories: $cloudflare_threats},
+    DBIP: {Band: opt($band_dbip), Scale: "low/medium/high (provider label)", Status: $dbip_risk_status, Source: "public_demo", Reason: "provider_label_only"}
   },
   ProviderStatus: {
     CheckPlaceMaxMind: $status_maxmind,
@@ -2507,10 +2528,10 @@ def dnsresults($value):
     Abuser: {IP2LOCATION: factor($f_ip2_abuse), ipapi: factor($f_ipapi_abuse), Ipregistry: factor($f_ipregistry_abuse), IPQS: factor($f_ipqs_abuse), SCAMALYTICS: factor($f_scam_abuse), ipdata: factor($f_ipdata_abuse), IPinfo: factor($f_ipinfo_abuse)},
     Robot: {IP2LOCATION: factor($f_ip2_bot), ipapi: factor($f_ipapi_bot), Ipregistry: factor($f_ipregistry_bot), IPQS: factor($f_ipqs_bot), SCAMALYTICS: factor($f_scam_bot), ipdata: factor($f_ipdata_bot), IPinfo: factor($f_ipinfo_bot)}
   },
-  FactorMeta: {IPWhois: {Status: $status_ipwhois, Source: "public_api", Reason: "free_tier_security_not_provided"}},
+  FactorMeta: {IPWhois: {Status: $ipwhois_risk_status, Source: "public_demo", Reason: "website_demo_security_flags"}},
   ProviderContext: {
     DBIP: {
-      Provider: "DB-IP", Status: $status_dbip, Mode: "free_geolocation", IP: opt($dbip_ip),
+      Provider: "DB-IP", Status: $status_dbip, Mode: "public_demo", IP: opt($dbip_ip),
       CountryCode: opt($dbip_countrycode), Country: opt($dbip_country), Region: opt($dbip_region), City: opt($dbip_city),
       Attribution: "IP geolocation by DB-IP (https://db-ip.com/)"
     },
@@ -2521,7 +2542,7 @@ def dnsresults($value):
       TimeZone: opt($ipapi_timezone)
     },
     IPWhois: {
-      Provider: "ipwho.is", Status: $status_ipwhois,
+      Provider: "IPWHOIS", Status: $status_ipwhois, Mode: "public_demo",
       CountryCode: opt($ipwhois_countrycode), ASN: opt($ipwhois_asn),
       Organization: opt($ipwhois_org), ISP: opt($ipwhois_isp),
       TimeZone: opt($ipwhois_timezone)
@@ -2544,6 +2565,10 @@ def dnsresults($value):
 }
 | .Factor |= with_entries(.value.IPWhois = null)
 | .Factor.CountryCode.IPWhois = factor($ipwhois_countrycode)
+| .Factor.Proxy.IPWhois = boolnull($ipwhois_proxy)
+| .Factor.VPN.IPWhois = boolnull($ipwhois_vpn)
+| .Factor.Tor.IPWhois = boolnull($ipwhois_tor)
+| .Factor.Server.IPWhois = boolnull($ipwhois_server)
 | if $reputation_enabled then
     .Ping0 = {
       Status: $ping_status, IPMatch: boolnull($ping_match), Location: opt($ping_location),

@@ -67,8 +67,8 @@ many DNS/TCP probes add latency and cannot describe an HTTP-proxied leaf.
 | Ipregistry IP Intelligence | Direct official API when `IPREGISTRY_API_KEY` is configured | Connection/company type, country, proxy, VPN, Tor, cloud-hosting, abuse/attack signals |
 | Scamalytics via `ipinfo.check.place` | Upstream relay | Fraud score, proxy, VPN, Tor, blacklist/bot indicators |
 | ipapi.is | Direct public API; anonymous or optional free-tier key | Anonymous ASN/ownership/geography context, or keyed ASN/company type, provider-supplied abuser-score label, and risk factors |
-| ipwho.is | Direct public API, no key | Country, ASN, organization, ISP, timezone context; the free tier does not expose security fields |
-| DB-IP Free | Direct public API, no account/key | Country, region and city only; no free threat level or proxy/VPN signals |
+| IPWHOIS website demo | Direct public demo, no account/key | Country, network context and any supplied proxy/VPN/Tor/hosting flags; explicit demo rate-limit status |
+| DB-IP website demo | Direct public demo, no account/key | Original low/medium/high threat label plus geography; explicit demo quota failures |
 | Cloudflare Security Center IP Intelligence | Direct official API when both Cloudflare credentials are configured | Country, ASN/provider context, infrastructure type, named threat categories; no universal numeric score |
 | AbuseIPDB via `ipinfo.check.place` | Upstream relay | Abuse-confidence score and usage type |
 | IP2Location via `ipinfo.check.place` | Upstream relay | 0-99 potential-risk score, usage/company type, proxy-category factors |
@@ -85,9 +85,9 @@ fields are comparable:
 | --- | --- |
 | Basic information | Check.Place/MaxMind-shaped response, with IPinfo as fallback |
 | Type matrix | IPinfo, Ipregistry, IPQS, ipapi.is, IP2Location, AbuseIPDB when a type exists in the response |
-| Score section | Numeric matrix: IP2Location, Scamalytics, ipapi.is, AbuseIPDB, IPQS. Named status lines: Cloudflare threat categories and DB-IP's free-tier score limitation |
-| Factor matrix | IP2Location, ipapi.is, Ipregistry, IPQS, Scamalytics, ipdata, IPinfo when a factor exists; ipwho.is shows country plus explicit unavailable security fields |
-| Official/public network observations | Ping0, RIPEstat, Shodan InternetDB, ipwho.is, DB-IP Free, Cloudflare IP Intelligence when configured |
+| Score section | IP2Location, Scamalytics, ipapi.is, AbuseIPDB, IPQS; Cloudflare and DB-IP have named columns with null numeric scores. Cloudflare supplies threat categories; DB-IP supplies its original threat label when available |
+| Factor matrix | IP2Location, ipapi.is, Ipregistry, IPQS, Scamalytics, ipdata, IPinfo when a factor exists; IPWHOIS website-demo flags and their lookup status |
+| Official/public network observations | Ping0, RIPEstat, Shodan InternetDB; anonymous ipapi context if relevant. Cloudflare, DB-IP and IPWHOIS are absent from section 5 |
 
 ## Interpretation rules
 
@@ -102,16 +102,22 @@ fields are comparable:
   hosting, abuse, type, or score evidence. Error bodies, quota responses, and
   malformed nested sections become an explicit unavailable status, with the
   upstream body and jq diagnostics kept out of the terminal report.
-- `ipwho.is` validates the returned target IP and retains only the free endpoint's
-  location/network/timezone fields. The absence of its paid security object is
-  not treated as a clean proxy, VPN, Tor, hosting, or abuse result.
-  Section 4 keeps its named column and query status; unavailable factors are `-`.
-  JSON retains null factors and explains the free-tier limitation in FactorMeta.
-- DB-IP Free validates the exact target and bounded geography fields. Its
-  section-3 status explains why no free risk grade exists, while section 5 keeps
-  the geography and DB-IP attribution. Unexpected premium/security fields are
-  ignored, not promoted to free risk evidence. JSON Score.DBIP is null and
-  ScoreMeta.DBIP.Reason is free_tier_geography_only.
+- IPWHOIS uses its current homepage demo, `https://ipwhois.io/demo?ip={IP}`.
+  The old upstream used `/widget`; its current JavaScript uses `/demo`.
+  Section 4 accepts only actual boolean proxy/VPN/Tor/hosting fields in
+  `security`, bound to the exact returned target. Missing fields stay null,
+  including abuse/bot fields that the demo does not supply. HTTP 200 with
+  `success:false` and a rate-limit message means `rate_limited`, not usable.
+  `FactorMeta.IPWhois` records `public_demo` and the risk-query status.
+- DB-IP uses the public homepage lookup `https://db-ip.com/demo/home.php?s={IP}`,
+  which still appears in its current homepage source. It validates outer
+  `status`, `demoInfo`, exact target and bounded geography before accepting a
+  `threatLevel` of low/medium/high. A missing label remains unknown. The original
+  label is in section 3 and `ScoreMeta.DBIP.Band`; `Score.DBIP` remains null.
+  HTTP 200 with nested `OVER_QUERY_LIMIT` means `rate_limited`. No label is
+  converted to a 0/50/100 score. No public embedded API key is scraped or saved.
+  The no-key free geography contract is retained only for the MCP's optional
+  `free_api` probe; unexpected premium fields there still cannot supply risk.
 - Cloudflare IP Intelligence validates the target IP, ASN reference, and bounded
   threat-category objects. Its categories remain source-specific observations;
   they are not converted into the project's other boolean factors or a score.
@@ -119,12 +125,16 @@ fields are comparable:
   string example; valid 32-bit numeric ASNs are normalized to `AS<number>`.
   Missing `risk_types` stays `null` in JSON, while an explicitly empty array stays
   `[]`. A null `threat_summary` supplies no clean-IP evidence.
-  Section 3 shows its official status and actual threat categories beside the
-  numeric score matrix. Missing categories say "not supplied"; an empty array
-  says none listed, without claiming a clean IP. Score.Cloudflare remains null.
-- The additional providers always have a visible source-status line.
-  Anonymous ipapi explicitly explains the free-key requirement; missing
-  Cloudflare credentials are shown as unconfigured. Context IP fields use the
+  Section 3 includes a Cloudflare column, official query status and actual threat
+  categories. Missing categories say "not supplied"; an empty array says none
+  listed, without claiming a clean IP. Score.Cloudflare remains null.
+  Cloudflare's current WAF documentation says legacy Threat Score is always 0
+  and no longer populated. The old upstream fetched `.ip.riskScore` from the
+  third-party `ip.nodeget.com` and assigned local risk bands. That old zero is
+  not restored as a low-risk result. JSON marks LegacyThreatScore as
+  `retired_constant_zero`; the terminal also explains the retirement.
+- The additional providers retain visible source status in their risk sections.
+  Missing Cloudflare credentials are shown as unconfigured. Context IP fields use the
   same masking as `Head.IP`. Cloudflare category names remain intact JSON strings,
   including names containing commas.
 - A field missing from an otherwise useful result appears as `-` in the terminal
@@ -199,7 +209,21 @@ documents 500 requests per day. It requires no account, key, billing or 2FA.
 Its country/state/city response is distinct from the paid Extended API's threat
 level, crawler and proxy fields. No paid trial or Extended credential is used.
 The free `ipwho.is` endpoint requires no key and documents a limit of 1,000
-requests per client IP per day; its free response has no security data. Cloudflare
+requests per client IP per day; its free response has no security data. These
+permanent free quotas do **not** describe the separate website demos used by the
+reporter. Demo quotas are unspecified and their availability is not guaranteed.
+Each demo gets one bounded target request per report, with no automatic retry,
+route rotation, paid signup, account or 2FA. No geography-only fallback hides a
+failed risk lookup behind an "available" risk status. The account MCP can probe
+either `free_api` or `public_demo` separately without account creation.
+
+On 2026-09-24 the DB-IP demo returned `OVER_QUERY_LIMIT` and the current IPWHOIS
+demo returned `success:false` / rate-limit text for a direct 1.1.1.1 query.
+Those responses establish current unavailability on that test, not that free
+website risk observations never exist. Successful fixtures model the documented
+contracts and do not establish live risk availability.
+
+Cloudflare
 Security Center's IP Intelligence endpoint requires an account ID and an API
 token with Intel Read (or Intel Write) permission. Cloudflare documents 100
 Threat Intelligence API calls per month on Free, Pro, and Business plans; calls
@@ -261,10 +285,13 @@ the remaining references were checked on 2026-09-22:
 
 - [IPinfo developer documentation](https://ipinfo.io/developers)
 - [ipapi.is developer documentation](https://ipapi.is/developers.html)
-- [ipwho.is API documentation](https://ipwhois.io/documentation)
+- [IPWHOIS homepage demo](https://ipwhois.io/), [current demo JavaScript](https://ipwhois.io/js/theme.min.js), and [API documentation](https://ipwhois.io/documentation)
+- [DB-IP public homepage demo](https://db-ip.com/)
 - [DB-IP permanent free API](https://db-ip.com/api/free), [response contract](https://db-ip.com/api/doc.php), and [paid Extended fields](https://db-ip.com/api/extended)
 - [Cloudflare IP Intelligence API](https://developers.cloudflare.com/api/resources/intel/subresources/ips/methods/get/)
 - [Cloudflare Threat Intelligence API limits](https://developers.cloudflare.com/security-center/intel-apis/limits/)
+- [Cloudflare legacy Threat Score retirement](https://developers.cloudflare.com/waf/tools/security-level/#threat-score)
+- [Historical upstream v2025-03-13 source](https://github.com/xykt/IPQuality/blob/b3ad433931db9882673e070f59edaf17d56e05ac/ip.sh)
 - [ipapi.co pricing and free-trial terms](https://ipapi.co/pricing/)
 - [Ipregistry authentication](https://ipregistry.co/docs/authentication)
 - [IPQualityScore API overview](https://www.ipqualityscore.com/documentation/proxy-detection-api/overview),

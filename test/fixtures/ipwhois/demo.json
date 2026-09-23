@@ -1,0 +1,7 @@
+{
+  "ip": "198.51.100.23",
+  "success": true,
+  "country_code": "US",
+  "connection": { "asn": 64500, "org": "Example Network", "isp": "Example ISP" },
+  "security": { "proxy": false, "vpn": true, "tor": false, "hosting": true }
+}

@@ -121,8 +121,9 @@ API keys are optional; private file formats and precedence are in
 - [mcp/provider-accounts/AGENTS.md](mcp/provider-accounts/AGENTS.md) owns free
   ipapi/Cloudflare account setup with dedicated profiles. It reuses the external
   `mcps/common/shared` browser, HTTP, MCP and secret-file APIs.
-  Its public-provider probe also validates DB-IP and ipwho.is without creating
-  accounts or 2FA. Both free endpoints provide context rather than security flags.
+  Its public-provider probe distinguishes DB-IP/IPWHOIS free context APIs from
+  their public website risk demos. Neither requires accounts or 2FA. The reporter
+  uses the demos once per target and exposes rate limits as unknown risk.
 - Node dependencies and MCP commands are separate from the zsh/Ruby reporter.
   Build with `npm --prefix mcp/ipqs run build`; start either MCP through its
   package's `npm start`. Account mutations require explicit task intent.
@@ -174,7 +175,7 @@ live in [PROVIDERS.md](PROVIDERS.md); consult it when changing a source.
 
 - `bin/ip-quality`: CLI policy, live queries, aggregation, and JSON assembly.
 - `bin/test-clash-leaf`: direct Ruby entrypoint, CLI policy, and route selection.
-- `common/`: shared provider values, terminal text, printable metadata,
+- `common/`: shared provider values, jq value predicates, terminal text, printable metadata,
   verified-file snapshots, and child-process proxy overrides; see
   [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md).
 - `leaf_runner/`: cached-subscription selection, exact-leaf extraction,

@@ -13,11 +13,8 @@ typeset response="$1"
 typeset expected_ip="$2"
 
 cloudflare_parsed=()
-print -rn -- "$response"|jq -e --arg expected "$expected_ip" '
-  def text_or_null($value; $max):
-    $value == null or (($value | type) == "string" and ($value | length) <= $max and ($value | contains("\u0000") | not));
-  def integer_or_null($value):
-    $value == null or (($value | type) == "number" and ($value | floor) == $value and $value >= 0 and $value <= 2147483647);
+print -rn -- "$response"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg expected "$expected_ip" '
+  include "json_values";
   def network_or_null($value):
     text_or_null($value; 256) or (($value | type) == "number" and ($value | floor) == $value and $value >= 1 and $value <= 4294967295);
   type == "object" and
@@ -37,8 +34,8 @@ print -rn -- "$response"|jq -e --arg expected "$expected_ip" '
     (.risk_types == null or
       (.risk_types |
         type == "array" and length <= 128 and
-        all(.[]; type == "object" and integer_or_null(.id) and
-          text_or_null(.name; 128) and integer_or_null(.super_category_id)))))
+        all(.[]; type == "object" and integer_or_null(.id; 0; 2147483647) and
+          text_or_null(.name; 128) and integer_or_null(.super_category_id; 0; 2147483647)))))
 ' >/dev/null 2>&1||return 1
 
 cloudflare_parsed[status]="ok"

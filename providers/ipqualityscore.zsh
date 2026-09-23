@@ -5,6 +5,17 @@ typeset -gA ipqualityscore_unavailable=()
 typeset -gA ipqualityscore_parsed=()
 typeset -gA ipqualityscore_usage=()
 
+# IPQS connection_type vocabulary, used by its official and relay adapters.
+ipqualityscore_connection_type_server_flag(){
+emulate -LR zsh
+case "${1:l}" in
+"data center")print -rn -- "true"
+;;
+residential|corporate|education|mobile)print -rn -- "false"
+;;
+esac
+}
+
 ipqualityscore_parse_usage_response(){
 emulate -LR zsh
 typeset response="$1"
@@ -47,7 +58,7 @@ ipqualityscore_parsed[tor]=$(print -rn -- "$response"|jq -r 'if .tor == null the
 ipqualityscore_parsed[abuser]=$(print -rn -- "$response"|jq -r 'if .recent_abuse == null then empty else .recent_abuse end')
 ipqualityscore_parsed[robot]=$(print -rn -- "$response"|jq -r 'if .bot_status == null then empty else .bot_status end')
 ipqualityscore_parsed[connection_type]=$(print -rn -- "$response"|jq -r '.connection_type // empty')
-ipqualityscore_parsed[server]=$(provider_connection_type_server_flag "${ipqualityscore_parsed[connection_type]}")
+ipqualityscore_parsed[server]=$(ipqualityscore_connection_type_server_flag "${ipqualityscore_parsed[connection_type]}")
 ipqualityscore_parsed[status]="ok"
 return 0
 }

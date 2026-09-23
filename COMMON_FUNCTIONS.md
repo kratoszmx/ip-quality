@@ -16,6 +16,7 @@ separately owned Node account MCPs reuse the existing mcps JavaScript library.
 | Definition | Production callers | Responsibility |
 | --- | --- | --- |
 | `common/provider_values.zsh` | Provider parsers and `bin/ip-quality` | Validate/normalize provider values without source-specific schemas |
+| `common/json_values.jq` | ipapi, Cloudflare, IPWHOIS and DB-IP parsers | Optional bounded text/integer predicates; source schemas stay in each parser |
 | `common/terminal.zsh` | `bin/ip-quality` and `report/reputation.zsh` | Remove terminal formatting and measure the project's display-cell approximation |
 | `common/text.rb` | `leaf_runner/profile.rb`, `leaf_runner/subscription_catalog.rb` | Validate bounded printable metadata |
 | `common/safe_snapshot.rb` | Profile, catalog, and isolated Mihomo session | Read or verify owner-controlled local files and compare snapshots |
@@ -33,8 +34,7 @@ value functions print without a trailing newline.
 | `provider_integer_in_range VALUE MIN MAX` | Exit 0 for three nonnegative integer strings when `MIN <= VALUE <= MAX` |
 | `provider_merge_boolean_signals SIGNAL...` | `true` if any signal is exactly `true`; `false` only for a nonempty all-`false` list; otherwise empty (unknown) |
 | `provider_has_observation VALUE...` | Exit 0 if any value is not empty, `null`, or `unknown` (case-insensitive); `false` is an observation |
-| `provider_http_failure_status CODE BODY` | `cloudflare_blocked` for the known 403/block-page signature; otherwise `http_NNN` for a three-digit nonzero status, or `network_error`; never echoes the body |
-| `provider_connection_type_server_flag TYPE` | `true` for `data center`; `false` for residential/corporate/education/mobile; otherwise empty, case-insensitive |
+| `provider_http_failure_status CODE BODY` | `cloudflare_blocked` for the known 403/block-page signature, `rate_limited` for HTTP 429; otherwise `http_NNN` for a three-digit nonzero status, or `network_error`; never echoes the body |
 
 ```zsh
 source common/provider_values.zsh
@@ -45,6 +45,34 @@ provider_merge_boolean_signals false unknown  # empty: missing evidence stays un
 Provider schemas, request endpoints, optional credential files, source-specific
 status decisions, and report labels remain in `providers/`, `bin/ip-quality`,
 and `report/`. A similar `jq` expression alone is not a shared schema contract.
+
+## jq value predicates
+
+Use `jq -L /absolute/path/to/ipquality/common` with `include "json_values";`.
+Provider functions resolve this path from their own source file, so standalone
+fixture calls also work from another current directory. The reporter verifies
+the module exists as a readable regular file before any lookup.
+
+| Predicate | Contract |
+| --- | --- |
+| `text_or_null($value; $max)` | True for null or a string of at most `$max` Unicode codepoints with no C0/DEL controls; empty string is allowed |
+| `integer_or_null($value; $min; $max)` | True for null or an integer JSON number within the inclusive numeric bounds; rejects numeric strings and booleans |
+
+```sh
+jq -n -L common 'include "json_values"; text_or_null("香港"; 2)'
+```
+
+These predicates unify the repeated value validation in four providers. They
+do not interpret absence as false or validate IP/ASN/source schemas. Text control
+characters are rejected before they reach the terminal. String-form ASNs are
+still accepted only by providers whose contracts explicitly allow them.
+
+The common-library audit moved `provider_connection_type_server_flag` back to
+`providers/ipqualityscore.zsh` as `ipqualityscore_connection_type_server_flag`.
+Both callers belong to IPQS (official API and relay). Its `data center`,
+`residential`, `corporate`, `education`, and `mobile` mapping is IPQS vocabulary,
+not a project-wide network classifier. Both adapters call the owning function
+directly; the old name and forwarding aliases were removed.
 
 ## zsh terminal text
 
@@ -153,12 +181,16 @@ pure policies. The observed icon-only logout is checked together with the saved
 email and labelled key; generic page text cannot substitute for that account
 evidence. No unverified security-page URL is exposed for ipapi.
 
-The same MCP owns `public-api.mjs::verifyPublicProvider(provider, confirmation)`
-for DB-IP/ipwho.is. It uses shared `http-read` for one fixed 1.1.1.1 request,
-then applies the provider-local `publicProviderContext` schema and field projection.
-Results carry query status, geography/network context, documented daily quota
-and explicit account/MFA/risk-field capabilities. No HTTP 200 alone establishes
-usefulness; redirects, rate limits, mismatches and malformed data remain failures.
+The same MCP owns `public-api.mjs::verifyPublicProvider(provider, confirmation,
+request, surface)` for DB-IP/IPWHOIS. The MCP selects `free_api` (default) or
+`public_demo`; the optional `request` argument supplies the offline test transport.
+It uses shared `http-read` for one fixed 1.1.1.1 request and applies the local
+`publicProviderObservation(provider, body, expected, surface)` schema/projection.
+Free APIs supply context; explicitly selected website demos can supply a DB-IP
+threat label or IPWHOIS security booleans. Missing fields stay null and demo
+quota is unspecified. Results carry query status, the validated observation and
+account/MFA/risk capabilities. HTTP 200 quota-error bodies are classified as
+`rate_limited`, without retry, account creation or MFA enrollment.
 Reporter and Node fixture suites share sanitized JSON inputs; their language-
 specific parsers remain local and do not invoke one another through wrappers.
 
@@ -171,7 +203,9 @@ Ruby common contracts, provider/terminal fixtures, and route integration tests.
 overrides, file-size/mode limits, verification-only symlink rejection, and
 snapshot replacement. Runner tests retain cleanup, signal, link rejection, and
 route-isolation coverage. `test/providers_test.rb` exercises shared provider
-values; `test/report_test.rb` checks terminal functions and real file/ANSI bytes.
+values; `test/common_test.rb` also checks jq value types, bounds and controls.
+`test/public_demo_test.rb` checks source contracts rather than promoting their
+schema/quotas into the common library. `test/report_test.rb` checks terminal functions and real file/ANSI bytes.
 The CLI self-test retains typed JSON checks.
 
 Mihomo process lifecycle and cleanup remain in `leaf_runner/`; they carry

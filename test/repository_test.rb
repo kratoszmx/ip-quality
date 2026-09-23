@@ -30,7 +30,7 @@ class RepositoryTest < ReporterTestCase
     assert_includes source, "typeset -A"
     assert_includes source, "/bin/zsh -fc"
     assert_includes source, 'command curl -q "$@"'
-    refute_includes source, '--arg band_dbip'
+    refute_match(/dbip\[score\]\s*=/, source)
     refute_includes source, "shead[command]"
     refute_includes source, "factor_updates"
     refute_match(/jq\s+"\$head_updates/, source)

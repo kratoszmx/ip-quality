@@ -18,7 +18,7 @@ Dependency restoration uses npm install --offline --ignore-scripts.
 | provider_account_read | Redacted existing-page text and value-free controls; DOM state alone may be inconclusive |
 | provider_account_create_free | One free signup after CREATE_FREE_ACCOUNT; uses the confirmed private email/country |
 | ipapi_import_free_key | Import a labelled key after one full-response free lookup and IMPORT_FREE_API_KEY |
-| public_provider_verify_free_api | VERIFY_FREE_API performs one fixed 1.1.1.1 DB-IP/ipwho.is query; returns validated context, quota and capability metadata, without an account or browser |
+| public_provider_verify_free_api | VERIFY_FREE_API performs one fixed 1.1.1.1 query; surface=free_api (default) checks DB-IP/ipwho.is free context, surface=public_demo checks DB-IP/IPWHOIS website risk data. No account/browser |
 | cloudflare_account_check | Current server identity, email and 2FA state; no Intel credit |
 | cloudflare_prepare_intel_token | Prepare an account-scoped Intel Read token and validate the dashboard's JSON review |
 | cloudflare_create_intel_token | Revalidate and submit that exact policy once after CREATE_INTEL_READ_TOKEN; save its value privately |
@@ -31,12 +31,17 @@ changed account/key or stale proof stops before authenticator enrollment. Existi
 factors and different saved seeds/keys are preserved. Missing threat data remains
 unknown even when the network-context API is useful.
 
-`public-api.mjs` maintains the account-free DB-IP/ipwho.is contracts. Its shared
-HTTP reader rejects redirects, bounds time/bytes and never retries. Only approved
-context fields reach the result; unexpected security fields cannot establish
-free risk coverage. DB-IP's 500/day geography API is permanent and needs no paid
-trial. Its Extended security API is paid and has no integration/account/profile
-here. The no-account endpoints have no MFA factor to enroll.
+`public-api.mjs` maintains separate permanent free API and public-demo contracts.
+Its shared HTTP reader rejects redirects, bounds time/bytes and never retries.
+Only the explicit demo surface can provide a DB-IP threat label or IPWHOIS
+proxy/VPN/Tor/hosting booleans. Values are target-bound, source-projected and
+nullable. Numeric risk scores are never invented. `observation` contains the
+validated data; `riskLabelAvailable`/`riskFactorsAvailable` say what was actually
+supplied. Missing demo security is distinct from a useful geography observation.
+HTTP 200 quota-error bodies return `usable:false`, `status:rate_limited`.
+Demo quotas are unspecified, distinct from 500/day DB-IP and 1,000/day ipwho.is
+free geography. No demo account/key/2FA is required, no embedded key is scraped,
+and no paid Extended integration/account/profile is created.
 
 ipapi's observed dashboard is /app/home. Its logout is an icon, so the account
 check uses the exact saved email, one visible labelled key and the same-origin
@@ -106,7 +111,12 @@ six-digit code. Inspect navigation/identity before clicking a Verify button that
 may already have disappeared. Both owned setup browsers and the temporary proof
 profile were closed/removed after validation; the normal account profile remains.
 
-On 2026-09-24 both public-provider probes returned usable context for 1.1.1.1.
-Validation passed 25 offline tests plus the stdio contract within that count.
-The full repository command also passed 88 reporter tests / 1,303 assertions and
-22 IPQS tests. These fixture counts and the live account/API evidence are separate.
+On 2026-09-24 both permanent free API probes returned usable context for 1.1.1.1.
+The website-demo investigation then returned DB-IP OVER_QUERY_LIMIT and IPWHOIS
+rate-limit errors. These are unavailable risk observations, not successful free
+risk proof. No new account or 2FA enrollment was attempted. Existing Cloudflare
+TOTP remains the previously verified factor; its legacy Threat Score is now
+constant zero and is not a reason to recreate the account/factor.
+The provider MCP passes 28 offline tests, including stdio, both demo success
+contracts, HTTP 200 quota failures and no-retry checks. Repository-wide evidence
+is maintained in ../../HANDOFF.md.

@@ -29,10 +29,11 @@ the tests and claiming a complete pass.
 
 | File | Responsibility |
 | --- | --- |
-| `test/common_test.rb` | Printable text, proxy overrides, verified-file snapshots |
+| `test/common_test.rb` | Printable text, jq value types/bounds/controls, proxy overrides, verified-file snapshots |
 | `test/ip_quality_test.rb` | CLI plans and rejection gates, dependency failure, fixture DNSBL/SMTP execution |
 | `test/providers_test.rb` | Provider parsing, unknown/failure semantics, credentials, zero-credit preflight |
-| `test/dbip_test.rb` | Permanent free geography, exact-IP/schema validation, ignored premium signals, HTTP failure and one-request runtime |
+| `test/dbip_test.rb` | Demo exact-IP/geography validation, no invented score and one-request runtime |
+| `test/public_demo_test.rb` | DB-IP labels/IPWHOIS boolean flags, HTTP 200 quota errors, partial/malformed data, target binding and state reset |
 | `test/report_test.rb` | Provider tables, ANSI/layout, JSON/file bytes, exclusive report creation |
 | `test/repository_test.rb` | Source/data safety, vendored references, provenance, removed runtime paths |
 | `test/clash_leaf_runner_test.rb` | Cached selection, YAML safety, exact leaf/dependencies, proxy isolation, process cleanup |

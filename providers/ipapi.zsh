@@ -14,11 +14,8 @@ typeset response="$1"
 typeset expected_ip="${2:-}"
 
 ipapi_parsed=()
-print -rn -- "$response"|jq -e --arg expected "$expected_ip" '
-  def text_or_null($value; $max):
-    $value == null or (($value | type) == "string" and ($value | length) <= $max and ($value | contains("\u0000") | not));
-  def integer_or_null($value):
-    $value == null or (($value | type) == "number" and ($value | floor) == $value and $value >= 0 and $value <= 4294967295);
+print -rn -- "$response"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg expected "$expected_ip" '
+  include "json_values";
   def valid_asn_object($value):
     if $value == null then true
     elif ($value | type) != "object" then false
@@ -54,7 +51,7 @@ print -rn -- "$response"|jq -e --arg expected "$expected_ip" '
     ((.asn | type) == "object" or (.company | type) == "object" or (.location | type) == "object");
   def valid_anonymous_response:
     valid_ip and .location == null and
-    ((.asn == null) or text_or_null(.asn; 256) or integer_or_null(.asn)) and
+    ((.asn == null) or text_or_null(.asn; 256) or integer_or_null(.asn; 0; 4294967295)) and
     ((.company == null) or text_or_null(.company; 256)) and
     text_or_null(.city; 128) and
     text_or_null(.region; 128) and

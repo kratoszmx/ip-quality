@@ -65,7 +65,9 @@ class IpQualityTest < ReporterTestCase
     stdout, stderr, status = run_script("--scope", "reputation")
 
     assert status.success?, stderr
-    assert_includes stdout, "official-contract sources"
+    assert_includes stdout, "reputation sources"
+    assert_includes stdout, "public website demos: DB-IP threat labels and IPWHOIS security flags"
+    assert_includes stdout, "legacy Threat Score is retired"
     assert_includes stdout, "configured Ipregistry/IPQS APIs"
     assert_includes stdout, "supplementary sources"
     assert_includes stdout, "Ping0"

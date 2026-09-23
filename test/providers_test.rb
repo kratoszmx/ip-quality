@@ -312,7 +312,7 @@ class ProvidersTest < ReporterTestCase
       IP='198.51.100.23' CurlARG='' ibar_step=0 fixture="$3"
       sinfo[database]=0 sinfo[ldatabase]=0
       Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
-      provider_http_failure_status(){ print -r -- "http_$1"; }
+      source "$4"
       show_progress_bar(){ :; }
       curl_safe(){ cat "$fixture"; print -r -- 429; }
       db_ipapi 4
@@ -320,14 +320,14 @@ class ProvidersTest < ReporterTestCase
     ZSH
     stdout, stderr, status = Open3.capture3(
       "/bin/zsh", "-f", "-c", probe,
-      "ipapi-rate-limit-runtime-test", IPAPI_LIBRARY, function_source, IPAPI_RATE_LIMIT_FIXTURE
+      "ipapi-rate-limit-runtime-test", IPAPI_LIBRARY, function_source, IPAPI_RATE_LIMIT_FIXTURE, COMMON_PROVIDER_LIBRARY
     )
     assert status.success?, stderr
-    assert_equal "1|http_429\n", stdout
+    assert_equal "1|rate_limited\n", stdout
     assert_empty stderr
   end
 
-  def test_ipwhois_parser_keeps_free_context_and_rejects_target_mismatch
+  def test_ipwhois_parser_keeps_demo_context_without_security_and_rejects_target_mismatch
     parser_probe = <<~'ZSH'
       setopt KSH_ARRAYS
       source "$1"

@@ -32,8 +32,8 @@ server.registerTool('ipapi_import_free_key', {
 }, ({ confirmation }) => result(() => importIpapiKey(confirmation)));
 
 server.registerTool('public_provider_verify_free_api', {
-  description: buildToolDescription('Verify DB-IP or ipwho.is with one free 1.1.1.1 lookup. Returns validated geography/network context and free-plan capabilities. These endpoints need no account, key or 2FA and provide no risk scores or factors. No arbitrary URL, retries or paid trial.', instructions), inputSchema: { provider: z.enum(['dbip', 'ipwhois']), confirmation: z.literal('VERIFY_FREE_API') },
-}, ({ provider, confirmation }) => result(() => verifyPublicProvider(provider, confirmation)));
+  description: buildToolDescription('Verify DB-IP or IPWHOIS with one fixed 1.1.1.1 lookup. Choose free_api for permanent free geography/network context, or public_demo for website threat labels/security flags. Demo quota is unspecified; rate limits remain unavailable. Neither surface needs an account, key or 2FA. No retries, scraped keys or paid trial.', instructions), inputSchema: { provider: z.enum(['dbip', 'ipwhois']), surface: z.enum(['free_api', 'public_demo']).default('free_api'), confirmation: z.literal('VERIFY_FREE_API') },
+}, ({ provider, surface, confirmation }) => result(() => verifyPublicProvider(provider, confirmation, undefined, surface)));
 
 server.registerTool('cloudflare_account_check', {
   description: buildToolDescription('Verify the saved Cloudflare identity, email and 2FA state with one same-origin account read. Does not spend an Intel lookup.', instructions), inputSchema: {},
