@@ -1,13 +1,26 @@
 # Current handoff
 
-## 2026-09-24 provider request fixes
+## 2026-09-24 compact reports and visible Cloudflare context
 
 Worktree: /Users/zmx/Projects/projects/ipquality, main, reporter
-v2026-09-24-standalone.21. All route choices remain reputation-only by default.
+v2026-09-24-standalone.22. All route choices remain reputation-only by default.
 Media/AI probes stay removed; raw mail/DNSBL scopes remain optional.
 The live interactive menu is:
 
     /usr/bin/ruby --disable-gems bin/test-clash-leaf --confirm-network-lookup -4
+
+Cloudflare connects successfully. Its useful ASN context was already parsed and
+stored in JSON but omitted from the terminal after the providers moved out of
+section 5. Section 3 now shows ASN, ASN country, ASN type and ASN organization in
+a compact table after the risk matrix. Actual threat categories appear in the
+matrix's band/label row; absent categories remain `-`, not a fabricated zero.
+ASN classification does not establish residential-IP or VPN status.
+
+Removed the four routine Cloudflare/DB-IP/ipapi/IPWHOIS explanation footers.
+The factor matrix now has one aligned query-status row, preserving rate limits,
+missing risk and TLS failures. Credential mode, response tier and interpretation
+remain in JSON and PROVIDERS.md. Shared localized status rendering stays under
+report/, with the owning display code. No provider requests or JSON fields changed.
 
 ## Corrected findings
 
@@ -43,8 +56,8 @@ current official Intel categories/status, with no invented numeric score.
 ## ipapi visibility and transport
 
 Section 4 previously hid ipapi.is whenever every risk/country field was unknown.
-It now retains the attempted provider and explains key mode, anonymous response,
-missing risk, and query failure. JSON FactorMeta.ipapi records those distinctions.
+It now retains the attempted provider and shows missing risk or query failure in
+the matrix. JSON FactorMeta.ipapi records key mode and response tier as well.
 Timeout, TLS handshake, TLS certificate and other network errors are separate;
 none is reported as an exhausted quota. False values remain actual observations.
 
@@ -59,12 +72,24 @@ a free account key returns full data with 1,000/day. Actual HTTP responses gover
 
 ## Live evidence
 
-The corrected ATT report (vps+yyssr22 / ATT) completed in 21.1 seconds, exit 0,
+One new official Cloudflare lookup through isolated vps+yyssr22 / ATT returned
+HTTP 200, curl exit 0, success true and an exact target match. It supplied
+AS7018, US, isp and AT&T Enterprises, LLC. risk_types was absent; ip_lists and
+threat_summary were null. These missing fields do not mean connection failure.
+The sanitized receipt is reports/cloudflare-v22-proof.json; it contains no
+target IP, credentials or account identifier. No full provider sweep was repeated
+for this display change. The existing Cloudflare account/token/TOTP were reused.
+reports/cloudflare-v22-preview.txt renders that receipt through the new section 3
+code. It is a display preview of the single live Cloudflare result, not a new
+multi-provider measurement.
+
+The earlier v21 ATT report (vps+yyssr22 / ATT) completed in 21.1 seconds, exit 0,
 with zero jq errors. Ten provider statuses were ok, including DB-IP, IPWHOIS,
 official Cloudflare and IPQS. DB-IP supplied low; IPWHOIS supplied US and false
 for proxy/VPN/Tor/hosting. Missing abuse/bot fields remain null.
 Cloudflare was available but supplied no threat categories. ipapi had a transport
-failure and remained visible in section 4 with its configured-key explanation.
+failure and remained visible in section 4. This earlier ipapi route failure was
+not remeasured by the v22 Cloudflare-only diagnostic.
 
 Private ignored evidence:
 reports/risk-v21-att-20260924-121527.json, plus .ansi, .txt and .stderr.txt.
@@ -88,11 +113,13 @@ mapping belongs to providers/ipqualityscore.zsh. DB-IP guest-page parsing is
 provider-specific and stays in providers/dbip.zsh, not common.
 [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md) describes the shared APIs.
 
-/bin/zsh -f scripts/test-offline passed 96 reporter/route tests with 1,595
+/bin/zsh -f scripts/test-offline passed 98 reporter/route tests with 1,730
 assertions, 22 IPQS tests plus build/doctor, and 29 provider-account tests.
 Regressions cover website headers, two-step DB-IP route/family preservation,
 token bounds, no retry after failure, target mismatch, JSON contract changes,
-ipapi visibility in both languages, and transport-error classification.
+ipapi visibility in both languages, and transport-error classification. New
+cases cover Cloudflare ASN context without threat data, suppressing unavailable
+context, removing provider footers and aligned in-table query failure statuses.
 [TESTING.md](TESTING.md) owns complete/focused validation instructions.
 
 Only owned code/tests/docs are staged. Reports, credentials and temporary

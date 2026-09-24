@@ -84,7 +84,12 @@ The DB-IP regression tests cover the two-step visitor request, route/family
 preservation, target mismatch, bounded guest-token parsing, and stopping after
 page/transport/quota failures. IPWHOIS tests require its website request headers.
 Report tests retain ipapi.is for anonymous, limited and failed lookups in both
-languages, with missing values distinct from false. MCP tests separately cover
+languages, with missing values distinct from false. Query statuses stay aligned
+inside the factor matrix, including long TLS-error labels. Cloudflare's ASN
+context is visible in section 3 even when categories are missing; failed or empty
+context queries create no context table. Categories keep null and empty-array
+meanings, numeric scores remain absent, and routine provider footers stay removed.
+MCP tests separately cover
 request_egress metadata, visitor-token redaction and no-retry behavior.
 
 - Reporter CLI tests copy only runtime source/data into an owned temporary

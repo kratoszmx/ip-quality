@@ -45,6 +45,8 @@ provider_merge_boolean_signals false unknown  # empty: missing evidence stays un
 Provider schemas, request endpoints, optional credential files, source-specific
 status decisions, and report labels remain in `providers/`, `bin/ip-quality`,
 and `report/`. A similar `jq` expression alone is not a shared schema contract.
+The score and factor tables share `report_query_status` inside `report/`;
+its localized display labels are presentation policy, not a runtime provider API.
 
 ## jq value predicates
 

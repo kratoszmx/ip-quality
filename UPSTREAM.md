@@ -70,14 +70,16 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   DB-IP's numeric score remains null. Cloudflare/IPWHOIS/DB-IP now appear in
   sections 3/4 and are removed from terminal section 5. Cloudflare's retired,
   now constant-zero Threat Score is explicitly excluded from clean-IP evidence;
-  its current IP Intelligence threat categories remain identifiable.
+  its current IP Intelligence threat categories remain identifiable. Section 3
+  also displays its successful ASN country/type/organization observations.
 - Replaced score bars with aligned per-provider type/score/factor matrices,
   provider-specific scales, ASCII missing-field markers, colored risk factors,
   and compact unavailable-source summaries. IPQS keeps a source/status row;
   Ping0, RIPEstat, and Shodan share one context section. Reports mask IP/prefix
   by default; JSON preserves types and report files are created exclusively.
-  Section 4 now retains ipapi.is after a failed or anonymous lookup and reports
-  credential mode, response tier and risk availability instead of hiding it.
+  Section 4 retains ipapi.is after a failed or anonymous lookup, with a compact
+  query-status row across the factor matrix. Credential mode and response tier
+  remain in JSON. Repeated provider prose below the matrices was removed.
 - Removed locally synthesized risk bands, retaining only provider-supplied
   labels, and corrected IP2Location/IP2Proxy potential risk to a 0–99 scale.
 - Bounded DNS attempts, added `Unknown` outcomes, retained every zone in JSON,

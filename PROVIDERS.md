@@ -85,7 +85,7 @@ fields are comparable:
 | --- | --- |
 | Basic information | Check.Place/MaxMind-shaped response, with IPinfo as fallback |
 | Type matrix | IPinfo, Ipregistry, IPQS, ipapi.is, IP2Location, AbuseIPDB when a type exists in the response |
-| Score section | IP2Location, Scamalytics, ipapi.is, AbuseIPDB, IPQS; Cloudflare and DB-IP have named columns with null numeric scores. Cloudflare supplies threat categories; DB-IP supplies its original threat label when available |
+| Score section | IP2Location, Scamalytics, ipapi.is, AbuseIPDB, IPQS; Cloudflare and DB-IP have named columns with null numeric scores. Cloudflare supplies threat categories and an ASN context table; DB-IP supplies its original threat label when available |
 | Factor matrix | IP2Location, Ipregistry, IPQS, Scamalytics, ipdata, IPinfo when a factor exists; ipapi.is and IPWHOIS retain columns and lookup status even when risk data is missing |
 | Official/public network observations | Ping0, RIPEstat, Shodan InternetDB; anonymous ipapi context if relevant. Cloudflare, DB-IP and IPWHOIS are absent from section 5 |
 
@@ -103,8 +103,9 @@ fields are comparable:
   malformed nested sections become an explicit unavailable status, with the
   upstream body and jq diagnostics kept out of the terminal report.
   Section 4 keeps the ipapi.is column on failures or anonymous responses. Its
-  footer distinguishes the key actually supplied, response tier and missing
-  risk data; `FactorMeta.ipapi` records these separately from API availability.
+  query-status row distinguishes missing risk from request failure. Credential
+  mode and response tier remain in `FactorMeta.ipapi`; no routine prose footer
+  repeats them below the matrix. The same status row covers the other sources.
   Curl timeout, TLS-handshake and certificate-verification failures have separate
   statuses; none implies an exhausted API allowance. A 2026-09-24 comparison
   returned a full keyed response over direct access and curl 35 before HTTP
@@ -134,7 +135,8 @@ fields are comparable:
   geography and a `threatLevel` of low/medium/high. A missing label remains unknown. The original
   label is in section 3 and `ScoreMeta.DBIP.Band`; `Score.DBIP` remains null.
   HTTP 200 with `OVER_QUERY_LIMIT` or explicit query-limit text means `rate_limited`. No label is
-  converted to a 0/50/100 score. No public embedded API key is scraped or saved.
+  converted to a 0/50/100 score. The public visitor token is used only in memory;
+  no account key is obtained or saved.
   The no-key free geography contract is retained only for the MCP's optional
   `free_api` probe; unexpected premium fields there still cannot supply risk.
 - Cloudflare IP Intelligence validates the target IP, ASN reference, and bounded
@@ -145,13 +147,19 @@ fields are comparable:
   Missing `risk_types` stays `null` in JSON, while an explicitly empty array stays
   `[]`. A null `threat_summary` supplies no clean-IP evidence.
   Section 3 includes a Cloudflare column, official query status and actual threat
-  categories. Missing categories say "not supplied"; an empty array says none
-  listed, without claiming a clean IP. Score.Cloudflare remains null.
+  categories in its band/label row. Missing categories display `-`; an explicit
+  empty array says "none listed". Score.Cloudflare remains null. A successful
+  response also shows a compact table for ASN, ASN country, ASN type and ASN
+  organization. These are `belongs_to_ref` attributes: the country belongs to
+  the ASN context and the type classifies the ASN, not whether the tested IP
+  itself is residential, a VPN or clean. This context table is omitted when
+  the query fails or all four fields are absent.
   Cloudflare's current WAF documentation says legacy Threat Score is always 0
   and no longer populated. The old upstream fetched `.ip.riskScore` from the
   third-party `ip.nodeget.com` and assigned local risk bands. That old zero is
   not restored as a low-risk result. JSON marks LegacyThreatScore as
-  `retired_constant_zero`; the terminal also explains the retirement.
+  `retired_constant_zero`. Interpretation details remain here and in JSON;
+  the terminal omits the repeated Cloudflare, DB-IP, ipapi and IPWHOIS prose.
 - The additional providers retain visible source status in their risk sections.
   Missing Cloudflare credentials are shown as unconfigured. Context IP fields use the
   same masking as `Head.IP`. Cloudflare category names remain intact JSON strings,

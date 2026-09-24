@@ -22,24 +22,31 @@ class ReportTest < ReporterTestCase
       show_factor
     ZSH
     {
-      ["cn", "ok", "anonymous", "anonymous"] => "匿名地理资料",
-      ["en", "ok", "anonymous", "anonymous"] => "anonymous geography only",
-      ["cn", "rate_limited", "", "key"] => "官方/限流",
-      ["en", "rate_limited", "", "key"] => "official/rate limit",
+      ["cn", "ok", "anonymous", "anonymous"] => "未提供风险",
+      ["en", "ok", "anonymous", "anonymous"] => "risk not supplied",
+      ["cn", "rate_limited", "", "key"] => "限流",
+      ["en", "rate_limited", "", "key"] => "rate limit",
       ["cn", "network_error", "", "key"] => "连接失败",
       ["cn", "tls_error", "", "key"] => "TLS 握手失败",
       ["en", "tls_error", "", "key"] => "TLS handshake failed",
       ["cn", "timeout", "", "key"] => "连接超时",
       ["cn", "invalid_response", "", "key"] => "响应格式异常",
-      ["cn", "ok", "full", "key"] => "官方/可用",
-      ["en", "ok", "full", "key"] => "API key supplied"
+      ["cn", "tls_verification_failed", "", "key"] => "TLS 证书验证失败",
+      ["en", "tls_verification_failed", "", "key"] => "TLS certificate rejected",
+      ["cn", "ok", "full", "key"] => "可用",
+      ["en", "ok", "full", "key"] => "available"
     }.each do |args, expected|
       stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
         "ipapi-factor-status", REPUTATION_REPORT, TERMINAL_LIBRARY, *args)
       assert status.success?, stderr
       assert_empty stderr
       assert_match(/(?:参数|Field)\s+\|.*ipapi\.is.*IPQS/, stdout)
-      assert_includes stdout, expected
+      assert_match(/(?:查询状态|Status)\s+\|\s+#{Regexp.escape(expected)}\s+\|/, stdout)
+      refute_match(/^ipapi\.is[：:]/, stdout)
+      table_widths = stdout.lines.select { |line| line.include?(" | ") }.map do |line|
+        line.split("|").map { |cell| cell.chars.sum { |char| char.ascii_only? ? 1 : 2 } }
+      end
+      assert_equal 1, table_widths.uniq.length, stdout
       if args[2] == "full"
         assert_match(/(?:代理|Proxy)\s+\|\s+(?:否|No)\s+\|/, stdout)
       else
@@ -70,14 +77,14 @@ class ReportTest < ReporterTestCase
     assert_includes score, "三、风险评分"
     assert_match(/参数\s+\|.*Cloudflare.*DB-IP/, score)
     assert_match(/分值\s+\|\s+-\s+\|\s+-/, score)
-    assert_includes score, "威胁类别=Phishing, Malware"
-    assert_includes score, "旧 Threat Score 已停用并固定为 0"
-    assert_match(/分段\/标签\s+\|\s+-\s+\|\s+低风险/, score)
+    assert_match(/分段\/标签\s+\|\s+Phishing, Malware\s+\|\s+低风险/, score)
     assert_includes score, "公开示例/可用"
     assert_includes factors, "IPWHOIS"
     assert_match(/代理\s+\|\s+是\s+\|\s+否/, factors)
     assert_match(/VPN\s+\|\s+-\s+\|\s+是/, factors)
-    assert_includes factors, "- 表示本次未取得，不是“否”"
+    assert_match(/查询状态\s+\|\s+可用\s+\|\s+可用/, factors)
+    refute_match(/^(?:Cloudflare|DB-IP|ipapi\.is|IPWHOIS)[：:]/, stdout)
+    refute_match(/Threat Score|不是“否”|原始风险等级/, stdout)
   end
 
   def test_cloudflare_missing_and_empty_threats_never_imply_a_clean_ip
@@ -90,12 +97,15 @@ class ReportTest < ReporterTestCase
       cloudflare[status]="$3" cloudflare[threats_json]="$4"
       show_score
     ZSH
-    { ["ok", "null"] => "not supplied", ["ok", "[]"] => "none listed (not a clean result)", ["rate_limited", "null"] => "official/rate limit" }.each do |(state, threats), expected|
+    { ["ok", "null"] => "-", ["ok", "[]"] => "none listed", ["rate_limited", "null"] => "-" }.each do |(state, threats), expected|
       stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "threat-absence", REPUTATION_REPORT, TERMINAL_LIBRARY, state, threats)
       assert status.success?, stderr
       assert_empty stderr
       assert_includes stdout, "3. Risk Score"
-      assert_includes stdout, expected
+      assert_match(/Band \/ label\s+\|\s+#{Regexp.escape(expected)}\s*$/, stdout)
+      assert_includes stdout, state == "ok" ? "official/available" : "official/rate limit"
+      assert_match(/Score\s+\|\s+-\s*$/, stdout)
+      refute_match(/Threat Score|^Cloudflare:/, stdout)
       refute_includes stdout, "Low"
     end
   end
@@ -115,9 +125,63 @@ class ReportTest < ReporterTestCase
     assert status.success?, stderr
     assert_empty stderr
     assert_includes stdout, "DB-IP"
-    assert_includes stdout, "IPWHOIS：公开示例/限流"
+    assert_match(/参数\s+\|\s+IPWHOIS/, stdout)
+    assert_match(/查询状态\s+\|\s+限流/, stdout)
     assert_match(/来源\/状态\s+\|\s+公开示例\/限流/, stdout)
     refute_match(/低风险|\|\s+否/, stdout)
+  end
+
+  def test_cloudflare_network_context_is_visible_without_threat_categories
+    probe = <<~'ZSH'
+      setopt KSH_ARRAYS
+      source "$1"
+      source "$2"
+      YY="$3"
+      typeset -A sscore cloudflare
+      sscore[title]=Scores
+      cloudflare[status]=ok cloudflare[threats_json]=null
+      cloudflare[network]=AS64500 cloudflare[countrycode]=US
+      cloudflare[infrastructure]=isp cloudflare[org]='Example Network 测试'
+      show_score
+    ZSH
+    %w[cn en].each do |language|
+      stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
+        "cloudflare-asn-context", REPUTATION_REPORT, TERMINAL_LIBRARY, language)
+      assert status.success?, stderr
+      assert_empty stderr
+      assert_match(/Cloudflare\s+\|\s+ASN\s+\|\s+ASN(?:所属地| country)\s+\|\s+ASN(?:类型| type)\s+\|\s+ASN(?:组织| organization)/, stdout)
+      assert_match(/(?:网络归属|ASN context)\s+\|\s+AS64500\s+\|\s+US\s+\|\s+isp\s+\|\s+Example Network 测试/, stdout)
+      assert_match(/(?:分值|Score)\s+\|\s+-\s*$/, stdout)
+      assert_match(/(?:分段\/标签|Band \/ label)\s+\|\s+-\s*$/, stdout)
+      refute_match(/威胁类别=|Threat Score|clean|低风险|Low/, stdout)
+      context_rows = stdout.lines.select { |line| line.start_with?("Cloudflare", "网络归属", "ASN context") }
+      widths = context_rows.map do |line|
+        line.split("|").map { |cell| cell.chars.sum { |char| char.ascii_only? ? 1 : 2 } }
+      end
+      assert_equal 2, context_rows.length
+      assert_equal 1, widths.uniq.length, context_rows.join
+    end
+  end
+
+  def test_cloudflare_unavailable_context_does_not_repeat_network_rows
+    probe = <<~'ZSH'
+      source "$1"
+      source "$2"
+      YY=en
+      typeset -A sscore cloudflare
+      sscore[title]=Scores
+      cloudflare[status]="$3"
+      [[ "$3" != ok ]]&&cloudflare[network]=AS64500
+      show_score
+    ZSH
+    %w[ok rate_limited not_configured invalid_response].each do |state|
+      stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
+        "cloudflare-no-asn-context", REPUTATION_REPORT, TERMINAL_LIBRARY, state)
+      assert status.success?, stderr
+      assert_empty stderr
+      assert_includes stdout, "Cloudflare"
+      refute_match(/ASN|AS64500|Low/, stdout)
+    end
   end
 
   def test_score_columns_expand_together_for_long_scales_and_demo_statuses
