@@ -213,50 +213,10 @@ esac
 print -rn -- "${state_color}$state_label${Font_Suffix:-}"
 }
 
-report_table_cell(){
-typeset value="$1"
-typeset width="$2"
-typeset visible padding
-visible=$(display_width "$value")
-padding=$((width-visible))
-[[ $padding -lt 0 ]]&&padding=0
-print -rn -- "$value"
-printf '%*s' "$padding" ''
-}
-
-report_table_row(){
-typeset label="$1"
-typeset label_width="$2"
-typeset cell_width="$3"
-shift 3
-report_table_cell "$label" "$label_width"
-typeset value
-for value in "$@";do
-print -rn -- " | "
-report_table_cell "$value" "$cell_width"
-done
-print
-}
-
-report_table_rule(){
-typeset columns="$1"
-typeset label_width="$2"
-typeset cell_width="$3"
-typeset rule=""
-typeset index column
-for ((index=0;index<label_width;index++));do rule+="-";done
-for ((column=0;column<columns;column++));do
-rule+="-+-"
-for ((index=0;index<cell_width;index++));do rule+="-";done
-done
-print -r -- "$rule"
-}
-
 report_factor_row(){
 typeset label="$1"
-typeset label_width="$2"
-typeset cell_width="$3"
-shift 3
+typeset widths="$2"
+shift 2
 typeset -a values rendered
 values=("$@")
 report_any_known "${values[@]}"||return 0
@@ -264,7 +224,7 @@ typeset value
 for value in "${values[@]}";do
 rendered+=("$(report_factor_or_dash "$value")")
 done
-report_table_row "$label" "$label_width" "$cell_width" "${rendered[@]}"
+terminal_table_row "$widths" "$label" "${rendered[@]}"
 }
 
 show_type(){
@@ -322,11 +282,12 @@ field_label="参数" source_label="来源" usage_label="使用类型" company_la
 else
 field_label="Field" source_label="Source" usage_label="Usage" company_label="Company" cell_width=19
 fi
-report_table_row "${Font_B}${field_label}${Font_Suffix}" 10 "$cell_width" "${headers[@]}"
-report_table_rule "${#headers[@]}" 10 "$cell_width"
-report_table_row "$source_label" 10 "$cell_width" "${rendered_sources[@]}"
-report_table_row "$usage_label" 10 "$cell_width" "${rendered_usages[@]}"
-report_table_row "$company_label" 10 "$cell_width" "${rendered_companies[@]}"
+typeset widths="10 $(terminal_table_widths "$cell_width" "${#headers[@]}" "${headers[@]}" "${rendered_sources[@]}" "${rendered_usages[@]}" "${rendered_companies[@]}")"
+terminal_table_row "$widths" "${Font_B}${field_label}${Font_Suffix}" "${headers[@]}"
+terminal_table_rule "$widths"
+terminal_table_row "$widths" "$source_label" "${rendered_sources[@]}"
+terminal_table_row "$widths" "$usage_label" "${rendered_usages[@]}"
+terminal_table_row "$widths" "$company_label" "${rendered_companies[@]}"
 }
 
 report_cloudflare_threats(){
@@ -339,29 +300,10 @@ report_dash
 fi
 }
 
-report_cloudflare_network(){
-[[ "${cloudflare[status]:-}" == ok ]]||return 0
-report_any_known "${cloudflare[network]}" "${cloudflare[countrycode]}" "${cloudflare[infrastructure]}" "${cloudflare[org]}"||return 0
-typeset -a labels values rendered
-typeset row_label cell_width=12 label_width=11 value width
-if [[ "$YY" == cn ]];then
-labels=("ASN" "ASN所属地" "ASN类型" "ASN组织") row_label="网络归属"
-else
-labels=("ASN" "ASN country" "ASN type" "ASN organization") row_label="ASN context"
-fi
-values=("${cloudflare[network]}" "${cloudflare[countrycode]}" "${cloudflare[infrastructure]}" "${cloudflare[org]}")
-for value in "${values[@]}";do rendered+=("$(report_neutral_or_dash "$value")");done
-for value in "${labels[@]}" "${rendered[@]}";do
-width=$(display_width "$value")
-(( width > cell_width ))&&cell_width=$width
-done
-report_table_row "${Font_B}${Font_Cyan}Cloudflare${Font_Suffix}" "$label_width" "$cell_width" "${labels[@]}"
-report_table_rule 4 "$label_width" "$cell_width"
-report_table_row "$row_label" "$label_width" "$cell_width" "${rendered[@]}"
-}
-
 show_score(){
+setopt localoptions KSH_ARRAYS
 typeset -a headers scores risks scales source_statuses
+typeset -i cloudflare_column=-1
 if report_any_known "${ip2location[score]}" "${ip2location[risk]}";then
 headers+=("${Font_B}${Font_Cyan}IP2Location$Font_Suffix")
 scores+=("${ip2location[score]}") risks+=("${ip2location[risk]}") scales+=("0-99 potential")
@@ -397,6 +339,7 @@ fi
 source_statuses+=("$(report_score_source_status "$ipqs_source_kind" "$ipqs_query_status")")
 fi
 if [[ -n "${cloudflare[status]:-}" ]];then
+cloudflare_column=${#headers[@]}
 headers+=("${Font_B}${Font_Cyan}Cloudflare$Font_Suffix")
 scores+=("") risks+=("$(report_cloudflare_threats)") scales+=("threat categories")
 source_statuses+=("$(report_score_source_status official "${cloudflare[status]}")")
@@ -408,7 +351,6 @@ source_statuses+=("$(report_score_source_status demo "${dbip[risk_status]:-${dbi
 fi
 (( ${#headers[@]} )) || return 0
 print -r -- "$Font_B${sscore[title]}$Font_Suffix"
-if (( ${#headers[@]} ));then
 typeset value
 typeset -a rendered_scores rendered_risks rendered_scales
 for value in "${scores[@]}";do rendered_scores+=("$(report_neutral_or_dash "$value")");done
@@ -422,25 +364,45 @@ else
 field_label="Field" score_label="Score" band_label="Band / label" scale_label="Scale" source_status_label="Source/status" cell_width=19
 note="Note: provider scales differ; - means that source did not supply the field."
 fi
-# Keep every row aligned when a source status or scale exceeds the baseline.
-typeset value_width
-for value in "${headers[@]}" "${rendered_scores[@]}" "${rendered_risks[@]}" "${rendered_scales[@]}" "${source_statuses[@]}";do
-value_width=$(display_width "$value")
-(( value_width > cell_width ))&&cell_width=$value_width
+# Keep Cloudflare context in its provider column, inside the same matrix.
+typeset -a context_labels context_cells
+typeset field label dash="$(report_dash)"
+typeset -i column offset
+if [[ "${cloudflare[status]:-}" == ok ]]&&
+   report_any_known "${cloudflare[network]}" "${cloudflare[countrycode]}" "${cloudflare[infrastructure]}" "${cloudflare[org]}";then
+if [[ "$YY" == cn ]];then
+context_labels=("ASN" "ASN所属地" "ASN类型" "ASN组织")
+else
+context_labels=("ASN" "ASN country" "ASN type" "ASN organization")
+fi
+for field in network countrycode infrastructure org;do
+value=$(report_neutral_or_dash "${cloudflare[$field]}")
+for ((column=0;column<${#headers[@]};column++));do
+if (( column == cloudflare_column ));then context_cells+=("$value")
+else context_cells+=("$dash")
+fi
 done
-for value in "$field_label" "$score_label" "$band_label" "$scale_label" "$source_status_label";do
+done
+fi
+typeset value_width
+for value in "$field_label" "$score_label" "$band_label" "$scale_label" "$source_status_label" "${context_labels[@]}";do
 value_width=$(display_width "$value")
 (( value_width > label_width ))&&label_width=$value_width
 done
+typeset widths="$label_width $(terminal_table_widths "$cell_width" "${#headers[@]}" "${headers[@]}" "${rendered_scores[@]}" "${rendered_risks[@]}" "${rendered_scales[@]}" "${source_statuses[@]}" "${context_cells[@]}")"
 print -r -- "$note"
-report_table_row "${Font_B}${field_label}${Font_Suffix}" "$label_width" "$cell_width" "${headers[@]}"
-report_table_rule "${#headers[@]}" "$label_width" "$cell_width"
-report_table_row "$score_label" "$label_width" "$cell_width" "${rendered_scores[@]}"
-report_any_known "${risks[@]}"&&report_table_row "$band_label" "$label_width" "$cell_width" "${rendered_risks[@]}"
-report_table_row "$scale_label" "$label_width" "$cell_width" "${rendered_scales[@]}"
-report_table_row "$source_status_label" "$label_width" "$cell_width" "${source_statuses[@]}"
-fi
-report_cloudflare_network
+terminal_table_row "$widths" "${Font_B}${field_label}${Font_Suffix}" "${headers[@]}"
+terminal_table_rule "$widths"
+terminal_table_row "$widths" "$score_label" "${rendered_scores[@]}"
+report_any_known "${risks[@]}"&&terminal_table_row "$widths" "$band_label" "${rendered_risks[@]}"
+terminal_table_row "$widths" "$scale_label" "${rendered_scales[@]}"
+terminal_table_row "$widths" "$source_status_label" "${source_statuses[@]}"
+offset=0
+for label in "${context_labels[@]}";do
+terminal_table_row "$widths" "$label" "${context_cells[@]:$offset:${#headers[@]}}"
+(( offset += ${#headers[@]} ))
+done
+return 0
 }
 
 show_factor(){
@@ -509,31 +471,28 @@ proxies+=("${ipwhois[proxy]}") vpns+=("${ipwhois[vpn]}") tors+=("${ipwhois[tor]}
 fi
 (( ${#headers[@]} ))||return 0
 print -r -- "$Font_B${sfactor[title]}$Font_Suffix"
-typeset field_label status_label cell_width=12 value width
+typeset field_label status_label widths
 [[ "$YY" == "cn" ]]&&{ field_label="参数"; status_label="查询状态"; }||{ field_label="Field"; status_label="Status"; }
-for value in "${headers[@]}" "${statuses[@]}";do
-width=$(display_width "$value")
-(( width > cell_width ))&&cell_width=$width
-done
-report_table_row "${Font_B}${field_label}${Font_Suffix}" 8 "$cell_width" "${headers[@]}"
-report_table_rule "${#headers[@]}" 8 "$cell_width"
-report_table_row "$status_label" 8 "$cell_width" "${statuses[@]}"
+widths="8 $(terminal_table_widths 12 "${#headers[@]}" "${headers[@]}" "${statuses[@]}")"
+terminal_table_row "$widths" "${Font_B}${field_label}${Font_Suffix}" "${headers[@]}"
+terminal_table_rule "$widths"
+terminal_table_row "$widths" "$status_label" "${statuses[@]}"
 if [[ "$YY" == "cn" ]];then
-report_factor_row "地区" 8 "$cell_width" "${countries[@]}"
-report_factor_row "代理" 8 "$cell_width" "${proxies[@]}"
-report_factor_row "VPN" 8 "$cell_width" "${vpns[@]}"
-report_factor_row "Tor" 8 "$cell_width" "${tors[@]}"
-report_factor_row "机房" 8 "$cell_width" "${servers[@]}"
-report_factor_row "滥用" 8 "$cell_width" "${abusers[@]}"
-report_factor_row "机器人" 8 "$cell_width" "${robots[@]}"
+report_factor_row "地区" "$widths" "${countries[@]}"
+report_factor_row "代理" "$widths" "${proxies[@]}"
+report_factor_row "VPN" "$widths" "${vpns[@]}"
+report_factor_row "Tor" "$widths" "${tors[@]}"
+report_factor_row "机房" "$widths" "${servers[@]}"
+report_factor_row "滥用" "$widths" "${abusers[@]}"
+report_factor_row "机器人" "$widths" "${robots[@]}"
 else
-report_factor_row "Region" 8 "$cell_width" "${countries[@]}"
-report_factor_row "Proxy" 8 "$cell_width" "${proxies[@]}"
-report_factor_row "VPN" 8 "$cell_width" "${vpns[@]}"
-report_factor_row "Tor" 8 "$cell_width" "${tors[@]}"
-report_factor_row "Hosting" 8 "$cell_width" "${servers[@]}"
-report_factor_row "Abuse" 8 "$cell_width" "${abusers[@]}"
-report_factor_row "Bot" 8 "$cell_width" "${robots[@]}"
+report_factor_row "Region" "$widths" "${countries[@]}"
+report_factor_row "Proxy" "$widths" "${proxies[@]}"
+report_factor_row "VPN" "$widths" "${vpns[@]}"
+report_factor_row "Tor" "$widths" "${tors[@]}"
+report_factor_row "Hosting" "$widths" "${servers[@]}"
+report_factor_row "Abuse" "$widths" "${abusers[@]}"
+report_factor_row "Bot" "$widths" "${robots[@]}"
 fi
 }
 

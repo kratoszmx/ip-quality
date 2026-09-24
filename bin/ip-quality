@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-09-24-standalone.22"
+script_version="v2026-09-24-standalone.23"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset COMMON_DIR="$SCRIPT_DIR/common"
@@ -156,11 +156,9 @@ swarn[61]="ERROR: DNSBL scope supports IPv4 only!"
 swarn[62]="ERROR: an explicit target IP supports reputation or DNSBL scope only!"
 swarn[63]="ERROR: the explicit target IP conflicts with the selected address family!"
 sinfo[database]="Checking IP database "
-sinfo[ai]="Checking AI provider "
 sinfo[mail]="Connecting Email server "
 sinfo[dnsbl]="Checking Blacklist database "
 sinfo[ldatabase]=21
-sinfo[lai]=21
 sinfo[lmail]=24
 sinfo[ldnsbl]=28
 shead[title]="IP QUALITY CHECK REPORT: "
@@ -256,11 +254,9 @@ swarn[61]="错误：DNSBL范围仅支持IPv4！"
 swarn[62]="错误：指定公网IP仅支持信誉或DNSBL范围！"
 swarn[63]="错误：指定公网IP与选择的IPv4/IPv6类型冲突！"
 sinfo[database]="正在检测IP数据库 "
-sinfo[ai]="正在检测AI服务商 "
 sinfo[mail]="正在连接邮件服务商 "
 sinfo[dnsbl]="正在检测黑名单数据库 "
 sinfo[ldatabase]=17
-sinfo[lai]=17
 sinfo[lmail]=19
 sinfo[ldnsbl]=21
 shead[title]="IP质量体检报告："

@@ -29,7 +29,7 @@ the tests and claiming a complete pass.
 
 | File | Responsibility |
 | --- | --- |
-| `test/common_test.rb` | Printable text, jq value types/bounds/controls, proxy overrides, verified-file snapshots |
+| `test/common_test.rb` | Printable text, jq value types/bounds/controls, ANSI table widths/shape, proxy overrides, verified-file snapshots |
 | `test/ip_quality_test.rb` | CLI plans and rejection gates, dependency failure, fixture DNSBL/SMTP execution |
 | `test/providers_test.rb` | Provider parsing, unknown/failure semantics, credentials, zero-credit preflight |
 | `test/dbip_test.rb` | Demo exact-IP/geography validation, no invented score, two-request visitor flow, route preservation and bounded guest tokens |
@@ -89,11 +89,15 @@ page/transport/quota failures. IPWHOIS tests require its website request headers
 Report tests retain ipapi.is for anonymous, limited and failed lookups in both
 languages, with missing values distinct from false. Query statuses stay aligned
 inside the factor matrix, including long TLS-error labels. Cloudflare's ASN
-context is visible in section 3 even when categories are missing; failed or empty
-context queries create no context table. Categories keep null and empty-array
+context remains in its column of the single section 3 matrix, even when
+categories are missing. A long organization expands only that provider's column;
+failed or empty context queries add no context rows. Categories keep null and empty-array
 meanings, numeric scores remain absent, and routine provider footers stay removed.
 MCP tests separately cover
 request_egress metadata, visitor-token redaction and no-retry behavior.
+Shodan parser regressions reject fractional/out-of-range ports and control text,
+clearing any previous observations on rejection. Shared table tests run without
+provider state and check ANSI/CJK alignment, invalid dimensions and option scope.
 
 - Reporter CLI tests copy only runtime source/data into an owned temporary
   directory, use an empty credentials configuration directory, and replace

@@ -14,8 +14,8 @@ The optional Node account MCPs reuse the mcps JavaScript library described below
 | Definition | Production callers | Responsibility |
 | --- | --- | --- |
 | `common/provider_values.zsh` | Provider parsers and `bin/ip-quality` | Validate/normalize provider values without source-specific schemas |
-| `common/json_values.jq` | ipapi, Cloudflare, IPWHOIS and DB-IP parsers | Optional bounded text/integer predicates; source schemas stay in each parser |
-| `common/terminal.zsh` | `bin/ip-quality` and `report/reputation.zsh` | Remove terminal formatting and measure the project's display-cell approximation |
+| `common/json_values.jq` | ipapi, Cloudflare, IPWHOIS, DB-IP and Shodan parsers | Optional bounded text/integer predicates; source schemas stay in each parser |
+| `common/terminal.zsh` | `bin/ip-quality`; type, score and factor renderers in `report/reputation.zsh` | ANSI cleanup, display-cell measurement and aligned table layout with independent column widths |
 | `common/text.rb` | `leaf_runner/profile.rb`, `leaf_runner/subscription_catalog.rb` | Validate bounded printable metadata |
 | `common/safe_snapshot.rb` | Profile, catalog, and isolated Mihomo session | Read or verify owner-controlled local files and compare snapshots |
 | `common/network_environment.rb` | Direct route command and isolated Mihomo session | Produce child-process overrides removing inherited proxies |
@@ -62,10 +62,12 @@ the module exists as a readable regular file before any lookup.
 jq -n -L common 'include "json_values"; text_or_null("香港"; 2)'
 ```
 
-These predicates unify the repeated value validation in four providers. They
+These predicates unify repeated value validation in five providers. They
 do not interpret absence as false or validate IP/ASN/source schemas. Text control
 characters are rejected before they reach the terminal. String-form ASNs are
 still accepted only by providers whose contracts explicitly allow them.
+Shodan requires non-null elements before applying the optional predicates;
+fractional/out-of-range ports and control characters in text arrays are rejected.
 
 IPQS connection-type classification belongs to
 `providers/ipqualityscore.zsh::ipqualityscore_connection_type_server_flag`.
@@ -80,11 +82,40 @@ functions do not depend on report colors, language, or provider state.
 | --- | --- |
 | `clean_ansi TEXT [preserve]` | Decodes literal `\033`, removes ANSI sequences ending in `m`, `G`, `K`, `H`, or `F`, and trims each line's surrounding whitespace by default; `preserve` retains layout whitespace; adds no newline |
 | `display_width TEXT` | Decimal cell count for a single-line label after ANSI cleanup, including visible leading/trailing spaces; ASCII characters count as one cell and other characters as two |
+| `terminal_table_widths MIN COLUMNS CELL...` | Space-separated widths, one per column, computed from complete rows supplied in row order; each width is at least nonnegative `MIN`. Returns 2 for invalid dimensions or an incomplete row |
+| `terminal_table_cell TEXT WIDTH` | Prints the original text and padding to a nonnegative width; longer text is preserved without truncation |
+| `terminal_table_row "WIDTH..." CELL...` | Prints one row with ` | ` separators and a newline. Requires one nonnegative width per cell; invalid shape returns 2 before printing |
+| `terminal_table_rule "WIDTH..."` | Prints the matching `-+-` rule; invalid widths return 2 before printing |
+
+```zsh
+source common/terminal.zsh
+widths=$(terminal_table_widths 4 2 Name Region 'Example network' HK)
+terminal_table_row "$widths" Name Region
+terminal_table_rule "$widths"
+terminal_table_row "$widths" 'Example network' HK
+```
+
+Render values before measuring them. Each renderer prepends its label-column
+width and uses the same resulting width list for its header, rule and data rows.
+One long organization or error label expands only its own provider column.
+These functions preserve the caller's zsh options, including `KSH_ARRAYS`.
+The former `report_table_*` definitions are removed; callers use the common
+implementations directly, with no forwarding aliases.
 
 The width rule is the existing report-table approximation, now also used by
 headers. It is not a full Unicode `wcwidth` implementation: combining marks,
 emoji sequences, and ambiguous-width characters can differ between terminals.
-Padding/clamping and source-specific labels stay with the rendering callers.
+Source labels, status colors, missing-value policy and provider-row selection
+stay in `report/`; the common table code knows none of them.
+
+The September 24 audit retained all existing common modules: provider values,
+jq value predicates, terminal text, metadata, file snapshots and proxy overrides
+have reusable contracts. No existing common implementation needed relocation.
+Provider schemas and IPQS connection-type mapping remain provider-owned;
+Mihomo lifecycle remains runner-owned. Its redundant clock forwarding method
+was removed in favor of direct Ruby standard-library calls. The inspected
+myutils public APIs are Python modules and do not supply this zsh table contract;
+no Python subprocess or adapter was added to the reporter.
 
 ## Ruby metadata
 

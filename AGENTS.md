@@ -177,7 +177,7 @@ live in [PROVIDERS.md](PROVIDERS.md); consult it when changing a source.
 
 - `bin/ip-quality`: CLI policy, live queries, aggregation, and JSON assembly.
 - `bin/test-clash-leaf`: direct Ruby entrypoint, CLI policy, and route selection.
-- `common/`: shared provider values, jq value predicates, terminal text, printable metadata,
+- `common/`: shared provider values, jq value predicates, terminal text/table layout, printable metadata,
   verified-file snapshots, and child-process proxy overrides; see
   [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md).
 - `leaf_runner/`: cached-subscription selection, exact-leaf extraction,

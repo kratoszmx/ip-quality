@@ -90,6 +90,29 @@ class ProvidersTest < ReporterTestCase
     refute mismatch_status.success?
   end
 
+  def test_shodan_rejects_fractional_ports_and_control_text_without_retaining_observations
+    fixture = JSON.parse(File.read(INTERNETDB_FIXTURE))
+    probe = <<~'ZSH'
+      source "$1"
+      internetdb_parse_response "$(<"$2")" 198.51.100.23 || exit 1
+      internetdb_parse_response "$3" 198.51.100.23 && exit 2
+      (( ${#internetdb_parsed[@]} == 0 ))
+    ZSH
+    invalid = [22.5, -1, 0, 65536, nil, "443", true].map { |value| fixture.merge("ports" => [value]) }
+    %w[tags vulns hostnames].each do |field|
+      ["value\nnext", "\e[31mtext", "value\0", nil].each do |value|
+        invalid << fixture.merge(field => [value])
+      end
+    end
+    invalid.each do |body|
+      stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
+        "shodan-invalid-values", INTERNETDB_LIBRARY, INTERNETDB_FIXTURE, JSON.generate(body))
+      assert status.success?, "accepted malformed or retained previous fields: #{body.inspect}; #{stderr}"
+      assert_empty stdout
+      assert_empty stderr
+    end
+  end
+
   def test_common_provider_helpers_validate_objects_and_merge_boolean_signals_conservatively
     helper_probe = <<~'ZSH'
       source "$1"

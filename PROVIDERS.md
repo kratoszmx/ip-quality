@@ -85,7 +85,7 @@ fields are comparable:
 | --- | --- |
 | Basic information | Check.Place/MaxMind-shaped response, with IPinfo as fallback |
 | Type matrix | IPinfo, Ipregistry, IPQS, ipapi.is, IP2Location, AbuseIPDB when a type exists in the response |
-| Score section | IP2Location, Scamalytics, ipapi.is, AbuseIPDB, IPQS; Cloudflare and DB-IP have named columns with null numeric scores. Cloudflare supplies threat categories and an ASN context table; DB-IP supplies its original threat label when available |
+| Score section | IP2Location, Scamalytics, ipapi.is, AbuseIPDB, IPQS; Cloudflare and DB-IP have named columns with null numeric scores. Cloudflare threat categories and ASN context stay in its column of the same matrix; DB-IP supplies its original threat label when available |
 | Factor matrix | IP2Location, Ipregistry, IPQS, Scamalytics, ipdata, IPinfo when a factor exists; ipapi.is and IPWHOIS retain columns and lookup status even when risk data is missing |
 | Official/public network observations | Ping0, RIPEstat, Shodan InternetDB; anonymous ipapi context if relevant. Cloudflare, DB-IP and IPWHOIS are absent from section 5 |
 
@@ -149,10 +149,12 @@ fields are comparable:
   Section 3 includes a Cloudflare column, official query status and actual threat
   categories in its band/label row. Missing categories display `-`; an explicit
   empty array says "none listed". Score.Cloudflare remains null. A successful
-  response also shows a compact table for ASN, ASN country, ASN type and ASN
-  organization. These are `belongs_to_ref` attributes: the country belongs to
+  response adds ASN, ASN country, ASN type and ASN organization rows to the same
+  matrix, with values in the Cloudflare column and `-` in the other columns.
+  There is one header and one separator rule, with independently measured
+  column widths. These are `belongs_to_ref` attributes: the country belongs to
   the ASN context and the type classifies the ASN, not whether the tested IP
-  itself is residential, a VPN or clean. This context table is omitted when
+  itself is residential, a VPN or clean. These context rows are omitted when
   the query fails or all four fields are absent.
   Cloudflare's current WAF documentation says legacy Threat Score is always 0
   and no longer populated. The old upstream fetched `.ip.riskScore` from the
@@ -182,7 +184,9 @@ fields are comparable:
   in `ProviderStatus`.
 - Ping0 accepts exactly four bounded lines and requires the returned IP to match.
   RIPEstat validates prefix/ASN structure. Shodan validates the target IP and
-  bounded arrays; its documented no-information response means no public record,
+  bounded arrays. Ports must be integers from 1 through 65535, and text array
+  elements must be bounded strings without control characters; malformed values
+  are unavailable, not usable observations. Its documented no-information response means no public record,
   not a clean reputation judgment. Arbitrary upstream error text is not echoed.
 - Default terminal and JSON output mask both the tested address and any RIPEstat
   prefix derived from it. `-f` is required to reveal either.

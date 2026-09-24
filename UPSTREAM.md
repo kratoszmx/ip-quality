@@ -71,7 +71,8 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   sections 3/4 and are removed from terminal section 5. Cloudflare's retired,
   now constant-zero Threat Score is explicitly excluded from clean-IP evidence;
   its current IP Intelligence threat categories remain identifiable. Section 3
-  also displays its successful ASN country/type/organization observations.
+  also displays its successful ASN country/type/organization observations as
+  rows in the same matrix, within the Cloudflare column.
 - Replaced score bars with aligned per-provider type/score/factor matrices,
   provider-specific scales, ASCII missing-field markers, colored risk factors,
   and compact unavailable-source summaries. IPQS keeps a source/status row;
@@ -93,11 +94,15 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 - Split runner, provider, and report responsibilities. Consolidated verified
   file snapshots, proxy-environment overrides, printable metadata validation,
   provider value normalization, and terminal text helpers under `common/`.
-  Shared bounded text/integer jq predicates now serve four provider parsers;
+  Shared bounded text/integer jq predicates now serve five provider parsers,
+  including Shodan's integer-port and control-text validation;
   IPQS-only connection-type classification lives back in its provider module.
   The route command now lives directly in `bin/test-clash-leaf`; removed the
   shell forwarding entrypoint and report-output forwarding helper. Header and
-  table width calculations share one character-based implementation.
+  table width calculations share one character-based implementation. Generic
+  table measurement, cell padding, rows and rules now live in common/terminal.zsh;
+  type/score/factor matrices use independent column widths. Removed the runner's
+  clock forwarding method and unused media/AI progress labels.
 - Extracted the complete `network-manager/ip-quality/` history into standalone
   `ipquality` on 2026-08-23 and removed obsolete parent routing hooks.
 - Added optional Node account MCPs under `mcp/`: IPQS moved from mcps on

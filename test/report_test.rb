@@ -131,17 +131,19 @@ class ReportTest < ReporterTestCase
     refute_match(/低风险|\|\s+否/, stdout)
   end
 
-  def test_cloudflare_network_context_is_visible_without_threat_categories
+  def test_cloudflare_context_stays_in_its_column_in_one_score_matrix
     probe = <<~'ZSH'
       setopt KSH_ARRAYS
       source "$1"
       source "$2"
       YY="$3"
-      typeset -A sscore cloudflare
+      typeset -A sscore cloudflare ip2location scamalytics ipapi abuseipdb ipqs dbip
       sscore[title]=Scores
+      ip2location[score]=0 scamalytics[score]=0 ipapi[score]='0.14%'
+      abuseipdb[score]=2 ipqs[score]=0 dbip[status]=ok dbip[risk_status]=ok dbip[risk]=low
       cloudflare[status]=ok cloudflare[threats_json]=null
-      cloudflare[network]=AS64500 cloudflare[countrycode]=US
-      cloudflare[infrastructure]=isp cloudflare[org]='Example Network 测试'
+      cloudflare[network]=AS9808 cloudflare[countrycode]=CN
+      cloudflare[infrastructure]=isp cloudflare[org]='China Mobile Communications Group Co., Ltd.'
       show_score
     ZSH
     %w[cn en].each do |language|
@@ -149,17 +151,31 @@ class ReportTest < ReporterTestCase
         "cloudflare-asn-context", REPUTATION_REPORT, TERMINAL_LIBRARY, language)
       assert status.success?, stderr
       assert_empty stderr
-      assert_match(/Cloudflare\s+\|\s+ASN\s+\|\s+ASN(?:所属地| country)\s+\|\s+ASN(?:类型| type)\s+\|\s+ASN(?:组织| organization)/, stdout)
-      assert_match(/(?:网络归属|ASN context)\s+\|\s+AS64500\s+\|\s+US\s+\|\s+isp\s+\|\s+Example Network 测试/, stdout)
-      assert_match(/(?:分值|Score)\s+\|\s+-\s*$/, stdout)
-      assert_match(/(?:分段\/标签|Band \/ label)\s+\|\s+-\s*$/, stdout)
+      rows = stdout.lines.select { |line| line.include?(" | ") }
+      cells = rows.map { |line| line.split("|").map(&:strip) }
+      assert_equal %w[IP2Location Scamalytics ipapi.is AbuseIPDB IPQS Cloudflare DB-IP], cells.first.drop(1)
+      labels = language == "cn" ? ["ASN", "ASN所属地", "ASN类型", "ASN组织"] : ["ASN", "ASN country", "ASN type", "ASN organization"]
+      labels.zip(["AS9808", "CN", "isp", "China Mobile Communications Group Co., Ltd."]).each do |label, value|
+        row = cells.find { |entry| entry.first == label }
+        refute_nil row, stdout
+        expected = Array.new(7, "-")
+        expected[5] = value
+        assert_equal expected, row.drop(1), stdout
+      end
+      %w[分值 Score 分段/标签].push("Band / label").each do |label|
+        row = cells.find { |entry| entry.first == label }
+        assert_equal "-", row[6] if row
+      end
+      assert_equal 1, stdout.lines.count { |line| line.match?(/^(?:参数|Field)\s+\|/) }
+      assert_equal 1, stdout.lines.count { |line| line.match?(/\A[-+]+\n\z/) }
+      refute_match(/^Cloudflare\s+\||网络归属|ASN context/, stdout)
       refute_match(/威胁类别=|Threat Score|clean|低风险|Low/, stdout)
-      context_rows = stdout.lines.select { |line| line.start_with?("Cloudflare", "网络归属", "ASN context") }
-      widths = context_rows.map do |line|
+      widths = rows.map do |line|
         line.split("|").map { |cell| cell.chars.sum { |char| char.ascii_only? ? 1 : 2 } }
       end
-      assert_equal 2, context_rows.length
-      assert_equal 1, widths.uniq.length, context_rows.join
+      assert_equal 1, widths.uniq.length, rows.join
+      assert_operator widths.first[6], :>, widths.first[1]
+      assert_operator widths.first[6], :>, widths.first[7]
     end
   end
 
@@ -184,7 +200,7 @@ class ReportTest < ReporterTestCase
     end
   end
 
-  def test_score_columns_expand_together_for_long_scales_and_demo_statuses
+  def test_score_rows_align_with_independent_column_widths
     probe = <<~'ZSH'
       setopt KSH_ARRAYS
       source "$1"
@@ -295,7 +311,7 @@ end
       for value in 'abc' '中文' $'\033[31mA中\033[0m' ' A中 ' '\033[31mA中\033[0m'; do
         print -r -- "$(display_width "$value")"
       done
-      report_table_cell $'\033[31m A中 \033[0m' 8
+      terminal_table_cell $'\033[31m A中 \033[0m' 8
       print -r -- '|'
       calc_padding ' A中 ' 11
       print -r -- "${#PADDING}"

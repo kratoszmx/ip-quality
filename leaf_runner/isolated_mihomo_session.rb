@@ -269,8 +269,8 @@ module IpQuality
     end
 
     def wait_for_owned_listener(candidate_port)
-      deadline = monotonic_time + START_TIMEOUT_SECONDS
-      while monotonic_time < deadline
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + START_TIMEOUT_SECONDS
+      while Process.clock_gettime(Process::CLOCK_MONOTONIC) < deadline
         return false if reap_if_exited
         return true if listener_owned_by_child?(candidate_port)
 
@@ -322,8 +322,8 @@ module IpQuality
       end
 
       process_group_signal("TERM")
-      deadline = monotonic_time + STOP_TIMEOUT_SECONDS
-      until monotonic_time >= deadline
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + STOP_TIMEOUT_SECONDS
+      until Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
         break if reap_if_exited
 
         sleep 0.05
@@ -343,10 +343,6 @@ module IpQuality
       Process.kill(signal, -@pid)
     rescue Errno::ESRCH
       nil
-    end
-
-    def monotonic_time
-      Process.clock_gettime(Process::CLOCK_MONOTONIC)
     end
   end
 end

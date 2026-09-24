@@ -27,21 +27,22 @@ typeset response="$1"
 typeset expected_ip="$2"
 
 internetdb_parsed=()
-print -rn -- "$response"|jq -e --arg expected "$expected_ip" '
+print -rn -- "$response"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg expected "$expected_ip" '
+  include "json_values";
   type == "object" and
   .ip == $expected and
   (.ports | type == "array") and
   (.ports | length <= 256) and
-  all(.ports[]; type == "number" and . >= 1 and . <= 65535) and
+  all(.ports[]; . != null and integer_or_null(.; 1; 65535)) and
   (.vulns | type == "array") and
   (.vulns | length <= 1024) and
-  all(.vulns[]; type == "string" and length <= 128) and
+  all(.vulns[]; . != null and text_or_null(.; 128)) and
   (.tags | type == "array") and
   (.tags | length <= 128) and
-  all(.tags[]; type == "string" and length <= 128) and
+  all(.tags[]; . != null and text_or_null(.; 128)) and
   (.hostnames | type == "array") and
   (.hostnames | length <= 128) and
-  all(.hostnames[]; type == "string" and length <= 512)
+  all(.hostnames[]; . != null and text_or_null(.; 512))
 ' >/dev/null 2>&1||return 1
 
 internetdb_parsed[status]="available"
