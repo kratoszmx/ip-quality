@@ -62,6 +62,21 @@ clearing environment variables alone leaves Chrome's macOS system proxy active.
 An existing browser with different routing arguments is rejected before account
 actions, and only its verified owner should close it before changing routes.
 
+## External checks
+
+Supervisor owns the schedule; these are bounded weekly jobs, not project daemons:
+
+| Check | Purpose |
+| --- | --- |
+| `test.mcps.ipqs-mcp.test-offline` | IPQS build and offline tests only; excludes reporter/provider-account suites and the synthetic browser test |
+| `mcp.ipqs` | One sanitized account API probe; no Chrome or reputation lookup |
+| `api.ipqs` | Local API-key expiry metadata; no provider request |
+
+Use [TESTING.md](TESTING.md) for complete project validation. The scheduler and
+its service are owned by `/Users/zmx/Projects/supervisor`; these checks remain
+useful and do not require a retained project browser. Historical support-mail
+receipts are not background services or instructions to restart a watch.
+
 ## Network-free checks
 
 There is no resident health endpoint or restart command. For a network-free

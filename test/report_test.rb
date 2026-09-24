@@ -31,9 +31,7 @@ class ReportTest < ReporterTestCase
       [types, scores, factors].each do |table|
         assert_includes table, language == "cn" ? "TLS 握手失败" : "TLS handshake failed"
         refute_match(/低风险|Low risk|\|\s+(?:是|否|Yes|No|0)\s*(?:\||$)/, table)
-        rows = table.lines.select { |line| line.include?(" | ") }
-        widths = rows.map { |line| line.split("|").map { |cell| cell.chars.sum { |char| char.ascii_only? ? 1 : 2 } } }
-        assert_equal 1, widths.uniq.length, rows.join
+        assert_aligned_table(table)
       end
     end
   end
@@ -96,10 +94,7 @@ class ReportTest < ReporterTestCase
       assert_match(/(?:参数|Field)\s+\|.*ipapi\.is.*IPQS/, stdout)
       assert_match(/(?:查询状态|Status)\s+\|\s+#{Regexp.escape(expected)}\s+\|/, stdout)
       refute_match(/^ipapi\.is[：:]/, stdout)
-      table_widths = stdout.lines.select { |line| line.include?(" | ") }.map do |line|
-        line.split("|").map { |cell| cell.chars.sum { |char| char.ascii_only? ? 1 : 2 } }
-      end
-      assert_equal 1, table_widths.uniq.length, stdout
+      assert_aligned_table(stdout)
       if args[2] == "full"
         assert_match(/(?:代理|Proxy)\s+\|\s+(?:否|No)\s+\|/, stdout)
       else
@@ -271,17 +266,7 @@ class ReportTest < ReporterTestCase
       stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "long-score-cells", REPUTATION_REPORT, TERMINAL_LIBRARY, language)
       assert status.success?, stderr
       assert_empty stderr
-      rows = stdout.lines.select { |line| line.include?(" | ") }
-      assert_operator rows.length, :>=, 4
-      positions = rows.map do |line|
-        column = 0
-        line.each_char.map do |char|
-          current = column
-          column += char.ascii_only? ? 1 : 2
-          current if char == "|"
-        end.compact
-      end
-      assert_equal 1, positions.uniq.length, rows.join
+      assert_aligned_table(stdout, minimum_rows: 4)
     end
   end
 
@@ -479,11 +464,13 @@ end
     assert_includes stdout, "\e[32m"
     assert_includes stdout, "\e[31m"
     plain = stdout.gsub(/\e\[[0-9;]*m/, "")
-    assert_match(/^分段\/标签 {2}\|/, plain)
+    assert_match(/^分段\/标签\s+\|/, plain)
     assert_match(/参数\s+\|.*Ipregistry.*IPQS.*ipapi\.is/, plain)
     refute_includes plain, "分段／标签"
     refute_includes plain, "—"
-    assert_match(/^分值 {7}\| 3 {16}\| 3 {16}\| 0\.00% {12}\| 0 {16}\| 87 {14}$/, plain)
+    score_row = plain.lines.find { |line| line.start_with?("分值") }
+    refute_nil score_row
+    assert_equal ["分值", "3", "3", "0.00%", "0", "87"], score_row.split("|").map(&:strip)
     sections = [
       plain[/二、IP类型属性\n(.*?)三、风险评分\n/m, 1],
       plain[/三、风险评分\n(.*?)四、风险因子\n/m, 1],
@@ -491,19 +478,7 @@ end
     ]
     sections.each do |section|
       refute_nil section
-      table_lines = section.lines.map(&:chomp).select { |line| line.include?("|") }
-      refute_empty table_lines
-      assert_equal 1, table_lines.map { |line| line.count("|") }.uniq.length, table_lines.join("\n")
-      separators = table_lines.map do |line|
-        positions = []
-        display_column = 0
-        line.each_char do |character|
-          positions << display_column if character == "|"
-          display_column += character.ascii_only? ? 1 : 2
-        end
-        positions
-      end
-      assert_equal 1, separators.uniq.length, table_lines.join("\n")
+      assert_aligned_table(section)
     end
     assert_equal 1, sections[0].lines.count { |line| line.start_with?("参数") }
     assert_equal 1, sections[1].lines.count { |line| line.start_with?("参数") }
@@ -755,6 +730,17 @@ end
   end
 
   private
+
+  # Keep the width oracle independent of production zsh helpers. A lone row
+  # cannot establish alignment; compare every cell, including the last column.
+  def assert_aligned_table(output, minimum_rows: 2)
+    rows = output.gsub(/\e\[[0-9;]*m/, "").lines.map(&:chomp).select { |line| line.include?("|") }
+    assert_operator rows.length, :>=, minimum_rows, output
+    widths = rows.map do |line|
+      line.split("|", -1).map { |cell| cell.chars.sum { |char| char.ascii_only? ? 1 : 2 } }
+    end
+    assert_equal 1, widths.uniq.length, rows.join("\n")
+  end
 
   def write_report(path, json, ansi)
     probe = reporter_functions("open_report_output", "write_report_output", "close_report_output") + <<~'ZSH'

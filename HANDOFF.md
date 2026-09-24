@@ -75,7 +75,7 @@ There is no project-specific skill or duplicate README.
 
 Validation on v25:
 
-- `/bin/zsh -f scripts/test-offline`: **105 Ruby tests / 2,030 assertions**,
+- `/bin/zsh -f scripts/test-offline`: **105 Ruby tests / 2,043 assertions**,
   **26 IPQS tests** plus build/static doctor, and **31 provider-account tests**;
   no failures or skips.
 - Report cases verify Cloudflare appears only in section 1, in both languages
@@ -95,6 +95,20 @@ reviewed all 13 maintained guides, and inspected both servers' actual
 instructions/tool schemas over stdio without invoking account tools. It corrected
 Ipregistry's unconfigured-column behavior, clarified HTTP-state recovery, and
 consolidated repeated audit history. No new provider or account check was made.
+
+The September 24 test/service audit retained all test cases, consolidated four
+table-alignment checks into one independent Ruby assertion, and replaced exact
+padding counts with score values plus alignment checks. The full offline and
+ten-case synthetic browser suites passed again; tracked files stayed unchanged
+during the final full run. Both MCP test guides remain current.
+
+The service audit found no project launchd entry or user cron job, owned account
+browser or listener on 19453/19503/19504. Node processes sharing this worktree were external
+text-browser-kernel clients, not project daemons. Supervisor's three weekly
+checks remain useful; its saved metadata confirms `mail.ipqs-quota-20260916`
+was cancelled on September 22. No service needed removal or shutdown.
+[SERVICES.md](SERVICES.md#external-checks) now distinguishes the weekly IPQS-only
+test from complete project validation.
 
 [TESTING.md](TESTING.md) owns complete/focused commands and their limits.
 Configured remotes are `github-kratoszmx` (`kratoszmx/ip-quality`) and

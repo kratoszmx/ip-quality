@@ -81,6 +81,10 @@ live IPQS service. Also run it whenever `dashboard-text.ts` changes; see the
 npm --prefix mcp/ipqs run test:browser-text
 ```
 
+The external Supervisor weekly test entry runs only the IPQS offline suite;
+it does not replace the complete runner or the separate browser-text check.
+See [SERVICES.md](SERVICES.md#external-checks) for scheduling ownership.
+
 ## Maintain the boundary
 
 Provider tests cover transport/schema failures, state reset and request boundaries:
@@ -88,7 +92,9 @@ DB-IP's two requests keep their route/family, IPWHOIS sends website headers,
 IPinfo validates nested objects, and Shodan rejects fractional ports/control text.
 Report tests keep failed/unconfigured sources visible, preserve unknown versus
 false/zero, and place Cloudflare only in section 1 on both basic-data paths and
-in both languages. Shared table fixtures check ANSI/CJK alignment and option scope.
+in both languages. One local Ruby assertion checks ANSI/CJK table alignment
+independently of production helpers; value checks avoid fixed padding counts.
+Shared table fixtures also check width calculation and option scope.
 
 MCP fixtures cover HTTP identity, bounded reads/cleanup, demo target/redaction and
 no-retry behavior. TOTP tests bind issuer/account and reviewed forms; the separate
