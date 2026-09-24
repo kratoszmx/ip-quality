@@ -1,18 +1,29 @@
 # DB-IP public website demo; original threat labels, never invented scores.
 typeset -gA dbip_parsed=()
 
+dbip_demo_key_from_page(){
+emulate -LR zsh
+setopt KSH_ARRAYS
+typeset pattern='data-api-key="([A-Za-z0-9_-]{8,128})"'
+[[ "$1" =~ "$pattern" ]]||return 1
+print -rn -- "${match[0]}"
+}
+
 dbip_parse_response(){
 emulate -LR zsh
 setopt KSH_ARRAYS
 typeset response="$1" expected_ip="$2"
 dbip_parsed=()
-print -rn -- "$response"|jq -e 'type == "object" and .status == "ok" and (.demoInfo | type == "object")' >/dev/null 2>&1||return 1
-response=$(print -rn -- "$response"|jq -c '.demoInfo')
+print -rn -- "$response"|jq -e 'type == "object"' >/dev/null 2>&1||return 1
 if print -rn -- "$response"|jq -e 'type == "object" and (.errorCode != null or .error != null)' >/dev/null 2>&1;then
 dbip_parsed[status]=upstream_error
-if print -rn -- "$response"|jq -e '.errorCode == "OVER_QUERY_LIMIT"' >/dev/null 2>&1;then
+if print -rn -- "$response"|jq -e '.errorCode == "OVER_QUERY_LIMIT" or (.error | type == "string" and test("over query limit|maximum number of queries"; "i"))' >/dev/null 2>&1;then
 dbip_parsed[status]=rate_limited
 fi
+return 1
+fi
+if print -rn -- "$response"|jq -e --arg expected "$expected_ip" '.ipAddress | type == "string" and . != $expected' >/dev/null 2>&1;then
+dbip_parsed[status]=ip_mismatch
 return 1
 fi
 print -rn -- "$response"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg expected "$expected_ip" '

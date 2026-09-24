@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-09-24-standalone.20"
+script_version="v2026-09-24-standalone.21"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset COMMON_DIR="$SCRIPT_DIR/common"
@@ -405,12 +405,13 @@ setopt SH_WORD_SPLIT
 typeset address_family="$1"
 typeset endpoint="$2"
 typeset maximum_bytes="${3:-262144}"
+if (( $# >= 3 ));then shift 3;else shift 2;fi
 typeset wire_response curl_exit http_code response_body
 
 PROVIDER_RESPONSE_BODY=""
 PROVIDER_RESPONSE_STATUS="unknown"
 wire_response=$(curl_safe $CurlARG -sS -L -$address_family -m 10 \
-  --max-filesize "$maximum_bytes" --write-out $'\n%{http_code}' "$endpoint" 2>/dev/null)
+  --max-filesize "$maximum_bytes" --write-out $'\n%{http_code}' "$@" "$endpoint" 2>/dev/null)
 curl_exit=$?
 if (( curl_exit != 0 )) || [[ "$wire_response" != *$'\n'* ]];then
 PROVIDER_RESPONSE_STATUS="network_error"
@@ -519,7 +520,7 @@ print -r -- "  DNSBL concurrency cap: $dnsbl_concurrency"
 print -r -- "  output: masked IP by default; local stdout/file only"
 print -r -- "  telemetry/report upload/remote code: disabled"
 scope_includes reputation&&print -r -- "  reputation sources: ipapi.is, Cloudflare IP Intelligence (when configured), Ping0, RIPEstat, Shodan InternetDB, plus configured Ipregistry/IPQS APIs"
-scope_includes reputation&&print -r -- "  public website demos: DB-IP threat labels and IPWHOIS security flags; one target lookup each, no account/key, no guaranteed quota or availability"
+scope_includes reputation&&print -r -- "  public website demos: DB-IP page + one visitor-egress lookup (must match target); IPWHOIS one target lookup; no account, no guaranteed quota or availability"
 scope_includes reputation&&print -r -- "  supplementary sources: IPinfo public demo widget plus named Check.Place relays (MaxMind-labeled, Scamalytics, AbuseIPDB, IP2Location, ipdata, IPQualityScore)"
 scope_includes reputation&&print -r -- "  Ping0 limitation: the official free /geo endpoint exposes IP/location/ASN/organization, not a risk score"
 scope_includes reputation&&print -r -- "  Cloudflare: IP Intelligence threat categories, no numeric IP score; legacy Threat Score is retired (constant zero). RIPEstat reports routing; Shodan InternetDB reports public exposure"
@@ -1362,6 +1363,8 @@ show_progress_bar "$temp_info" $((40-6-${sinfo[ldatabase]}))
 ipapi=()
 ipapi[status]="unknown"
 typeset api_key="${provider_credentials[IPAPI_API_KEY]:-}"
+ipapi[credential_mode]=anonymous
+[[ -n "$api_key" ]]&&ipapi[credential_mode]=key
 typeset endpoint="https://api.ipapi.is/?q=$IP"
 [[ -n "$api_key" ]]&&endpoint="$endpoint&key=$api_key"
 typeset wire_response curl_exit http_code RESPONSE
@@ -1375,6 +1378,11 @@ fi
 curl_exit=$?
 if (( curl_exit != 0 )) || [[ "$wire_response" != *$'\n'* ]];then
 ipapi[status]="network_error"
+case "$curl_exit" in
+28)ipapi[status]=timeout ;;
+35)ipapi[status]=tls_error ;;
+60)ipapi[status]=tls_verification_failed ;;
+esac
 return 1
 fi
 http_code="${wire_response##*$'\n'}"
@@ -1461,6 +1469,9 @@ ipapi[vpn]="${ipapi_parsed[vpn]}"
 ipapi[server]="${ipapi_parsed[server]}"
 ipapi[abuser]="${ipapi_parsed[abuser]}"
 ipapi[robot]="${ipapi_parsed[robot]}"
+ipapi[risk_status]=not_provided
+provider_has_observation "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ipapi[server]}" "${ipapi[abuser]}" "${ipapi[robot]}"&&ipapi[risk_status]=ok
+return 0
 }
 db_ipwhois(){
 local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}IPWHOIS public demo $Font_Suffix"
@@ -1469,7 +1480,10 @@ show_progress_bar "$temp_info" $((40-9-${sinfo[ldatabase]}))
 ipwhois=()
 ipwhois[status]="unknown"
 ipwhois[source]="public_demo"
-provider_fetch_public_json "$1" "https://ipwhois.io/demo?ip=$IP" 131072||true
+provider_fetch_public_json "$1" "https://ipwhois.io/demo?ip=$IP" 131072 \
+  -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' \
+  -H 'Accept: */*' -H 'Origin: https://ipwhois.io' -H 'Referer: https://ipwhois.io/' \
+  -H 'Sec-Fetch-Dest: empty' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Site: same-origin'||true
 ipwhois[status]="$PROVIDER_RESPONSE_STATUS"
 local RESPONSE="$PROVIDER_RESPONSE_BODY"
 [[ "${ipwhois[status]}" == "ok" ]]||return 0
@@ -1495,10 +1509,38 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}DB-IP public demo $
 show_progress_bar "$temp_info" $((40-9-${sinfo[ldatabase]}))
 dbip=()
 dbip[source]="public_demo"
-provider_fetch_public_json "$1" "https://db-ip.com/demo/home.php?s=$IP" 65536||true
-dbip[status]="$PROVIDER_RESPONSE_STATUS"
-[[ "${dbip[status]}" == "ok" ]]||return 0
-if dbip_parse_response "$PROVIDER_RESPONSE_BODY" "$IP";then
+dbip[status]=unknown
+typeset wire_response response_body http_code guest_key endpoint
+typeset -a demo_headers
+demo_headers=(-A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' \
+  -H 'Accept: */*' -H 'Origin: https://db-ip.com' -H 'Referer: https://db-ip.com/')
+# The website's current visitor demo is bound to the requesting egress. Keep
+# both requests on this route, including IPv6; never substitute another IP.
+endpoint='https://db-ip.com/api/core/'
+typeset step
+for step in page observation;do
+wire_response=$(curl_with_secret_url "$endpoint" $CurlARG -sS -$1 -m 10 \
+  --max-filesize 262144 --write-out $'\n%{http_code}' "${demo_headers[@]}" 2>/dev/null)
+if (( $? != 0 )) || [[ "$wire_response" != *$'\n'* ]];then
+dbip[status]=network_error
+return 0
+fi
+http_code="${wire_response##*$'\n'}"
+response_body="${wire_response%$'\n'*}"
+if [[ "$http_code" != 200 ]];then
+dbip[status]=$(provider_http_failure_status "$http_code" "$response_body")
+return 0
+fi
+if [[ "$step" == page ]];then
+guest_key=$(dbip_demo_key_from_page "$response_body")||{
+dbip[status]=invalid_response
+return 0
+}
+endpoint="https://api.db-ip.com/v2/$guest_key/self?convertCurrencies"
+fi
+done
+if dbip_parse_response "$response_body" "$IP";then
+dbip[status]=ok
 dbip[risk_status]="${dbip_parsed[risk_status]}"
 dbip[threat_level]="${dbip_parsed[threat_level]}"
 case "${dbip[threat_level]}" in
@@ -2393,6 +2435,7 @@ ipjson=$(jq -n \
 --arg status_ip2location "${ip2location[status]:-unknown}" \
 --arg status_ipdata "${ipdata[status]:-unknown}" \
 --arg status_ipapi "${ipapi[status]:-unknown}" \
+--arg ipapi_risk_status "${ipapi[risk_status]:-${ipapi[status]:-unknown}}" --arg ipapi_credential_mode "${ipapi[credential_mode]:-}" \
 --arg ipapi_mode "${ipapi[mode]:-}" --arg ipapi_ip "${ipapi[ip]:+$displayed_ip}" \
 --arg ipapi_countrycode "${ipapi[countrycode]:-}" \
 --arg ipapi_asn "${ipapi[anonymous_asn]:-}" --arg ipapi_company "${ipapi[anonymous_company]:-}" \
@@ -2528,7 +2571,10 @@ def dnsresults($value):
     Abuser: {IP2LOCATION: factor($f_ip2_abuse), ipapi: factor($f_ipapi_abuse), Ipregistry: factor($f_ipregistry_abuse), IPQS: factor($f_ipqs_abuse), SCAMALYTICS: factor($f_scam_abuse), ipdata: factor($f_ipdata_abuse), IPinfo: factor($f_ipinfo_abuse)},
     Robot: {IP2LOCATION: factor($f_ip2_bot), ipapi: factor($f_ipapi_bot), Ipregistry: factor($f_ipregistry_bot), IPQS: factor($f_ipqs_bot), SCAMALYTICS: factor($f_scam_bot), ipdata: factor($f_ipdata_bot), IPinfo: factor($f_ipinfo_bot)}
   },
-  FactorMeta: {IPWhois: {Status: $ipwhois_risk_status, Source: "public_demo", Reason: "website_demo_security_flags"}},
+  FactorMeta: {
+    ipapi: {Status: $ipapi_risk_status, Source: "public_api", Mode: opt($ipapi_mode), CredentialMode: opt($ipapi_credential_mode)},
+    IPWhois: {Status: $ipwhois_risk_status, Source: "public_demo", Reason: "website_demo_security_flags"}
+  },
   ProviderContext: {
     DBIP: {
       Provider: "DB-IP", Status: $status_dbip, Mode: "public_demo", IP: opt($dbip_ip),

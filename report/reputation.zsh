@@ -157,6 +157,18 @@ cn:rate_limited)state_label="限流"
 ;;
 cn:not_provided)state_label="未提供风险"
 ;;
+cn:ip_mismatch)state_label="出口与目标不符"
+;;
+cn:network_error)state_label="连接失败"
+;;
+cn:timeout)state_label="连接超时"
+;;
+cn:tls_error)state_label="TLS 握手失败"
+;;
+cn:tls_verification_failed)state_label="TLS 证书验证失败"
+;;
+cn:invalid_response)state_label="响应格式异常"
+;;
 cn:http_403)state_label="HTTP 403"
 ;;
 cn:cloudflare_blocked)state_label="Cloudflare 阻挡"
@@ -172,6 +184,18 @@ en:upstream_insufficient_credits|en:official_insufficient_credits)state_label="n
 en:rate_limited)state_label="rate limit"
 ;;
 en:not_provided)state_label="risk not supplied"
+;;
+en:ip_mismatch)state_label="egress/target mismatch"
+;;
+en:network_error)state_label="connection failed"
+;;
+en:timeout)state_label="connection timed out"
+;;
+en:tls_error)state_label="TLS handshake failed"
+;;
+en:tls_verification_failed)state_label="TLS certificate rejected"
+;;
+en:invalid_response)state_label="invalid response"
 ;;
 en:http_403)state_label="HTTP 403"
 ;;
@@ -415,7 +439,7 @@ vpns+=("${ip2location[vpn]}") tors+=("${ip2location[tor]}")
 servers+=("${ip2location[server]}") abusers+=("${ip2location[abuser]}")
 robots+=("${ip2location[robot]}")
 fi
-if report_any_known "${ipapi[countrycode]}" "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ipapi[server]}" "${ipapi[abuser]}" "${ipapi[robot]}";then
+if [[ -n "${ipapi[status]:-}" ]] || report_any_known "${ipapi[countrycode]}" "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ipapi[server]}" "${ipapi[abuser]}" "${ipapi[robot]}";then
 headers+=("${Font_B}${Font_Cyan}ipapi.is$Font_Suffix")
 countries+=("${ipapi[countrycode]}") proxies+=("${ipapi[proxy]}")
 vpns+=("${ipapi[vpn]}") tors+=("${ipapi[tor]}")
@@ -484,6 +508,29 @@ report_factor_row "Tor" 8 12 "${tors[@]}"
 report_factor_row "Hosting" 8 12 "${servers[@]}"
 report_factor_row "Abuse" 8 12 "${abusers[@]}"
 report_factor_row "Bot" 8 12 "${robots[@]}"
+fi
+if [[ -n "${ipapi[status]:-}" ]];then
+typeset ipapi_source=direct ipapi_detail
+[[ "${ipapi[credential_mode]:-}" == key ]]&&ipapi_source=official
+if [[ "$YY" == cn ]];then
+if [[ "${ipapi[mode]:-}" == anonymous ]];then
+ipapi_detail="本次仅返回匿名地理资料，风险因子需要免费 API key"
+elif [[ "${ipapi[credential_mode]:-}" == key ]];then
+ipapi_detail="已使用 API key"
+else
+ipapi_detail="未配置 API key"
+fi
+print -r -- "ipapi.is：$(report_score_source_status "$ipapi_source" "${ipapi[risk_status]:-${ipapi[status]}}") | $ipapi_detail；- 表示本次未提供，不是“否”。"
+else
+if [[ "${ipapi[mode]:-}" == anonymous ]];then
+ipapi_detail="anonymous geography only; risk factors need a free API key"
+elif [[ "${ipapi[credential_mode]:-}" == key ]];then
+ipapi_detail="API key supplied"
+else
+ipapi_detail="no API key configured"
+fi
+print -r -- "ipapi.is: $(report_score_source_status "$ipapi_source" "${ipapi[risk_status]:-${ipapi[status]}}") | $ipapi_detail; - means not supplied, not No."
+fi
 fi
 if [[ -n "${ipwhois[status]:-}" ]];then
 if [[ "$YY" == "cn" ]];then

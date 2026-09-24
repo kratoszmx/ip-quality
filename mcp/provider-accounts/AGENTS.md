@@ -18,7 +18,7 @@ Dependency restoration uses npm install --offline --ignore-scripts.
 | provider_account_read | Redacted existing-page text and value-free controls; DOM state alone may be inconclusive |
 | provider_account_create_free | One free signup after CREATE_FREE_ACCOUNT; uses the confirmed private email/country |
 | ipapi_import_free_key | Import a labelled key after one full-response free lookup and IMPORT_FREE_API_KEY |
-| public_provider_verify_free_api | VERIFY_FREE_API performs one fixed 1.1.1.1 query; surface=free_api (default) checks DB-IP/ipwho.is free context, surface=public_demo checks DB-IP/IPWHOIS website risk data. No account/browser |
+| public_provider_verify_free_api | VERIFY_FREE_API with surface=free_api checks DB-IP/ipwho.is context for 1.1.1.1. public_demo checks IPWHOIS security for 1.1.1.1 or DB-IP's requesting egress via its page and one visitor lookup. No account/browser |
 | cloudflare_account_check | Current server identity, email and 2FA state; no Intel credit |
 | cloudflare_prepare_intel_token | Prepare an account-scoped Intel Read token and validate the dashboard's JSON review |
 | cloudflare_create_intel_token | Revalidate and submit that exact policy once after CREATE_INTEL_READ_TOKEN; save its value privately |
@@ -40,8 +40,13 @@ validated data; `riskLabelAvailable`/`riskFactorsAvailable` say what was actuall
 supplied. Missing demo security is distinct from a useful geography observation.
 HTTP 200 quota-error bodies return `usable:false`, `status:rate_limited`.
 Demo quotas are unspecified, distinct from 500/day DB-IP and 1,000/day ipwho.is
-free geography. No demo account/key/2FA is required, no embedded key is scraped,
-and no paid Extended integration/account/profile is created.
+free geography. Both use the websites' request headers. DB-IP reads /api/core/
+and keeps its bounded public guest token in memory for one /self?convertCurrencies
+request; URLs/tokens are never returned or saved. Its target is request_egress,
+not the fixed address used by free geography. Page failure stops before lookup;
+there are no retries or route switches. No demo account/2FA or paid Extended
+integration/profile is created. Direct native-HTTP probes on 2026-09-24 returned
+a DB-IP low label and IPWHOIS security booleans after these request corrections.
 
 ipapi's observed dashboard is /app/home. Its logout is an icon, so the account
 check uses the exact saved email, one visible labelled key and the same-origin

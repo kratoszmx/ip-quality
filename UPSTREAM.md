@@ -60,10 +60,13 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 - Removed DB-IP's invented 0/50/100 scores and the paid Extended adapter.
   On 2026-09-24, compared historical upstream commit
   `b3ad433931db9882673e070f59edaf17d56e05ac` (v2025-03-13) with today's provider
-  websites. Restored the public homepage DB-IP demo for original threat labels,
-  and use IPWHOIS's current `/demo` for actual security booleans. The explicit
-  permanent free API contracts remain MCP context probes. Demo HTTP 200 quota
-  errors stay unavailable; no scraped key, account or paid plan is required.
+  websites. The old DB-IP target demo returned quota errors; the current
+  `/api/core/` visitor demo returned original threat labels. Its public guest
+  token stays in memory, both requests preserve the route, and the returned
+  IP must match the target. IPWHOIS's current `/demo` needs website request
+  headers to return security booleans on the tested route. The explicit
+  permanent free API contracts remain MCP context probes. Actual quota errors
+  stay unavailable; no account or paid plan is required.
   DB-IP's numeric score remains null. Cloudflare/IPWHOIS/DB-IP now appear in
   sections 3/4 and are removed from terminal section 5. Cloudflare's retired,
   now constant-zero Threat Score is explicitly excluded from clean-IP evidence;
@@ -73,6 +76,8 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   and compact unavailable-source summaries. IPQS keeps a source/status row;
   Ping0, RIPEstat, and Shodan share one context section. Reports mask IP/prefix
   by default; JSON preserves types and report files are created exclusively.
+  Section 4 now retains ipapi.is after a failed or anonymous lookup and reports
+  credential mode, response tier and risk availability instead of hiding it.
 - Removed locally synthesized risk bands, retaining only provider-supplied
   labels, and corrected IP2Location/IP2Proxy potential risk to a 0–99 scale.
 - Bounded DNS attempts, added `Unknown` outcomes, retained every zone in JSON,

@@ -1,112 +1,101 @@
 # Current handoff
 
-## 2026-09-24 risk sources and common-library audit
+## 2026-09-24 provider request fixes
 
 Worktree: /Users/zmx/Projects/projects/ipquality, main, reporter
-v2026-09-24-standalone.20. All route choices default to reputation; media/AI
-probes remain removed. Raw-reporter mail/DNSBL scopes remain optional.
-A bare invocation is a network-free disclosure plan. The live menu is:
+v2026-09-24-standalone.21. All route choices remain reputation-only by default.
+Media/AI probes stay removed; raw mail/DNSBL scopes remain optional.
+The live interactive menu is:
 
     /usr/bin/ruby --disable-gems bin/test-clash-leaf --confirm-network-lookup -4
 
-## Report behavior and source investigation
+## Corrected findings
 
-Section 3 now contains Cloudflare and DB-IP columns. Cloudflare retains official
-API status and actual threat categories. Its numeric score stays null: current
-Cloudflare WAF documentation says legacy Threat Score is retired and always zero.
-The report explains why zero is not low-risk evidence. Missing categories remain
-null; an explicitly empty array remains [].
+The earlier conclusion that DB-IP/IPWHOIS risk demos were simply unavailable
+was too broad. Direct comparisons on 2026-09-24 established:
 
-DB-IP queries its public homepage demo once for the exact target and accepts
-only its original low/medium/high threat label. No invented 0/50/100 mapping,
-embedded-key scraping, paid account or trial. IPWHOIS queries its current /demo
-and displays actual boolean proxy/VPN/Tor/hosting fields in section 4. Missing
-fields remain null. HTTP 200 quota errors from both demos are rate_limited.
-Their failed risk lookup is not hidden by a geography-only fallback.
+- Bare IPWHOIS /demo requests returned a rate-limit message. A matching request
+  with website Origin/Referer and browser headers returned security booleans.
+  The reporter and provider-account MCP now supply those headers.
+- DB-IP's old /demo/home.php target lookup returned query-limit errors even with
+  website headers. The current /api/core/ visitor demo returned a low label.
+  The reporter and MCP now read that page and make one /self?convertCurrencies
+  GET with its transient public visitor token. The token is bounded and never
+  saved or printed; reporter URLs go through curl stdin.
+- DB-IP is an egress observation. Both requests preserve the selected proxy
+  and address family. The reporter rejects a returned IP different from the
+  target as ip_mismatch. It never silently evaluates the requesting host in
+  place of an unrelated target. The MCP labels this probe request_egress.
+- True rate limits remain unavailable, without automatic retries or changing
+  routes. Public demo limits are distinct from permanent free geography quotas.
 
-Cloudflare, DB-IP and IPWHOIS are absent from terminal section 5; their named
-context remains in JSON. Section 5 keeps Ping0/RIPEstat/Shodan and anonymous ipapi
-context when relevant. Score-table widths now include both row labels and cells,
-fixing long Cloudflare scales and Chinese/English demo-status alignment.
-The shared HTTP classifier also names HTTP 429 as rate_limited.
+The supplied NodeQuality report is dated 2025-03-24 and uses v2025-03-13.
+Its upstream code uses third-party ip.nodeget.com/json .ip.riskScore under the
+Cloudflare label, DB-IP's old target demo, and IPWHOIS /widget. Today's source
+called by NodeQuality is v2026-09-16: it has no Cloudflare/IPWHOIS query
+functions and uses the DB-IP visitor demo. No downloaded script was executed.
+The old third-party Cloudflare-labeled endpoint returned HTTP 200 without
+riskScore in a direct check. Cloudflare's own documentation independently says
+legacy Threat Score is no longer populated and is always zero. We retain the
+current official Intel categories/status, with no invented numeric score.
+[PROVIDERS.md](PROVIDERS.md) links the sources and defines these contracts.
 
-Historical upstream commit b3ad433931db9882673e070f59edaf17d56e05ac (v2025-03-13)
-used DB-IP /demo/home.php, IPWHOIS /widget and third-party ip.nodeget.com
-.ip.riskScore labelled Cloudflare. Today's DB-IP homepage still uses /demo/home.php;
-IPWHOIS homepage JavaScript now uses /demo. Permanent free API and website-demo
-capabilities differ. [PROVIDERS.md](PROVIDERS.md) records contracts and sources.
+## ipapi visibility and transport
 
-## Live evidence and remaining limitation
+Section 4 previously hid ipapi.is whenever every risk/country field was unknown.
+It now retains the attempted provider and explains key mode, anonymous response,
+missing risk, and query failure. JSON FactorMeta.ipapi records those distinctions.
+Timeout, TLS handshake, TLS certificate and other network errors are separate;
+none is reported as an exhausted quota. False values remain actual observations.
 
-A live vps+yyssr22 / ATT reputation report on 2026-09-24 completed in **20.6
-seconds**, exit 0, with **zero jq errors**. Nine ProviderStatus entries were ok,
-including official IPQS, keyed ipapi and Cloudflare. DB-IP and IPWHOIS returned
-rate_limited. Cloudflare supplied no threat categories on this lookup. Direct
-demo probes also returned quota/limit errors. No automatic retry was added.
+A paired keyed 1.1.1.1 diagnostic returned HTTP 200/full data over direct access
+in about 1.95 seconds. Isolated ATT returned curl 35 / SSL_ERROR_SYSCALL before
+HTTP. TLS 1.2 and the documented US diagnostic host also failed on ATT.
+The key is valid; the remaining route-specific TLS failure is not fixed or
+attributed to a particular firewall/provider. Runtime retains the canonical
+endpoint, TLS verification and selected route without a direct fallback.
+Anonymous-quota pages currently disagree (30 versus 100/day); both agree that
+a free account key returns full data with 1,000/day. Actual HTTP responses govern.
 
-Private ignored evidence: reports/risk-v20-att-20260924-013151.json, with matching
-.ansi, .txt and .stderr.txt. IP/prefix are masked. Stderr contains progress and
-shutdown messages, not parser failures. The temporary Mihomo exited; no owned
-leaf workspaces remained and live Clash was unchanged. The table-width repair
-followed this measurement and was checked offline; no extra live query was spent
-solely to reformat the evidence.
+## Live evidence
 
-DB-IP/IPWHOIS live risk availability remains unproven in these attempts. Positive
-fixtures model website schemas, not successful live measurements. A later
-authorized run can display valid exact-target labels/booleans if returned.
-Until then, limits and unknown values stay explicit. No paid account or new
-2FA was created for these account-free demos.
+The corrected ATT report (vps+yyssr22 / ATT) completed in 21.1 seconds, exit 0,
+with zero jq errors. Ten provider statuses were ok, including DB-IP, IPWHOIS,
+official Cloudflare and IPQS. DB-IP supplied low; IPWHOIS supplied US and false
+for proxy/VPN/Tor/hosting. Missing abuse/bot fields remain null.
+Cloudflare was available but supplied no threat categories. ipapi had a transport
+failure and remained visible in section 4 with its configured-key explanation.
 
-## Shared-code and MCP ownership
+Private ignored evidence:
+reports/risk-v21-att-20260924-121527.json, plus .ansi, .txt and .stderr.txt.
+This snapshot predates the more specific TLS-error labels; the subsequent
+transport diagnostics and offline cases establish that distinction.
+Temporary Mihomo instances were stopped by their owner; live Clash was unchanged.
+Direct native-HTTP MCP probes also returned usable DB-IP and IPWHOIS risk data.
+No account, paid plan or 2FA was created for these account-free demos.
 
-common/json_values.jq centralizes optional bounded text/integer predicates used
-by ipapi, Cloudflare, IPWHOIS and DB-IP. It rejects terminal control characters.
-Provider schemas, endpoints, quota rules and risk meanings stay provider-local.
-The reporter validates the module before lookup; offline runtime copies include it.
+## Ownership and validation
 
-IPQS-specific connection-type mapping moved from common/provider_values.zsh to
-providers/ipqualityscore.zsh. Official and relay adapters directly call
-ipqualityscore_connection_type_server_flag; no old alias/wrapper remains.
-Unused reporter free-geography branches were removed. The Node MCP retains its
-optional free-API contracts. [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md) indexes
-definitions, callers and examples. The rechecked myutils APIs are Python imports,
-so the zsh/system-Ruby runtime reuses its own common library and the MCPs continue
-using mcps shared Node packages. No new dependency or subproject was introduced.
+IPQS stays entirely under mcp/ipqs with shared secrets/ipqs. The earlier removal
+of the obsolete mcps package/key remains intact; central orchestration points
+here. The provider-account MCP still uses mcps/common/shared directly. Existing
+Cloudflare TOTP and the ipapi free account were preserved. There was no parent
+mcps/Supervisor change, dependency install or registration mutation.
 
-The provider-account MCP tool now selects free_api or public_demo, using one
-fixed 1.1.1.1 request, bounded bytes/time and no redirects/retries. observation,
-riskLabelAvailable and riskFactorsAvailable describe only validated data.
-HTTP 200 quota bodies remain unusable. Demo quotas are unspecified; permanent
-free quotas are not applied to them. No dbipmcp account/profile/key was created.
+The prior common-library audit remains current: common/json_values.jq owns
+bounded optional text/integer predicates, while IPQS-only connection-type
+mapping belongs to providers/ipqualityscore.zsh. DB-IP guest-page parsing is
+provider-specific and stays in providers/dbip.zsh, not common.
+[COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md) describes the shared APIs.
 
-Existing 2026-09-22 account setup is preserved: ipapi's verified free key uses the
-user's IPQS email and Hong Kong; its UI had no native 2FA entry. Cloudflare retains
-its scoped Intel Read token and previously server-confirmed/fresh-login-tested
-TOTP. No factor was re-enrolled or replaced. Current API availability and that
-prior authentication proof are separate. See [CREDENTIALS.md](CREDENTIALS.md)
-and [the MCP guide](mcp/provider-accounts/AGENTS.md).
+/bin/zsh -f scripts/test-offline passed 96 reporter/route tests with 1,595
+assertions, 22 IPQS tests plus build/doctor, and 29 provider-account tests.
+Regressions cover website headers, two-step DB-IP route/family preservation,
+token bounds, no retry after failure, target mismatch, JSON contract changes,
+ipapi visibility in both languages, and transport-error classification.
+[TESTING.md](TESTING.md) owns complete/focused validation instructions.
 
-IPQS remains entirely under mcp/ipqs and shares secrets/ipqs with the reporter.
-The earlier mcps cleanup removed its old package/key and empty security directory;
-central orchestration points here. This turn changed no parent mcps/Supervisor
-code or live Codex registration.
-
-## Validation and synchronization
-
-/bin/zsh -f scripts/test-offline passed **93 reporter tests / 1,465 assertions**,
-**22 IPQS tests** plus build/doctor, and **28 provider-account tests**, all offline.
-Coverage includes demo contracts/quotas, unknown-vs-false, target mismatch, schema
-drift, state reset, one-request behavior, common value bounds, both table languages
-and route isolation. [TESTING.md](TESTING.md) owns complete/focused commands.
-
-The 2026-09-24 test maintenance consolidated three overlapping IPWHOIS runtime
-tests in test/public_demo_test.rb. It preserves successful context and nonfatal
-target-mismatch checks, and verifies stale context/risk clearing after missing
-flags, quota errors and mismatched targets. The corrected reporter-only command
-also passed. Both MCP test guides were checked; the separate IPQS browser-text
-suite passed all eight checks, with zero live requests and no real account profile.
-
-Only owned code/tests/docs are eligible for staging; reports and credentials stay
-ignored. Configured remotes are github-kratoszmx (kratoszmx/ip-quality, existing
-remote name) and github-kratosbackup (kratosbackup/ipquality). The local project
-is correctly named ipquality.
+Only owned code/tests/docs are staged. Reports, credentials and temporary
+state stay out of Git. Configured remotes are github-kratoszmx
+(kratoszmx/ip-quality, existing remote name) and github-kratosbackup
+(kratosbackup/ipquality). The local repository is ipquality.

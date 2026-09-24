@@ -66,7 +66,8 @@ class IpQualityTest < ReporterTestCase
 
     assert status.success?, stderr
     assert_includes stdout, "reputation sources"
-    assert_includes stdout, "public website demos: DB-IP threat labels and IPWHOIS security flags"
+    assert_includes stdout, "DB-IP page + one visitor-egress lookup (must match target)"
+    assert_includes stdout, "IPWHOIS one target lookup"
     assert_includes stdout, "legacy Threat Score is retired"
     assert_includes stdout, "configured Ipregistry/IPQS APIs"
     assert_includes stdout, "supplementary sources"

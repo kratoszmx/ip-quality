@@ -7,7 +7,7 @@ class PublicDemoTest < ReporterTestCase
     whois = fixture("ipwhois", "demo")
     assert_equal "0|ok|ok|low||", parse("dbip", dbip)
     assert_equal "0|ok|ok|false|true|false|true", parse("ipwhois", whois)
-    dbip["demoInfo"].delete("threatLevel")
+    dbip.delete("threatLevel")
     whois.delete("security")
     assert_equal "0|ok|not_provided|||", parse("dbip", dbip)
     assert_equal "0|ok|not_provided||||", parse("ipwhois", whois)
@@ -28,9 +28,9 @@ class PublicDemoTest < ReporterTestCase
     dbip = fixture("dbip", "demo")
     whois = fixture("ipwhois", "demo")
     [nil, [], "not an object", { "status" => "ok", "demoInfo" => "error" },
-     { "status" => "ok", "demoInfo" => dbip["demoInfo"].merge("ipAddress" => "8.8.8.8") },
-     { "status" => "ok", "demoInfo" => dbip["demoInfo"].merge("threatLevel" => 0) },
-     { "status" => "ok", "demoInfo" => dbip["demoInfo"].merge("threatLevel" => "clean") }].each do |body|
+     dbip.merge("ipAddress" => "8.8.8.8"),
+     dbip.merge("threatLevel" => 0),
+     dbip.merge("threatLevel" => "clean")].each do |body|
       assert_match(/\A1\|/, parse("dbip", body))
     end
     [nil, [], "not an object", whois.merge("ip" => "8.8.8.8"),
@@ -52,6 +52,7 @@ class PublicDemoTest < ReporterTestCase
       show_progress_bar(){ :; }
       provider_fetch_public_json(){
         [[ "$1" == 4 && "$2" == 'https://ipwhois.io/demo?ip=198.51.100.23' ]] || exit 99
+        [[ "$*" == *'Origin: https://ipwhois.io'* && "$*" == *'Referer: https://ipwhois.io/'* && "$*" == *Mozilla/5.0* ]] || exit 98
         ((calls+=1))
         PROVIDER_RESPONSE_STATUS=ok PROVIDER_RESPONSE_BODY="$body"
       }

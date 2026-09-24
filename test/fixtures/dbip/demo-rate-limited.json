@@ -1,7 +1,4 @@
 {
-  "status": "ok",
-  "demoInfo": {
     "errorCode": "OVER_QUERY_LIMIT",
     "error": "maximum number of queries per day exceeded"
-  }
 }

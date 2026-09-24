@@ -3,6 +3,51 @@
 require_relative "support/reporter_test_case"
 
 class ReportTest < ReporterTestCase
+  def test_ipapi_factor_column_survives_anonymous_rate_limited_and_failed_queries
+    probe = <<~'ZSH'
+      source "$1"
+      source "$2"
+      YY="$3"
+      typeset -A sfactor ipapi ipqs
+      sfactor[title]=Factors
+      ipqs[proxy]=false
+      ipapi[status]="$4" ipapi[mode]="$5" ipapi[credential_mode]="$6"
+      if [[ "${ipapi[status]}" == ok ]];then
+        if [[ "${ipapi[mode]}" == anonymous ]];then
+          ipapi[risk_status]=not_provided
+        else
+          ipapi[risk_status]=ok ipapi[proxy]=false
+        fi
+      fi
+      show_factor
+    ZSH
+    {
+      ["cn", "ok", "anonymous", "anonymous"] => "匿名地理资料",
+      ["en", "ok", "anonymous", "anonymous"] => "anonymous geography only",
+      ["cn", "rate_limited", "", "key"] => "官方/限流",
+      ["en", "rate_limited", "", "key"] => "official/rate limit",
+      ["cn", "network_error", "", "key"] => "连接失败",
+      ["cn", "tls_error", "", "key"] => "TLS 握手失败",
+      ["en", "tls_error", "", "key"] => "TLS handshake failed",
+      ["cn", "timeout", "", "key"] => "连接超时",
+      ["cn", "invalid_response", "", "key"] => "响应格式异常",
+      ["cn", "ok", "full", "key"] => "官方/可用",
+      ["en", "ok", "full", "key"] => "API key supplied"
+    }.each do |args, expected|
+      stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
+        "ipapi-factor-status", REPUTATION_REPORT, TERMINAL_LIBRARY, *args)
+      assert status.success?, stderr
+      assert_empty stderr
+      assert_match(/(?:参数|Field)\s+\|.*ipapi\.is.*IPQS/, stdout)
+      assert_includes stdout, expected
+      if args[2] == "full"
+        assert_match(/(?:代理|Proxy)\s+\|\s+(?:否|No)\s+\|/, stdout)
+      else
+        assert_match(/(?:代理|Proxy)\s+\|\s+-\s+\|/, stdout)
+      end
+    end
+  end
+
   def test_demo_risk_fields_are_visible_in_the_requested_sections_without_fake_scores
     probe = <<~'ZSH'
       setopt KSH_ARRAYS

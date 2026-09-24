@@ -122,8 +122,10 @@ API keys are optional; private file formats and precedence are in
   ipapi/Cloudflare account setup with dedicated profiles. It reuses the external
   `mcps/common/shared` browser, HTTP, MCP and secret-file APIs.
   Its public-provider probe distinguishes DB-IP/IPWHOIS free context APIs from
-  their public website risk demos. Neither requires accounts or 2FA. The reporter
-  uses the demos once per target and exposes rate limits as unknown risk.
+  their public website risk demos. Neither requires accounts or 2FA. DB-IP reads
+  a public page and one visitor lookup, accepting it only when its egress matches
+  the target. IPWHOIS makes one target lookup with website request headers.
+  Rate limits remain unknown risk; neither integration retries automatically.
 - Node dependencies and MCP commands are separate from the zsh/Ruby reporter.
   Build with `npm --prefix mcp/ipqs run build`; start either MCP through its
   package's `npm start`. Account mutations require explicit task intent.

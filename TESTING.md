@@ -80,6 +80,13 @@ npm --prefix mcp/ipqs run test:browser-text
 
 ## Maintain the boundary
 
+The DB-IP regression tests cover the two-step visitor request, route/family
+preservation, target mismatch, bounded guest-token parsing, and stopping after
+page/transport/quota failures. IPWHOIS tests require its website request headers.
+Report tests retain ipapi.is for anonymous, limited and failed lookups in both
+languages, with missing values distinct from false. MCP tests separately cover
+request_egress metadata, visitor-token redaction and no-retry behavior.
+
 - Reporter CLI tests copy only runtime source/data into an owned temporary
   directory, use an empty credentials configuration directory, and replace
   network commands with fixtures or rejecting tripwires. They do not copy real

@@ -323,7 +323,7 @@ module IpQuality
       @stdout.puts "  Ping0: official public geo/ASN/organization observation; public endpoint has no risk score"
       @stdout.puts "  RIPEstat: official routed-prefix/origin-ASN context; not a risk score"
       @stdout.puts "  Shodan InternetDB: official IPv4 exposure context; not a risk score"
-      @stdout.puts "  DB-IP/IPWHOIS: public website risk demos; one target lookup each, rate limits remain unknown"
+      @stdout.puts "  DB-IP: public page + one visitor-egress lookup (must match target); IPWHOIS: one public website target lookup; rate limits remain unknown"
       @stdout.puts "  Cloudflare: configured IP Intelligence categories; legacy Threat Score is retired, not a clean-IP score"
       @stdout.puts "  start gate: add --confirm-network-lookup"
     end

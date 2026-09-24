@@ -253,6 +253,7 @@ class ProvidersTest < ReporterTestCase
       eval "$2"
       typeset -A provider_credentials ipapi sinfo stype sscore
       provider_credentials[IPAPI_API_KEY]='fixture-ipapi-key'
+      source "$4"
       IP='198.51.100.23' CurlARG='' ibar_step=0 fixture="$3"
       sinfo[database]=0 sinfo[ldatabase]=0
       Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
@@ -266,7 +267,7 @@ class ProvidersTest < ReporterTestCase
     ZSH
     stdout, stderr, status = Open3.capture3(
       "/bin/zsh", "-f", "-c", probe,
-      "ipapi-key-runtime-test", IPAPI_LIBRARY, function_source, IPAPI_FIXTURE
+      "ipapi-key-runtime-test", IPAPI_LIBRARY, function_source, IPAPI_FIXTURE, COMMON_PROVIDER_LIBRARY
     )
     assert status.success?, stderr
     assert_equal "ok|isp|1.00%\n", stdout
@@ -282,6 +283,7 @@ class ProvidersTest < ReporterTestCase
       setopt KSH_ARRAYS SH_WORD_SPLIT
       source "$1"
       eval "$2"
+      source "$4"
       typeset -A ipapi sinfo stype sscore
       IP='198.51.100.23' CurlARG='' ibar_step=0 fixture="$3"
       sinfo[database]=0 sinfo[ldatabase]=0
@@ -295,7 +297,7 @@ class ProvidersTest < ReporterTestCase
     ZSH
     stdout, stderr, status = Open3.capture3(
       "/bin/zsh", "-f", "-c", probe,
-      "ipapi-anonymous-runtime-test", IPAPI_LIBRARY, function_source, IPAPI_ANONYMOUS_FIXTURE
+      "ipapi-anonymous-runtime-test", IPAPI_LIBRARY, function_source, IPAPI_ANONYMOUS_FIXTURE, COMMON_PROVIDER_LIBRARY
     )
     assert status.success?, stderr
     assert_equal "ok|anonymous|AS64500 Example ISP|Example ISP|missing|missing\n", stdout
@@ -325,6 +327,26 @@ class ProvidersTest < ReporterTestCase
     assert status.success?, stderr
     assert_equal "1|rate_limited\n", stdout
     assert_empty stderr
+  end
+
+  def test_ipapi_transport_failure_is_not_reported_as_quota_exhaustion
+    probe = <<~'ZSH'
+      eval "$1"
+      typeset -A provider_credentials ipapi sinfo
+      provider_credentials[IPAPI_API_KEY]=fixture-key
+      IP=198.51.100.23 ibar_step=0
+      sinfo[ldatabase]=0
+      show_progress_bar(){ :; }
+      curl_with_secret_url(){ return "$failure"; }
+      for failure in 28 35 60 7;do
+        db_ipapi 4
+        print -r -- "$?|${ipapi[status]}|${ipapi[credential_mode]}|${ipapi[proxy]}"
+      done
+    ZSH
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "ipapi-transport", reporter_functions("db_ipapi"))
+    assert status.success?, stderr
+    assert_empty stderr
+    assert_equal "1|timeout|key|\n1|tls_error|key|\n1|tls_verification_failed|key|\n1|network_error|key|\n", stdout
   end
 
   def test_ipwhois_parser_keeps_demo_context_without_security_and_rejects_target_mismatch
