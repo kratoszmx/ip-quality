@@ -9,6 +9,29 @@ require_relative "../common/safe_snapshot"
 require_relative "../common/text"
 
 class CommonTest < Minitest::Test
+  def test_http_envelope_preserves_transport_failures_and_clears_previous_bodies
+    probe = <<~'ZSH'
+      setopt KSH_ARRAYS SH_WORD_SPLIT
+      source "$1"
+      for failure in 28 35 60 7 0;do
+        provider_decode_http_response $'{"ok":true}\n200' 0 || exit 1
+        provider_decode_http_response $'{"misleading":true}\n200' "$failure"
+        print -r -- "${provider_http_response[status]}|${provider_http_response[body]}"
+      done
+      for wire in $'{"ok":true}\n429' $'Sorry, you have been blocked by Cloudflare\n403' $'forbidden\n403' $'body\n000' 'missing envelope';do
+        provider_decode_http_response "$wire" 0 && exit 2
+        print -r -- "${provider_http_response[status]}|${provider_http_response[body]}"
+      done
+      [[ -o KSH_ARRAYS && -o SH_WORD_SPLIT ]]
+    ZSH
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
+      "http-envelope", File.expand_path("../common/provider_values.zsh", __dir__))
+    assert status.success?, stderr
+    assert_empty stderr
+    assert_equal ["timeout|", "tls_error|", "tls_verification_failed|", "network_error|",
+      'ok|{"misleading":true}', "rate_limited|", "cloudflare_blocked|", "http_403|", "network_error|", "network_error|"], stdout.lines.map(&:strip)
+  end
+
   def test_terminal_tables_share_independent_widths_without_report_state_or_option_changes
     probe = <<~'ZSH'
       setopt KSH_ARRAYS SH_WORD_SPLIT NO_CASE_MATCH

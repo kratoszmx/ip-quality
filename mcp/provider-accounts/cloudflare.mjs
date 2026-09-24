@@ -2,10 +2,11 @@ import path from 'node:path';
 import { Agent } from 'node:https';
 import { requestHttpRead } from '@codex-mcp/shared-http-read';
 import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@codex-mcp/shared-secret-file';
-import { withLoopbackOperationLease, requestBinaryWithBrowserContext } from '@codex-mcp/shared-browser-session';
+import { withLoopbackOperationLease, requestBinaryWithBrowserContext, saveStorageStateSafely } from '@codex-mcp/shared-browser-session';
 import { SECRETS, withSession, privateAccount } from './accounts.mjs';
 import { accountNetworkOptions, assertAccountOrigin, validApiKey } from './policy.mjs';
 import { cloudflareIdentity, cloudflareApiUsable, intelReadPolicy } from './cloudflare-policy.mjs';
+import { httpStatePath, readHttpAccount } from './http-account.mjs';
 
 const ORIGIN = 'https://dash.cloudflare.com';
 export const keyPath = path.join(SECRETS, 'cloudflare_token');
@@ -23,11 +24,13 @@ export async function identityOnPage(page) {
   });
   let body;
   if (/^application\/json\b/i.test(response.contentType || '')) { try { body = JSON.parse(response.body.toString('utf8')); } catch { /* unconfirmed */ } }
-  return cloudflareIdentity(response.status, body, account.email);
+  const identity = cloudflareIdentity(response.status, body, account.email);
+  if (identity.authenticated) await saveStorageStateSafely(page.context(), httpStatePath('cloudflare'));
+  return identity;
 }
 
 export async function checkCloudflareAccount() {
-  return withSession('cloudflare', async page => ({ provider: 'cloudflare', ...await identityOnPage(page) }));
+  return readHttpAccount('cloudflare', (await privateAccount('cloudflare')).email);
 }
 
 async function reviewedPolicy(page, accountId) {

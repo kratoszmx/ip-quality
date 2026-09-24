@@ -46,6 +46,8 @@ import {
   type DashboardSubmit,
 } from "./frontend-policy.js";
 import { boundedVisibleText, redactText } from "./redaction.js";
+import { probeIpqsAccount } from "./account-probe.js";
+import { enrollIpqsTotp, completeIpqsTotp } from "./totp.js";
 
 type ChromeSession = Awaited<ReturnType<typeof connectOrLaunchChromeOverCDP>>;
 
@@ -284,6 +286,7 @@ export async function loginWithSavedCredentials(options: {
     await page.goto(dashboardUrl("home"), { waitUntil: "domcontentloaded", timeout: getTimeoutMs() });
     let status = await inspectIpqsAuthPage(page);
     let credentialsRead = false;
+    let totpSubmitted = false;
     let submissions = { email: 0, password: 0 };
 
     if (!status.authenticated) {
@@ -298,6 +301,11 @@ export async function loginWithSavedCredentials(options: {
       }
     }
 
+    if (status.stage === "secondary-verification" && await page.locator('input[name="2fa"]').count() === 1) {
+      totpSubmitted = true;
+      await completeIpqsTotp(page);
+      status = await inspectIpqsAuthPage(page);
+    }
     const shouldKeepBrowser = !status.authenticated || options.keepBrowser !== false;
     if (!shouldKeepBrowser) {
       await activeSession.close().catch(() => undefined);
@@ -309,6 +317,7 @@ export async function loginWithSavedCredentials(options: {
       loginCompleted: status.authenticated,
       credentialsRead,
       credentialsSubmitted: submissions.password > 0,
+      totpSubmitted,
       credentialSubmissions: submissions,
       state: status.stage,
       page: status,
@@ -388,6 +397,22 @@ export async function readDashboard(pageName: DashboardPageName, limit = 12_000,
   return withDashboardSession(pageName, async ({ page }) => {
     await waitForDashboardContent(page, pageName);
     return collectDashboardSnapshot(page, pageName, limit);
+  });
+}
+
+export async function enableIpqsTotp() {
+  if ((await probeIpqsAccount()).outcome !== "authenticated") throw new Error("Verify usable IPQS API credits before authenticator enrollment.");
+  return withDashboardSession("settings", async ({ page }) => {
+    if (!(await inspectIpqsAuthPage(page)).authenticated) throw new Error("Authenticate the IPQS account before enrollment.");
+    return enrollIpqsTotp(page);
+  });
+}
+
+export async function finishIpqsTotp() {
+  return withDashboardSession("home", async ({ page }) => {
+    await completeIpqsTotp(page);
+    const result = await inspectIpqsAuthPage(page);
+    return { authenticated: result.authenticated, stage: result.stage, submittedOnce: true };
   });
 }
 

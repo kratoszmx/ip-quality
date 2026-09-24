@@ -17,6 +17,7 @@ try {
     <div hidden>private-hidden-value</div><div style="display:none">private-css-value</div>
     <div style="opacity:0.5">partially visible text</div>
     <p>owner@example.test</p><code>syntheticApiKey1234567890</code>
+    <div>Emergency Backup Code <code>12345678</code></div>
     <script>globalThis.unwantedScript = true</script>
     <img src="https://example.test/unwanted-image"><iframe src="https://example.test/unwanted-frame"></iframe>`;
   await context.route("**/*", async route => {
@@ -48,6 +49,7 @@ try {
   assert.match(result.text, /duplicate free account/);
   assert.match(result.text, /partially visible text/);
   assert.doesNotMatch(result.text, /private-|owner@example|syntheticApiKey|unwantedScript/);
+  assert.doesNotMatch(result.text, /12345678/);
   assert.equal(await page.title(), "Synthetic session container", "text read must not navigate the page");
   assert.equal(await page.evaluate(() => "unwantedScript" in globalThis), false);
 
@@ -56,6 +58,11 @@ try {
   assert.equal(login.httpStatus, 200);
   assert.equal(login.authenticated, false);
   assert.equal(login.loginRequired, true);
+
+  html = '<a href="/logout">Logout</a><form method="post"><input name="2fa" type="number"><button>Finish Login »</button></form>';
+  const challenge = await readDashboardText(page, "home", 5000);
+  assert.equal(challenge.authenticated, false, "logout navigation cannot authenticate a TOTP challenge");
+  assert.equal(challenge.loginRequired, true);
 
   status = 429;
   html = '<a href="/logout">Logout</a>';
@@ -76,5 +83,5 @@ try {
   assert.deepEqual(candidates.map(candidate => candidate.secret).sort(),
     ["visibleApiKey1234567890", "splitApiKey1234567890"].sort());
   console.log(JSON.stringify({ status: "PASS", liveNetworkRequests: 0, realProfileUsed: false,
-    cases: ["same-origin-get", "no-navigation", "inert-no-subresources", "redaction", "login-html", "http-error", "body-limit", "visible-key-candidates"] }));
+    cases: ["same-origin-get", "no-navigation", "inert-no-subresources", "redaction", "login-html", "totp-challenge", "recovery-redaction", "http-error", "body-limit", "visible-key-candidates"] }));
 } finally { await browser.close(); }

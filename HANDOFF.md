@@ -1,7 +1,7 @@
 # Current handoff
 
 Updated 2026-09-24. Worktree: `/Users/zmx/Projects/projects/ipquality`, branch
-`main`, reporter `v2026-09-24-standalone.24`. Start with [AGENTS.md](AGENTS.md)
+`main`, reporter `v2026-09-24-standalone.25`. Start with [AGENTS.md](AGENTS.md)
 for a network-free plan and route selection.
 
 ## Current behavior
@@ -13,11 +13,12 @@ for a network-free plan and route selection.
   basic data. Section 3 no longer has its column or ASN rows. Missing threat data
   is not a connection failure or a zero score; ASN type does not classify the individual
   IP as residential or VPN.
-- Section 4 keeps attempted ipapi/IPWHOIS columns and aligned query statuses,
-  including missing risk and TLS failures. Repeated provider explanation
+- Every attempted source stays in its applicable type/score/factor tables with
+  aligned query statuses, including timeouts, TLS/certificate failures, rate
+  limits and invalid responses. Unconfigured sources are also explicit. Repeated provider explanation
   footers are removed; credential mode, response tier and interpretation stay
-  in JSON and [PROVIDERS.md](PROVIDERS.md). The v24 display change altered no
-  provider requests or JSON fields.
+  in JSON and [PROVIDERS.md](PROVIDERS.md). JSON now records every type source's
+  status and adds IPinfo to `ProviderStatus`; unknown results never become clean.
 - DB-IP uses a page plus one visitor lookup and accepts a label only for the
   tested egress. IPWHOIS uses its website request headers. Corrected requests
   returned risk data on September 24, superseding the earlier blanket
@@ -33,6 +34,18 @@ for a network-free plan and route selection.
 - Shodan now reuses the common jq predicates for bounded printable strings and
   integer ports. Fractional ports and control text are rejected, clearing previous
   observations. This is covered by malformed-response regressions.
+- The v25 audit extracted curl envelope/status decoding to
+  `common/provider_values.zsh` for six retrieval paths, removed the pure curl
+  forwarding function, and preserved source-specific parsers. IPinfo now rejects
+  changed nested objects before jq field access; IPinfo/Ipregistry retain precise
+  transport and HTTP failures. Tracing current callers found no overly specialized
+  common module requiring relocation; account/TOTP policy stays in its owning MCP.
+- [MCP_AUTH.md](MCP_AUTH.md) inventories both maintained MCPs and dated login
+  evidence. ipapi/Cloudflare account reads now use HTTP with Chrome closed;
+  ipapi recovery can use headless Chrome. Cloudflare and IPQS retain headed
+  recovery where current headless trials returned 403. IPQS TOTP was enabled
+  after usable API proof and verified with a real challenge and fresh login.
+  Its separate one-submit native HTTP login did not establish authentication.
 
 ## Remaining issue
 
@@ -46,8 +59,9 @@ verification and chosen route without a silent direct fallback.
 
 ## Recorded live evidence
 
-These are earlier authorized measurements. The v24 section change
-made no new provider/account requests. Reports remain private ignored outputs.
+These are earlier authorized reputation measurements. The v25 audit performed
+account/login checks documented in MCP_AUTH.md and spent no reputation lookup
+credits. Reports remain private ignored outputs.
 
 | Date / scope | Result and evidence |
 | --- | --- |
@@ -64,29 +78,27 @@ Mihomo instances and left live Clash unchanged.
 ## Ownership and validation
 
 IPQS lives in `mcp/ipqs` and shares `secrets/ipqs` with the reporter. Provider
-account state and the previously verified Cloudflare TOTP remain private.
+HTTP/browser state, existing Cloudflare TOTP and the new IPQS TOTP remain private.
 Both MCPs reuse the sibling mcps shared libraries. [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md)
 maps APIs and owners; [SERVICES.md](SERVICES.md) explains stdio and browser lifetime.
 There is no project-specific skill or duplicate README.
 
-The September 24 documentation audit rechecked all 12 maintained Markdown files,
-corrected stale MCP status and request counts, shortened the handoffs, and
-clarified startup/dependencies/shutdown. No provider or account request was made
-for this audit.
+Validation on v25:
 
-Validation on v24:
-
-- `/bin/zsh -f scripts/test-offline`: **101 Ruby tests / 1,890 assertions**,
-  **22 IPQS tests** plus build/static doctor, and **29 provider-account tests**;
+- `/bin/zsh -f scripts/test-offline`: **105 Ruby tests / 2,030 assertions**,
+  **26 IPQS tests** plus build/static doctor, and **31 provider-account tests**;
   no failures or skips.
 - Report cases verify Cloudflare appears only in section 1, in both languages
   and both relay/fallback basic-data paths. Failed queries cannot show stale
   context, and absent threat categories produce no extra line.
 - `reports/basic-v24-layout-preview.txt` shows the new placement using fields
   supplied by the user (AS9808 / China Mobile); it is not a new network measurement.
-- `git diff --check` passed. The earlier v22 documentation audit also passed
-  the eight synthetic IPQS browser cases, CLI/MCP examples and 53 documentation
-  links/anchors; those unchanged browser/account flows were not remeasured here.
+- `npm --prefix mcp/ipqs run test:browser-text`: **10 synthetic cases** passed,
+  including TOTP-challenge rejection and emergency-code redaction; no external
+  requests or real profile used. Both rendered and inert text authentication
+  checks reject a TOTP challenge even when dashboard navigation is present.
+- Shell/Ruby syntax and `git diff --check` passed; maintained local documentation
+  links and anchors were checked separately.
 
 [TESTING.md](TESTING.md) owns complete/focused commands and their limits.
 Configured remotes are `github-kratoszmx` (`kratoszmx/ip-quality`) and

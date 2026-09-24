@@ -8,6 +8,8 @@ import { getIpqsAccountUsage, lookupIpqs, type ApiParameterValue } from "./api.j
 import {
   applySettingChange,
   closeBrowser,
+  enableIpqsTotp,
+  finishIpqsTotp,
   finishInteractiveLogin,
   importApiKeyFromDashboard,
   loginWithSavedCredentials,
@@ -32,6 +34,14 @@ const server = new McpServer({
 
 
 const dashboardPageSchema = z.enum(["home", "settings", "api_keys"]);
+server.registerTool("ipqs_enable_totp", {
+  description: buildToolDescription("Enable the existing IPQS account authenticator once after usable API proof. Saves the textual setup URI and emergency backup code privately before submission. Existing factors and enrollment attempts are preserved.", SERVER_INSTRUCTIONS),
+  inputSchema: { confirm: z.literal("ENABLE_IPQS_TOTP") },
+}, () => safeResult(enableIpqsTotp));
+server.registerTool("ipqs_complete_totp", {
+  description: buildToolDescription("Complete one reviewed IPQS authenticator challenge using its private saved seed. Requires task authorization; never returns or logs codes and never retries automatically.", SERVER_INSTRUCTIONS),
+  inputSchema: { confirm: z.literal("USE_SAVED_IPQS_TOTP") },
+}, () => safeResult(finishIpqsTotp));
 const parameterScalarSchema = z.union([z.string().max(1000), z.number().finite(), z.boolean()]);
 const parameterValueSchema = z.union([parameterScalarSchema, z.array(parameterScalarSchema).max(20)]);
 const parametersSchema = z.record(z.string(), parameterValueSchema).default({});

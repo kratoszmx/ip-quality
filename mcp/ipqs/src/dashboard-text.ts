@@ -50,7 +50,8 @@ export async function readDashboardText(page: Page, pageName: DashboardPageName,
       const template = document.createElement("template");
       template.innerHTML = html;
       const root = template.content;
-      const loginRequired = Array.from(root.querySelectorAll("form")).some(form => {
+      const totpRequired = !!root.querySelector('input[name="2fa"]') && /Finish Login/.test(root.textContent || "");
+      const loginRequired = totpRequired || Array.from(root.querySelectorAll("form")).some(form => {
         const action = new URL(form.getAttribute("action") || "", url);
         return action.origin === location.origin && action.pathname === "/login/submit";
       });

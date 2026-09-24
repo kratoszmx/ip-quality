@@ -68,7 +68,7 @@ class DbipTest < ReporterTestCase
     Dir.mktmpdir("ipquality-dbip-test-") do |directory|
       stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "dbip-runtime", LIBRARY, reporter_functions("db_dbip"), FIXTURE, "unused", File.join(directory, "calls"), COMMON_PROVIDER_LIBRARY)
       assert status.success?, stderr
-      assert_equal "2|ok|Example City\n1|rate_limited|\n1|invalid_response|\n1|network_error|\n2|ip_mismatch|\n", stdout
+      assert_equal "2|ok|Example City\n1|rate_limited|\n1|invalid_response|\n1|timeout|\n2|ip_mismatch|\n", stdout
       assert_empty stderr
     end
   end

@@ -84,10 +84,17 @@ fields are comparable:
 | Destination | Sources |
 | --- | --- |
 | Basic information | Check.Place/MaxMind-shaped response, with IPinfo as fallback; separately named Cloudflare query status, ASN context and supplied threat categories |
-| Type matrix | IPinfo, Ipregistry, IPQS, ipapi.is, IP2Location, AbuseIPDB when a type exists in the response |
+| Type matrix | IPinfo, Ipregistry, IPQS, ipapi.is, IP2Location, AbuseIPDB; attempted/unconfigured sources retain columns and query status even without a type |
 | Score section | IP2Location, Scamalytics, ipapi.is, AbuseIPDB, IPQS; DB-IP supplies its original threat label with a null numeric score. Cloudflare appears only in basic information |
-| Factor matrix | IP2Location, Ipregistry, IPQS, Scamalytics, ipdata, IPinfo when a factor exists; ipapi.is and IPWHOIS retain columns and lookup status even when risk data is missing |
+| Factor matrix | IP2Location, ipapi.is, Ipregistry, IPQS, Scamalytics, ipdata, IPinfo and IPWHOIS; attempted sources retain columns and lookup status even when risk data is missing |
 | Official/public network observations | Ping0, RIPEstat, Shodan InternetDB; anonymous ipapi context if relevant. Cloudflare, DB-IP and IPWHOIS are absent from section 5 |
+
+All three matrices retain attempted-source columns after TLS/transport failures,
+rate limits, quota exhaustion or schema errors. Type adds a query-status row;
+score/factor retain their existing status rows. Missing values are `-`, never
+zero/false. Sources that were never queried and have no values are omitted.
+JSON adds IPinfo status and fills every type source's status alongside the
+existing provider statuses; query endpoints and quotas are unchanged.
 
 ## Interpretation rules
 

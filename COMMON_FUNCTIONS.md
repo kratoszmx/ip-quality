@@ -33,18 +33,28 @@ value functions print without a trailing newline.
 | `provider_merge_boolean_signals SIGNAL...` | `true` if any signal is exactly `true`; `false` only for a nonempty all-`false` list; otherwise empty (unknown) |
 | `provider_has_observation VALUE...` | Exit 0 if any value is not empty, `null`, or `unknown` (case-insensitive); `false` is an observation |
 | `provider_http_failure_status CODE BODY` | `cloudflare_blocked` for the known 403/block-page signature, `rate_limited` for HTTP 429; otherwise `http_NNN` for a three-digit nonzero status, or `network_error`; never echoes the body |
+| `provider_decode_http_response WIRE CURL_EXIT` | Resets `provider_http_response` (`status`, `http_code`, `body`); exit 0 only for a successful curl and 2xx envelope. Curl 28/35/60 retain timeout/TLS/certificate distinctions. Failure clears the body and returns 1; no network or JSON parsing |
 
 ```zsh
 source common/provider_values.zsh
 provider_integer_in_range 99 0 99
 provider_merge_boolean_signals false unknown  # empty: missing evidence stays unknown
+provider_decode_http_response $'{"example":true}\n200' 0
+print -r -- "${provider_http_response[status]}"
 ```
 
 Provider schemas, request endpoints, optional credential files, source-specific
 status decisions, and report labels remain in `providers/`, `bin/ip-quality`,
 and `report/`. A similar `jq` expression alone is not a shared schema contract.
-The score and factor tables share `report_query_status` inside `report/`;
+The type, score and factor tables share `report_query_status` inside `report/`;
 its localized display labels are presentation policy, not a runtime provider API.
+
+The HTTP decoder replaces repeated envelope handling in public JSON retrieval,
+IPinfo, Ipregistry, ipapi, Cloudflare and both DB-IP requests. It accepts text or
+JSON bodies; callers retain schema validation and any exact-200 contract.
+The forwarding `curl_safe` function was removed: request sites use `curl -q`
+directly, while credential-bearing URL/header functions retain their substantive
+stdin-config handling in the reporter.
 
 ## jq value predicates
 
@@ -182,12 +192,12 @@ They do not copy those implementations or leave forwarding packages in mcps.
 
 | Shared package | Callers and use |
 | --- | --- |
-| `browser-session` | Both MCPs: dedicated Chrome lifecycle, verified profile binding, operation leases |
+| `browser-session` | Both MCPs: dedicated Chrome lifecycle and verified profile binding; provider accounts also reuse private storage-state saving and bounded HTTP context reads |
 | `secret-file` | Both MCPs: inspect/read/write private data-only files; reporter and IPQS share `secrets/ipqs` |
 | `mcp-server` | Both MCPs: tool descriptions and structured text results |
 | `one-use-token` | IPQS: prepared setting-change reservation and expiry |
 | `http-read` | Provider accounts: bounded API reads with no redirects or automatic retries |
-| `totp` | Cloudflare account setup: validate a textual provisioning URI and generate a short-lived RFC 6238 code |
+| `totp` | Cloudflare and IPQS: validate textual provisioning URIs and generate RFC 6238 codes; IPQS alone opts into its issuer's 80-bit seed format |
 
 Provider origins, form selectors, account identity, API contracts and registration
 receipts remain inside their owning MCP. Shared helpers do not decide whether an
@@ -203,6 +213,11 @@ owns its fixed account paths, server identity check and token policy; its TOTP
 consumer reuses these directly. `cloudflare-policy.mjs` contains fixture-testable
 identity, token scope, response and API-before-MFA decisions. MCP action entrypoints
 return metadata only; secrets stay inside their private-file and HTTP/form calls.
+
+The v25 audit retained every existing `common/` module after tracing its callers.
+IPQS enrollment/challenge policy stays in `mcp/ipqs/src/totp.ts`; the HTTP account
+identity and state paths stay in `mcp/provider-accounts/http-account.mjs`.
+Neither is a platform-neutral API suitable for the project common directory.
 
 The same MCP owns `public-api.mjs::verifyPublicProvider(provider, confirmation,
 request, surface)` for DB-IP/IPWHOIS. The MCP selects `free_api` (default) or

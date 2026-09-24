@@ -15,7 +15,8 @@ npm --prefix mcp/ipqs start
 `check` builds before offline tests and the static doctor; `start` runs the built
 stdio server for an MCP client, not an interactive CLI. For build-only setup use
 `npm --prefix mcp/ipqs run build`. Stop the server through its client or Ctrl-C.
-See [../../TESTING.md](../../TESTING.md) for dependency restoration and all test
+See [../../MCP_AUTH.md](../../MCP_AUTH.md) for current authentication/backend evidence,
+[../../TESTING.md](../../TESTING.md) for dependency restoration and all test
 commands, [../../SERVICES.md](../../SERVICES.md) for retained-browser lifetime,
 and [HANDOFF.md](HANDOFF.md) for dated account evidence. The commands below use
 this package as the working directory.
@@ -32,7 +33,7 @@ this package as the working directory.
 4. Import an existing visible dashboard API key directly into the ignored parent secret file without returning the key to the agent.
 5. Official JSON API authentication uses headers for explicit fraud-intelligence lookups, and the documented path-auth form for account usage.
 
-The dedicated profile is the login container. API requests use the local key file and do not depend on exported browser cookies. Saved credentials are read only after task-level confirmation, never enter MCP arguments or output, and are not read when the profile is already authenticated. CAPTCHA, email verification, passkeys, and 2FA stay in the visible browser as human-auth steps.
+The dedicated profile is the login container. API requests use the local key file and do not depend on exported browser cookies. Saved credentials are read only after task-level confirmation, never enter MCP arguments or output, and are not read when the profile is already authenticated. Authorized saved login may complete one exact reviewed TOTP challenge using the private seed. CAPTCHA, email verification and passkeys stay in the visible browser as human-auth steps.
 
 ## Directory Map
 
@@ -40,6 +41,7 @@ The dedicated profile is the login container. API requests use the local key fil
 - `src/browser.ts`: Chrome/CDP lifecycle, authentication evidence, redacted dashboard reads, API-key import, and two-stage setting changes.
 - `src/dashboard-text.ts`: bounded same-origin GET and inert HTML text projection; no page navigation, script execution, session export or input values.
 - `src/auth.ts`: exact IPQS login-form recognition, authenticated-page classification, and one-submit credential policy.
+- `src/totp.ts`: issuer/account-bound textual enrollment, private emergency recovery, and one-submit authenticator challenge. Uses the shared TOTP library's explicit legacy-80-bit option for this issuer.
 - `src/api.ts`: bounded read-only IPQS JSON API client.
 - `src/account-probe.ts`: fixed-outcome, secret-free account/API authentication probe over the non-lookup account endpoint.
 - `src/account-policy.ts`: IPQS-specific HTTP, authentication and quota interpretation, used by the probe and API-key validation.
@@ -63,6 +65,8 @@ The dedicated profile is the login container. API requests use the local key fil
 - `ipqs_open_login`: keep the dedicated real Chrome session open on the login page for human authentication.
 - `ipqs_finish_login`: verify the current authenticated dashboard and optionally keep the browser open.
 - `ipqs_login_with_saved_credentials`: reuse the profile first, then after explicit confirmation read the fixed owner-only bundle and submit the reviewed IPQS login form at most once.
+- `ipqs_enable_totp`: after `ENABLE_IPQS_TOTP`, prove usable API credits, save the bound seed and emergency backup code privately, reserve and submit one enrollment. Existing factors/attempts are preserved.
+- `ipqs_complete_totp`: after `USE_SAVED_IPQS_TOTP`, submit one reviewed challenge from the private seed; no code is returned.
 - `ipqs_open_dashboard`: keep the browser open on the dashboard home, settings, or API-key page.
 - `ipqs_read_dashboard`: default `mode=text` returns redacted HTML text from one same-origin GET; `mode=controls` returns rendered DOM text plus value-free controls and buttons from an allowlisted dashboard page.
 - `ipqs_import_api_key`: reveal when necessary, select one visible dashboard API key, and write it directly to the private local secret file; returns metadata and a fingerprint only.
@@ -104,6 +108,7 @@ The dedicated profile is the login container. API requests use the local key fil
 ## Safety Evidence
 
 - The package reuses `@codex-mcp/shared-browser-session`, `@codex-mcp/shared-mcp-server`, `@codex-mcp/shared-secret-file`, and `@codex-mcp/shared-one-use-token` from the external mcps common library. IPQS URLs, quota messages, account state and selectors stay in this package.
+- `@codex-mcp/shared-totp` supplies RFC 6238 validation/generation. The website's QR URL is read as text; no image processing occurs. Seed and recovery code are saved before activation, and a changed/foreign form stops before secret use.
 - The saved account directory must be an owned ordinary `0700` directory containing exactly one owned, singly linked, `0600` ordinary file with email and password as two positional lines.
 - Authentication checks recognize the reviewed visible `/login/submit` form rather than treating password-change fields on `/user/settings` as a login page.
 - Dashboard tools accept only the three named IPQS pages; callers cannot supply a foreign URL or arbitrary selector.

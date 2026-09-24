@@ -78,8 +78,10 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   and compact unavailable-source summaries. IPQS keeps a source/status row;
   Ping0, RIPEstat, and Shodan share one context section. Reports mask IP/prefix
   by default; JSON preserves types and report files are created exclusively.
-  Section 4 retains ipapi.is after a failed or anonymous lookup, with a compact
-  query-status row across the factor matrix. Credential mode and response tier
+  Every attempted source remains in its applicable type/score/factor matrix
+  after failure, with query-status rows and unknown values. HTTP transport
+  failures preserve timeout/TLS/certificate distinctions; JSON includes every
+  type source's status. Credential mode and response tier
   remain in JSON. Repeated provider prose below the matrices was removed.
 - Removed locally synthesized risk bands, retaining only provider-supplied
   labels, and corrected IP2Location/IP2Proxy potential risk to a 0–99 scale.
@@ -103,12 +105,22 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   table measurement, cell padding, rows and rules now live in common/terminal.zsh;
   type/score/factor matrices use independent column widths. Removed the runner's
   clock forwarding method and unused media/AI progress labels.
+  Shared curl response-envelope decoding now serves six retrieval paths;
+  removed the pure curl forwarding function. IPinfo validates nested objects
+  before jq field reads and both IPinfo/Ipregistry retain precise failures.
 - Extracted the complete `network-manager/ip-quality/` history into standalone
   `ipquality` on 2026-08-23 and removed obsolete parent routing hooks.
 - Added optional Node account MCPs under `mcp/`: IPQS moved from mcps on
   2026-09-22; provider accounts owns free ipapi/Cloudflare setup and account-free
   public API/demo probes. They directly reuse the sibling mcps shared libraries;
   private browser state, credentials and account receipts are excluded from Git.
+  Routine ipapi/Cloudflare account checks now use bounded HTTP with exact saved
+  identity validation; ipapi recovery defaults to verified headless Chrome.
+  IPQS retains its verified headed dashboard fallback after independent HTTP
+  and headless login trials did not establish authentication. Added provider-bound
+  IPQS TOTP enrollment/challenge handling through shared TOTP primitives, private
+  seed/recovery storage, one-attempt reservation and fixture/synthetic regressions.
+  The formal server inventory and dated login proofs live in MCP_AUTH.md.
 
 ## Deliberate exclusions
 

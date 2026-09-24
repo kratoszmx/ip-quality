@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-09-24-standalone.24"
+script_version="v2026-09-24-standalone.25"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset COMMON_DIR="$SCRIPT_DIR/common"
@@ -368,17 +368,13 @@ local decimal_pattern='^-?[0-9]+([.][0-9]+)?$'
 [[ "$1" =~ $decimal_pattern ]]
 }
 
-curl_safe(){
-command curl -q "$@"
-}
-
 # Feed credential-bearing curl options over stdin so API keys never appear in
 # process arguments, Git configuration, or the report. Callers validate every
 # interpolated key and IP before reaching these helpers.
 curl_with_secret_url(){
 typeset secret_url="$1"
 shift
-print -r -- "url = \"$secret_url\""|curl_safe "$@" --config -
+print -r -- "url = \"$secret_url\""|curl -q "$@" --config -
 }
 
 curl_with_secret_header(){
@@ -389,7 +385,7 @@ shift 3
 {
 print -r -- "header = \"$header_name: $header_value\""
 print -r -- "url = \"$endpoint\""
-}|curl_safe "$@" --config -
+}|curl -q "$@" --config -
 }
 
 typeset -g PROVIDER_RESPONSE_BODY=""
@@ -402,23 +398,16 @@ typeset address_family="$1"
 typeset endpoint="$2"
 typeset maximum_bytes="${3:-262144}"
 if (( $# >= 3 ));then shift 3;else shift 2;fi
-typeset wire_response curl_exit http_code response_body
+typeset wire_response response_body
 
 PROVIDER_RESPONSE_BODY=""
 PROVIDER_RESPONSE_STATUS="unknown"
-wire_response=$(curl_safe $CurlARG -sS -L -$address_family -m 10 \
+wire_response=$(curl -q $CurlARG -sS -L -$address_family -m 10 \
   --max-filesize "$maximum_bytes" --write-out $'\n%{http_code}' "$@" "$endpoint" 2>/dev/null)
-curl_exit=$?
-if (( curl_exit != 0 )) || [[ "$wire_response" != *$'\n'* ]];then
-PROVIDER_RESPONSE_STATUS="network_error"
-return 1
-fi
-http_code="${wire_response##*$'\n'}"
-response_body="${wire_response%$'\n'*}"
-if [[ "$http_code" != [0-9][0-9][0-9] ]] || (( 10#$http_code < 200 || 10#$http_code > 299 ));then
-PROVIDER_RESPONSE_STATUS=$(provider_http_failure_status "$http_code" "$response_body")
-return 1
-fi
+provider_decode_http_response "$wire_response" "$?"
+PROVIDER_RESPONSE_STATUS="${provider_http_response[status]}"
+[[ "$PROVIDER_RESPONSE_STATUS" == ok ]]||return 1
+response_body="${provider_http_response[body]}"
 if ! provider_json_is_object "$response_body";then
 PROVIDER_RESPONSE_STATUS="invalid_response"
 return 1
@@ -672,7 +661,7 @@ print -ru2 -- "SELF-TEST FAILED: provider mobile display normalization changed"
 return 1
 }
 (
-curl_safe(){ print -rn -- $'{"provider":"fixture"}\n200'; }
+curl(){ print -rn -- $'{"provider":"fixture"}\n200'; }
 CurlARG=""
 provider_fetch_public_json 4 "https://fixture.invalid" 1024&&
   [[ "$PROVIDER_RESPONSE_STATUS" == "ok" && "$PROVIDER_RESPONSE_BODY" == '{"provider":"fixture"}' ]]
@@ -681,7 +670,7 @@ print -ru2 -- "SELF-TEST FAILED: provider HTTP success classification changed"
 return 1
 }
 (
-curl_safe(){ print -rn -- $'<html>Sorry, you have been blocked by Cloudflare</html>\n403'; }
+curl(){ print -rn -- $'<html>Sorry, you have been blocked by Cloudflare</html>\n403'; }
 CurlARG=""
 ! provider_fetch_public_json 4 "https://fixture.invalid" 1024&&
   [[ "$PROVIDER_RESPONSE_STATUS" == "cloudflare_blocked" && -z "$PROVIDER_RESPONSE_BODY" ]]
@@ -690,7 +679,7 @@ print -ru2 -- "SELF-TEST FAILED: provider Cloudflare classification changed"
 return 1
 }
 (
-curl_safe(){ print -rn -- $'<html>forbidden</html>\n403'; }
+curl(){ print -rn -- $'<html>forbidden</html>\n403'; }
 CurlARG=""
 ! provider_fetch_public_json 4 "https://fixture.invalid" 1024&&
   [[ "$PROVIDER_RESPONSE_STATUS" == "http_403" && -z "$PROVIDER_RESPONSE_BODY" ]]
@@ -786,6 +775,7 @@ maxmind[org]="$json_special"
 maxmind[countrycode]="US"
 maxmind[regcountrycode]="US"
 maxmind[status]="ok"
+ipinfo[status]="ok"
 ipinfo[susetype]="${stype[hosting]}"
 ipregistry[status]="ok"
 ipregistry[susetype]="${stype[hosting]}"
@@ -853,8 +843,12 @@ print -r -- "$ipjson"|jq -e --arg expected "$json_special" '
   .Type.Source.IPinfo == "public demo widget" and
   .Type.Source.Ipregistry == "official API" and
   .Type.Source.IPQS == "official_api" and
+  .Type.Status.IPinfo == "ok" and
   .Type.Status.Ipregistry == "ok" and
   .Type.Status.IPQS == "ok" and
+  .Type.Status.ipapi == "ok" and
+  .Type.Status.IP2LOCATION == "ok" and
+  .Type.Status.AbuseIPDB == "http_403" and
   .Type.Usage.IPQS != null and
   .Type.Usage.IP2LOCATION == null and
   .Score.IPQS == "100" and
@@ -864,6 +858,7 @@ print -r -- "$ipjson"|jq -e --arg expected "$json_special" '
   .ScoreMeta.IPQS.Status == "ok" and
   .ScoreMeta.IPQS.Source == "official_api" and
   .ProviderStatus.CheckPlaceMaxMind == "ok" and
+  .ProviderStatus.IPinfo == "ok" and
   .ProviderStatus.ipapi == "ok" and
   .ProviderStatus.AbuseIPDB == "http_403" and
   .ProviderStatus.ipdata == "network_error" and
@@ -987,7 +982,7 @@ local response
 IPV4=""
 local API_NET=("https://ipinfo.io/ip" "https://myip.check.place" "https://ip.sb" "https://ping0.cc" "https://icanhazip.com" "https://api64.ipify.org" "https://ifconfig.co" "https://ident.me")
 for p in "${API_NET[@]}";do
-response=$(curl_safe $CurlARG -s4 --max-time 2 "$p")
+response=$(curl -q $CurlARG -s4 --max-time 2 "$p")
 local curl_status=$?
 if (( curl_status == 0 ))&&is_valid_ipv4 "$response"&&! is_private_ipv4 "$response";then
 IPV4="$response"
@@ -1046,7 +1041,7 @@ local response
 IPV6=""
 local API_NET=("https://myip.check.place" "https://ip.sb" "https://ping0.cc" "https://icanhazip.com" "https://api64.ipify.org" "https://ifconfig.co" "https://ident.me")
 for p in "${API_NET[@]}";do
-response=$(curl_safe $CurlARG -s6 --max-time 2 "$p")
+response=$(curl -q $CurlARG -s6 --max-time 2 "$p")
 local curl_status=$?
 response="${response%$'\n'}"
 if (( curl_status == 0 ))&&is_valid_ipv6 "$response"&&! is_private_ipv6 "$response";then
@@ -1240,12 +1235,20 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}IPinfo $Font_Suffix
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-7-${sinfo[ldatabase]}))
 ipinfo=()
+typeset wire_response RESPONSE
 if [[ $IP == *:* ]];then
-local RESPONSE=$(curl_safe -Ls -m 10 "https://ipinfo.io/widget/demo/$IP")
+wire_response=$(curl -q -Ls -m 10 --max-filesize 262144 --write-out $'\n%{http_code}' "https://ipinfo.io/widget/demo/$IP")
 else
-local RESPONSE=$(curl_safe $CurlARG -Ls -m 10 "https://ipinfo.io/widget/demo/$IP")
+wire_response=$(curl -q $CurlARG -Ls -m 10 --max-filesize 262144 --write-out $'\n%{http_code}' "https://ipinfo.io/widget/demo/$IP")
 fi
-provider_json_is_object "$RESPONSE"||RESPONSE=""
+provider_decode_http_response "$wire_response" "$?"
+ipinfo[status]="${provider_http_response[status]}"
+[[ "${ipinfo[status]}" == ok ]]||return 0
+RESPONSE="${provider_http_response[body]}"
+if ! print -rn -- "$RESPONSE"|jq -e 'type == "object" and (.data | type == "object") and ([.data.asn, .data.company, .data.privacy, .data.abuse] | all(. == null or type == "object"))' >/dev/null 2>&1;then
+ipinfo[status]=invalid_response
+return 0
+fi
 ipinfo[usetype]=$(echo "$RESPONSE"|jq -r '.data.asn.type')
 ipinfo[comtype]=$(echo "$RESPONSE"|jq -r '.data.company.type')
 case ${ipinfo[usetype]} in
@@ -1309,10 +1312,14 @@ typeset api_key="${provider_credentials[IPREGISTRY_API_KEY]:-}"
 local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Ipregistry official API $Font_Suffix"
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-15-${sinfo[ldatabase]}))
-ipregistry[status]="unknown"
-local RESPONSE=$(curl_with_secret_header "Authorization" "ApiKey $api_key" \
+typeset RESPONSE wire_response
+wire_response=$(curl_with_secret_header "Authorization" "ApiKey $api_key" \
   "https://api.ipregistry.co/$IP" $CurlARG -sS -$1 -m 10 \
-  --max-filesize 262144 2>/dev/null)
+  --max-filesize 262144 --write-out $'\n%{http_code}' 2>/dev/null)
+provider_decode_http_response "$wire_response" "$?"
+ipregistry[status]="${provider_http_response[status]}"
+[[ "${ipregistry[status]}" == ok ]]||return 0
+RESPONSE="${provider_http_response[body]}"
 if ipregistry_parse_response "$RESPONSE" "$IP";then
 ipregistry[status]="ok"
 ipregistry[source]="official_api"
@@ -1326,6 +1333,8 @@ ipregistry[vpn]="${ipregistry_parsed[vpn]}"
 ipregistry[tor]="${ipregistry_parsed[tor]}"
 ipregistry[server]="${ipregistry_parsed[server]}"
 ipregistry[abuser]="${ipregistry_parsed[abuser]}"
+else
+ipregistry[status]=invalid_response
 fi
 }
 db_scamalytics(){
@@ -1363,30 +1372,18 @@ ipapi[credential_mode]=anonymous
 [[ -n "$api_key" ]]&&ipapi[credential_mode]=key
 typeset endpoint="https://api.ipapi.is/?q=$IP"
 [[ -n "$api_key" ]]&&endpoint="$endpoint&key=$api_key"
-typeset wire_response curl_exit http_code RESPONSE
+typeset wire_response RESPONSE
 if [[ -n "$api_key" ]];then
 wire_response=$(curl_with_secret_url "$endpoint" $CurlARG -sS -L -$1 -m 10 \
   --max-filesize 262144 --write-out $'\n%{http_code}' 2>/dev/null)
 else
-wire_response=$(curl_safe $CurlARG -sS -L -$1 -m 10 -H 'origin: https://ipapi.is' \
+wire_response=$(curl -q $CurlARG -sS -L -$1 -m 10 -H 'origin: https://ipapi.is' \
   --max-filesize 262144 --write-out $'\n%{http_code}' "$endpoint" 2>/dev/null)
 fi
-curl_exit=$?
-if (( curl_exit != 0 )) || [[ "$wire_response" != *$'\n'* ]];then
-ipapi[status]="network_error"
-case "$curl_exit" in
-28)ipapi[status]=timeout ;;
-35)ipapi[status]=tls_error ;;
-60)ipapi[status]=tls_verification_failed ;;
-esac
-return 1
-fi
-http_code="${wire_response##*$'\n'}"
-RESPONSE="${wire_response%$'\n'*}"
-if [[ "$http_code" != [0-9][0-9][0-9] ]] || (( 10#$http_code < 200 || 10#$http_code > 299 ));then
-ipapi[status]=$(provider_http_failure_status "$http_code" "$RESPONSE")
-return 1
-fi
+provider_decode_http_response "$wire_response" "$?"
+ipapi[status]="${provider_http_response[status]}"
+[[ "${ipapi[status]}" == ok ]]||return 1
+RESPONSE="${provider_http_response[body]}"
 if ! ipapi_parse_response "$RESPONSE" "$IP";then
 ipapi[status]="invalid_response"
 return 1
@@ -1506,7 +1503,7 @@ show_progress_bar "$temp_info" $((40-9-${sinfo[ldatabase]}))
 dbip=()
 dbip[source]="public_demo"
 dbip[status]=unknown
-typeset wire_response response_body http_code guest_key endpoint
+typeset wire_response response_body guest_key endpoint
 typeset -a demo_headers
 demo_headers=(-A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' \
   -H 'Accept: */*' -H 'Origin: https://db-ip.com' -H 'Referer: https://db-ip.com/')
@@ -1517,14 +1514,12 @@ typeset step
 for step in page observation;do
 wire_response=$(curl_with_secret_url "$endpoint" $CurlARG -sS -$1 -m 10 \
   --max-filesize 262144 --write-out $'\n%{http_code}' "${demo_headers[@]}" 2>/dev/null)
-if (( $? != 0 )) || [[ "$wire_response" != *$'\n'* ]];then
-dbip[status]=network_error
-return 0
-fi
-http_code="${wire_response##*$'\n'}"
-response_body="${wire_response%$'\n'*}"
-if [[ "$http_code" != 200 ]];then
-dbip[status]=$(provider_http_failure_status "$http_code" "$response_body")
+provider_decode_http_response "$wire_response" "$?"
+dbip[status]="${provider_http_response[status]}"
+[[ "${dbip[status]}" == ok ]]||return 0
+response_body="${provider_http_response[body]}"
+if [[ "${provider_http_response[http_code]}" != 200 ]];then
+dbip[status]=invalid_response
 return 0
 fi
 if [[ "$step" == page ]];then
@@ -1570,20 +1565,13 @@ cloudflare[status]="unknown"
 local query_name="ipv4"
 [[ "$IP" == *:* ]]&&query_name="ipv6"
 local endpoint="https://api.cloudflare.com/client/v4/accounts/$account_id/intel/ip?$query_name=$IP"
-local wire_response curl_exit http_code response_body
+local wire_response response_body
 wire_response=$(curl_with_secret_header "Authorization" "Bearer $api_token" "$endpoint" \
   $CurlARG -sS -L -$1 -m 10 --max-filesize 131072 --write-out $'\n%{http_code}' 2>/dev/null)
-curl_exit=$?
-if (( curl_exit != 0 )) || [[ "$wire_response" != *$'\n'* ]];then
-cloudflare[status]="network_error"
-return 0
-fi
-http_code="${wire_response##*$'\n'}"
-response_body="${wire_response%$'\n'*}"
-if [[ "$http_code" != [0-9][0-9][0-9] ]] || (( 10#$http_code < 200 || 10#$http_code > 299 ));then
-cloudflare[status]=$(provider_http_failure_status "$http_code" "$response_body")
-return 0
-fi
+provider_decode_http_response "$wire_response" "$?"
+cloudflare[status]="${provider_http_response[status]}"
+[[ "${cloudflare[status]}" == ok ]]||return 0
+response_body="${provider_http_response[body]}"
 if ! provider_json_is_object "$response_body";then
 cloudflare[status]="invalid_response"
 return 0
@@ -1844,7 +1832,7 @@ return 0
 fi
 local endpoint="https://ipv4.ping0.cc/geo"
 [[ "$1" -eq 6 ]]&&endpoint="https://ipv6.ping0.cc/geo"
-local RESPONSE=$(curl_safe $CurlARG -sS -L -$1 -m 10 --max-filesize 4096 "$endpoint" 2>/dev/null)
+local RESPONSE=$(curl -q $CurlARG -sS -L -$1 -m 10 --max-filesize 4096 "$endpoint" 2>/dev/null)
 ping0_parse_geo "$RESPONSE" "$IP"
 local parse_status=$?
 case "$parse_status" in
@@ -1867,7 +1855,7 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}RIPEstat routing $F
 show_progress_bar "$temp_info" $((40-13-${sinfo[ldatabase]}))
 ripestat=()
 ripestat[status]="unknown"
-local RESPONSE=$(curl_safe $CurlARG -sS -L -$1 -m 10 --max-filesize 65536 --get --data-urlencode "resource=$IP" "https://stat.ripe.net/data/network-info/data.json" 2>/dev/null)
+local RESPONSE=$(curl -q $CurlARG -sS -L -$1 -m 10 --max-filesize 65536 --get --data-urlencode "resource=$IP" "https://stat.ripe.net/data/network-info/data.json" 2>/dev/null)
 if ripestat_parse_network_info "$RESPONSE";then
 ripestat[status]="${ripestat_parsed[status]}"
 ripestat[prefix]="${ripestat_parsed[prefix]}"
@@ -1884,7 +1872,7 @@ fi
 local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Shodan InternetDB $Font_Suffix"
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-17-${sinfo[ldatabase]}))
-local RESPONSE=$(curl_safe $CurlARG -sS -L -4 -m 10 --max-filesize 262144 "https://internetdb.shodan.io/$IP" 2>/dev/null)
+local RESPONSE=$(curl -q $CurlARG -sS -L -4 -m 10 --max-filesize 262144 "https://internetdb.shodan.io/$IP" 2>/dev/null)
 if internetdb_parse_response "$RESPONSE" "$IP";then
 internetdb[status]="${internetdb_parsed[status]}"
 internetdb[ports]="${internetdb_parsed[ports]}"
@@ -2423,6 +2411,7 @@ ipjson=$(jq -n \
 --arg band_abuse "$(clean_ansi "${abuseipdb[risk]:-}")" \
 --arg band_ipqs "$(clean_ansi "${ipqs[risk]:-}")" \
 --arg status_ipqs "${ipqs[status]:-unknown}" \
+--arg status_ipinfo "${ipinfo[status]:-unknown}" \
 --arg source_ipqs "${ipqs[source]:-unknown}" \
 --arg status_ipregistry "${ipregistry[status]:-not_configured}" \
 --arg status_maxmind "${maxmind[status]:-unknown}" \
@@ -2531,7 +2520,7 @@ def dnsresults($value):
   },
   Type: {
     Source: {IPinfo: "public demo widget", Ipregistry: "official API", IPQS: $source_ipqs, ipapi: "direct public API", IP2LOCATION: "upstream relay", AbuseIPDB: "upstream relay"},
-    Status: {Ipregistry: $status_ipregistry, IPQS: $status_ipqs},
+    Status: {IPinfo: $status_ipinfo, Ipregistry: $status_ipregistry, IPQS: $status_ipqs, ipapi: $status_ipapi, IP2LOCATION: $status_ip2location, AbuseIPDB: $status_abuseipdb},
     Usage: {IPinfo: opt($type_ipinfo_usage), Ipregistry: opt($type_ipregistry_usage), IPQS: opt($type_ipqs_usage), ipapi: opt($type_ipapi_usage), IP2LOCATION: opt($type_ip2_usage), AbuseIPDB: opt($type_abuse_usage)},
     Company: {IPinfo: opt($type_ipinfo_company), Ipregistry: opt($type_ipregistry_company), IPQS: null, ipapi: opt($type_ipapi_company), IP2LOCATION: opt($type_ip2_company), AbuseIPDB: null}
   },
@@ -2546,6 +2535,7 @@ def dnsresults($value):
     DBIP: {Band: opt($band_dbip), Scale: "low/medium/high (provider label)", Status: $dbip_risk_status, Source: "public_demo", Reason: "provider_label_only"}
   },
   ProviderStatus: {
+    IPinfo: $status_ipinfo,
     CheckPlaceMaxMind: $status_maxmind,
     Ipregistry: $status_ipregistry,
     Scamalytics: $status_scamalytics,

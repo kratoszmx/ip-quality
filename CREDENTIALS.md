@@ -17,6 +17,9 @@ The reporter's accepted names and precedence are documented in
 | Provider login | `secrets/accounts/{ipapi,cloudflare}/credentials.json`, private email/password |
 | Cloudflare authenticator | `secrets/accounts/cloudflare/totp-uri`, private RFC 6238 provisioning URI |
 | Cloudflare recovery codes | `secrets/accounts/cloudflare/recovery-codes.json`, private recovery data after enrollment |
+| IPQS authenticator | `secrets/accounts/ipqs/totp-uri`, private exact-account provisioning URI; issuer provisions an 80-bit seed |
+| IPQS emergency recovery | `secrets/accounts/ipqs/recovery-code`; `enrollment-attempt.json` prevents duplicate activation |
+| Browserless account sessions | `mcp/provider-accounts/.state/{ipapi,cloudflare}-http.json`, owner-only saved state; never emitted or committed |
 | Account action evidence | Provider-local registration/token/enrollment receipts and `availability.json` under `secrets/accounts/` |
 
 A saved registration password does not establish that an account was created.
@@ -24,6 +27,7 @@ A saved API key does not establish available quota. `cloudflare_verify_free_api`
 records a real useful lookup before its TOTP tool can run, bound to the same
 account and key. Existing factors and different local keys are preserved.
 
-Browser profiles belong to their MCP's private `.state/` directories. No cookie
-export or duplicate key is required for the reporter. Textual provider setup
+Browser profiles belong to their MCP's private `.state/` directories. Private
+HTTP state serves account checks only; the reporter uses no cookies or duplicate keys. Textual provider setup
 seeds are imported directly into private storage; QR images are not processed.
+See [MCP_AUTH.md](MCP_AUTH.md) for checked login state and recovery paths.

@@ -37,6 +37,7 @@
     "node": ">=22"
   },
   "dependencies": {
+    "@codex-mcp/shared-totp": "file:../../../../mcps/common/shared/totp",
     "@codex-mcp/shared-browser-session": "file:../../../../mcps/common/shared/browser-session",
     "@codex-mcp/shared-mcp-server": "file:../../../../mcps/common/shared/mcp-server",
     "@codex-mcp/shared-one-use-token": "file:../../../../mcps/common/shared/one-use-token",

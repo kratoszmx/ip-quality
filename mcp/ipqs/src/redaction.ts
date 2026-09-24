@@ -12,6 +12,8 @@ export function redactText(value: unknown, knownSecrets: readonly string[] = [])
     text = text.replace(new RegExp(escapeRegExp(secret), "g"), "<redacted-secret>");
   }
   return text
+    .replace(/otpauth:\/\/\S+/gi, "<redacted-totp>")
+    .replace(/(Emergency Backup Code[\s\S]*?)\b\d{8}\b/gi, "$1<redacted-recovery>")
     .replace(BEARER_PATTERN, "$1<redacted-secret>")
     .replace(EMAIL_PATTERN, "<redacted-email>")
     .replace(LONG_CREDENTIAL_PATTERN, "<redacted-secret>");

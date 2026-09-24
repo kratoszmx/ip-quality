@@ -3,6 +3,32 @@
 require_relative "support/reporter_test_case"
 
 class ProvidersTest < ReporterTestCase
+  def test_ipinfo_and_ipregistry_keep_transport_and_schema_failures_without_old_values
+    probe = <<~'ZSH'
+      source "$1"
+      eval "$2"
+      typeset -A ipinfo ipregistry provider_credentials sinfo
+      IP=198.51.100.23 ibar_step=0
+      sinfo[ldatabase]=0
+      provider_credentials[IPREGISTRY_API_KEY]=fixture-key
+      show_progress_bar(){ :; }
+      curl(){ return 35; }
+      curl_with_secret_header(){ return 28; }
+      ipinfo[countrycode]=US ipregistry[proxy]=false
+      db_ipinfo
+      db_ipregistry 4
+      print -r -- "${ipinfo[status]}|${ipinfo[countrycode]}|${ipregistry[status]}|${ipregistry[proxy]}"
+      curl(){ print -r -- $'{"data":"schema drift"}\n200'; }
+      db_ipinfo
+      print -r -- "${ipinfo[status]}|${ipinfo[proxy]}"
+    ZSH
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
+      "legacy-source-failures", COMMON_PROVIDER_LIBRARY, reporter_functions("db_ipinfo", "db_ipregistry"))
+    assert status.success?, stderr
+    assert_empty stderr
+    assert_equal "tls_error||timeout|\ninvalid_response|\n", stdout
+  end
+
   def test_ping0_parser_accepts_exact_four_line_geo_and_rejects_challenge_html
     parser_probe = <<~'ZSH'
       setopt KSH_ARRAYS
@@ -247,13 +273,14 @@ class ProvidersTest < ReporterTestCase
     probe = <<~'ZSH'
       setopt KSH_ARRAYS SH_WORD_SPLIT
       source "$1"
+      source "$4"
       eval "$2"
       typeset -A ipapi sinfo stype sscore
       IP='198.51.100.23' CurlARG='' ibar_step=0 fixture="$3"
       sinfo[database]=0 sinfo[ldatabase]=0
       Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
       show_progress_bar(){ :; }
-      curl_safe(){ cat "$fixture"; print -r -- 200; }
+      curl(){ cat "$fixture"; print -r -- 200; }
       db_ipapi 4
       exit_code=$?
       print -r -- "$exit_code|${ipapi[status]:-missing}|${ipapi[usetype]:-}|${ipapi[score]:-}"
@@ -261,7 +288,7 @@ class ProvidersTest < ReporterTestCase
     stdout, stderr, status = Open3.capture3(
       "/bin/zsh", "-f", "-c", probe,
       "ipapi-runtime-schema-drift-test", IPAPI_LIBRARY, function_source,
-      IPAPI_MALFORMED_FIXTURE
+      IPAPI_MALFORMED_FIXTURE, COMMON_PROVIDER_LIBRARY
     )
     assert status.success?, stderr
     assert_equal "1|invalid_response||\n", stdout
@@ -297,7 +324,7 @@ class ProvidersTest < ReporterTestCase
     assert_empty stderr
 
     source = File.read(SCRIPT, encoding: "UTF-8")
-    refute_match(/curl_safe[^\n]*\$api_key/, source)
+    refute_match(/\bcurl\s[^\n]*\$api_key/, source)
   end
 
   def test_ipapi_anonymous_runtime_keeps_minimal_context_without_fake_risk
@@ -314,7 +341,7 @@ class ProvidersTest < ReporterTestCase
       stype[unknown]='Unknown'
       is_nonnegative_decimal(){ [[ "$1" =~ '^[0-9]+([.][0-9]+)?$' ]]; }
       show_progress_bar(){ :; }
-      curl_safe(){ cat "$fixture"; print -r -- 200; }
+      curl(){ cat "$fixture"; print -r -- 200; }
       db_ipapi 4
       print -r -- "${ipapi[status]}|${ipapi[mode]}|${ipapi[anonymous_asn]}|${ipapi[anonymous_company]}|${ipapi[score]:-missing}|${ipapi[proxy]:-missing}"
     ZSH
@@ -339,7 +366,7 @@ class ProvidersTest < ReporterTestCase
       Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
       source "$4"
       show_progress_bar(){ :; }
-      curl_safe(){ cat "$fixture"; print -r -- 429; }
+      curl(){ cat "$fixture"; print -r -- 429; }
       db_ipapi 4
       print -r -- "$?|${ipapi[status]}"
     ZSH
@@ -354,6 +381,7 @@ class ProvidersTest < ReporterTestCase
 
   def test_ipapi_transport_failure_is_not_reported_as_quota_exhaustion
     probe = <<~'ZSH'
+      source "$2"
       eval "$1"
       typeset -A provider_credentials ipapi sinfo
       provider_credentials[IPAPI_API_KEY]=fixture-key
@@ -366,7 +394,7 @@ class ProvidersTest < ReporterTestCase
         print -r -- "$?|${ipapi[status]}|${ipapi[credential_mode]}|${ipapi[proxy]}"
       done
     ZSH
-    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "ipapi-transport", reporter_functions("db_ipapi"))
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "ipapi-transport", reporter_functions("db_ipapi"), COMMON_PROVIDER_LIBRARY)
     assert status.success?, stderr
     assert_empty stderr
     assert_equal "1|timeout|key|\n1|tls_error|key|\n1|tls_verification_failed|key|\n1|network_error|key|\n", stdout
@@ -577,7 +605,7 @@ class ProvidersTest < ReporterTestCase
 
     source = File.read(SCRIPT, encoding: "UTF-8")
     assert_includes source, "--config -"
-    refute_match(/curl_safe[^\n]*\$api_key/, source)
+    refute_match(/\bcurl\s[^\n]*\$api_key/, source)
   end
 
   def test_optional_provider_credentials_are_loaded_from_the_private_assignment_file

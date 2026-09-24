@@ -31,6 +31,7 @@ disclosure. A plan is not a measurement.
 | [SERVICES.md](SERVICES.md) | No resident service; temporary process startup, shutdown, and checks |
 | [PROVIDERS.md](PROVIDERS.md) | Query scopes, source contracts, and disclosure |
 | [CREDENTIALS.md](CREDENTIALS.md) | Private account/API/TOTP path and format index |
+| [MCP_AUTH.md](MCP_AUTH.md) | Maintained MCP inventory, current login/2FA evidence, HTTP/headless selection and recovery |
 | [UPSTREAM.md](UPSTREAM.md) | AGPL provenance and material modifications |
 
 `README.md` is intentionally absent. There is currently no project-specific
@@ -129,6 +130,10 @@ alone does not contain those packages. IPQS needs Node 22+, provider accounts
 needs Node 24.5+, and browser tools need Chrome. Build/start/stop commands are in
 [SERVICES.md](SERVICES.md#account-mcp-startup-and-shutdown); offline dependency
 setup is in [TESTING.md](TESTING.md). Account mutations require explicit task intent.
+Both are maintained on-demand MCPs; [MCP_AUTH.md](MCP_AUTH.md) records their
+backend checks. ipapi/Cloudflare account reads use HTTP with Chrome closed;
+ipapi setup defaults to headless. IPQS dashboard and Cloudflare setup retain
+headed Chrome where lower backends failed current verification.
 
 The default reporter and every route-runner choice use `reputation`. Media/AI
 unlock tests were removed because accessibility does not establish IP reputation.

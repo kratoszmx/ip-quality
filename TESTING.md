@@ -29,7 +29,7 @@ the tests and claiming a complete pass.
 
 | File | Responsibility |
 | --- | --- |
-| `test/common_test.rb` | Printable text, jq value types/bounds/controls, ANSI table widths/shape, proxy overrides, verified-file snapshots |
+| `test/common_test.rb` | HTTP envelopes/transport errors/state reset, printable text, jq predicates, table widths/shape, proxy overrides and snapshots |
 | `test/ip_quality_test.rb` | CLI plans and rejection gates, dependency failure, fixture DNSBL/SMTP execution |
 | `test/providers_test.rb` | Provider parsing, unknown/failure semantics, credentials, zero-credit preflight |
 | `test/dbip_test.rb` | Demo exact-IP/geography validation, no invented score, two-request visitor flow, route preservation and bounded guest tokens |
@@ -86,9 +86,11 @@ npm --prefix mcp/ipqs run test:browser-text
 The DB-IP regression tests cover the two-step visitor request, route/family
 preservation, target mismatch, bounded guest-token parsing, and stopping after
 page/transport/quota failures. IPWHOIS tests require its website request headers.
-Report tests retain ipapi.is for anonymous, limited and failed lookups in both
-languages, with missing values distinct from false. Query statuses stay aligned
-inside the factor matrix, including long TLS-error labels. Cloudflare's ASN
+Report tests retain every attempted source in its applicable type/score/factor
+matrices, in both languages, including an all-failed report. Status rows remain
+aligned, including long TLS-error labels; missing values never become false or zero.
+IPinfo/Ipregistry regressions preserve transport failures and clear stale values;
+IPinfo rejects a changed nested object before running jq field reads. Cloudflare's ASN
 context and status appear only in section 1, for both the relay and fallback
 basic-data paths in both languages. The report assembly test stubs all provider
 queries and checks the section boundary. Failed queries cannot show stale context.
@@ -96,6 +98,10 @@ Categories keep null and empty-array
 meanings, numeric scores remain absent, and routine provider footers stay removed.
 MCP tests separately cover
 request_egress metadata, visitor-token redaction and no-retry behavior.
+HTTP-account tests verify exact identity, login/error bodies, redirects, bounded
+reads, cleanup and secret-free failures without Chrome. IPQS tests cover issuer/
+account binding, textual setup, private recovery redaction and strict TOTP
+challenge forms. An MFA challenge with dashboard navigation is not authenticated.
 Shodan parser regressions reject fractional/out-of-range ports and control text,
 clearing any previous observations on rejection. Shared table tests run without
 provider state and check ANSI/CJK alignment, invalid dimensions and option scope.

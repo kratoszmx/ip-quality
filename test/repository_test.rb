@@ -17,7 +17,7 @@ class RepositoryTest < ReporterTestCase
     background_disown: /\bdisown\b/,
     return_trap: /trap[^\n]*RETURN/,
     cookie_bundle: /ref\/cookies\.txt/,
-    bundled_cookie_header: /curl_safe[^\n]+(?:\s-b\s|Cookie:)/i,
+    bundled_cookie_header: /curl[^\n]+(?:\s-b\s|Cookie:)/i,
     embedded_authorization_header: /authorization:/i,
     dynamic_api_key_scrape: /apiKey=/
   }.freeze
@@ -29,7 +29,10 @@ class RepositoryTest < ReporterTestCase
     assert_includes source, "--confirm-network-lookup"
     assert_includes source, "typeset -A"
     assert_includes source, "/bin/zsh -fc"
-    assert_includes source, 'command curl -q "$@"'
+    refute_match(/^curl_safe\(\)/, source)
+    commands = source.lines.reject { |line| line.lstrip.start_with?("#", "local -a required=") }.grep(/\bcurl\s/)
+    assert commands.all? { |line| line.match?(/\bcurl -q\s/) }, "curl must ignore user curlrc"
+    assert_includes source, 'curl -q "$@" --config -'
     refute_match(/dbip\[score\]\s*=/, source)
     refute_includes source, "shead[command]"
     refute_includes source, "factor_updates"

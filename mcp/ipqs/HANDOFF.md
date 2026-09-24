@@ -1,7 +1,6 @@
 # IPQS handoff
 
-Documentation reviewed 2026-09-24. The latest account checks below are dated
-snapshots, not a new login or quota check. Start with [AGENTS.md](AGENTS.md);
+Account and documentation checked 2026-09-24. Start with [AGENTS.md](AGENTS.md);
 repository-wide status and validation live in [../../HANDOFF.md](../../HANDOFF.md).
 
 ## Current integration
@@ -19,6 +18,21 @@ It proves usability at that time; the cause of recovery and any support reply
 are not established by the API result.
 
 ## Dashboard access
+
+The v25 audit freshly verified the account API (`authenticated`, credits usable),
+restored an expired dashboard login, enabled TOTP after privately saving its
+issuer-bound seed/emergency code, and passed a real challenge. A fresh isolated
+Chrome profile subsequently completed authorized saved login and was closed and
+removed. Existing profile and API key remain in place.
+
+Backend trials: copied session state returned HTTP 200 login HTML; isolated
+headless returned HTTP 403. One independent HTTP login used the reviewed form
+and saved credentials, received HTTP 302 on submission, but subsequent settings
+read did not establish authenticated state. No automatic second submission was
+made and no unsuccessful HTTP-login implementation is retained. This does not
+prove native HTTP login is permanently impossible. The supported dashboard path
+remains headed Chrome; usage/lookups remain direct HTTP. Full inventory and
+current backend decisions are in [../../MCP_AUTH.md](../../MCP_AUTH.md).
 
 The September 22 recovery identified an HTTP 200 login form at `/user/dashboard`
 and restored authentication with one authorized saved-credential submission.

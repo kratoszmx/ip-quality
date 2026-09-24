@@ -31,6 +31,8 @@ test("compiled stdio MCP lists the complete tool surface and returns a secret-fr
       "ipqs_account_usage",
       "ipqs_apply_setting_change",
       "ipqs_close_browser",
+      "ipqs_complete_totp",
+      "ipqs_enable_totp",
       "ipqs_finish_login",
       "ipqs_import_api_key",
       "ipqs_login_with_saved_credentials",

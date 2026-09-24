@@ -3,6 +3,59 @@
 require_relative "support/reporter_test_case"
 
 class ReportTest < ReporterTestCase
+  def test_failed_sources_remain_in_all_applicable_matrices_in_both_languages
+    probe = <<~'ZSH'
+      source "$1"
+      source "$2"
+      YY="$3"
+      typeset -A stype sscore sfactor ipinfo ipregistry ipqs ipapi ip2location abuseipdb scamalytics ipdata dbip ipwhois
+      stype[title]=Types sscore[title]=Scores sfactor[title]=Factors
+      ipinfo[status]=invalid_response ipregistry[status]=not_configured
+      ipqs[status]=official_insufficient_credits ipqs[source]=official_api
+      ipapi[status]=tls_error ip2location[status]=timeout abuseipdb[status]=http_403
+      scamalytics[status]=cloudflare_blocked ipdata[status]=network_error
+      dbip[status]=rate_limited ipwhois[status]=rate_limited
+      show_type
+      show_score
+      show_factor
+    ZSH
+    %w[cn en].each do |language|
+      stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
+        "failed-matrices", REPUTATION_REPORT, TERMINAL_LIBRARY, language)
+      assert status.success?, stderr
+      assert_empty stderr
+      types, scores, factors = stdout.split(/Scores\n|Factors\n/)
+      %w[IPinfo Ipregistry IPQS ipapi.is IP2Location AbuseIPDB].each { |name| assert_includes types, name }
+      %w[IP2Location Scamalytics ipapi.is AbuseIPDB IPQS DB-IP].each { |name| assert_includes scores, name }
+      %w[IP2Location ipapi.is Ipregistry IPQS Scamalytics ipdata IPinfo IPWHOIS].each { |name| assert_includes factors, name }
+      [types, scores, factors].each do |table|
+        assert_includes table, language == "cn" ? "TLS 握手失败" : "TLS handshake failed"
+        refute_match(/低风险|Low risk|\|\s+(?:是|否|Yes|No|0)\s*(?:\||$)/, table)
+        rows = table.lines.select { |line| line.include?(" | ") }
+        widths = rows.map { |line| line.split("|").map { |cell| cell.chars.sum { |char| char.ascii_only? ? 1 : 2 } } }
+        assert_equal 1, widths.uniq.length, rows.join
+      end
+    end
+  end
+
+  def test_ipqs_unknown_attempt_is_visible_without_becoming_available
+    probe = <<~'ZSH'
+      source "$1"
+      source "$2"
+      YY=en
+      typeset -A sscore ipinfo ipregistry ipqs ipapi ip2location abuseipdb scamalytics dbip
+      sscore[title]=Scores ipqs[status]=unknown ipqs[source]=official_api
+      show_score
+    ZSH
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
+      "unknown-ipqs", REPUTATION_REPORT, TERMINAL_LIBRARY)
+    assert status.success?, stderr
+    assert_empty stderr
+    assert_includes stdout, "IPQS"
+    assert_includes stdout, "official/failed"
+    refute_includes stdout, "official/available"
+  end
+
   def test_ipapi_factor_column_survives_anonymous_rate_limited_and_failed_queries
     probe = <<~'ZSH'
       source "$1"

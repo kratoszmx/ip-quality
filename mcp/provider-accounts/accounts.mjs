@@ -5,11 +5,12 @@ import { Agent } from 'node:https';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { chromium } from 'playwright-core';
-import { connectOrLaunchChromeOverCDP, ensurePrivateDirectoryStrict, verifyChromeProfileBinding, withLoopbackOperationLease } from '@codex-mcp/shared-browser-session';
+import { connectOrLaunchChromeOverCDP, ensurePrivateDirectoryStrict, verifyChromeProfileBinding, withLoopbackOperationLease, saveStorageStateSafely } from '@codex-mcp/shared-browser-session';
 import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@codex-mcp/shared-secret-file';
 import { requestHttpRead } from '@codex-mcp/shared-http-read';
 import { providerConfig, accountUrl, accountPagePath, accountNetworkOptions, accountRouteMatches, assertAccountOrigin, redactAccountText, classifyAccountPage, ipapiDashboardAccepted, validApiKey, ipapiKeyAccepted } from './policy.mjs';
 import { submitReviewedSignup } from './signup.mjs';
+import { httpStatePath, readHttpAccount } from './http-account.mjs';
 
 export const ROOT = path.dirname(fileURLToPath(import.meta.url));
 export const SECRETS = path.resolve(ROOT, '../../secrets');
@@ -23,8 +24,10 @@ export async function withSession(provider, operation, { foreground = false } = 
     const profileDir = path.join(ROOT, '.state', provider);
     await ensurePrivateDirectoryStrict(profileDir);
     const routing = accountNetworkOptions();
+    const headless = provider === 'ipapi' && !foreground;
     const session = await connectOrLaunchChromeOverCDP(chromium, {
-      profileDir, cdpPort: config.port, proxyServer: routing.proxyServer, extraArgs: routing.chromeArgs, startUrl: 'about:blank',
+      profileDir, cdpPort: config.port, proxyServer: routing.proxyServer,
+      extraArgs: [...routing.chromeArgs, ...(headless ? ['--headless=new'] : [])], startUrl: 'about:blank',
       background: !foreground, hidden: !foreground, detached: true, unref: true,
       preserveContextSettings: true, timeoutMs: 20_000, killLaunchedProcessOnClose: false,
     });
@@ -92,18 +95,22 @@ export async function accountStatus(provider) {
   return { provider, savedAccount: account.usable, apiKeyConfigured: key.usable, registrationAttempted: attempt.exists, liveAuthenticationChecked: false };
 }
 
-export async function openAccount(provider, surface) {
+export async function openAccount(provider, surface, visible = false) {
   const url = accountUrl(provider, surface);
   return withSession(provider, async page => {
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20_000 });
     if (response && response.status() >= 400) return { provider, state: 'access_unavailable', httpStatus: response.status() };
     await page.locator('body').waitFor({ timeout: 10_000 });
-    return snapshot(provider, page);
-  }, { foreground: true });
+    const result = await snapshot(provider, page);
+    if (provider === 'ipapi' && result.state === 'authenticated') await saveStorageStateSafely(page.context(), httpStatePath(provider));
+    return result;
+  }, { foreground: visible || provider === 'cloudflare' });
 }
 
-export async function readAccount(provider) {
-  return withSession(provider, page => snapshot(provider, page));
+export async function readAccount(provider, mode = 'http') {
+  if (mode === 'browser') return withSession(provider, page => snapshot(provider, page));
+  if (mode !== 'http') throw new Error('Unknown read mode.');
+  return readHttpAccount(provider, (await privateAccount(provider)).email);
 }
 
 // Credentials are persisted before the sole submission. A durable attempt

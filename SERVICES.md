@@ -12,7 +12,7 @@ External Supervisor checks and mail watches are owned outside this repository.
 | `--config-test-only` | Runs an existing Mihomo with `-t`, then exits; no report lookup or persistent proxy listener |
 | Confirmed exact-leaf report | Starts a private Mihomo on a random `127.0.0.1` port, verifies listener ownership, then runs the reporter through it |
 | `mcp/ipqs` | Stdio account/API tools; dashboard work may retain its own Chrome on CDP 19453 |
-| `mcp/provider-accounts` | Stdio free-account tools; dedicated ipapi/Cloudflare Chrome profiles use CDP 19503/19504 |
+| `mcp/provider-accounts` | Stdio account reads use HTTP without Chrome. Explicit setup/recovery uses headless ipapi / headed Cloudflare on CDP 19503/19504 |
 
 Use the route commands in [AGENTS.md](AGENTS.md#choose-a-route). During a live
 run, Ctrl-C stops the runner; handled HUP/TERM signals also stop its reporter
@@ -44,11 +44,15 @@ Browser lifetime is separate:
   Chrome only if the session launched it with shutdown ownership. An attached
   Chrome can remain open. `auth:check` deliberately retains its background
   headed container and is a live dashboard check.
-- Provider-account tools detach after each operation and retain their Chrome.
+- Provider-account HTTP reads start no browser. Explicit browser tools detach
+  after each operation and retain their Chrome (headless ipapi by default).
   They expose no browser-shutdown tool. When authorized maintenance needs to
   close it, connect through the package's shared browser helper, verify the
   expected private profile with `verifyChromeProfileBinding`, then send
   `Browser.close` only to that owned container. Keep its `.state/` login files.
+
+[MCP_AUTH.md](MCP_AUTH.md) records the tested fallback decisions. A failed HTTP
+identity read never silently opens a browser or retries with credentials.
 
 For a browser started through a temporary proxy, close the owned browser before
 stopping that proxy so it cannot retain a dead route. Loopback CDP traffic stays

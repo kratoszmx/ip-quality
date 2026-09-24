@@ -19,11 +19,11 @@ server.registerTool('provider_account_status', {
   description: buildToolDescription('Read local credential and one-submit registration state without network access.', instructions), inputSchema: { provider },
 }, ({ provider }) => result(() => accountStatus(provider)));
 server.registerTool('provider_account_open', {
-  description: buildToolDescription('Open one reviewed account page in its dedicated Chrome and return redacted text and value-free controls.', instructions), inputSchema: { provider, surface: z.enum(['signup', 'login', 'dashboard', 'security']) },
-}, ({ provider, surface }) => result(() => openAccount(provider, surface)));
+  description: buildToolDescription('Open one reviewed setup/recovery page. ipapi uses headless Chrome by default; visible=true requests its human recovery UI. Cloudflare retains headed Chrome because its headless dashboard returned HTTP 403. Routine account reads use HTTP instead.', instructions), inputSchema: { provider, surface: z.enum(['signup', 'login', 'dashboard', 'security']), visible: z.boolean().default(false) },
+}, ({ provider, surface, visible }) => result(() => openAccount(provider, surface, visible)));
 server.registerTool('provider_account_read', {
-  description: buildToolDescription('Inspect the existing account page without navigation or submission.', instructions), inputSchema: { provider },
-}, ({ provider }) => result(() => readAccount(provider)));
+  description: buildToolDescription('Check the saved account identity over bounded HTTP without Chrome. mode=browser explicitly inspects the existing dedicated page for setup or login recovery.', instructions), inputSchema: { provider, mode: z.enum(['http', 'browser']).default('http') },
+}, ({ provider, mode }) => result(() => readAccount(provider, mode)));
 server.registerTool('provider_account_create_free', {
   description: buildToolDescription('Submit one reviewed free signup with privately generated credentials. Uses the configured private registration email. Human verification blocks submission.', instructions), inputSchema: { provider, country: z.enum(['Hong Kong', 'China']).optional(), confirmation: z.literal('CREATE_FREE_ACCOUNT') },
 }, ({ provider, country, confirmation }) => result(() => createFreeAccount(provider, country, confirmation)));
@@ -36,7 +36,7 @@ server.registerTool('public_provider_verify_free_api', {
 }, ({ provider, surface, confirmation }) => result(() => verifyPublicProvider(provider, confirmation, undefined, surface)));
 
 server.registerTool('cloudflare_account_check', {
-  description: buildToolDescription('Verify the saved Cloudflare identity, email and 2FA state with one same-origin account read. Does not spend an Intel lookup.', instructions), inputSchema: {},
+  description: buildToolDescription('Verify the saved Cloudflare identity, email and 2FA state with one HTTP account read and private saved state. No Chrome and no Intel lookup; expired state requires explicit browser recovery.', instructions), inputSchema: {},
 }, () => result(checkCloudflareAccount));
 server.registerTool('cloudflare_prepare_intel_token', {
   description: buildToolDescription('Prepare and validate an account-scoped Intel Read token on the official dashboard without submitting it.', instructions), inputSchema: {},

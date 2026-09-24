@@ -20,14 +20,16 @@ No build step is needed. `start` runs a stdio MCP server for a client, not an
 interactive CLI. Start with the network-free `provider_account_status` tool;
 opening pages or verifying APIs makes live requests. Browser retention and
 shutdown are described in [../../SERVICES.md](../../SERVICES.md).
+The formal inventory and current account/2FA evidence are in
+[../../MCP_AUTH.md](../../MCP_AUTH.md).
 
 ## Tools and workflow
 
 | Tool | Effect |
 | --- | --- |
 | provider_account_status | Local credential and submission metadata; no network |
-| provider_account_open | Open one fixed signup/login/dashboard/security page in its dedicated profile |
-| provider_account_read | Redacted existing-page text and value-free controls; DOM state alone may be inconclusive |
+| provider_account_open | Explicit setup/recovery: ipapi defaults to headless; `visible=true` requests its human UI. Cloudflare keeps headed Chrome |
+| provider_account_read | Default `mode=http`: bounded exact-account identity read with saved state and no Chrome. Explicit `mode=browser`: redacted existing-page text/controls |
 | provider_account_create_free | One free signup after CREATE_FREE_ACCOUNT; uses the confirmed private email/country |
 | ipapi_import_free_key | Import a labelled key after one full-response free lookup and IMPORT_FREE_API_KEY |
 | public_provider_verify_free_api | VERIFY_FREE_API with surface=free_api checks DB-IP/ipwho.is context for 1.1.1.1. public_demo checks IPWHOIS security for 1.1.1.1 or DB-IP's requesting egress via its page and one visitor lookup. No account/browser |
@@ -67,11 +69,19 @@ page exposes no 2FA entry; the security surface therefore stops locally instead
 of navigating to a guessed settings path. An activation notice remains pending
 email verification even when a password form is present.
 
-Cloudflare account reads use the shared active-browser-context HTTP helper:
-one fixed GET to /api/v4/user, no redirects/retries, bounded body, exact saved-email
-comparison and suspended-account rejection. Browser-side fetch sometimes timed out
-on this surface; the context HTTP method passed and is now the direct path.
+Routine account reads use `http-account.mjs` and the shared bounded HTTP context
+reader with private saved state, without launching Chrome. Cloudflare uses one
+fixed GET to /api/v4/user; ipapi uses /app/home. Both bind the saved identity and
+reject login/error bodies, redirects and retries. A failed HTTP check returns a
+failure rather than automatically opening a browser. Explicit browser recovery
+refreshes the private HTTP state after server identity is confirmed.
 Intel lookups use native bounded HTTP with the saved token and no Chrome.
+
+The September 24 trial passed both HTTP identity checks with the owned Chrome
+containers closed. ipapi's isolated headless dashboard also passed, so its setup
+default now adds `--headless=new`. Cloudflare headless returned 403; its explicit
+setup/recovery browser stays headed. Switching an existing container's mode
+requires closing that verified owned container first.
 
 ## Private files and lifetime
 

@@ -21,9 +21,11 @@ export interface IpqsAuthSignals {
   loginFormPresent: boolean;
   secondaryVerification: boolean;
   credentialError: boolean;
+  totpChallengePresent?: boolean;
 }
 
 export function classifyIpqsAuthSignals(signals: IpqsAuthSignals): IpqsAuthStage {
+  if (signals.trustedOrigin && signals.totpChallengePresent) return "secondary-verification";
   if (signals.trustedOrigin
     && signals.path?.startsWith("/user")
     && signals.authenticatedMarkerCount > 0
@@ -59,6 +61,7 @@ export async function inspectIpqsAuthPage(page: Page) {
     });
     return {
       title: document.title,
+      totpChallengePresent: !!document.querySelector('input[name="2fa"]') && /Finish Login/.test(body),
       authenticatedMarkerCount,
       loginFormPresent,
       secondaryVerification: new RegExp(secondaryPattern, "i").test(body),
@@ -73,7 +76,7 @@ export async function inspectIpqsAuthPage(page: Page) {
   const dashboardCandidate = locationSummary.trustedOrigin
     && locationSummary.path?.startsWith("/user")
     && state.authenticatedMarkerCount > 0
-    && !state.loginFormPresent;
+    && !state.loginFormPresent && !state.totpChallengePresent;
   const signals: IpqsAuthSignals = {
     trustedOrigin: locationSummary.trustedOrigin,
     path: locationSummary.path,
@@ -81,6 +84,7 @@ export async function inspectIpqsAuthPage(page: Page) {
     loginFormPresent: state.loginFormPresent,
     secondaryVerification: !dashboardCandidate && state.secondaryVerification,
     credentialError: !dashboardCandidate && state.credentialError,
+    totpChallengePresent: state.totpChallengePresent,
   };
   const stage = classifyIpqsAuthSignals(signals);
   return {

@@ -55,3 +55,31 @@ else
 print -rn -- "network_error"
 fi
 }
+
+# Decode curl's bounded body + newline + HTTP-code envelope. Callers still own
+# endpoints, credentials, acceptable success codes, and response schemas.
+provider_decode_http_response(){
+emulate -LR zsh
+typeset wire_response="$1" curl_exit="$2" http_code response_body
+typeset -gA provider_http_response
+provider_http_response=([status]=network_error [body]="" [http_code]="")
+case "$curl_exit" in
+0) ;;
+28)provider_http_response[status]=timeout; return 1 ;;
+35)provider_http_response[status]=tls_error; return 1 ;;
+60)provider_http_response[status]=tls_verification_failed; return 1 ;;
+*)return 1 ;;
+esac
+[[ "$wire_response" == *$'\n'* ]]||return 1
+http_code="${wire_response##*$'\n'}"
+response_body="${wire_response%$'\n'*}"
+[[ "$http_code" == [0-9][0-9][0-9] ]]||return 1
+provider_http_response[http_code]="$http_code"
+if (( 10#$http_code < 200 || 10#$http_code > 299 ));then
+provider_http_response[status]=$(provider_http_failure_status "$http_code" "$response_body")
+return 1
+fi
+provider_http_response[status]=ok
+provider_http_response[body]="$response_body"
+return 0
+}
