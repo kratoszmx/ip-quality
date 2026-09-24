@@ -1,24 +1,43 @@
-# MCP inventory and authentication
+# MCP guide and authentication
 
-Owner: `ipquality`. Checked 2026-09-24. This is the maintained inventory and
-dated authentication evidence; file existence alone is never a login check.
+Owner: `ipquality`. Inventory and tool schemas reviewed 2026-09-24. The account
+evidence below records the earlier v25 authentication audit; documentation
+validation does not repeat live logins. File existence alone is not a login check.
 Private paths/formats are in [CREDENTIALS.md](CREDENTIALS.md), process lifetime
 in [SERVICES.md](SERVICES.md), and offline checks in [TESTING.md](TESTING.md).
 
 ## Maintained servers
 
-| Server | Owner / start from repository root | Purpose and disposition |
+| Server | Owner / start from repository root | Use it for |
 | --- | --- | --- |
-| `codex-ipqs-mcp` | `mcp/ipqs`; build with `npm --prefix mcp/ipqs run build`, start with `npm --prefix mcp/ipqs start` | Formal, maintained: official API, dashboard, saved login and private TOTP |
-| `ipquality-provider-accounts` | `mcp/provider-accounts`; `npm --prefix mcp/provider-accounts start` | Formal, maintained: ipapi/Cloudflare identity and setup; DB-IP/IPWHOIS account-free probes |
+| `codex-ipqs-mcp` | [IPQS guide](mcp/ipqs/AGENTS.md); build with `npm --prefix mcp/ipqs run build`, start with `npm --prefix mcp/ipqs start` | Official IPQS API usage/lookups, dashboard, saved login and private TOTP |
+| `ipquality-provider-accounts` | [Provider-account guide](mcp/provider-accounts/AGENTS.md); `npm --prefix mcp/provider-accounts start` | ipapi/Cloudflare identity and setup; DB-IP/IPWHOIS account-free probes |
 
-Both are optional on-demand stdio servers. The reporter needs neither running.
-The inventory checked repository entrypoints, package manifests, private profile
-directory names, the sibling mcps source tree/manifest and global MCP entry names.
-No temporary MCP or separate DB-IP/IPWHOIS MCP remains to promote or delete.
-The old mcps IPQS package is absent; its external manifest entry points here.
-The three owned account profiles and IPQS support receipts are useful recovery
-and audit state. They are not obsolete MCPs or duplicate credentials.
+Both are optional on-demand stdio servers; the reporter needs neither running.
+Runtime/dependency and shutdown details are in [SERVICES.md](SERVICES.md).
+There is no separate DB-IP/IPWHOIS server. Account profiles and support receipts
+are private recovery/audit state, not disposable temporary MCPs.
+
+## Choose a first call
+
+These are server-local tool names and JSON arguments; a client may add its own
+prefix. The first two calls are offline. Live MCP reads run when called; the
+reporter's `--confirm-network-lookup` flag does not apply to MCP tools.
+
+| Need | Tool | Arguments | Network / meaning |
+| --- | --- | --- | --- |
+| IPQS local readiness | `ipqs_status` | `{"probeBrowser":false}` | None; saved files are not proof of login or credits |
+| ipapi/Cloudflare local readiness | `provider_account_status` | `{"provider":"ipapi"}` | None; use `cloudflare` for that account |
+| IPQS account/API acceptance | `ipqs_account_usage` | `{}` | One live account read; no reputation lookup credit |
+| ipapi saved-session identity | `provider_account_read` | `{"provider":"ipapi","mode":"http"}` | Live HTTP, no Chrome; inspect `authenticated` and `state` |
+| Cloudflare identity and 2FA state | `cloudflare_account_check` | `{}` | Live HTTP, no Chrome or Intel lookup |
+| DB-IP free geography probe | `public_provider_verify_free_api` | `{"provider":"dbip","surface":"free_api","confirmation":"VERIFY_FREE_API"}` | One live `1.1.1.1` lookup; supplies context, not a risk verdict |
+
+For website risk observations, explicitly choose `public_demo`: IPWHOIS tests
+`1.1.1.1`, while DB-IP reads a page and the requesting egress. Field availability
+and quotas differ from `free_api`; see [PROVIDERS.md](PROVIDERS.md).
+IPQS uses the input name `confirm` for mutations; provider accounts uses
+`confirmation`. Account operations follow task intent and the tool's own schema.
 
 ## Dated state and preferred access
 
@@ -44,27 +63,24 @@ removed after its process exited; no temporary MCP was introduced.
 - IPQS API: `npm --prefix mcp/ipqs run probe:sanitized` performs one non-lookup
   account read. `npm --prefix mcp/ipqs run auth:check` checks the retained browser.
   For an authorized login recovery, use `ipqs_login_with_saved_credentials`
-  with `USE_SAVED_IPQS_CREDENTIALS`; the exact reviewed TOTP challenge is completed
-  once with its private seed. `ipqs_complete_totp` with `USE_SAVED_IPQS_TOTP`
+  with `confirm=USE_SAVED_IPQS_CREDENTIALS`; the reviewed TOTP challenge completes
+  once with its private seed. `ipqs_complete_totp` with `confirm=USE_SAVED_IPQS_TOTP`
   handles a pending challenge. Failed or changed forms stop without retries.
-- ipapi/Cloudflare: `provider_account_read` defaults to `mode=http` and returns
-  exact-account identity metadata. `cloudflare_account_check` additionally checks
-  email and factor state. Neither starts Chrome. `provider_account_status` is
-  only an offline credential-readiness check.
 - Explicit recovery/setup: `provider_account_open` opens one allowlisted page;
   `provider_account_read` with `mode=browser` inspects its redacted controls.
-  Verified ipapi dashboard visits and Cloudflare server-identity reads refresh
-  the corresponding private `.state/*-http.json`. Never copy these files into
-  logs, tool arguments or Git. Close the verified owned browser before changing
-  its route or switching an existing headless container to a visible one.
-- Enrollment: `ipqs_enable_totp` with `ENABLE_IPQS_TOTP` verifies usable API
+  A verified ipapi dashboard visit refreshes its private HTTP state. Cloudflare
+  requires its separate server-identity helper; generic open/read tools do not
+  refresh its state. Follow [HTTP state recovery](mcp/provider-accounts/AGENTS.md#http-state-recovery).
+  Private state stays out of logs, tool arguments and Git. Close the owned browser
+  before changing its route or switching an existing headless container to a visible one.
+- Enrollment: `ipqs_enable_totp` with `confirm=ENABLE_IPQS_TOTP` verifies usable API
   credits, binds the issuer/account from the existing textual QR URL, saves
   seed/recovery data and reserves the one submission before activation. No image
   decoding is used. Existing factors and receipts stop duplicate enrollment.
   Cloudflare retains its API-before-2FA policy. Account-free platforms need no
   registration, paid plan or authenticator.
 
-Account operations require task intent. The user authorized this audit, recovery,
-backend changes and applicable 2FA setup; routine offline tests exercise fixtures
-only. Live authentication receipts and any short-lived proof profile belong to
-ignored private storage, never the repository's public source.
+The dated authentication audit had its own authorization for recovery and 2FA;
+it is not a standing instruction to repeat enrollment during documentation work.
+Routine offline tests exercise fixtures. Live authentication receipts remain in
+ignored private storage.

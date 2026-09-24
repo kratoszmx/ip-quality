@@ -92,7 +92,9 @@ fields are comparable:
 All three matrices retain attempted-source columns after TLS/transport failures,
 rate limits, quota exhaustion or schema errors. Type adds a query-status row;
 score/factor retain their existing status rows. Missing values are `-`, never
-zero/false. Sources that were never queried and have no values are omitted.
+zero/false. Explicit `not_configured` states also remain visible in applicable
+matrices. Within those matrices, a source with neither status nor observation
+is omitted.
 JSON adds IPinfo status and fills every type source's status alongside the
 existing provider statuses; query endpoints and quotas are unchanged.
 
@@ -232,8 +234,9 @@ syntax, and key characters are validated without executing the file. Keys are
 fed to curl through standard-input configuration, so they do not appear in
 process arguments, Git configuration, or reports.
 
-Without an Ipregistry key, its optional column is absent. Without an IPQS key,
-the reporter uses the named Check.Place relay and records that source. With an
+Without an Ipregistry key, no Ipregistry request is made; its type and factor
+columns remain visible with `not_configured` and unknown values. Without an IPQS
+key, the reporter uses the named Check.Place relay and records that source. With an
 IPQS key, it first calls the account-usage endpoint; a confirmed zero balance or
 insufficient-credit response stops before the reputation request. Other failures
 remain attributed to the official path rather than being described as a clean IP.

@@ -52,9 +52,8 @@ its localized display labels are presentation policy, not a runtime provider API
 The HTTP decoder replaces repeated envelope handling in public JSON retrieval,
 IPinfo, Ipregistry, ipapi, Cloudflare and both DB-IP requests. It accepts text or
 JSON bodies; callers retain schema validation and any exact-200 contract.
-The forwarding `curl_safe` function was removed: request sites use `curl -q`
-directly, while credential-bearing URL/header functions retain their substantive
-stdin-config handling in the reporter.
+Request sites use `curl -q`; credential-bearing URL/header functions retain
+their stdin-config handling in the reporter.
 
 ## jq value predicates
 
@@ -109,23 +108,12 @@ Render values before measuring them. Each renderer prepends its label-column
 width and uses the same resulting width list for its header, rule and data rows.
 One long organization or error label expands only its own provider column.
 These functions preserve the caller's zsh options, including `KSH_ARRAYS`.
-The former `report_table_*` definitions are removed; callers use the common
-implementations directly, with no forwarding aliases.
 
 The width rule is the existing report-table approximation, now also used by
 headers. It is not a full Unicode `wcwidth` implementation: combining marks,
 emoji sequences, and ambiguous-width characters can differ between terminals.
 Source labels, status colors, missing-value policy and provider-row selection
 stay in `report/`; the common table code knows none of them.
-
-The September 24 audit retained all existing common modules: provider values,
-jq value predicates, terminal text, metadata, file snapshots and proxy overrides
-have reusable contracts. No existing common implementation needed relocation.
-Provider schemas and IPQS connection-type mapping remain provider-owned;
-Mihomo lifecycle remains runner-owned. Its redundant clock forwarding method
-was removed in favor of direct Ruby standard-library calls. The inspected
-myutils public APIs are Python modules and do not supply this zsh table contract;
-no Python subprocess or adapter was added to the reporter.
 
 ## Ruby metadata
 
@@ -201,7 +189,7 @@ They do not copy those implementations or leave forwarding packages in mcps.
 
 Provider origins, form selectors, account identity, API contracts and registration
 receipts remain inside their owning MCP. Shared helpers do not decide whether an
-account is usable; the Cloudflare workflow owns its API-before-2FA check.
+account is usable; each account workflow owns its API-before-2FA check.
 
 Inside `mcp/provider-accounts`, `accounts.mjs::withSession` owns the shared
 provider profile binding and lease, `privateAccount` validates saved identities,
@@ -214,10 +202,18 @@ consumer reuses these directly. `cloudflare-policy.mjs` contains fixture-testabl
 identity, token scope, response and API-before-MFA decisions. MCP action entrypoints
 return metadata only; secrets stay inside their private-file and HTTP/form calls.
 
-The v25 audit retained every existing `common/` module after tracing its callers.
-IPQS enrollment/challenge policy stays in `mcp/ipqs/src/totp.ts`; the HTTP account
-identity and state paths stay in `mcp/provider-accounts/http-account.mjs`.
-Neither is a platform-neutral API suitable for the project common directory.
+IPQS enrollment/challenge policy stays in `mcp/ipqs/src/totp.ts`. Provider-account
+HTTP helpers live in `mcp/provider-accounts/http-account.mjs`:
+
+| Function | Input / output |
+| --- | --- |
+| `httpStatePath(provider)` | Validates `ipapi`/`cloudflare` and returns its absolute private HTTP-state path |
+| `httpAccountIdentity(provider, status, contentType, body, expectedEmail)` | Pure provider-specific identity check; returns booleans/status metadata without email or response content |
+| `readHttpAccount(provider, expectedEmail, dependencies = {})` | One bounded HTTP GET using private saved state; returns identity/status metadata, disposes its HTTP context, and starts no Chrome. Tests can inject secret/context/response readers |
+
+Cloudflare's `identityOnPage(page)` verifies the active browser's server identity
+before refreshing saved HTTP state. Ordinary HTTP checks only consume that state;
+see [recovery guidance](mcp/provider-accounts/AGENTS.md#http-state-recovery).
 
 The same MCP owns `public-api.mjs::verifyPublicProvider(provider, confirmation,
 request, surface)` for DB-IP/IPWHOIS. The MCP selects `free_api` (default) or

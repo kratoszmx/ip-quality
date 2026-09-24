@@ -25,27 +25,17 @@ for a network-free plan and route selection.
   unavailable-demo conclusion. Actual rate limits still remain unknown risk,
   without retries or route switching. Contracts and the historical NodeQuality
   comparison belong in [PROVIDERS.md](PROVIDERS.md).
-- The common-library audit extracted generic table measurement/padding/rows/rules
-  to `common/terminal.zsh`, used directly by all three matrices. Columns grow
-  independently; a long value does not widen other providers.
-  Existing common modules retain reusable contracts; none needed moving back.
-  Provider schemas/labels and lifecycle policy stay with their owners. The
-  redundant Ruby clock forwarding method and unused media/AI labels were removed.
-- Shodan now reuses the common jq predicates for bounded printable strings and
-  integer ports. Fractional ports and control text are rejected, clearing previous
-  observations. This is covered by malformed-response regressions.
-- The v25 audit extracted curl envelope/status decoding to
-  `common/provider_values.zsh` for six retrieval paths, removed the pure curl
-  forwarding function, and preserved source-specific parsers. IPinfo now rejects
-  changed nested objects before jq field access; IPinfo/Ipregistry retain precise
-  transport and HTTP failures. Tracing current callers found no overly specialized
-  common module requiring relocation; account/TOTP policy stays in its owning MCP.
-- [MCP_AUTH.md](MCP_AUTH.md) inventories both maintained MCPs and dated login
-  evidence. ipapi/Cloudflare account reads now use HTTP with Chrome closed;
-  ipapi recovery can use headless Chrome. Cloudflare and IPQS retain headed
-  recovery where current headless trials returned 403. IPQS TOTP was enabled
-  after usable API proof and verified with a real challenge and fresh login.
-  Its separate one-submit native HTTP login did not establish authentication.
+- Shared helpers cover curl response envelopes, independent table-column widths
+  and bounded jq values. IPinfo rejects changed nested objects; IPinfo/Ipregistry
+  preserve transport failures; Shodan rejects fractional ports and control text.
+  [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md) owns API/caller details, while
+  [UPSTREAM.md](UPSTREAM.md) records removed wrappers and other modifications.
+- [MCP_AUTH.md](MCP_AUTH.md) is the maintained MCP guide: server selection,
+  first-call arguments, live/offline boundaries and dated login/2FA evidence.
+  ipapi/Cloudflare routine account reads use saved-state HTTP without Chrome;
+  recovery choices and the separate Cloudflare state-refresh step are documented
+  there. IPQS TOTP enrollment and fresh-login proof belong to the earlier v25
+  account audit; they are not repeated by documentation validation.
 
 ## Remaining issue
 
@@ -59,9 +49,9 @@ verification and chosen route without a silent direct fallback.
 
 ## Recorded live evidence
 
-These are earlier authorized reputation measurements. The v25 audit performed
-account/login checks documented in MCP_AUTH.md and spent no reputation lookup
-credits. Reports remain private ignored outputs.
+These are earlier authorized reputation measurements. The earlier v25 account
+audit performed the login checks recorded in MCP_AUTH.md without reputation
+lookups. Reports remain private ignored outputs.
 
 | Date / scope | Result and evidence |
 | --- | --- |
@@ -99,6 +89,12 @@ Validation on v25:
   checks reject a TOTP challenge even when dashboard navigation is present.
 - Shell/Ruby syntax and `git diff --check` passed; maintained local documentation
   links and anchors were checked separately.
+
+The subsequent documentation audit re-ran the full offline and synthetic suites,
+reviewed all 13 maintained guides, and inspected both servers' actual
+instructions/tool schemas over stdio without invoking account tools. It corrected
+Ipregistry's unconfigured-column behavior, clarified HTTP-state recovery, and
+consolidated repeated audit history. No new provider or account check was made.
 
 [TESTING.md](TESTING.md) owns complete/focused commands and their limits.
 Configured remotes are `github-kratoszmx` (`kratoszmx/ip-quality`) and

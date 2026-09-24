@@ -19,38 +19,25 @@ are not established by the API result.
 
 ## Dashboard access
 
-The v25 audit freshly verified the account API (`authenticated`, credits usable),
-restored an expired dashboard login, enabled TOTP after privately saving its
-issuer-bound seed/emergency code, and passed a real challenge. A fresh isolated
-Chrome profile subsequently completed authorized saved login and was closed and
-removed. Existing profile and API key remain in place.
+The September 24 v25 account audit verified usable API credits, restored login,
+enabled TOTP after saving its bound seed/emergency code, and passed a real
+challenge plus fresh-profile login. The proof profile was closed and removed;
+the normal profile and API key remain. This documentation review did not repeat
+those live actions.
 
-Backend trials: copied session state returned HTTP 200 login HTML; isolated
-headless returned HTTP 403. One independent HTTP login used the reviewed form
-and saved credentials, received HTTP 302 on submission, but subsequent settings
-read did not establish authenticated state. No automatic second submission was
-made and no unsuccessful HTTP-login implementation is retained. This does not
-prove native HTTP login is permanently impossible. The supported dashboard path
-remains headed Chrome; usage/lookups remain direct HTTP. Full inventory and
-current backend decisions are in [../../MCP_AUTH.md](../../MCP_AUTH.md).
-
-The September 22 recovery identified an HTTP 200 login form at `/user/dashboard`
-and restored authentication with one authorized saved-credential submission.
-Fresh same-origin GETs then passed through a retained background headed Chrome.
-Closing/restarting that container lost usable authentication in one experiment;
-the default `auth:check` now retains and reuses it. The explicit `--headless`
-experiment returned 403 and was not adopted.
+The supported dashboard path remains retained headed Chrome; usage/lookups use
+the official HTTP API. Independent HTTP/headless trials did not establish
+dashboard authentication. Their exact outcomes and current recovery commands are
+centralized in [../../MCP_AUTH.md](../../MCP_AUTH.md). Closing/restarting the
+container lost usable authentication in an earlier experiment, so `auth:check`
+retains it; this is observed behavior, not proof that other backends can never work.
 
 The user authorized existing saved credentials on 2026-09-15. The continuing
 IPQS account task may reuse that permission; a documentation/test task does not
 itself call for login. Support messages and purchases need their own task intent.
 
-Use the official API for usage/lookups, `mode=text` for redacted dashboard HTML,
-and `mode=controls` for dynamic values or form controls. Text mode does not prove
-external-CSS visibility or browserless login. Browser commands run compiled
-JavaScript because direct `tsx` execution injected `__name` helpers into
-Playwright callbacks. Commands and regression coverage are in
-[../../TESTING.md](../../TESTING.md).
+Tool behavior is in [AGENTS.md](AGENTS.md); regression commands and coverage are
+in [../../TESTING.md](../../TESTING.md).
 
 ## Historical support case
 

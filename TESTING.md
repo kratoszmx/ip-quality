@@ -39,8 +39,8 @@ the tests and claiming a complete pass.
 | `test/clash_leaf_runner_test.rb` | Cached selection, YAML safety, exact leaf/dependencies, proxy isolation, process cleanup |
 | `test/support/reporter_test_case.rb` | Shared paths, named zsh function probes, isolated reporter copies and fake commands |
 | `test/fixtures/` | Sanitized provider responses; data only |
-| `mcp/ipqs/tests/` | Official account/API, saved-login, secret and MCP contracts |
-| `mcp/provider-accounts/tests/` | Free-account policy, one-submit form handling, private output and provider MCP contracts |
+| `mcp/ipqs/tests/` | Official account/API, saved login, TOTP issuer/account/form policy, secrets and MCP contracts |
+| `mcp/provider-accounts/tests/` | HTTP identity/state, signup/TOTP/recovery policy, public-provider probes, private output and MCP contracts |
 
 Each suite can run directly. Minitest options pass through the complete runner
 to the Ruby aggregate only; both Node suites still run in full. Replace the
@@ -83,28 +83,17 @@ npm --prefix mcp/ipqs run test:browser-text
 
 ## Maintain the boundary
 
-The DB-IP regression tests cover the two-step visitor request, route/family
-preservation, target mismatch, bounded guest-token parsing, and stopping after
-page/transport/quota failures. IPWHOIS tests require its website request headers.
-Report tests retain every attempted source in its applicable type/score/factor
-matrices, in both languages, including an all-failed report. Status rows remain
-aligned, including long TLS-error labels; missing values never become false or zero.
-IPinfo/Ipregistry regressions preserve transport failures and clear stale values;
-IPinfo rejects a changed nested object before running jq field reads. Cloudflare's ASN
-context and status appear only in section 1, for both the relay and fallback
-basic-data paths in both languages. The report assembly test stubs all provider
-queries and checks the section boundary. Failed queries cannot show stale context.
-Categories keep null and empty-array
-meanings, numeric scores remain absent, and routine provider footers stay removed.
-MCP tests separately cover
-request_egress metadata, visitor-token redaction and no-retry behavior.
-HTTP-account tests verify exact identity, login/error bodies, redirects, bounded
-reads, cleanup and secret-free failures without Chrome. IPQS tests cover issuer/
-account binding, textual setup, private recovery redaction and strict TOTP
-challenge forms. An MFA challenge with dashboard navigation is not authenticated.
-Shodan parser regressions reject fractional/out-of-range ports and control text,
-clearing any previous observations on rejection. Shared table tests run without
-provider state and check ANSI/CJK alignment, invalid dimensions and option scope.
+Provider tests cover transport/schema failures, state reset and request boundaries:
+DB-IP's two requests keep their route/family, IPWHOIS sends website headers,
+IPinfo validates nested objects, and Shodan rejects fractional ports/control text.
+Report tests keep failed/unconfigured sources visible, preserve unknown versus
+false/zero, and place Cloudflare only in section 1 on both basic-data paths and
+in both languages. Shared table fixtures check ANSI/CJK alignment and option scope.
+
+MCP fixtures cover HTTP identity, bounded reads/cleanup, demo target/redaction and
+no-retry behavior. TOTP tests bind issuer/account and reviewed forms; the separate
+synthetic browser suite rejects challenges with dashboard navigation and redacts
+emergency recovery data. These fixture passes do not prove a live account session.
 
 - Reporter CLI tests copy only runtime source/data into an owned temporary
   directory, use an empty credentials configuration directory, and replace

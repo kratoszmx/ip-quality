@@ -73,8 +73,8 @@ Routine account reads use `http-account.mjs` and the shared bounded HTTP context
 reader with private saved state, without launching Chrome. Cloudflare uses one
 fixed GET to /api/v4/user; ipapi uses /app/home. Both bind the saved identity and
 reject login/error bodies, redirects and retries. A failed HTTP check returns a
-failure rather than automatically opening a browser. Explicit browser recovery
-refreshes the private HTTP state after server identity is confirmed.
+failure rather than automatically opening a browser. HTTP-state recovery is
+described below; opening a browser alone does not refresh every provider's state.
 Intel lookups use native bounded HTTP with the saved token and no Chrome.
 
 The September 24 trial passed both HTTP identity checks with the owned Chrome
@@ -82,6 +82,20 @@ containers closed. ipapi's isolated headless dashboard also passed, so its setup
 default now adds `--headless=new`. Cloudflare headless returned 403; its explicit
 setup/recovery browser stays headed. Switching an existing container's mode
 requires closing that verified owned container first.
+
+## HTTP state recovery
+
+After an authorized login, `provider_account_open` on ipapi's `dashboard`
+refreshes `.state/ipapi-http.json` only after exact account recognition.
+`provider_account_read` with `mode=browser` only inspects the page.
+
+Cloudflare's generic open/read tools do not refresh `.state/cloudflare-http.json`.
+The package currently has no dedicated MCP tool for that step. Authorized
+maintenance can use `withSession('cloudflare', identityOnPage)`, importing
+`withSession` from `accounts.mjs` and `identityOnPage` from `cloudflare.mjs`.
+This checks the authenticated browser's `/api/v4/user`, saves state only for the
+expected identity, and returns boolean metadata. It does not create an API token
+or change 2FA. Then `cloudflare_account_check` can validate the saved HTTP path.
 
 ## Private files and lifetime
 
