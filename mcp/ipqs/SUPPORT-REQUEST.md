@@ -1,5 +1,10 @@
 # IPQS account review request
 
+Historical sent-message record. Account usage and an authorized IP lookup passed
+on 2026-09-22; the zero-allocation problem below is no longer the latest account
+state. See [HANDOFF.md](HANDOFF.md). The message body is retained unchanged as
+send evidence, without implying a support reply or a need to resend it.
+
 Status: SENT — 2026-09-16 19:36:24 +08:00, using the user-authorized Gmail account. Independently verified in Gmail Sent: exact sender, recipient, subject and body. Recipient delivery/read is unverified.
 Recipient: `support@ipqualityscore.com`, verified against https://www.ipqualityscore.com/contact-us. No password, API key or attachment was sent. Private send/verification receipts are under ignored `.state/support/20260916/`; mailbox identifiers stay there. Supervisor watch: `mail.ipqs-quota-20260916` (live state is authoritative).
 

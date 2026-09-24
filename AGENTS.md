@@ -115,20 +115,20 @@ API keys are optional; private file formats and precedence are in
 
 ## Provider account MCPs
 
-- [mcp/ipqs/AGENTS.md](mcp/ipqs/AGENTS.md) owns the migrated IPQS dashboard,
+- [mcp/ipqs/AGENTS.md](mcp/ipqs/AGENTS.md) owns the IPQS dashboard,
   account probe, API integration and private browser profile. Reporter and MCP
   share the same private `secrets/ipqs` key.
 - [mcp/provider-accounts/AGENTS.md](mcp/provider-accounts/AGENTS.md) owns free
-  ipapi/Cloudflare account setup with dedicated profiles. It reuses the external
-  `mcps/common/shared` browser, HTTP, MCP and secret-file APIs.
-  Its public-provider probe distinguishes DB-IP/IPWHOIS free context APIs from
-  their public website risk demos. Neither requires accounts or 2FA. DB-IP reads
-  a public page and one visitor lookup, accepting it only when its egress matches
-  the target. IPWHOIS makes one target lookup with website request headers.
-  Rate limits remain unknown risk; neither integration retries automatically.
-- Node dependencies and MCP commands are separate from the zsh/Ruby reporter.
-  Build with `npm --prefix mcp/ipqs run build`; start either MCP through its
-  package's `npm start`. Account mutations require explicit task intent.
+  ipapi/Cloudflare account setup and account-free DB-IP/IPWHOIS probes. Free
+  geography APIs and website risk demos have separate contracts; see
+  [PROVIDERS.md](PROVIDERS.md).
+
+MCPs are optional for running the reporter. Both use local dependencies from
+the sibling `/Users/zmx/Projects/mcps/common/shared` repository; this checkout
+alone does not contain those packages. IPQS needs Node 22+, provider accounts
+needs Node 24.5+, and browser tools need Chrome. Build/start/stop commands are in
+[SERVICES.md](SERVICES.md#account-mcp-startup-and-shutdown); offline dependency
+setup is in [TESTING.md](TESTING.md). Account mutations require explicit task intent.
 
 The default reporter and every route-runner choice use `reputation`. Media/AI
 unlock tests were removed because accessibility does not establish IP reputation.

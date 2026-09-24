@@ -1,8 +1,9 @@
 # Services and process lifetime
 
-This project owns no persistent service, daemon, scheduled job, or service
-installation. Both CLI entrypoints run on demand and finish with the report.
-Account MCP servers use stdio and run only while their client is connected.
+This project installs no daemon or scheduled job. Both CLI entrypoints run on
+demand and finish with the report. Account MCP servers use stdio under their
+client's process lifetime; dedicated Chrome containers can outlive those servers.
+External Supervisor checks and mail watches are owned outside this repository.
 
 | Mode | Processes and lifetime |
 | --- | --- |
@@ -25,17 +26,39 @@ The installed Clash Verge service, active profile, and subscription cache are
 external dependencies. This project does not start, stop, restart, or rewrite
 them; its temporary proxy is separate.
 
-Account browsers retain private login state under their package's ignored
-`.state/` directory. A client disconnect detaches from a retained Chrome rather
-than deleting account state. Closing a browser first verifies its profile binding;
-only the owned browser receives `Browser.close`. Registration through a temporary
-ATT proxy closes the owned signup browser before the temporary Mihomo exits, so
-it cannot retain a dead proxy route. Loopback CDP traffic must remain direct;
-`PROVIDER_ACCOUNTS_PROXY` configures the account browser's external route.
+## Account MCP startup and shutdown
+
+From the worktree root, with the dependencies described in
+[TESTING.md](TESTING.md):
+
+| Package | Prepare | Start for an MCP client | Offline check |
+| --- | --- | --- | --- |
+| IPQS | `npm --prefix mcp/ipqs run build` | `npm --prefix mcp/ipqs start` | `npm --prefix mcp/ipqs run check` |
+| Provider accounts | No build step | `npm --prefix mcp/provider-accounts start` | `npm --prefix mcp/provider-accounts test` |
+
+These are stdio servers, not interactive menus or HTTP endpoints. Closing the
+client transport, or Ctrl-C when launched in a terminal, stops the server.
+Browser lifetime is separate:
+
+- IPQS `ipqs_close_browser` closes that server's active CDP session and stops
+  Chrome only if the session launched it with shutdown ownership. An attached
+  Chrome can remain open. `auth:check` deliberately retains its background
+  headed container and is a live dashboard check.
+- Provider-account tools detach after each operation and retain their Chrome.
+  They expose no browser-shutdown tool. When authorized maintenance needs to
+  close it, connect through the package's shared browser helper, verify the
+  expected private profile with `verifyChromeProfileBinding`, then send
+  `Browser.close` only to that owned container. Keep its `.state/` login files.
+
+For a browser started through a temporary proxy, close the owned browser before
+stopping that proxy so it cannot retain a dead route. Loopback CDP traffic stays
+direct; `PROVIDER_ACCOUNTS_PROXY` configures the account browser's external route.
 Use `PROVIDER_ACCOUNTS_PROXY=DIRECT` for explicit direct browser/API access;
 clearing environment variables alone leaves Chrome's macOS system proxy active.
 An existing browser with different routing arguments is rejected before account
 actions, and only its verified owner should close it before changing routes.
+
+## Network-free checks
 
 There is no resident health endpoint or restart command. For a network-free
 check, run `/usr/bin/ruby --disable-gems bin/test-clash-leaf --direct` and

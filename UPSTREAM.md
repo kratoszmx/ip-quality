@@ -100,6 +100,10 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   table width calculations share one character-based implementation.
 - Extracted the complete `network-manager/ip-quality/` history into standalone
   `ipquality` on 2026-08-23 and removed obsolete parent routing hooks.
+- Added optional Node account MCPs under `mcp/`: IPQS moved from mcps on
+  2026-09-22; provider accounts owns free ipapi/Cloudflare setup and account-free
+  public API/demo probes. They directly reuse the sibling mcps shared libraries;
+  private browser state, credentials and account receipts are excluded from Git.
 
 ## Deliberate exclusions
 

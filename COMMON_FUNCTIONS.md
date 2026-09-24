@@ -5,11 +5,9 @@ repository. Load the needed file directly; there is no forwarding layer or
 compatibility copy at the former paths. Loading these modules performs no
 network access, credential read, or environment mutation.
 
-Reporter runtime dependencies remain zsh and system Ruby. `provider_json_is_object`
-uses the existing `jq` dependency; terminal text cleanup uses system `sed`.
-The public APIs in `/Users/zmx/Projects/myutils` are Python imports, so none can
-be reused directly within this runtime without adding a new dependency. The
-separately owned Node account MCPs reuse the existing mcps JavaScript library.
+The reporter runs in zsh and the route runner in system Ruby.
+`provider_json_is_object` uses `jq`; terminal text cleanup uses system `sed`.
+The optional Node account MCPs reuse the mcps JavaScript library described below.
 
 ## File and caller map
 
@@ -69,12 +67,9 @@ do not interpret absence as false or validate IP/ASN/source schemas. Text contro
 characters are rejected before they reach the terminal. String-form ASNs are
 still accepted only by providers whose contracts explicitly allow them.
 
-The common-library audit moved `provider_connection_type_server_flag` back to
-`providers/ipqualityscore.zsh` as `ipqualityscore_connection_type_server_flag`.
-Both callers belong to IPQS (official API and relay). Its `data center`,
-`residential`, `corporate`, `education`, and `mobile` mapping is IPQS vocabulary,
-not a project-wide network classifier. Both adapters call the owning function
-directly; the old name and forwarding aliases were removed.
+IPQS connection-type classification belongs to
+`providers/ipqualityscore.zsh::ipqualityscore_connection_type_server_flag`.
+Its official and relay callers share IPQS vocabulary, not a general classifier.
 
 ## zsh terminal text
 
@@ -165,7 +160,7 @@ They do not copy those implementations or leave forwarding packages in mcps.
 
 Provider origins, form selectors, account identity, API contracts and registration
 receipts remain inside their owning MCP. Shared helpers do not decide whether an
-account is usable. A successful free API lookup is required before 2FA setup.
+account is usable; the Cloudflare workflow owns its API-before-2FA check.
 
 Inside `mcp/provider-accounts`, `accounts.mjs::withSession` owns the shared
 provider profile binding and lease, `privateAccount` validates saved identities,
@@ -178,21 +173,24 @@ consumer reuses these directly. `cloudflare-policy.mjs` contains fixture-testabl
 identity, token scope, response and API-before-MFA decisions. MCP action entrypoints
 return metadata only; secrets stay inside their private-file and HTTP/form calls.
 
-ipapi dashboard identity and full-key response validation remain provider-local
-pure policies. The observed icon-only logout is checked together with the saved
-email and labelled key; generic page text cannot substitute for that account
-evidence. No unverified security-page URL is exposed for ipapi.
-
 The same MCP owns `public-api.mjs::verifyPublicProvider(provider, confirmation,
 request, surface)` for DB-IP/IPWHOIS. The MCP selects `free_api` (default) or
-`public_demo`; the optional `request` argument supplies the offline test transport.
-It uses shared `http-read` for one fixed 1.1.1.1 request and applies the local
-`publicProviderObservation(provider, body, expected, surface)` schema/projection.
-Free APIs supply context; explicitly selected website demos can supply a DB-IP
-threat label or IPWHOIS security booleans. Missing fields stay null and demo
-quota is unspecified. Results carry query status, the validated observation and
-account/MFA/risk capabilities. HTTP 200 quota-error bodies are classified as
-`rate_limited`, without retry, account creation or MFA enrollment.
+`public_demo`, with literal confirmation `VERIFY_FREE_API`; the optional
+`request` function injects the offline transport in place of shared `http-read`.
+
+| Surface | Requests and observation |
+| --- | --- |
+| Either provider's `free_api` | One lookup for `1.1.1.1`; geography/network context |
+| IPWHOIS `public_demo` | One lookup for `1.1.1.1` with website headers; supplied security booleans |
+| DB-IP `public_demo` | One page, then one visitor lookup using an in-memory guest token; `request_egress`, with an optional threat label |
+
+`publicProviderObservation(provider, body, expected, surface)` returns a validated
+projection or `null`. The caller validates DB-IP's returned IP before projecting
+its egress observation; other lookups must match `1.1.1.1`. Results carry query
+status, the observation and account/MFA/risk capabilities. Missing fields stay
+null; HTTP 200 quota errors become `rate_limited`, without retries or enrollment.
+Provider-specific workflow details belong in
+[the account guide](mcp/provider-accounts/AGENTS.md).
 Reporter and Node fixture suites share sanitized JSON inputs; their language-
 specific parsers remain local and do not invoke one another through wrappers.
 

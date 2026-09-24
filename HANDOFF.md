@@ -1,128 +1,80 @@
 # Current handoff
 
-## 2026-09-24 compact reports and visible Cloudflare context
+Updated 2026-09-24. Worktree: `/Users/zmx/Projects/projects/ipquality`, branch
+`main`, reporter `v2026-09-24-standalone.22`. Start with [AGENTS.md](AGENTS.md)
+for a network-free plan and route selection.
 
-Worktree: /Users/zmx/Projects/projects/ipquality, main, reporter
-v2026-09-24-standalone.22. All route choices remain reputation-only by default.
-Media/AI probes stay removed; raw mail/DNSBL scopes remain optional.
-The live interactive menu is:
+## Current behavior
 
-    /usr/bin/ruby --disable-gems bin/test-clash-leaf --confirm-network-lookup -4
+- Reporter and every runner route default to `reputation`. Raw mail/DNSBL
+  scopes remain optional; media/AI probes are removed.
+- Section 3 shows Cloudflare's actual threat categories and a compact ASN,
+  ASN-country, ASN-type and organization table. Missing threat data is not a
+  connection failure or a zero score; ASN type does not classify the individual
+  IP as residential or VPN.
+- Section 4 keeps attempted ipapi/IPWHOIS columns and aligned query statuses,
+  including missing risk and TLS failures. Repeated provider explanation
+  footers are removed; credential mode, response tier and interpretation stay
+  in JSON and [PROVIDERS.md](PROVIDERS.md). The v22 display change altered no
+  provider requests or JSON fields.
+- DB-IP uses a page plus one visitor lookup and accepts a label only for the
+  tested egress. IPWHOIS uses its website request headers. Corrected requests
+  returned risk data on September 24, superseding the earlier blanket
+  unavailable-demo conclusion. Actual rate limits still remain unknown risk,
+  without retries or route switching. Contracts and the historical NodeQuality
+  comparison belong in [PROVIDERS.md](PROVIDERS.md).
 
-Cloudflare connects successfully. Its useful ASN context was already parsed and
-stored in JSON but omitted from the terminal after the providers moved out of
-section 5. Section 3 now shows ASN, ASN country, ASN type and ASN organization in
-a compact table after the risk matrix. Actual threat categories appear in the
-matrix's band/label row; absent categories remain `-`, not a fabricated zero.
-ASN classification does not establish residential-IP or VPN status.
+## Remaining issue
 
-Removed the four routine Cloudflare/DB-IP/ipapi/IPWHOIS explanation footers.
-The factor matrix now has one aligned query-status row, preserving rate limits,
-missing risk and TLS failures. Credential mode, response tier and interpretation
-remain in JSON and PROVIDERS.md. Shared localized status rendering stays under
-report/, with the owning display code. No provider requests or JSON fields changed.
+The September 24 keyed ipapi diagnostic returned HTTP 200/full data directly,
+but isolated ATT returned curl 35 / `SSL_ERROR_SYSCALL` before HTTP. TLS 1.2
+and the official US diagnostic host also failed on ATT. This supports a
+route-specific TLS failure, not an invalid key, exhausted quota, or a proven
+remote cause. It remains unresolved and was not remeasured by the later
+Cloudflare-only check. Runtime preserves the canonical endpoint, certificate
+verification and chosen route without a silent direct fallback.
 
-## Corrected findings
+## Recorded live evidence
 
-The earlier conclusion that DB-IP/IPWHOIS risk demos were simply unavailable
-was too broad. Direct comparisons on 2026-09-24 established:
+These are earlier authorized measurements, not live checks performed by the
+documentation audit. Reports remain private ignored outputs.
 
-- Bare IPWHOIS /demo requests returned a rate-limit message. A matching request
-  with website Origin/Referer and browser headers returned security booleans.
-  The reporter and provider-account MCP now supply those headers.
-- DB-IP's old /demo/home.php target lookup returned query-limit errors even with
-  website headers. The current /api/core/ visitor demo returned a low label.
-  The reporter and MCP now read that page and make one /self?convertCurrencies
-  GET with its transient public visitor token. The token is bounded and never
-  saved or printed; reporter URLs go through curl stdin.
-- DB-IP is an egress observation. Both requests preserve the selected proxy
-  and address family. The reporter rejects a returned IP different from the
-  target as ip_mismatch. It never silently evaluates the requesting host in
-  place of an unrelated target. The MCP labels this probe request_egress.
-- True rate limits remain unavailable, without automatic retries or changing
-  routes. Public demo limits are distinct from permanent free geography quotas.
+| Date / scope | Result and evidence |
+| --- | --- |
+| September 24, v22 Cloudflare only, isolated vps+yyssr22 / ATT | HTTP 200, exact target match; AS7018, US, isp, AT&T Enterprises, LLC. `risk_types` absent, `ip_lists`/`threat_summary` null. Sanitized receipt: `reports/cloudflare-v22-proof.json` |
+| September 24, v22 display preview | `reports/cloudflare-v22-preview.txt` renders that single Cloudflare receipt; it is not a new multi-provider measurement |
+| September 24, v21 ATT report | Exit 0 in 21.1 seconds, no jq errors; ten providers `ok`, including DB-IP, IPWHOIS, Cloudflare and IPQS. DB-IP supplied `low`; IPWHOIS supplied US and false proxy/VPN/Tor/hosting, with missing abuse/bot fields null. ipapi had a transport failure. Evidence: `reports/risk-v21-att-20260924-121527.json` and matching ANSI/text/stderr files |
+| September 24, direct account-free MCP probes | Corrected DB-IP visitor and IPWHOIS requests supplied risk data; no account or 2FA was created |
+| September 22, IPQS recovery | Account probe and authorized official lookup passed; the older zero-credit support case is historical. Details: [mcp/ipqs/HANDOFF.md](mcp/ipqs/HANDOFF.md) |
 
-The supplied NodeQuality report is dated 2025-03-24 and uses v2025-03-13.
-Its upstream code uses third-party ip.nodeget.com/json .ip.riskScore under the
-Cloudflare label, DB-IP's old target demo, and IPWHOIS /widget. Today's source
-called by NodeQuality is v2026-09-16: it has no Cloudflare/IPWHOIS query
-functions and uses the DB-IP visitor demo. No downloaded script was executed.
-The old third-party Cloudflare-labeled endpoint returned HTTP 200 without
-riskScore in a direct check. Cloudflare's own documentation independently says
-legacy Threat Score is no longer populated and is always zero. We retain the
-current official Intel categories/status, with no invented numeric score.
-[PROVIDERS.md](PROVIDERS.md) links the sources and defines these contracts.
-
-## ipapi visibility and transport
-
-Section 4 previously hid ipapi.is whenever every risk/country field was unknown.
-It now retains the attempted provider and shows missing risk or query failure in
-the matrix. JSON FactorMeta.ipapi records key mode and response tier as well.
-Timeout, TLS handshake, TLS certificate and other network errors are separate;
-none is reported as an exhausted quota. False values remain actual observations.
-
-A paired keyed 1.1.1.1 diagnostic returned HTTP 200/full data over direct access
-in about 1.95 seconds. Isolated ATT returned curl 35 / SSL_ERROR_SYSCALL before
-HTTP. TLS 1.2 and the documented US diagnostic host also failed on ATT.
-The key is valid; the remaining route-specific TLS failure is not fixed or
-attributed to a particular firewall/provider. Runtime retains the canonical
-endpoint, TLS verification and selected route without a direct fallback.
-Anonymous-quota pages currently disagree (30 versus 100/day); both agree that
-a free account key returns full data with 1,000/day. Actual HTTP responses govern.
-
-## Live evidence
-
-One new official Cloudflare lookup through isolated vps+yyssr22 / ATT returned
-HTTP 200, curl exit 0, success true and an exact target match. It supplied
-AS7018, US, isp and AT&T Enterprises, LLC. risk_types was absent; ip_lists and
-threat_summary were null. These missing fields do not mean connection failure.
-The sanitized receipt is reports/cloudflare-v22-proof.json; it contains no
-target IP, credentials or account identifier. No full provider sweep was repeated
-for this display change. The existing Cloudflare account/token/TOTP were reused.
-reports/cloudflare-v22-preview.txt renders that receipt through the new section 3
-code. It is a display preview of the single live Cloudflare result, not a new
-multi-provider measurement.
-
-The earlier v21 ATT report (vps+yyssr22 / ATT) completed in 21.1 seconds, exit 0,
-with zero jq errors. Ten provider statuses were ok, including DB-IP, IPWHOIS,
-official Cloudflare and IPQS. DB-IP supplied low; IPWHOIS supplied US and false
-for proxy/VPN/Tor/hosting. Missing abuse/bot fields remain null.
-Cloudflare was available but supplied no threat categories. ipapi had a transport
-failure and remained visible in section 4. This earlier ipapi route failure was
-not remeasured by the v22 Cloudflare-only diagnostic.
-
-Private ignored evidence:
-reports/risk-v21-att-20260924-121527.json, plus .ansi, .txt and .stderr.txt.
-This snapshot predates the more specific TLS-error labels; the subsequent
-transport diagnostics and offline cases establish that distinction.
-Temporary Mihomo instances were stopped by their owner; live Clash was unchanged.
-Direct native-HTTP MCP probes also returned usable DB-IP and IPWHOIS risk data.
-No account, paid plan or 2FA was created for these account-free demos.
+The v21 report predates the specific TLS-error labels; later diagnostics and
+fixtures establish that distinction. Measurement owners stopped their temporary
+Mihomo instances and left live Clash unchanged.
 
 ## Ownership and validation
 
-IPQS stays entirely under mcp/ipqs with shared secrets/ipqs. The earlier removal
-of the obsolete mcps package/key remains intact; central orchestration points
-here. The provider-account MCP still uses mcps/common/shared directly. Existing
-Cloudflare TOTP and the ipapi free account were preserved. There was no parent
-mcps/Supervisor change, dependency install or registration mutation.
+IPQS lives in `mcp/ipqs` and shares `secrets/ipqs` with the reporter. Provider
+account state and the previously verified Cloudflare TOTP remain private.
+Both MCPs reuse the sibling mcps shared libraries. [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md)
+maps APIs and owners; [SERVICES.md](SERVICES.md) explains stdio and browser lifetime.
+There is no project-specific skill or duplicate README.
 
-The prior common-library audit remains current: common/json_values.jq owns
-bounded optional text/integer predicates, while IPQS-only connection-type
-mapping belongs to providers/ipqualityscore.zsh. DB-IP guest-page parsing is
-provider-specific and stays in providers/dbip.zsh, not common.
-[COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md) describes the shared APIs.
+The September 24 documentation audit rechecked all 12 maintained Markdown files,
+corrected stale MCP status and request counts, shortened the handoffs, and
+clarified startup/dependencies/shutdown. No provider or account request was made
+for this audit.
 
-/bin/zsh -f scripts/test-offline passed 98 reporter/route tests with 1,730
-assertions, 22 IPQS tests plus build/doctor, and 29 provider-account tests.
-Regressions cover website headers, two-step DB-IP route/family preservation,
-token bounds, no retry after failure, target mismatch, JSON contract changes,
-ipapi visibility in both languages, and transport-error classification. New
-cases cover Cloudflare ASN context without threat data, suppressing unavailable
-context, removing provider footers and aligned in-table query failure statuses.
-[TESTING.md](TESTING.md) owns complete/focused validation instructions.
+Validation on v22:
 
-Only owned code/tests/docs are staged. Reports, credentials and temporary
-state stay out of Git. Configured remotes are github-kratoszmx
-(kratoszmx/ip-quality, existing remote name) and github-kratosbackup
-(kratosbackup/ipquality). The local repository is ipquality.
+- `/bin/zsh -f scripts/test-offline`: **98 Ruby tests / 1,730 assertions**,
+  **22 IPQS tests** plus build/static doctor, and **29 provider-account tests**;
+  no failures or skips.
+- `npm --prefix mcp/ipqs run test:browser-text`: passed all eight synthetic
+  cases, with zero live requests and no real account profile.
+- CLI plan/help, both MCP startup/EOF shutdown examples, 53 local documentation
+  links/anchors, the five repository checks and `git diff --check` passed.
+
+[TESTING.md](TESTING.md) owns complete/focused commands and their limits.
+Configured remotes are `github-kratoszmx` (`kratoszmx/ip-quality`) and
+`github-kratosbackup` (`kratosbackup/ipquality`); final synchronization receipts
+belong to the completing task's report.

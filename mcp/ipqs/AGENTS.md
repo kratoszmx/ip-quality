@@ -2,6 +2,24 @@
 
 Private local MCP for IPQualityScore dashboard access, low-risk account preference management, API-key acquisition from the logged-in frontend, and secret-backed read-only official API calls.
 
+## Start here
+
+This optional package needs Node 22+ and the sibling `mcps/common/shared`
+dependencies. Browser tools also need installed Chrome. From the project root:
+
+```text
+npm --prefix mcp/ipqs run check
+npm --prefix mcp/ipqs start
+```
+
+`check` builds before offline tests and the static doctor; `start` runs the built
+stdio server for an MCP client, not an interactive CLI. For build-only setup use
+`npm --prefix mcp/ipqs run build`. Stop the server through its client or Ctrl-C.
+See [../../TESTING.md](../../TESTING.md) for dependency restoration and all test
+commands, [../../SERVICES.md](../../SERVICES.md) for retained-browser lifetime,
+and [HANDOFF.md](HANDOFF.md) for dated account evidence. The commands below use
+this package as the working directory.
+
 ## Authentication check
 
 `npm run auth:check` verifies the browser dashboard and exits nonzero without positive proof; official API status remains `npm run probe:sanitized`. The verified default uses a no-store same-origin HTTP GET from a retained background headed Chrome container, so adjacent checks attach instead of repeatedly restarting a GUI. `--headless` is an explicit bounded experiment; on 2026-09-22 it returned 403 and was not adopted. HTTP rejection is distinct from a DOM verification challenge. Standard HTTPS_PROXY/HTTP_PROXY or IPQS_PROXY_SERVER may select the existing task-scoped proxy. A real login form under /user/dashboard is expired authentication even at HTTP 200.
@@ -52,7 +70,7 @@ The dedicated profile is the login container. API requests use the local key fil
 - `ipqs_apply_setting_change`: revalidate and apply one prepared low-risk setting after literal confirmation, then return sanitized success evidence.
 - `ipqs_account_usage`: read current credits and usage through the official account API.
 - `ipqs_lookup`: perform one explicit IP, email, phone, or URL reputation lookup through the official API.
-- `ipqs_close_browser`: close the package-managed Chrome/CDP session.
+- `ipqs_close_browser`: close this server's active Chrome/CDP session; it stops Chrome only when that session launched it with shutdown ownership. An attached retained container can remain open.
 
 ## Frontend Experience
 

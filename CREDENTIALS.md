@@ -7,6 +7,7 @@ The reporter's accepted names and precedence are documented in
 
 | Credential | Location / format |
 | --- | --- |
+| Optional Ipregistry API key | `secrets/ipregistry`, one raw key; global assignment is also supported |
 | Shared IPQS API key | `secrets/ipqs`, one raw key shared by reporter and `mcp/ipqs` |
 | Existing IPQS login | Fixed private two-line bundle under `/Users/zmx/codexworkspace/secrets/infrastructure/network/ipqs/`; discovered by `mcp/ipqs/src/credentials.ts` |
 | ipapi full API key | `secrets/ipapi`, verified free-plan raw key shared by reporter and account MCP |

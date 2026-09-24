@@ -32,8 +32,8 @@ the tests and claiming a complete pass.
 | `test/common_test.rb` | Printable text, jq value types/bounds/controls, proxy overrides, verified-file snapshots |
 | `test/ip_quality_test.rb` | CLI plans and rejection gates, dependency failure, fixture DNSBL/SMTP execution |
 | `test/providers_test.rb` | Provider parsing, unknown/failure semantics, credentials, zero-credit preflight |
-| `test/dbip_test.rb` | Demo exact-IP/geography validation, no invented score and one-request runtime |
-| `test/public_demo_test.rb` | DB-IP labels/IPWHOIS boolean flags, HTTP 200 quota errors, partial/malformed data, target binding and state reset |
+| `test/dbip_test.rb` | Demo exact-IP/geography validation, no invented score, two-request visitor flow, route preservation and bounded guest tokens |
+| `test/public_demo_test.rb` | DB-IP labels/IPWHOIS boolean flags, quota errors, partial/malformed data, target binding, state reset and one-request IPWHOIS headers |
 | `test/report_test.rb` | Provider tables, ANSI/layout, JSON/file bytes, exclusive report creation |
 | `test/repository_test.rb` | Source/data safety, vendored references, provenance, removed runtime paths |
 | `test/clash_leaf_runner_test.rb` | Cached selection, YAML safety, exact leaf/dependencies, proxy isolation, process cleanup |
@@ -42,8 +42,9 @@ the tests and claiming a complete pass.
 | `mcp/ipqs/tests/` | Official account/API, saved-login, secret and MCP contracts |
 | `mcp/provider-accounts/tests/` | Free-account policy, one-submit form handling, private output and provider MCP contracts |
 
-Each suite can run directly. Minitest options also pass through the complete
-runner; replace the example seed with the one from a failing run:
+Each suite can run directly. Minitest options pass through the complete runner
+to the Ruby aggregate only; both Node suites still run in full. Replace the
+example seed with the one from a failing run:
 
 ```text
 /usr/bin/ruby test/providers_test.rb
@@ -63,9 +64,11 @@ For a reporter-only aggregate, run from the root:
 /usr/bin/ruby -e 'Dir.glob("test/*_test.rb").sort.each { |file| require File.expand_path(file) }'
 ```
 
-MCP dependencies reference the existing sibling `mcps/common/shared` packages;
-restore from the local npm cache with `npm install --offline --ignore-scripts`
-inside each package when needed. No install runs as part of the test entrypoint.
+MCP dependencies reference `/Users/zmx/Projects/mcps/common/shared` through local
+`file:` paths. That sibling checkout and cached registry packages must be present
+before restoring dependencies with `npm install --offline --ignore-scripts`
+inside each MCP package. The complete runner needs both packages; reporter-only
+validation does not. No install runs as part of the test entrypoint.
 
 To include every test, also run the separate IPQS browser-text suite below. It
 needs an installed Chrome, opens an isolated temporary browser context, and

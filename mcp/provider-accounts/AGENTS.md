@@ -5,9 +5,21 @@ ipwho.is and DB-IP need no account or key for their free context APIs. This pack
 reuses mcps/common/shared browser-session, http-read, secret-file, totp and
 mcp-server directly. Provider state, selectors, quotas and API contracts stay here.
 
-Node 24.5+ supports the native HTTPS proxy agent. npm start starts stdio;
-npm test runs offline policy, one-submit form, TOTP/recovery and MCP fixtures.
-Dependency restoration uses npm install --offline --ignore-scripts.
+## Start here
+
+Use Node 24.5+ for the native HTTPS proxy agent and installed Chrome for browser
+tools. The sibling `mcps/common/shared` dependencies must be present; restoration
+and test coverage are in [../../TESTING.md](../../TESTING.md). From the project root:
+
+```text
+npm --prefix mcp/provider-accounts test
+npm --prefix mcp/provider-accounts start
+```
+
+No build step is needed. `start` runs a stdio MCP server for a client, not an
+interactive CLI. Start with the network-free `provider_account_status` tool;
+opening pages or verifying APIs makes live requests. Browser retention and
+shutdown are described in [../../SERVICES.md](../../SERVICES.md).
 
 ## Tools and workflow
 
@@ -39,14 +51,14 @@ nullable. Numeric risk scores are never invented. `observation` contains the
 validated data; `riskLabelAvailable`/`riskFactorsAvailable` say what was actually
 supplied. Missing demo security is distinct from a useful geography observation.
 HTTP 200 quota-error bodies return `usable:false`, `status:rate_limited`.
-Demo quotas are unspecified, distinct from 500/day DB-IP and 1,000/day ipwho.is
-free geography. Both use the websites' request headers. DB-IP reads /api/core/
+Demo quotas are unspecified and separate from free geography allowances in
+[../../PROVIDERS.md](../../PROVIDERS.md). Both use the websites' request headers.
+DB-IP reads /api/core/
 and keeps its bounded public guest token in memory for one /self?convertCurrencies
 request; URLs/tokens are never returned or saved. Its target is request_egress,
 not the fixed address used by free geography. Page failure stops before lookup;
 there are no retries or route switches. No demo account/2FA or paid Extended
-integration/profile is created. Direct native-HTTP probes on 2026-09-24 returned
-a DB-IP low label and IPWHOIS security booleans after these request corrections.
+integration/profile is created.
 
 ipapi's observed dashboard is /app/home. Its logout is an icon, so the account
 check uses the exact saved email, one visible labelled key and the same-origin
@@ -89,10 +101,10 @@ No billing, upgrade, email-send, generic arbitrary-selector or recovery-code
 regeneration tool is exposed. Public results never include credentials, codes,
 seeds, cookies, account IDs or verification URL tokens.
 
-## Current evidence — 2026-09-22
+## Dated account evidence
 
-The user selected the existing IPQS email and Hong Kong. ipapi signup and email
-activation succeeded on verified explicit DIRECT. Earlier proxy/system-route and
+On 2026-09-22 the user selected the existing IPQS email and Hong Kong. ipapi
+signup and email activation succeeded on verified explicit DIRECT. Earlier proxy/system-route and
 isolated vps+yyssr18 / ATT attempts were rejected. Clearing proxy environment
 variables alone had left Chrome using macOS system proxy preferences; the new
 direct flag and retained-process route check fix that bug. The dashboard confirms
@@ -116,12 +128,11 @@ six-digit code. Inspect navigation/identity before clicking a Verify button that
 may already have disappeared. Both owned setup browsers and the temporary proof
 profile were closed/removed after validation; the normal account profile remains.
 
-On 2026-09-24 both permanent free API probes returned usable context for 1.1.1.1.
-The website-demo investigation then returned DB-IP OVER_QUERY_LIMIT and IPWHOIS
-rate-limit errors. These are unavailable risk observations, not successful free
-risk proof. No new account or 2FA enrollment was attempted. Existing Cloudflare
-TOTP remains the previously verified factor; its legacy Threat Score is now
-constant zero and is not a reason to recreate the account/factor.
-The provider MCP passes 28 offline tests, including stdio, both demo success
-contracts, HTTP 200 quota failures and no-retry checks. Repository-wide evidence
-is maintained in ../../HANDOFF.md.
+On 2026-09-24 both permanent free API probes returned context for 1.1.1.1.
+The old DB-IP target demo and bare IPWHOIS requests returned limit errors; later
+corrected native-HTTP requests returned a DB-IP visitor `low` label and IPWHOIS
+security booleans. This supersedes the blanket conclusion that the demos were
+unavailable, without establishing their unpublished quota policy. No new account
+or 2FA enrollment was needed. These are dated observations, not current account
+or service-health guarantees. Latest aggregate test results and the remaining
+ipapi route-specific TLS issue are in [../../HANDOFF.md](../../HANDOFF.md).

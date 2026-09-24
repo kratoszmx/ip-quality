@@ -210,6 +210,10 @@ secrets/cloudflare_token
 secrets/cloudflare_account_id
 ```
 
+The uppercase names above are fields in the global assignment file, not reporter
+environment overrides. The separate IPQS MCP also supports an `IPQS_API_KEY`
+environment override; see [its guide](mcp/ipqs/AGENTS.md#api-experience).
+
 Project-local values override the corresponding global value. Credential files
 must be regular, readable, owned by the current user, and mode `600` or stricter;
 links and group/other permission bits are rejected. Names, duplicates, file
@@ -232,7 +236,8 @@ the free-tier page; 100 on the developer page). Treat HTTP 429/Retry-After as
 authoritative for an actual request, without retrying into a firewall ban. A free
 ipapi.is account key raises the documented allowance to 1,000 lookups per day
 and unlocks the complete response used by the type, score, and factor tables.
-The reporter reads that optional key from `IPAPI_API_KEY` or `secrets/ipapi`.
+The reporter reads that optional key from the file assignment `IPAPI_API_KEY`
+or the raw-key file `secrets/ipapi`.
 DB-IP's permanent free endpoint is `https://api.db-ip.com/v2/free/{IP}` and
 documents 500 requests per day. It requires no account, key, billing or 2FA.
 Its country/state/city response is distinct from the paid Extended API's threat
