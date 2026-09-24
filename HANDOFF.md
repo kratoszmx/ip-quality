@@ -1,22 +1,22 @@
 # Current handoff
 
 Updated 2026-09-24. Worktree: `/Users/zmx/Projects/projects/ipquality`, branch
-`main`, reporter `v2026-09-24-standalone.23`. Start with [AGENTS.md](AGENTS.md)
+`main`, reporter `v2026-09-24-standalone.24`. Start with [AGENTS.md](AGENTS.md)
 for a network-free plan and route selection.
 
 ## Current behavior
 
 - Reporter and every runner route default to `reputation`. Raw mail/DNSBL
   scopes remain optional; media/AI probes are removed.
-- Section 3 has one matrix. Cloudflare's ASN, ASN-country, ASN-type and
-  organization are rows in its existing column, alongside the other providers;
-  the separate Cloudflare table is removed. Missing threat data is not a
-  connection failure or a zero score; ASN type does not classify the individual
+- Cloudflare is in section 1 only: query status, ASN, ASN-country, ASN-type,
+  organization and any supplied threat categories follow the relay or fallback
+  basic data. Section 3 no longer has its column or ASN rows. Missing threat data
+  is not a connection failure or a zero score; ASN type does not classify the individual
   IP as residential or VPN.
 - Section 4 keeps attempted ipapi/IPWHOIS columns and aligned query statuses,
   including missing risk and TLS failures. Repeated provider explanation
   footers are removed; credential mode, response tier and interpretation stay
-  in JSON and [PROVIDERS.md](PROVIDERS.md). The v23 display change altered no
+  in JSON and [PROVIDERS.md](PROVIDERS.md). The v24 display change altered no
   provider requests or JSON fields.
 - DB-IP uses a page plus one visitor lookup and accepts a label only for the
   tested egress. IPWHOIS uses its website request headers. Corrected requests
@@ -26,7 +26,7 @@ for a network-free plan and route selection.
   comparison belong in [PROVIDERS.md](PROVIDERS.md).
 - The common-library audit extracted generic table measurement/padding/rows/rules
   to `common/terminal.zsh`, used directly by all three matrices. Columns grow
-  independently; a long Cloudflare organization does not widen other providers.
+  independently; a long value does not widen other providers.
   Existing common modules retain reusable contracts; none needed moving back.
   Provider schemas/labels and lifecycle policy stay with their owners. The
   redundant Ruby clock forwarding method and unused media/AI labels were removed.
@@ -46,7 +46,7 @@ verification and chosen route without a silent direct fallback.
 
 ## Recorded live evidence
 
-These are earlier authorized measurements. The v23 refactor and layout change
+These are earlier authorized measurements. The v24 section change
 made no new provider/account requests. Reports remain private ignored outputs.
 
 | Date / scope | Result and evidence |
@@ -74,16 +74,16 @@ corrected stale MCP status and request counts, shortened the handoffs, and
 clarified startup/dependencies/shutdown. No provider or account request was made
 for this audit.
 
-Validation on v23:
+Validation on v24:
 
-- `/bin/zsh -f scripts/test-offline`: **101 Ruby tests / 1,850 assertions**,
+- `/bin/zsh -f scripts/test-offline`: **101 Ruby tests / 1,890 assertions**,
   **22 IPQS tests** plus build/static doctor, and **29 provider-account tests**;
   no failures or skips.
-- New report cases verify a single section 3 matrix in both languages, with all
-  four Cloudflare fields under the correct column and independent widths.
-  Shared table and malformed-Shodan cases passed, including state reset.
-- `reports/score-v23-layout-preview.txt` shows the new rendering of fields supplied
-  by the user (AS9808 / China Mobile); it is not a new network measurement.
+- Report cases verify Cloudflare appears only in section 1, in both languages
+  and both relay/fallback basic-data paths. Failed queries cannot show stale
+  context, and absent threat categories produce no extra line.
+- `reports/basic-v24-layout-preview.txt` shows the new placement using fields
+  supplied by the user (AS9808 / China Mobile); it is not a new network measurement.
 - `git diff --check` passed. The earlier v22 documentation audit also passed
   the eight synthetic IPQS browser cases, CLI/MCP examples and 53 documentation
   links/anchors; those unchanged browser/account flows were not remeasured here.

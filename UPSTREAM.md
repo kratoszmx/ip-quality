@@ -67,12 +67,12 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   headers to return security booleans on the tested route. The explicit
   permanent free API contracts remain MCP context probes. Actual quota errors
   stay unavailable; no account or paid plan is required.
-  DB-IP's numeric score remains null. Cloudflare/IPWHOIS/DB-IP now appear in
-  sections 3/4 and are removed from terminal section 5. Cloudflare's retired,
+  DB-IP's numeric score remains null. Cloudflare appears in section 1, DB-IP in
+  section 3 and IPWHOIS in section 4; all are absent from terminal section 5. Cloudflare's retired,
   now constant-zero Threat Score is explicitly excluded from clean-IP evidence;
-  its current IP Intelligence threat categories remain identifiable. Section 3
-  also displays its successful ASN country/type/organization observations as
-  rows in the same matrix, within the Cloudflare column.
+  its current IP Intelligence threat categories remain identifiable. Section 1
+  displays its query status, successful ASN country/type/organization observations
+  and supplied threat categories alongside the separately attributed basic data.
 - Replaced score bars with aligned per-provider type/score/factor matrices,
   provider-specific scales, ASCII missing-field markers, colored risk factors,
   and compact unavailable-source summaries. IPQS keeps a source/status row;

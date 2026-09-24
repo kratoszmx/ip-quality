@@ -55,6 +55,7 @@ class ReporterTestCase < Minitest::Test
   # This avoids coupling a probe to the order of neighbouring functions.
   def reporter_functions(*names)
     source = File.read(SCRIPT, encoding: "UTF-8")
+    source = source.split(/^parse_cli "\$@"\|\|exit \$\?\n/, 2).first
     names.map do |name|
       source[/^#{Regexp.escape(name)}\(\)\{\n.*?^\}\n(?=\n*(?:[A-Za-z_]\w*\(\)\{|\z))/m] ||
         raise("missing reporter function: #{name}")

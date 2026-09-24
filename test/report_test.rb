@@ -75,9 +75,11 @@ class ReportTest < ReporterTestCase
     assert_empty stderr
     score, factors = stdout.split("四、风险因子", 2)
     assert_includes score, "三、风险评分"
-    assert_match(/参数\s+\|.*Cloudflare.*DB-IP/, score)
-    assert_match(/分值\s+\|\s+-\s+\|\s+-/, score)
-    assert_match(/分段\/标签\s+\|\s+Phishing, Malware\s+\|\s+低风险/, score)
+    assert_match(/参数\s+\|\s+DB-IP/, score)
+    assert_match(/分值\s+\|\s+-/, score)
+    assert_match(/分段\/标签\s+\|\s+低风险/, score)
+    refute_includes score, "Cloudflare"
+    refute_includes score, "Phishing"
     assert_includes score, "公开示例/可用"
     assert_includes factors, "IPWHOIS"
     assert_match(/代理\s+\|\s+是\s+\|\s+否/, factors)
@@ -95,17 +97,21 @@ class ReportTest < ReporterTestCase
       typeset -A sscore cloudflare
       sscore[title]='3. Risk Score'
       cloudflare[status]="$3" cloudflare[threats_json]="$4"
+      show_cloudflare_basic
       show_score
     ZSH
     { ["ok", "null"] => "-", ["ok", "[]"] => "none listed", ["rate_limited", "null"] => "-" }.each do |(state, threats), expected|
       stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "threat-absence", REPUTATION_REPORT, TERMINAL_LIBRARY, state, threats)
       assert status.success?, stderr
       assert_empty stderr
-      assert_includes stdout, "3. Risk Score"
-      assert_match(/Band \/ label\s+\|\s+#{Regexp.escape(expected)}\s*$/, stdout)
+      refute_includes stdout, "3. Risk Score"
+      if threats == "[]"
+        assert_includes stdout, "Threat categories: #{expected}"
+      else
+        refute_includes stdout, "Threat categories"
+      end
       assert_includes stdout, state == "ok" ? "official/available" : "official/rate limit"
-      assert_match(/Score\s+\|\s+-\s*$/, stdout)
-      refute_match(/Threat Score|^Cloudflare:/, stdout)
+      refute_includes stdout, "Threat Score"
       refute_includes stdout, "Low"
     end
   end
@@ -131,51 +137,47 @@ class ReportTest < ReporterTestCase
     refute_match(/低风险|\|\s+否/, stdout)
   end
 
-  def test_cloudflare_context_stays_in_its_column_in_one_score_matrix
-    probe = <<~'ZSH'
+  def test_cloudflare_is_in_basic_information_for_both_report_routes_and_languages
+    probe = reporter_functions("check_IP", "show_basic", "show_basic_lite") + <<~'ZSH'
       setopt KSH_ARRAYS
       source "$1"
       source "$2"
       YY="$3"
-      typeset -A sscore cloudflare ip2location scamalytics ipapi abuseipdb ipqs dbip
-      sscore[title]=Scores
-      ip2location[score]=0 scamalytics[score]=0 ipapi[score]='0.14%'
-      abuseipdb[score]=2 ipqs[score]=0 dbip[status]=ok dbip[risk_status]=ok dbip[risk]=low
-      cloudflare[status]=ok cloudflare[threats_json]=null
+      mode_lite="$4" mode_json=0 mode_output=0
+      typeset -A sbasic stype sscore sfactor smail smailstatus smail_response maxmind ipinfo ip2location cloudflare dbip
+      sbasic[title]='1. Basic Information (relay)' sbasic[title_lite]='1. Basic Information (fallback)'
+      stype[title]='2. IP Type' sscore[title]='3. Risk Score' sfactor[title]='4. Risk Factors'
+      maxmind[dms]=null ipinfo[dms]=null
+      ip2location[susetype]=ISP ip2location[score]=0 dbip[status]=ok dbip[risk_status]=ok dbip[risk]=low
+      cloudflare[status]=ok cloudflare[threats]='Phishing, Malware'
+      cloudflare[threats_json]='["Phishing","Malware"]'
       cloudflare[network]=AS9808 cloudflare[countrycode]=CN
       cloudflare[infrastructure]=isp cloudflare[org]='China Mobile Communications Group Co., Ltd.'
-      show_score
+      scope_includes(){ [[ "$1" == reputation ]]; }
+      for operation in hide_ipv4 show_head show_tail show_unavailable_sources \
+        db_maxmind_relay db_ipinfo db_ipregistry db_scamalytics db_ipapi db_ipwhois \
+        db_dbip db_cloudflare db_abuseipdb db_ip2location db_ipdata db_ipqs db_ping0 \
+        db_ripestat db_shodan_internetdb;do
+        functions[$operation]='return 0'
+      done
+      check_IP 198.51.100.23 4
     ZSH
-    %w[cn en].each do |language|
+    %w[cn en].product(%w[0 1]).each do |language, lite|
       stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-        "cloudflare-asn-context", REPUTATION_REPORT, TERMINAL_LIBRARY, language)
+        "cloudflare-basic-context", REPUTATION_REPORT, TERMINAL_LIBRARY, language, lite)
       assert status.success?, stderr
       assert_empty stderr
-      rows = stdout.lines.select { |line| line.include?(" | ") }
-      cells = rows.map { |line| line.split("|").map(&:strip) }
-      assert_equal %w[IP2Location Scamalytics ipapi.is AbuseIPDB IPQS Cloudflare DB-IP], cells.first.drop(1)
-      labels = language == "cn" ? ["ASN", "ASN所属地", "ASN类型", "ASN组织"] : ["ASN", "ASN country", "ASN type", "ASN organization"]
-      labels.zip(["AS9808", "CN", "isp", "China Mobile Communications Group Co., Ltd."]).each do |label, value|
-        row = cells.find { |entry| entry.first == label }
-        refute_nil row, stdout
-        expected = Array.new(7, "-")
-        expected[5] = value
-        assert_equal expected, row.drop(1), stdout
-      end
-      %w[分值 Score 分段/标签].push("Band / label").each do |label|
-        row = cells.find { |entry| entry.first == label }
-        assert_equal "-", row[6] if row
-      end
-      assert_equal 1, stdout.lines.count { |line| line.match?(/^(?:参数|Field)\s+\|/) }
-      assert_equal 1, stdout.lines.count { |line| line.match?(/\A[-+]+\n\z/) }
-      refute_match(/^Cloudflare\s+\||网络归属|ASN context/, stdout)
-      refute_match(/威胁类别=|Threat Score|clean|低风险|Low/, stdout)
-      widths = rows.map do |line|
-        line.split("|").map { |cell| cell.chars.sum { |char| char.ascii_only? ? 1 : 2 } }
-      end
-      assert_equal 1, widths.uniq.length, rows.join
-      assert_operator widths.first[6], :>, widths.first[1]
-      assert_operator widths.first[6], :>, widths.first[7]
+      basic, remaining = stdout.split("2. IP Type", 2)
+      assert_includes basic, lite == "0" ? "1. Basic Information (relay)" : "1. Basic Information (fallback)"
+      assert_includes basic, "Cloudflare"
+      assert_includes basic, "ASN=AS9808"
+      assert_includes basic, language == "cn" ? "ASN所属地=CN" : "ASN country=CN"
+      assert_includes basic, language == "cn" ? "ASN类型=isp" : "ASN type=isp"
+      assert_includes basic, "China Mobile Communications Group Co., Ltd."
+      assert_includes basic, "Phishing, Malware"
+      refute_nil remaining
+      assert_includes remaining, "3. Risk Score"
+      refute_match(/Cloudflare|AS9808|ASN|Phishing|China Mobile/, remaining)
     end
   end
 
@@ -188,6 +190,7 @@ class ReportTest < ReporterTestCase
       sscore[title]=Scores
       cloudflare[status]="$3"
       [[ "$3" != ok ]]&&cloudflare[network]=AS64500
+      show_cloudflare_basic
       show_score
     ZSH
     %w[ok rate_limited not_configured invalid_response].each do |state|

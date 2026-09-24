@@ -300,10 +300,33 @@ report_dash
 fi
 }
 
+show_cloudflare_basic(){
+[[ -n "${cloudflare[status]:-}" ]]||return 0
+typeset country_label type_label org_label threats_label separator
+if [[ "$YY" == cn ]];then
+country_label="ASN所属地" type_label="ASN类型" org_label="ASN组织" threats_label="威胁类别" separator="："
+else
+country_label="ASN country" type_label="ASN type" org_label="ASN organization" threats_label="Threat categories" separator=": "
+fi
+typeset summary="${Font_Cyan:-}Cloudflare${Font_Suffix:-}$separator$(report_score_source_status official "${cloudflare[status]}")"
+if [[ "${cloudflare[status]}" == ok ]];then
+report_any_known "${cloudflare[network]}"&&summary+=" | ASN=$(report_neutral_value "${cloudflare[network]}")"
+report_any_known "${cloudflare[countrycode]}"&&summary+=" | $country_label=$(report_neutral_value "${cloudflare[countrycode]}")"
+report_any_known "${cloudflare[infrastructure]}"&&summary+=" | $type_label=$(report_neutral_value "${cloudflare[infrastructure]}")"
+fi
+print -r -- "$summary"
+[[ "${cloudflare[status]}" == ok ]]||return 0
+if report_any_known "${cloudflare[org]}";then
+print -r -- "${Font_Cyan:-}Cloudflare $org_label${Font_Suffix:-}$separator$(report_neutral_value "${cloudflare[org]}")"
+fi
+if [[ -n "${cloudflare[threats]:-}" || "${cloudflare[threats_json]:-null}" == '[]' ]];then
+print -r -- "${Font_Cyan:-}Cloudflare $threats_label${Font_Suffix:-}$separator$(report_cloudflare_threats)"
+fi
+return 0
+}
+
 show_score(){
-setopt localoptions KSH_ARRAYS
 typeset -a headers scores risks scales source_statuses
-typeset -i cloudflare_column=-1
 if report_any_known "${ip2location[score]}" "${ip2location[risk]}";then
 headers+=("${Font_B}${Font_Cyan}IP2Location$Font_Suffix")
 scores+=("${ip2location[score]}") risks+=("${ip2location[risk]}") scales+=("0-99 potential")
@@ -338,12 +361,6 @@ ipqs_query_status="ok"
 fi
 source_statuses+=("$(report_score_source_status "$ipqs_source_kind" "$ipqs_query_status")")
 fi
-if [[ -n "${cloudflare[status]:-}" ]];then
-cloudflare_column=${#headers[@]}
-headers+=("${Font_B}${Font_Cyan}Cloudflare$Font_Suffix")
-scores+=("") risks+=("$(report_cloudflare_threats)") scales+=("threat categories")
-source_statuses+=("$(report_score_source_status official "${cloudflare[status]}")")
-fi
 if [[ -n "${dbip[status]:-}" ]];then
 headers+=("${Font_B}${Font_Cyan}DB-IP$Font_Suffix")
 scores+=("") risks+=("${dbip[risk]}") scales+=("low/medium/high")
@@ -364,32 +381,12 @@ else
 field_label="Field" score_label="Score" band_label="Band / label" scale_label="Scale" source_status_label="Source/status" cell_width=19
 note="Note: provider scales differ; - means that source did not supply the field."
 fi
-# Keep Cloudflare context in its provider column, inside the same matrix.
-typeset -a context_labels context_cells
-typeset field label dash="$(report_dash)"
-typeset -i column offset
-if [[ "${cloudflare[status]:-}" == ok ]]&&
-   report_any_known "${cloudflare[network]}" "${cloudflare[countrycode]}" "${cloudflare[infrastructure]}" "${cloudflare[org]}";then
-if [[ "$YY" == cn ]];then
-context_labels=("ASN" "ASN所属地" "ASN类型" "ASN组织")
-else
-context_labels=("ASN" "ASN country" "ASN type" "ASN organization")
-fi
-for field in network countrycode infrastructure org;do
-value=$(report_neutral_or_dash "${cloudflare[$field]}")
-for ((column=0;column<${#headers[@]};column++));do
-if (( column == cloudflare_column ));then context_cells+=("$value")
-else context_cells+=("$dash")
-fi
-done
-done
-fi
 typeset value_width
-for value in "$field_label" "$score_label" "$band_label" "$scale_label" "$source_status_label" "${context_labels[@]}";do
+for value in "$field_label" "$score_label" "$band_label" "$scale_label" "$source_status_label";do
 value_width=$(display_width "$value")
 (( value_width > label_width ))&&label_width=$value_width
 done
-typeset widths="$label_width $(terminal_table_widths "$cell_width" "${#headers[@]}" "${headers[@]}" "${rendered_scores[@]}" "${rendered_risks[@]}" "${rendered_scales[@]}" "${source_statuses[@]}" "${context_cells[@]}")"
+typeset widths="$label_width $(terminal_table_widths "$cell_width" "${#headers[@]}" "${headers[@]}" "${rendered_scores[@]}" "${rendered_risks[@]}" "${rendered_scales[@]}" "${source_statuses[@]}")"
 print -r -- "$note"
 terminal_table_row "$widths" "${Font_B}${field_label}${Font_Suffix}" "${headers[@]}"
 terminal_table_rule "$widths"
@@ -397,11 +394,6 @@ terminal_table_row "$widths" "$score_label" "${rendered_scores[@]}"
 report_any_known "${risks[@]}"&&terminal_table_row "$widths" "$band_label" "${rendered_risks[@]}"
 terminal_table_row "$widths" "$scale_label" "${rendered_scales[@]}"
 terminal_table_row "$widths" "$source_status_label" "${source_statuses[@]}"
-offset=0
-for label in "${context_labels[@]}";do
-terminal_table_row "$widths" "$label" "${context_cells[@]:$offset:${#headers[@]}}"
-(( offset += ${#headers[@]} ))
-done
 return 0
 }
 

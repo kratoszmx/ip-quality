@@ -83,9 +83,9 @@ fields are comparable:
 
 | Destination | Sources |
 | --- | --- |
-| Basic information | Check.Place/MaxMind-shaped response, with IPinfo as fallback |
+| Basic information | Check.Place/MaxMind-shaped response, with IPinfo as fallback; separately named Cloudflare query status, ASN context and supplied threat categories |
 | Type matrix | IPinfo, Ipregistry, IPQS, ipapi.is, IP2Location, AbuseIPDB when a type exists in the response |
-| Score section | IP2Location, Scamalytics, ipapi.is, AbuseIPDB, IPQS; Cloudflare and DB-IP have named columns with null numeric scores. Cloudflare threat categories and ASN context stay in its column of the same matrix; DB-IP supplies its original threat label when available |
+| Score section | IP2Location, Scamalytics, ipapi.is, AbuseIPDB, IPQS; DB-IP supplies its original threat label with a null numeric score. Cloudflare appears only in basic information |
 | Factor matrix | IP2Location, Ipregistry, IPQS, Scamalytics, ipdata, IPinfo when a factor exists; ipapi.is and IPWHOIS retain columns and lookup status even when risk data is missing |
 | Official/public network observations | Ping0, RIPEstat, Shodan InternetDB; anonymous ipapi context if relevant. Cloudflare, DB-IP and IPWHOIS are absent from section 5 |
 
@@ -146,23 +146,23 @@ fields are comparable:
   string example; valid 32-bit numeric ASNs are normalized to `AS<number>`.
   Missing `risk_types` stays `null` in JSON, while an explicitly empty array stays
   `[]`. A null `threat_summary` supplies no clean-IP evidence.
-  Section 3 includes a Cloudflare column, official query status and actual threat
-  categories in its band/label row. Missing categories display `-`; an explicit
-  empty array says "none listed". Score.Cloudflare remains null. A successful
-  response adds ASN, ASN country, ASN type and ASN organization rows to the same
-  matrix, with values in the Cloudflare column and `-` in the other columns.
-  There is one header and one separator rule, with independently measured
-  column widths. These are `belongs_to_ref` attributes: the country belongs to
+  Section 1 includes the named Cloudflare query status, ASN, ASN country,
+  ASN type and organization after either the relay or fallback basic data.
+  Actual threat categories appear there when supplied; missing categories
+  create no extra line, while an explicit empty array says "none listed".
+  Section 3 has no Cloudflare column or context rows. JSON fields remain
+  compatible: Score.Cloudflare is null, and ProviderContext.Cloudflare retains
+  all observations. These are `belongs_to_ref` attributes: the country belongs to
   the ASN context and the type classifies the ASN, not whether the tested IP
-  itself is residential, a VPN or clean. These context rows are omitted when
-  the query fails or all four fields are absent.
+  itself is residential, a VPN or clean. Failed queries show their status without
+  displaying stale context; absent fields are omitted.
   Cloudflare's current WAF documentation says legacy Threat Score is always 0
   and no longer populated. The old upstream fetched `.ip.riskScore` from the
   third-party `ip.nodeget.com` and assigned local risk bands. That old zero is
   not restored as a low-risk result. JSON marks LegacyThreatScore as
   `retired_constant_zero`. Interpretation details remain here and in JSON;
   the terminal omits the repeated Cloudflare, DB-IP, ipapi and IPWHOIS prose.
-- The additional providers retain visible source status in their risk sections.
+- The additional providers retain visible source status in their assigned sections.
   Missing Cloudflare credentials are shown as unconfigured. Context IP fields use the
   same masking as `Head.IP`. Cloudflare category names remain intact JSON strings,
   including names containing commas.

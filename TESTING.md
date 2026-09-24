@@ -89,9 +89,10 @@ page/transport/quota failures. IPWHOIS tests require its website request headers
 Report tests retain ipapi.is for anonymous, limited and failed lookups in both
 languages, with missing values distinct from false. Query statuses stay aligned
 inside the factor matrix, including long TLS-error labels. Cloudflare's ASN
-context remains in its column of the single section 3 matrix, even when
-categories are missing. A long organization expands only that provider's column;
-failed or empty context queries add no context rows. Categories keep null and empty-array
+context and status appear only in section 1, for both the relay and fallback
+basic-data paths in both languages. The report assembly test stubs all provider
+queries and checks the section boundary. Failed queries cannot show stale context.
+Categories keep null and empty-array
 meanings, numeric scores remain absent, and routine provider footers stay removed.
 MCP tests separately cover
 request_egress metadata, visitor-token redaction and no-retry behavior.
