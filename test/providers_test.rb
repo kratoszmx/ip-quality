@@ -406,60 +406,6 @@ class ProvidersTest < ReporterTestCase
     end
   end
 
-  def test_ipwhois_runtime_classifies_valid_public_response
-    function_source = reporter_functions("db_ipwhois")
-    probe = <<~'ZSH'
-      setopt KSH_ARRAYS SH_WORD_SPLIT
-      source "$1"
-      eval "$2"
-      typeset -A ipwhois sinfo
-      IP='198.51.100.23' CurlARG='' ibar_step=0 fixture="$3"
-      sinfo[database]=0 sinfo[ldatabase]=0
-      Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
-      show_progress_bar(){ :; }
-      provider_fetch_public_json(){
-        PROVIDER_RESPONSE_STATUS=ok
-        PROVIDER_RESPONSE_BODY="$(<"$fixture")"
-      }
-      db_ipwhois 4
-      print -r -- "${ipwhois[status]}|${ipwhois[countrycode]}|${ipwhois[asn]}|${ipwhois[org]}|${ipwhois[isp]}"
-    ZSH
-    stdout, stderr, status = Open3.capture3(
-      "/bin/zsh", "-f", "-c", probe,
-      "ipwhois-runtime-test", IPWHOIS_LIBRARY, function_source, IPWHOIS_FIXTURE
-    )
-    assert status.success?, stderr
-    assert_equal "ok|US|64500|Example Network|Example ISP\n", stdout
-    assert_empty stderr
-  end
-
-  def test_ipwhois_runtime_marks_target_mismatch_unavailable
-    function_source = reporter_functions("db_ipwhois")
-    probe = <<~'ZSH'
-      setopt KSH_ARRAYS SH_WORD_SPLIT
-      source "$1"
-      eval "$2"
-      typeset -A ipwhois sinfo
-      IP='198.51.100.23' CurlARG='' ibar_step=0 fixture="$3"
-      sinfo[database]=0 sinfo[ldatabase]=0
-      Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
-      show_progress_bar(){ :; }
-      provider_fetch_public_json(){
-        PROVIDER_RESPONSE_STATUS=ok
-        PROVIDER_RESPONSE_BODY="$(<"$fixture")"
-      }
-      db_ipwhois 4
-      print -r -- "$?|${ipwhois[status]}"
-    ZSH
-    stdout, stderr, status = Open3.capture3(
-      "/bin/zsh", "-f", "-c", probe,
-      "ipwhois-mismatch-runtime-test", IPWHOIS_LIBRARY, function_source, IPWHOIS_MISMATCH_FIXTURE
-    )
-    assert status.success?, stderr
-    assert_equal "0|invalid_response\n", stdout
-    assert_empty stderr
-  end
-
   def test_cloudflare_runtime_requires_both_credentials_and_uses_official_response
     function_source = reporter_functions("db_cloudflare")
     probe = <<~'ZSH'

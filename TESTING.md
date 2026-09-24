@@ -57,13 +57,26 @@ npm --prefix mcp/provider-accounts test
 execute every file whose name contains `test`. The canonical runner includes
 the reporter's `--self-test` once; it need not be run separately for a full pass.
 
-For a reporter-only aggregate, use `/usr/bin/ruby -e
-'Dir.glob("test/*_test.rb").sort.each { |file| require_relative file }'` from the
-root. MCP dependencies reference the existing sibling `mcps/common/shared`
-packages; restore from the local npm cache with `npm install --offline
---ignore-scripts` inside each package when needed. No install runs as part of
-the test entrypoint. The IPQS synthetic browser-text suite is a separate focused
-check documented in [its guide](mcp/ipqs/AGENTS.md).
+For a reporter-only aggregate, run from the root:
+
+```text
+/usr/bin/ruby -e 'Dir.glob("test/*_test.rb").sort.each { |file| require File.expand_path(file) }'
+```
+
+MCP dependencies reference the existing sibling `mcps/common/shared` packages;
+restore from the local npm cache with `npm install --offline --ignore-scripts`
+inside each package when needed. No install runs as part of the test entrypoint.
+
+To include every test, also run the separate IPQS browser-text suite below. It
+needs an installed Chrome, opens an isolated temporary browser context, and
+intercepts all requests locally. It uses neither the account profile nor the
+live IPQS service. Also run it whenever `dashboard-text.ts` changes; see the
+[IPQS guide](mcp/ipqs/AGENTS.md) and
+[provider-account guide](mcp/provider-accounts/AGENTS.md) for package details.
+
+```text
+npm --prefix mcp/ipqs run test:browser-text
+```
 
 ## Maintain the boundary
 

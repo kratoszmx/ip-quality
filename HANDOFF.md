@@ -93,11 +93,18 @@ code or live Codex registration.
 
 ## Validation and synchronization
 
-/bin/zsh -f scripts/test-offline passed **95 reporter tests / 1,473 assertions**,
+/bin/zsh -f scripts/test-offline passed **93 reporter tests / 1,465 assertions**,
 **22 IPQS tests** plus build/doctor, and **28 provider-account tests**, all offline.
 Coverage includes demo contracts/quotas, unknown-vs-false, target mismatch, schema
 drift, state reset, one-request behavior, common value bounds, both table languages
 and route isolation. [TESTING.md](TESTING.md) owns complete/focused commands.
+
+The 2026-09-24 test maintenance consolidated three overlapping IPWHOIS runtime
+tests in test/public_demo_test.rb. It preserves successful context and nonfatal
+target-mismatch checks, and verifies stale context/risk clearing after missing
+flags, quota errors and mismatched targets. The corrected reporter-only command
+also passed. Both MCP test guides were checked; the separate IPQS browser-text
+suite passed all eight checks, with zero live requests and no real account profile.
 
 Only owned code/tests/docs are eligible for staging; reports and credentials stay
 ignored. Configured remotes are github-kratoszmx (kratoszmx/ip-quality, existing

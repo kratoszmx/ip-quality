@@ -40,10 +40,12 @@ class PublicDemoTest < ReporterTestCase
     end
   end
 
-  def test_ipwhois_runtime_selects_current_demo_once_and_clears_fields_on_rate_limit
+  def test_ipwhois_runtime_fetches_demo_once_and_clears_stale_fields
     probe = <<~'ZSH'
+      setopt KSH_ARRAYS SH_WORD_SPLIT
       source "$1"
       eval "$2"
+      shift 2
       typeset -A ipwhois sinfo
       IP=198.51.100.23 ibar_step=0
       sinfo[ldatabase]=0
@@ -53,18 +55,26 @@ class PublicDemoTest < ReporterTestCase
         ((calls+=1))
         PROVIDER_RESPONSE_STATUS=ok PROVIDER_RESPONSE_BODY="$body"
       }
-      for body in "$3" "$4";do
+      for body in "$@";do
         calls=0
         db_ipwhois 4
-        print -r -- "$calls|${ipwhois[status]}|${ipwhois[proxy]}|${ipwhois[vpn]}|${ipwhois[server]}"
+        print -r -- "$?|$calls|${ipwhois[status]}|${ipwhois[risk_status]}|${ipwhois[countrycode]}|${ipwhois[asn]}|${ipwhois[org]}|${ipwhois[isp]}|${ipwhois[timezone]}|${ipwhois[proxy]}|${ipwhois[vpn]}|${ipwhois[tor]}|${ipwhois[server]}"
       done
     ZSH
+    # Reuse one runtime state: absent flags, quota failures and mismatched IPs
+    # must never inherit a preceding successful result.
+    responses = %w[demo valid demo-rate-limited demo mismatch].map do |name|
+      JSON.generate(fixture("ipwhois", name))
+    end
     stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-      "demo-runtime", IPWHOIS_LIBRARY, reporter_functions("db_ipwhois"),
-      JSON.generate(fixture("ipwhois", "demo")), JSON.generate(fixture("ipwhois", "demo-rate-limited")))
+      "demo-runtime", IPWHOIS_LIBRARY, reporter_functions("db_ipwhois"), *responses)
     assert status.success?, stderr
     assert_empty stderr
-    assert_equal "1|ok|false|true|true\n1|rate_limited|||\n", stdout
+    demo = [0, 1, "ok", "ok", "US", 64500, "Example Network", "Example ISP", "", false, true, false, true]
+    context_only = [0, 1, "ok", "not_provided", "US", 64500, "Example Network", "Example ISP", "America/Los_Angeles", "", "", "", ""]
+    expected = [demo, context_only, [0, 1, "rate_limited", *Array.new(10, "")],
+                demo, [0, 1, "invalid_response", *Array.new(10, "")]]
+    assert_equal expected.map { |fields| fields.join("|") }, stdout.lines.map(&:chomp)
   end
 
   private
