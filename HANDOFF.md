@@ -110,6 +110,12 @@ was cancelled on September 22. No service needed removal or shutdown.
 [SERVICES.md](SERVICES.md#external-checks) now distinguishes the weekly IPQS-only
 test from complete project validation.
 
+Follow-up test hardening bounds the TERM test's runner-exit wait to 15 seconds
+and makes IPQS stdio shutdown errors fail the test. Fault injection confirmed
+that an ignored TERM times out and both fixture children stop, and that a close
+error is reported. The complete offline entrypoint passed again with the counts
+above; no runtime or service behavior changed.
+
 [TESTING.md](TESTING.md) owns complete/focused commands and their limits.
 Configured remotes are `github-kratoszmx` (`kratoszmx/ip-quality`) and
 `github-kratosbackup` (`kratosbackup/ipquality`); final synchronization receipts

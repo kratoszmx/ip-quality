@@ -99,7 +99,8 @@ Shared table fixtures also check width calculation and option scope.
 MCP fixtures cover HTTP identity, bounded reads/cleanup, demo target/redaction and
 no-retry behavior. TOTP tests bind issuer/account and reviewed forms; the separate
 synthetic browser suite rejects challenges with dashboard navigation and redacts
-emergency recovery data. These fixture passes do not prove a live account session.
+emergency recovery data. MCP shutdown errors fail the stdio tests. These fixture
+passes do not prove a live account session.
 
 - Reporter CLI tests copy only runtime source/data into an owned temporary
   directory, use an empty credentials configuration directory, and replace
@@ -114,7 +115,9 @@ emergency recovery data. These fixture passes do not prove a live account sessio
   workspaces. The lifecycle launcher injects the session's existing `temp_parent`
   argument in its test child; setting `TMPDIR` alone cannot override the
   production preferred directory. Cleanup checks use the configuration path
-  recorded by fake Mihomo. Preserve success, failure, signal, abandoned-workspace,
+  recorded by fake Mihomo. The TERM test allows 15 seconds for runner shutdown;
+  timeout fails the test and its ensure block stops the owned fixture children.
+  Preserve success, failure, signal, abandoned-workspace,
   route, link, and malformed-input coverage.
 - New suites belong at `test/*_test.rb`; helpers and data belong under
   `test/support/` and `test/fixtures/`. Add a sanitized parser fixture with each

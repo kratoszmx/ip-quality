@@ -580,7 +580,9 @@ class ClashLeafRunnerTest < Minitest::Test
           end
         end
         Process.kill("TERM", runner_pid)
-        _waited_pid, status = Process.wait2(runner_pid)
+        _waited_pid, status = Timeout.timeout(15, Timeout::Error, "runner did not exit within 15 seconds after TERM") do
+          Process.wait2(runner_pid)
+        end
         runner_pid = nil
 
         assert_equal 130, status.exitstatus

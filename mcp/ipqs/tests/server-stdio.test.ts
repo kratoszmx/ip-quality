@@ -59,6 +59,6 @@ test("compiled stdio MCP lists the complete tool surface and returns a secret-fr
     assert.equal(status.result.savedCredentials.ready, false);
     assert.equal(status.result.apiCredential.usable, false);
   } finally {
-    await client.close().catch(() => undefined);
+    await client.close();
   }
 });
