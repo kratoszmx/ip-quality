@@ -107,7 +107,7 @@ The dedicated profile is the login container. API requests use the local key fil
 
 ## Safety Evidence
 
-- The package reuses `@codex-mcp/shared-browser-session`, `@codex-mcp/shared-mcp-server`, `@codex-mcp/shared-secret-file`, and `@codex-mcp/shared-one-use-token` from the external mcps common library. IPQS URLs, quota messages, account state and selectors stay in this package.
+- The package reuses `@myutils/browser-session`, `@codex-mcp/shared-mcp-server`, `@codex-mcp/shared-secret-file`, and `@codex-mcp/shared-one-use-token` from the external mcps common library. IPQS URLs, quota messages, account state and selectors stay in this package.
 - `@codex-mcp/shared-totp` supplies RFC 6238 validation/generation. The website's QR URL is read as text; no image processing occurs. Seed and recovery code are saved before activation, and a changed/foreign form stops before secret use.
 - The saved account directory must be an owned ordinary `0700` directory containing exactly one owned, singly linked, `0600` ordinary file with email and password as two positional lines.
 - Authentication checks recognize the reviewed visible `/login/submit` form rather than treating password-change fields on `/user/settings` as a login page.

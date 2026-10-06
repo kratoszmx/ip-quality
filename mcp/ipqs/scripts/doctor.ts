@@ -1,4 +1,4 @@
-import { resolveChromePath } from "@codex-mcp/shared-browser-session";
+import { resolveChromePath } from "@myutils/browser-session";
 
 import { defaultStateSummary, localStatus } from "../src/browser.js";
 import {

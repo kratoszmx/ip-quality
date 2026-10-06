@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "@codex-mcp/shared-totp": "file:../../../../mcps/common/shared/totp",
-    "@codex-mcp/shared-browser-session": "file:../../../../mcps/common/shared/browser-session",
+    "@myutils/browser-session": "file:../../../../myutils/net_utils/node/browser-session",
     "@codex-mcp/shared-mcp-server": "file:../../../../mcps/common/shared/mcp-server",
     "@codex-mcp/shared-one-use-token": "file:../../../../mcps/common/shared/one-use-token",
     "@codex-mcp/shared-secret-file": "file:../../../../mcps/common/shared/secret-file",

@@ -13,12 +13,12 @@
   },
   "dependencies": {
     "@codex-mcp/shared-totp": "file:../../../../mcps/common/shared/totp",
-    "@codex-mcp/shared-browser-session": "file:../../../../mcps/common/shared/browser-session",
+    "@myutils/browser-session": "file:../../../../myutils/net_utils/node/browser-session",
     "@codex-mcp/shared-mcp-server": "file:../../../../mcps/common/shared/mcp-server",
     "@codex-mcp/shared-secret-file": "file:../../../../mcps/common/shared/secret-file",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "playwright-core": "^1.61.1",
     "zod": "^4.4.3",
-    "@codex-mcp/shared-http-read": "file:../../../../mcps/common/shared/http-read"
+    "@myutils/http-read": "file:../../../../myutils/net_utils/node/http-read"
   }
 }

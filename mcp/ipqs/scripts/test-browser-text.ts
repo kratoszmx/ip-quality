@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { resolveChromePath } from "@codex-mcp/shared-browser-session";
+import { resolveChromePath } from "@myutils/browser-session";
 import { chromium } from "playwright-core";
 
 import { readDashboardText } from "../src/dashboard-text.js";

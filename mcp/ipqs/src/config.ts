@@ -3,7 +3,7 @@ import { lstat, open } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-import { ensurePrivateDirectoryStrict } from "@codex-mcp/shared-browser-session";
+import { ensurePrivateDirectoryStrict } from "@myutils/browser-session";
 import { fingerprintSecret, inspectPrivateSecretFile, readPrivateSecretFile } from "@codex-mcp/shared-secret-file";
 
 function findPackageRoot(startDir: string) {

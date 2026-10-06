@@ -1,5 +1,18 @@
 # Current handoff
 
+## Shared HTTP/Chrome reuse — 2026-10-07
+
+IPQS and provider-accounts now import `@myutils/browser-session` and/or
+`@myutils/http-read` directly, with matching local dependencies/lockfiles and
+documentation. MCP-specific helpers stay in mcps; IP/provider identity,
+authentication, exact-leaf isolation and zsh/Ruby route policy stay here.
+[Shared API](/Users/zmx/Projects/myutils/docs/NETWORK_API.md).
+
+The full offline entry passes **105 Ruby cases / 2,043 assertions**, IPQS's
+**26** tests and provider-accounts' **31** tests. IPQS's separate isolated
+browser-text suite also passes. No live reputation lookup, provider login,
+route/credential change or new third-party version was needed.
+
 Updated 2026-09-24. Worktree: `/Users/zmx/Projects/projects/ipquality`, branch
 `main`, reporter `v2026-09-24-standalone.25`. Start with [AGENTS.md](AGENTS.md)
 for a network-free plan and route selection.

@@ -1,6 +1,6 @@
 import { Agent } from 'node:https';
 import { isIP } from 'node:net';
-import { requestHttpRead } from '@codex-mcp/shared-http-read';
+import { requestHttpRead } from '@myutils/http-read';
 import { accountNetworkOptions } from './policy.mjs';
 
 const target = '1.1.1.1';

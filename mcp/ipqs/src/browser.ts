@@ -6,7 +6,7 @@ import {
   verifyChromeProfileBinding,
   withLoopbackOperationLease,
   waitForEnter,
-} from "@codex-mcp/shared-browser-session";
+} from "@myutils/browser-session";
 import { reserveOneUseRecord, takeOneUseRecord } from "@codex-mcp/shared-one-use-token";
 import { writePrivateSecretFile } from "@codex-mcp/shared-secret-file";
 import { chromium, type Page } from "playwright-core";
