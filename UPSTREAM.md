@@ -99,6 +99,8 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   Shared bounded text/integer jq predicates now serve five provider parsers,
   including Shodan's integer-port and control-text validation;
   IPQS-only connection-type classification lives back in its provider module.
+  IPQS official account and lookup requests also retain curl/TLS/HTTP failures;
+  an unsuccessful or malformed account preflight now stops before any lookup.
   The route command now lives directly in `bin/test-clash-leaf`; removed the
   shell forwarding entrypoint and report-output forwarding helper. Header and
   table width calculations share one character-based implementation. Generic

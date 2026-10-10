@@ -533,7 +533,7 @@ class ProvidersTest < ReporterTestCase
         case "$1" in
           */api/json/account/*)
             print -r -- account >> "$calls_file"
-            print -rn -- "$(<"$quota_fixture")" ;;
+            print -rn -- "$(<"$quota_fixture")"$'\n200' ;;
           */api/json/ip/*)
             print -r -- lookup >> "$calls_file"
             return 97 ;;
@@ -558,6 +558,61 @@ class ProvidersTest < ReporterTestCase
         assert_equal "official_insufficient_credits|\n", stdout
         assert_equal "account\n", File.read(calls_file), "zero credit must prevent the paid lookup"
         assert_empty stderr
+      end
+    end
+  end
+
+  def test_ipqs_preserves_transport_http_and_schema_errors_at_both_request_stages
+    probe = <<~'ZSH'
+      source "$1"
+      source "$2"
+      eval "$3"
+      typeset -A provider_credentials ipqs sinfo stype
+      provider_credentials[IPQS_API_KEY]=fixture-key
+      IP=198.51.100.23 ibar_step=0 sinfo[ldatabase]=0
+      failed_stage="$4" curl_exit="$5" response_file="$6" calls_file="$7"
+      show_progress_bar(){ :; }
+      styled_provider_type(){ print -rn -- "$1"; }
+      curl_with_secret_url(){
+        typeset phase=lookup
+        [[ "$1" == */account/* ]]&&phase=account
+        print -r -- "$phase" >> "$calls_file"
+        if [[ "$phase" == "$failed_stage" ]];then
+          print -rn -- "$(<"$response_file")"
+          return "$curl_exit"
+        fi
+        print -rn -- $'{"success":true,"credits":100,"usage":1}\n200'
+      }
+      ipqs[score]=0 ipqs[proxy]=false
+      db_ipqs 4
+      print -r -- "${ipqs[status]}|${ipqs[score]}|${ipqs[proxy]}"
+    ZSH
+    cases = [
+      [35, "\n000", "tls_error"], [28, "\n000", "timeout"],
+      [60, "\n000", "tls_verification_failed"],
+      [0, "Sorry, you have been blocked by Cloudflare\n403", "cloudflare_blocked"],
+      [0, '{"success":true,"fraud_score":0}' + "\n401", "http_401"],
+      [0, "slow down\n429", "rate_limited"],
+      [0, '"changed schema"' + "\n200", "invalid_response"],
+      [0, '{"success":false,"message":"Too many requests"}' + "\n200", "rate_limited"]
+    ]
+    Dir.mktmpdir("ipqs-failure-stages-") do |directory|
+      response = File.join(directory, "response.txt")
+      calls = File.join(directory, "calls.txt")
+      %w[account lookup].each do |stage|
+        stage_cases = cases.dup
+        stage_cases << [0, File.read(IPQUALITYSCORE_OFFICIAL_FIXTURE) + "\n200", "ok", "87", "true"] if stage == "lookup"
+        stage_cases.each do |curl_exit, wire, expected, score, proxy|
+          File.write(response, wire)
+          File.write(calls, "")
+          stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
+            "ipqs-stage-failures", COMMON_PROVIDER_LIBRARY, IPQUALITYSCORE_LIBRARY,
+            reporter_functions("db_ipqs"), stage, curl_exit.to_s, response, calls)
+          assert status.success?, stderr
+          assert_empty stderr
+          assert_equal "#{expected}|#{score}|#{proxy}\n", stdout
+          assert_equal stage == "account" ? "account\n" : "account\nlookup\n", File.read(calls)
+        end
       end
     end
   end

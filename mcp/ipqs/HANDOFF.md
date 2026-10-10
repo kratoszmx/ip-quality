@@ -1,9 +1,19 @@
 # IPQS handoff
 
-Account and documentation checked 2026-09-24. Start with [AGENTS.md](AGENTS.md);
+API transport checked 2026-10-10; browser evidence remains dated September 24.
+Start with [AGENTS.md](AGENTS.md);
 repository-wide status and validation live in [../../HANDOFF.md](../../HANDOFF.md).
 
 ## Current integration
+
+October 10: ATT account and reputation requests fail at TLS (curl 35 / HTTP 000),
+while account reads over direct IPv6/`awshk` and an `awshk` lookup of the same
+target succeed. The account has usable credits. Reporter v26 preserves these
+transport failures and stops before lookup if account preflight fails. The exact
+route/edge cause remains unconfirmed; repository [HANDOFF.md](../../HANDOFF.md)
+contains the fresh evidence. No dashboard login or credential rotation was needed.
+The user-authorized [TLS support inquiry](SUPPORT-TLS-20261010.md) was sent and
+independently verified in Gmail Sent; a provider diagnosis remains pending.
 
 IPQS moved from mcps to `ipquality/mcp/ipqs` on 2026-09-22, including its private
 Chrome profile and support receipts. There is no forwarding package at the old

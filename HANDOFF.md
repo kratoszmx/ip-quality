@@ -1,5 +1,45 @@
 # Current handoff
 
+## ATT provider investigation — 2026-10-10
+
+Reporter is now `v2026-10-10-standalone.26` on `main`. Authorized live reruns used
+the current cached `vps+sub5` / `ATT` leaf and left live Clash unchanged.
+
+- Cloudflare IP Intelligence succeeded, with the expected AS7018/US context.
+  Check.Place's separate Cloudflare protection blocked its MaxMind, Scamalytics,
+  AbuseIPDB, IP2Location and ipdata relay requests. Direct and `awshk` controls
+  also returned HTTP 403 from Check.Place; their bodies did not carry the same
+  Cloudflare block signature. This is not proof that ATT is unclean or that the
+  Cloudflare Intel token failed.
+- IPQS on ATT failed before HTTP, with curl 35 / HTTP 000. Its account API
+  succeeded over direct IPv6 and `awshk`, initially reporting credits=5020 and
+  usage=1. The same ATT target queried through `awshk` returned a valid official
+  fraud score. No account/key/quota failure was established. A separate native
+  HTTP client, header authentication, verified-DNS pinning and TLS 1.2 did not
+  establish the ATT path. The exact failing network/edge component is unknown.
+- Fixed a reporter bug that discarded IPQS curl/HTTP errors and continued from
+  a failed account preflight into another lookup. Both stages now use the shared
+  decoder; account failures stop before lookup, malformed bodies remain unknown,
+  and table/JSON status correctly reports `tls_error`. No alternate route, DNS
+  address or weaker certificate policy was added to production.
+- Private evidence: `reports/att-20261010-investigation.*`,
+  `reports/att-20261010-v26.*`, `reports/*20261010*diagnostics.json`,
+  `reports/ipqs-20261010-dns-proof.json`,
+  `reports/providers-20261010-route-comparison.json`, and
+  `reports/ipqs-20261010-lookup-control.json`.
+
+The user-authorized [IPQS support inquiry](mcp/ipqs/SUPPORT-TLS-20261010.md) was
+sent at 17:36:37 Asia/Shanghai and independently verified in Gmail Sent.
+No provider diagnosis is established yet; earlier September account/browser
+evidence is historical.
+
+Validation for v26: the complete offline entry passed **106 Ruby cases / 2,128
+assertions**, **26 IPQS tests** and **31 provider-account tests**. Shell syntax,
+diff whitespace and 82 local documentation links/anchors passed. The final ATT
+rerun exited successfully, kept Cloudflare Intel available, and explicitly
+reported the unresolved IPQS `tls_error` and Check.Place denials. A successful
+report process does not mean every source succeeded.
+
 ## Shared HTTP/Chrome reuse — 2026-10-07
 
 IPQS and provider-accounts now import `@myutils/browser-session` and/or
@@ -13,8 +53,8 @@ The full offline entry passes **105 Ruby cases / 2,043 assertions**, IPQS's
 browser-text suite also passes. No live reputation lookup, provider login,
 route/credential change or new third-party version was needed.
 
-Updated 2026-09-24. Worktree: `/Users/zmx/Projects/projects/ipquality`, branch
-`main`, reporter `v2026-09-24-standalone.25`. Start with [AGENTS.md](AGENTS.md)
+Worktree: `/Users/zmx/Projects/projects/ipquality`, branch
+`main`. Start with [AGENTS.md](AGENTS.md)
 for a network-free plan and route selection.
 
 ## Current behavior
@@ -50,15 +90,12 @@ for a network-free plan and route selection.
   there. IPQS TOTP enrollment and fresh-login proof belong to the earlier v25
   account audit; they are not repeated by documentation validation.
 
-## Remaining issue
+## Remaining issues
 
-The September 24 keyed ipapi diagnostic returned HTTP 200/full data directly,
-but isolated ATT returned curl 35 / `SSL_ERROR_SYSCALL` before HTTP. TLS 1.2
-and the official US diagnostic host also failed on ATT. This supports a
-route-specific TLS failure, not an invalid key, exhausted quota, or a proven
-remote cause. It remains unresolved and was not remeasured by the later
-Cloudflare-only check. Runtime preserves the canonical endpoint, certificate
-verification and chosen route without a silent direct fallback.
+ATT-to-IPQS TLS access and the Check.Place relay denials remain unresolved as
+described above. The earlier September ipapi failure is not a current blocker:
+both October 10 ATT reports returned ipapi `ok`. Results describe those runs,
+not a lasting provider-health guarantee.
 
 ## Recorded live evidence
 

@@ -41,6 +41,13 @@ IPQS uses the input name `confirm` for mutations; provider accounts uses
 
 ## Dated state and preferred access
 
+On October 10, official IPQS account reads passed over direct IPv6 and `awshk`;
+the initial balance was 5020 credits / usage 1. A lookup of the ATT target through
+`awshk` also passed. ATT itself failed before HTTP at TLS, while Cloudflare Intel
+queries through ATT passed. These API diagnostics did not repeat dashboard login
+or change credentials/2FA. See [HANDOFF.md](HANDOFF.md) for the report and support
+investigation. The browser/session observations below remain dated September 24.
+
 | Platform | Account/API evidence on September 24 | Routine backend | Browser fallback | 2FA |
 | --- | --- | --- | --- | --- |
 | IPQS | Non-lookup account API accepted the key with credits; expired browser login restored once; enrollment, a real TOTP challenge and fresh-profile login passed | Official API is direct HTTP; dashboard text is one same-origin GET in the retained container | Retained headed Chrome/CDP. Independent HTTP state returned login HTML; a separate one-submit HTTP login did not establish auth; isolated headless returned 403 | Enabled; private seed and emergency backup code saved before activation |

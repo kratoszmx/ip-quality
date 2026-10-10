@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-09-24-standalone.25"
+script_version="v2026-10-10-standalone.26"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset COMMON_DIR="$SCRIPT_DIR/common"
@@ -1749,12 +1749,16 @@ show_progress_bar "$temp_info" $((40-5-${sinfo[ldatabase]}))
 ipqs=()
 ipqs[status]="unknown"
 typeset api_key="${provider_credentials[IPQS_API_KEY]:-}"
-typeset RESPONSE=""
+typeset RESPONSE="" wire_response usage_response
 if [[ -n "$api_key" ]];then
 ipqs[source]="official_api"
-typeset usage_response=$(curl_with_secret_url \
+wire_response=$(curl_with_secret_url \
   "https://www.ipqualityscore.com/api/json/account/$api_key" \
-  $CurlARG -sS -$1 -m 10 --max-filesize 65536 2>/dev/null)
+  $CurlARG -sS -$1 -m 10 --max-filesize 65536 --write-out $'\n%{http_code}' 2>/dev/null)
+provider_decode_http_response "$wire_response" "$?"
+ipqs[status]="${provider_http_response[status]}"
+[[ "${ipqs[status]}" == ok ]]||return 0
+usage_response="${provider_http_response[body]}"
 if ipqualityscore_parse_usage_response "$usage_response";then
 ipqs[credits]="${ipqualityscore_usage[credits]}"
 ipqs[usage]="${ipqualityscore_usage[usage]}"
@@ -1763,15 +1767,24 @@ ipqs[status]="official_insufficient_credits"
 ipqs[risk]=""
 return 0
 fi
-elif ipqualityscore_parse_unavailability "$usage_response" &&
-     [[ "${ipqualityscore_unavailable[status]}" == "upstream_insufficient_credits" ]];then
+elif ipqualityscore_parse_unavailability "$usage_response";then
+ipqs[status]="${ipqualityscore_unavailable[status]}"
+if [[ "${ipqs[status]}" == upstream_insufficient_credits ]];then
 ipqs[status]="official_insufficient_credits"
+fi
 ipqs[risk]=""
 return 0
+else
+ipqs[status]=invalid_response
+return 0
 fi
-RESPONSE=$(curl_with_secret_url \
+wire_response=$(curl_with_secret_url \
   "https://www.ipqualityscore.com/api/json/ip/$api_key/$IP?strictness=0&allow_public_access_points=true" \
-  $CurlARG -sS -$1 -m 10 --max-filesize 131072 2>/dev/null)
+  $CurlARG -sS -$1 -m 10 --max-filesize 131072 --write-out $'\n%{http_code}' 2>/dev/null)
+provider_decode_http_response "$wire_response" "$?"
+ipqs[status]="${provider_http_response[status]}"
+[[ "${ipqs[status]}" == ok ]]||return 0
+RESPONSE="${provider_http_response[body]}"
 if ipqualityscore_parse_response "$RESPONSE";then
 ipqs[status]="ok"
 ipqs[score]="${ipqualityscore_parsed[score]}"
@@ -1790,6 +1803,8 @@ upstream_insufficient_credits)ipqs[status]="official_insufficient_credits"
 ;;
 *)ipqs[status]="${ipqualityscore_unavailable[status]}"
 esac
+else
+ipqs[status]=invalid_response
 fi
 else
 ipqs[source]="check_place_relay"

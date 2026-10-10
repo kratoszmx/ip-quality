@@ -50,8 +50,9 @@ The type, score and factor tables share `report_query_status` inside `report/`;
 its localized display labels are presentation policy, not a runtime provider API.
 
 The HTTP decoder replaces repeated envelope handling in public JSON retrieval,
-IPinfo, Ipregistry, ipapi, Cloudflare and both DB-IP requests. It accepts text or
-JSON bodies; callers retain schema validation and any exact-200 contract.
+IPinfo, Ipregistry, ipapi, Cloudflare, both DB-IP requests and IPQS account/lookup
+requests. It accepts text or JSON bodies; callers retain schema validation and
+any exact-200 contract.
 Request sites use `curl -q`; credential-bearing URL/header functions retain
 their stdin-config handling in the reporter.
 

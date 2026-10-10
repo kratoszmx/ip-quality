@@ -91,6 +91,10 @@ See [SERVICES.md](SERVICES.md#external-checks) for scheduling ownership.
 Provider tests cover transport/schema failures, state reset and request boundaries:
 DB-IP's two requests keep their route/family, IPWHOIS sends website headers,
 IPinfo validates nested objects, and Shodan rejects fractional ports/control text.
+IPQS tests exercise TLS/timeout/certificate failures, HTTP rejection and malformed
+or rate-limited JSON at both account and lookup stages, plus a successful lookup.
+A failed account preflight stops before the lookup; failures clear old scores and
+flags, and even a success-shaped body cannot override a failing HTTP status.
 Report tests keep failed/unconfigured sources visible, preserve unknown versus
 false/zero, and place Cloudflare only in section 1 on both basic-data paths and
 in both languages. One local Ruby assertion checks ANSI/CJK table alignment
