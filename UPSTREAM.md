@@ -101,6 +101,8 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   IPQS-only connection-type classification lives back in its provider module.
   IPQS official account and lookup requests also retain curl/TLS/HTTP failures;
   an unsuccessful or malformed account preflight now stops before any lookup.
+  Check.Place-specific in-memory request policy stops repeated relay requests
+  after a known block/429, with unqueried sources explicitly marked as skipped.
   The route command now lives directly in `bin/test-clash-leaf`; removed the
   shell forwarding entrypoint and report-output forwarding helper. Header and
   table width calculations share one character-based implementation. Generic

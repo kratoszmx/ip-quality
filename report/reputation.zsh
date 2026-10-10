@@ -160,6 +160,10 @@ cn:upstream_insufficient_credits|cn:official_insufficient_credits)state_label="�
 ;;
 cn:rate_limited)state_label="限流"
 ;;
+cn:skipped_relay_cloudflare_blocked)state_label="中继封锁/暂停"
+;;
+cn:skipped_relay_rate_limited)state_label="中继限流/暂停"
+;;
 cn:not_provided)state_label="未提供风险"
 ;;
 cn:ip_mismatch)state_label="出口与目标不符"
@@ -187,6 +191,10 @@ en:ok)state_label="available" state_color="${Font_Green:-}"
 en:upstream_insufficient_credits|en:official_insufficient_credits)state_label="no credit"
 ;;
 en:rate_limited)state_label="rate limit"
+;;
+en:skipped_relay_cloudflare_blocked)state_label="relay blocked/skipped"
+;;
+en:skipped_relay_rate_limited)state_label="relay limited/skipped"
 ;;
 en:not_provided)state_label="risk not supplied"
 ;;

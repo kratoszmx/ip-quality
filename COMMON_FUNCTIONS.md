@@ -49,6 +49,14 @@ and `report/`. A similar `jq` expression alone is not a shared schema contract.
 The type, score and factor tables share `report_query_status` inside `report/`;
 its localized display labels are presentation policy, not a runtime provider API.
 
+`providers/check_place.zsh` owns `check_place_fetch_json FAMILY TARGET QUERY
+[MAX_BYTES]`, used by the MaxMind, Scamalytics, AbuseIPDB, IP2Location, ipdata and
+unkeyed IPQS relay paths. It builds the fixed relay URL, uses the reporter's
+`provider_fetch_public_json`, and pauses subsequent relay calls after a confirmed
+Cloudflare block or HTTP 429. Pauses are in-memory and bound to target/family;
+skipped calls clear the body and retain an explicit skipped status. This is a
+Check.Place request policy, so it stays outside the project common library.
+
 The HTTP decoder replaces repeated envelope handling in public JSON retrieval,
 IPinfo, Ipregistry, ipapi, Cloudflare, both DB-IP requests and IPQS account/lookup
 requests. It accepts text or JSON bodies; callers retain schema validation and

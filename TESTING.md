@@ -32,6 +32,7 @@ the tests and claiming a complete pass.
 | `test/common_test.rb` | HTTP envelopes/transport errors/state reset, printable text, jq predicates, table widths/shape, proxy overrides and snapshots |
 | `test/ip_quality_test.rb` | CLI plans and rejection gates, dependency failure, fixture DNSBL/SMTP execution |
 | `test/providers_test.rb` | Provider parsing, unknown/failure semantics, credentials, zero-credit preflight |
+| `test/check_place_test.rb` | One actual request after a relay block/429, explicit skipped results, target/family/run isolation and unaffected official sources |
 | `test/dbip_test.rb` | Demo exact-IP/geography validation, no invented score, two-request visitor flow, route preservation and bounded guest tokens |
 | `test/public_demo_test.rb` | DB-IP labels/IPWHOIS boolean flags, quota errors, partial/malformed data, target binding, state reset and one-request IPWHOIS headers |
 | `test/report_test.rb` | Provider tables, ANSI/layout, JSON/file bytes, exclusive report creation |
@@ -95,6 +96,10 @@ IPQS tests exercise TLS/timeout/certificate failures, HTTP rejection and malform
 or rate-limited JSON at both account and lookup stages, plus a successful lookup.
 A failed account preflight stops before the lookup; failures clear old scores and
 flags, and even a success-shaped body cannot override a failing HTTP status.
+Check.Place tests count actual curl calls, distinguish an observed block from
+later skipped requests, and verify that generic 403/timeouts/schema failures do
+not pause other datasets. Report fixtures keep paused sources visible in both
+languages without scores or risk flags.
 Report tests keep failed/unconfigured sources visible, preserve unknown versus
 false/zero, and place Cloudflare only in section 1 on both basic-data paths and
 in both languages. One local Ruby assertion checks ANSI/CJK table alignment

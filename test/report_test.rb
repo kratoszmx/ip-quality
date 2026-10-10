@@ -12,16 +12,18 @@ class ReportTest < ReporterTestCase
       stype[title]=Types sscore[title]=Scores sfactor[title]=Factors
       ipinfo[status]=invalid_response ipregistry[status]=not_configured
       ipqs[status]=official_insufficient_credits ipqs[source]=official_api
-      ipapi[status]=tls_error ip2location[status]=timeout abuseipdb[status]=http_403
-      scamalytics[status]=cloudflare_blocked ipdata[status]=network_error
+      ipapi[status]=tls_error ip2location[status]="$4" abuseipdb[status]=http_403
+      scamalytics[status]=cloudflare_blocked ipdata[status]="$5"
       dbip[status]=rate_limited ipwhois[status]=rate_limited
       show_type
       show_score
       show_factor
     ZSH
-    %w[cn en].each do |language|
+    relay_states = [["timeout", "network_error"], ["skipped_relay_cloudflare_blocked", "skipped_relay_rate_limited"]]
+    %w[cn en].product(relay_states).each do |language, states|
+      paused = states.first.start_with?("skipped_")
       stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-        "failed-matrices", REPUTATION_REPORT, TERMINAL_LIBRARY, language)
+        "failed-matrices", REPUTATION_REPORT, TERMINAL_LIBRARY, language, *states)
       assert status.success?, stderr
       assert_empty stderr
       types, scores, factors = stdout.split(/Scores\n|Factors\n/)
@@ -30,9 +32,11 @@ class ReportTest < ReporterTestCase
       %w[IP2Location ipapi.is Ipregistry IPQS Scamalytics ipdata IPinfo IPWHOIS].each { |name| assert_includes factors, name }
       [types, scores, factors].each do |table|
         assert_includes table, language == "cn" ? "TLS 握手失败" : "TLS handshake failed"
+        assert_includes table, language == "cn" ? "中继封锁/暂停" : "relay blocked/skipped" if paused
         refute_match(/低风险|Low risk|\|\s+(?:是|否|Yes|No|0)\s*(?:\||$)/, table)
         assert_aligned_table(table)
       end
+      assert_includes factors, language == "cn" ? "中继限流/暂停" : "relay limited/skipped" if paused
     end
   end
 

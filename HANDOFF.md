@@ -1,8 +1,53 @@
 # Current handoff
 
-## ATT provider investigation — 2026-10-10
+## Direct/ATT follow-up — 2026-10-10
 
-Reporter is now `v2026-10-10-standalone.26` on `main`. Authorized live reruns used
+Current reporter: `v2026-10-10-standalone.27` on `main`. The preceding v26 fix
+preserved errors; it did not restore either blocked upstream path.
+
+Fresh complete v26 runs confirmed the user's updated observation: direct IPv4
+and isolated `vps+sub5` / `ATT` both received Check.Place Cloudflare blocks for
+five relay sources. Cloudflare's separate official Intel API succeeded on both.
+IPQS timed out on direct IPv4 and failed TLS on ATT.
+
+- Check.Place also returned the same 403 block in ATT headless Chrome and direct
+  headed Chrome. The upstream project's [issue 79](https://github.com/xykt/IPQuality/issues/79)
+  records another user's similar block, but establishes neither our trigger nor
+  a recovery deadline. No client change has restored Check.Place access.
+- Direct IPv4 IPQS reached HTTP 200 with valid TLS after resolving to an address
+  independently verified through encrypted DNS; the account endpoint accepted
+  the unchanged key (credits 5020, usage 2). Default system resolution timed
+  out. The resolver/address path therefore contributes to the direct failure.
+  No production DNS or hosts pin was added.
+- ATT still failed with HTTP CONNECT, SOCKS remote DNS, LibreSSL, SecureTransport,
+  verified IPv4/IPv6 destination addresses, and Chrome (`ERR_CONNECTION_CLOSED`).
+  Restoring the source subscription's DNS in a temporary instance, without its
+  listener or geodata downloads, also did not restore IPQS. The failing remote
+  component remains unconfirmed; the already-sent IPQS support inquiry stands.
+- v27 pauses subsequent Check.Place requests for the same target/family after
+  its first confirmed block or HTTP 429. The source-specific policy lives in
+  `providers/check_place.zsh`; skipped columns keep unknown values and explicit
+  statuses. This reduces unnecessary blocked requests; it does not unblock the
+  website. Other sources continue on their selected route.
+
+Private evidence: `reports/{direct,att}-20261010-followup.*`,
+`reports/providers-20261010-{browser,endpoint}-followup.json`,
+`reports/ipqs-20261010-{tls,source-dns}-followup.json`, and
+`reports/ipqs-20261010-direct-dns-account-proof.json`. Temporary browser and
+Mihomo processes were closed; no active Clash or account state was changed.
+
+Validation: **109 Ruby cases / 2,310 assertions**, **26 IPQS tests** and **31
+provider-account tests** passed through the complete offline entry. The live
+acceptance report `reports/att-20261010-v27-sub6.json` shows the first relay
+block, four explicitly skipped relays, Cloudflare Intel `ok` and IPQS
+`tls_error`. The externally maintained subscription advanced to `vps+sub6`
+during this investigation; its ATT leaf fields match the frozen `vps+sub5`
+release exactly, and the cached leaf matches the corresponding new release. The reporter
+did not perform that subscription update.
+
+## Earlier ATT provider investigation — 2026-10-10, v26
+
+The earlier `v2026-10-10-standalone.26` authorized live reruns used
 the current cached `vps+sub5` / `ATT` leaf and left live Clash unchanged.
 
 - Cloudflare IP Intelligence succeeded, with the expected AS7018/US context.
@@ -92,8 +137,9 @@ for a network-free plan and route selection.
 
 ## Remaining issues
 
-ATT-to-IPQS TLS access and the Check.Place relay denials remain unresolved as
-described above. The earlier September ipapi failure is not a current blocker:
+ATT-to-IPQS TLS access, direct IPv4 IPQS system DNS, and the Check.Place relay
+denials remain unresolved in normal production runs as described above.
+The earlier September ipapi failure is not a current blocker:
 both October 10 ATT reports returned ipapi `ok`. Results describe those runs,
 not a lasting provider-health guarantee.
 

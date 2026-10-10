@@ -100,6 +100,16 @@ existing provider statuses; query endpoints and quotas are unchanged.
 
 ## Interpretation rules
 
+Check.Place relays share one upstream host. After that host returns the known
+Cloudflare block page or HTTP 429, the remaining relay calls for the same target
+and address family pause for this reporter process. Their columns remain visible
+with `skipped_relay_cloudflare_blocked` or `skipped_relay_rate_limited`; those are
+unqueried/unknown results, not additional observed failures or clean results.
+The first actual failure retains its original status. Other official APIs,
+targets and address families proceed normally; no persistent cache, retry,
+browser fallback or route change is created. Ordinary HTTP 403, transport and
+schema failures do not trigger this source-specific pause.
+
 - Results remain per source. Conflicting answers stay visible and score scales
   are never averaged into a synthetic rating.
 - A provider failure, rate limit, quota response, malformed body, target mismatch,

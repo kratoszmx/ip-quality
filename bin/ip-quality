@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-10-10-standalone.26"
+script_version="v2026-10-10-standalone.27"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset COMMON_DIR="$SCRIPT_DIR/common"
@@ -17,6 +17,7 @@ typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
 typeset COMMON_PROVIDER_LIB="$COMMON_DIR/provider_values.zsh"
 typeset TERMINAL_LIB="$COMMON_DIR/terminal.zsh"
 typeset CREDENTIALS_LIB="$PROVIDER_DIR/credentials.zsh"
+typeset CHECK_PLACE_LIB="$PROVIDER_DIR/check_place.zsh"
 typeset IPREGISTRY_LIB="$PROVIDER_DIR/ipregistry.zsh"
 typeset IPAPI_LIB="$PROVIDER_DIR/ipapi.zsh"
 typeset IPWHOIS_LIB="$PROVIDER_DIR/ipwhois.zsh"
@@ -28,7 +29,7 @@ typeset RIPESTAT_LIB="$PROVIDER_DIR/ripestat.zsh"
 typeset INTERNETDB_LIB="$PROVIDER_DIR/shodan_internetdb.zsh"
 typeset REPUTATION_REPORT_LIB="$REPORT_DIR/reputation.zsh"
 typeset local_library
-for local_library in "$COMMON_DIR/json_values.jq" "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$DBIP_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for local_library in "$COMMON_DIR/json_values.jq" "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$CHECK_PLACE_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$DBIP_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$local_library" && -r "$local_library" && ! -L "$local_library" ]]||{
 print -ru2 -- "ERROR: unsafe or missing local library: $local_library"
 exit 66
@@ -1174,7 +1175,7 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Check.Place / MaxMi
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-8-${sinfo[ldatabase]}))
 maxmind=()
-provider_fetch_public_json "$1" "https://ipinfo.check.place/$IP?lang=$YY" 262144||true
+check_place_fetch_json "$1" "$IP" "lang=$YY"||true
 maxmind[status]="$PROVIDER_RESPONSE_STATUS"
 local RESPONSE="$PROVIDER_RESPONSE_BODY"
 if [[ -z $RESPONSE ]];then
@@ -1201,7 +1202,7 @@ maxmind[country]=$(echo "$RESPONSE"|jq -r '.Country.Name')
 maxmind[regcountrycode]=$(echo "$RESPONSE"|jq -r '.Country.RegisteredCountry.IsoCode')
 maxmind[regcountry]=$(echo "$RESPONSE"|jq -r '.Country.RegisteredCountry.Name')
 if [[ $YY != "en" && "${maxmind[status]}" == "ok" ]];then
-provider_fetch_public_json "$1" "https://ipinfo.check.place/$IP?lang=en" 262144||true
+check_place_fetch_json "$1" "$IP" "lang=en"||true
 local backup_response="$PROVIDER_RESPONSE_BODY"
 [[ ${maxmind[asn]} == "null" ]]&&maxmind[asn]=$(echo "$backup_response"|jq -r '.ASN.AutonomousSystemNumber')
 [[ ${maxmind[org]} == "null" ]]&&maxmind[org]=$(echo "$backup_response"|jq -r '.ASN.AutonomousSystemOrganization')
@@ -1342,7 +1343,7 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Scamalytics $Font_S
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-12-${sinfo[ldatabase]}))
 scamalytics=()
-provider_fetch_public_json "$1" "https://ipinfo.check.place/$IP?db=scamalytics" 262144||true
+check_place_fetch_json "$1" "$IP" "db=scamalytics"||true
 scamalytics[status]="$PROVIDER_RESPONSE_STATUS"
 local RESPONSE="$PROVIDER_RESPONSE_BODY"
 scamalytics[countrycode]=$(echo "$RESPONSE"|jq -r '.external_datasources.maxmind_geolite2.ip_country_code')
@@ -1595,7 +1596,7 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}AbuseIPDB $Font_Suf
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-10-${sinfo[ldatabase]}))
 abuseipdb=()
-provider_fetch_public_json "$1" "https://ipinfo.check.place/$IP?db=abuseipdb" 262144||true
+check_place_fetch_json "$1" "$IP" "db=abuseipdb"||true
 abuseipdb[status]="$PROVIDER_RESPONSE_STATUS"
 local RESPONSE="$PROVIDER_RESPONSE_BODY"
 abuseipdb[usetype]=$(echo "$RESPONSE"|jq -r '.data.usageType')
@@ -1641,7 +1642,7 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}IP2LOCATION $Font_S
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-12-${sinfo[ldatabase]}))
 ip2location=()
-provider_fetch_public_json "$1" "https://ipinfo.check.place/$IP?db=ip2location" 262144||true
+check_place_fetch_json "$1" "$IP" "db=ip2location"||true
 ip2location[status]="$PROVIDER_RESPONSE_STATUS"
 local RESPONSE="$PROVIDER_RESPONSE_BODY"
 ip2location[usetype]=$(echo "$RESPONSE"|jq -r '.usage_type')
@@ -1730,7 +1731,7 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}ipdata $Font_Suffix
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-7-${sinfo[ldatabase]}))
 ipdata=()
-provider_fetch_public_json "$1" "https://ipinfo.check.place/$IP?db=ipdata" 262144||true
+check_place_fetch_json "$1" "$IP" "db=ipdata"||true
 ipdata[status]="$PROVIDER_RESPONSE_STATUS"
 local RESPONSE="$PROVIDER_RESPONSE_BODY"
 ipdata[countrycode]=$(echo "$RESPONSE"|jq -r '.country_code')
@@ -1808,7 +1809,7 @@ ipqs[status]=invalid_response
 fi
 else
 ipqs[source]="check_place_relay"
-provider_fetch_public_json "$1" "https://ipinfo.check.place/$IP?db=ipqualityscore" 65536||true
+check_place_fetch_json "$1" "$IP" "db=ipqualityscore" 65536||true
 ipqs[status]="$PROVIDER_RESPONSE_STATUS"
 RESPONSE="$PROVIDER_RESPONSE_BODY"
 if ipqualityscore_parse_unavailability "$RESPONSE";then
