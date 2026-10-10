@@ -1,8 +1,60 @@
 # Current handoff
 
+## Source selection and direct IPQS DNS repair — 2026-10-10, v28
+
+Current reporter: `v2026-10-10-standalone.28` on `main`.
+
+- Both entrypoints now support `--sources all|independent|ID,ID`. The default
+  remains `all`; `independent` skips all Check.Place datasets and permits IPQS
+  only with its official key. Explicitly omitted sources become `disabled`,
+  are absent from terminal columns, and make no reputation request. Selected
+  failures stay visible. Egress discovery no longer depends on Check.Place.
+- `--ipqs-dns alidns` is a direct/specific-IP-only, opt-in repair. It uses verified
+  HTTPS DNS for the official IPQS hostname at both account and lookup stages.
+  There is no fixed destination pin, system-DNS change, route switch, retry or
+  certificate weakening. A missing key stops before a relay fallback. JSON
+  records source selection, explicit/discovered target mode and IPQS DNS policy.
+- A complete direct independent report with AliDNS returned IPQS `ok` and a
+  numeric score. A fresh ATT egress was then explicitly queried through direct
+  + AliDNS using the unchanged key: IPQS also returned `ok` and a score. This is
+  an alternate-route lookup of the ATT IP, not an ATT-origin connectivity pass.
+  The earlier same-day official account check returned credits=5020, usage=2;
+  that usage predates these successful lookups and is not a current balance.
+- ATT's independent report still returned IPQS `tls_error`. IPinfo, Ipregistry,
+  ipapi, IPWHOIS and Cloudflare Intel succeeded on both direct and ATT. DB-IP
+  returned `rate_limited`. These independent sources keep the project useful
+  while the relay and ATT-to-IPQS path are unavailable.
+- Strict direct Cloudflare/Google DoH were unavailable in this environment;
+  only the verified AliDNS option was retained. The normal system-DNS path
+  still needs a separate network-owner repair if it should work without the
+  explicit reporter option. No active Clash or system network setting changed.
+- NodeQuality's site/launcher were accessible; its current launcher still calls
+  IP.Check.Place, which matched xykt's `v2026-09-16` script byte-for-byte. A
+  bounded request to its current IPQS relay through ATT returned the known
+  Cloudflare HTTP 403 block. The linked user report is dated March 24, 2025.
+  No full Linux/chroot benchmark was executed, and no global outage is claimed.
+- The IPQS support message remains relevant to ATT edge/path attribution.
+  A bounded search for replies from IPQS with the inquiry's subject returned no
+  references. We still have no provider-side diagnosis; the evidence does not
+  establish that ATT's failure is caused by IPQS rather than another hop.
+
+Private evidence: `reports/direct-20261010-v28-alidns.json`,
+`reports/att-20261010-v28-independent.json`,
+`reports/ipqs-20261010-v28-att-target-via-direct.json`,
+`reports/ipqs-20261010-alidns-account-proof.json`, and
+`reports/nodequality-20261010-{browser.jsonl,loaded-report.json,upstream-probe.json}`.
+The earlier `direct-20261010-v28-independent.json` is the failed Cloudflare-DNS
+experiment, not the final direct success. All temporary processes were stopped.
+
+Validation: complete offline entry passed **116 Ruby cases / 2,423 assertions**,
+**26 IPQS tests** and **31 provider-account tests**. Selection tests check real
+fixture curl counts, no relay use, no silent DNS fallback, key privacy, target
+binding, option validation and failed versus deselected columns. The shared
+column-visibility rule stays in `report/`; source policy stays in `providers/`.
+
 ## Direct/ATT follow-up — 2026-10-10
 
-Current reporter: `v2026-10-10-standalone.27` on `main`. The preceding v26 fix
+Earlier reporter: `v2026-10-10-standalone.27` on `main`. The preceding v26 fix
 preserved errors; it did not restore either blocked upstream path.
 
 Fresh complete v26 runs confirmed the user's updated observation: direct IPv4
@@ -137,8 +189,10 @@ for a network-free plan and route selection.
 
 ## Remaining issues
 
-ATT-to-IPQS TLS access, direct IPv4 IPQS system DNS, and the Check.Place relay
-denials remain unresolved in normal production runs as described above.
+ATT-to-IPQS TLS access and Check.Place relay denials remain unresolved.
+Direct IPv4 IPQS works with the v28 AliDNS option; ordinary system DNS still
+needs its separate owner to investigate. Source selection can omit unavailable
+providers without suppressing failures from selected providers.
 The earlier September ipapi failure is not a current blocker:
 both October 10 ATT reports returned ipapi `ok`. Results describe those runs,
 not a lasting provider-health guarantee.

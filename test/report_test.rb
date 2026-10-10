@@ -194,17 +194,12 @@ class ReportTest < ReporterTestCase
       setopt KSH_ARRAYS
       source "$1"
       source "$2"
+      source "$5"
       YY="$3"
-      mode_lite="$4" mode_json=0 mode_output=0
-      typeset -A sbasic stype sscore sfactor smail smailstatus smail_response maxmind ipinfo ip2location cloudflare dbip
+      fixture_lite="$4" mode_json=0 mode_output=0
+      typeset -A sbasic stype sscore sfactor smail smailstatus smail_response maxmind ipinfo ip2location cloudflare dbip ipregistry scamalytics ipapi ipwhois abuseipdb ipdata ipqs ping0 ripestat internetdb
       sbasic[title]='1. Basic Information (relay)' sbasic[title_lite]='1. Basic Information (fallback)'
       stype[title]='2. IP Type' sscore[title]='3. Risk Score' sfactor[title]='4. Risk Factors'
-      maxmind[dms]=null ipinfo[dms]=null
-      ip2location[susetype]=ISP ip2location[score]=0 dbip[status]=ok dbip[risk_status]=ok dbip[risk]=low
-      cloudflare[status]=ok cloudflare[threats]='Phishing, Malware'
-      cloudflare[threats_json]='["Phishing","Malware"]'
-      cloudflare[network]=AS9808 cloudflare[countrycode]=CN
-      cloudflare[infrastructure]=isp cloudflare[org]='China Mobile Communications Group Co., Ltd.'
       scope_includes(){ [[ "$1" == reputation ]]; }
       for operation in hide_ipv4 show_head show_tail show_unavailable_sources \
         db_maxmind_relay db_ipinfo db_ipregistry db_scamalytics db_ipapi db_ipwhois \
@@ -212,11 +207,21 @@ class ReportTest < ReporterTestCase
         db_ripestat db_shodan_internetdb;do
         functions[$operation]='return 0'
       done
+      db_maxmind_relay(){ mode_lite="$fixture_lite"; maxmind[dms]=null; }
+      db_ipinfo(){ ipinfo[status]=ok; ipinfo[dms]=null; }
+      db_ip2location(){ ip2location[status]=ok; ip2location[susetype]=ISP; ip2location[score]=0; }
+      db_dbip(){ dbip[status]=ok; dbip[risk_status]=ok; dbip[risk]=low; }
+      db_cloudflare(){
+        cloudflare[status]=ok cloudflare[threats]='Phishing, Malware'
+        cloudflare[threats_json]='["Phishing","Malware"]'
+        cloudflare[network]=AS9808 cloudflare[countrycode]=CN
+        cloudflare[infrastructure]=isp cloudflare[org]='China Mobile Communications Group Co., Ltd.'
+      }
       check_IP 198.51.100.23 4
     ZSH
     %w[cn en].product(%w[0 1]).each do |language, lite|
       stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-        "cloudflare-basic-context", REPUTATION_REPORT, TERMINAL_LIBRARY, language, lite)
+        "cloudflare-basic-context", REPUTATION_REPORT, TERMINAL_LIBRARY, language, lite, File.join(ROOT, "providers", "selection.zsh"))
       assert status.success?, stderr
       assert_empty stderr
       basic, remaining = stdout.split("2. IP Type", 2)

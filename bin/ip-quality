@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-10-10-standalone.27"
+script_version="v2026-10-10-standalone.28"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset COMMON_DIR="$SCRIPT_DIR/common"
@@ -18,6 +18,7 @@ typeset COMMON_PROVIDER_LIB="$COMMON_DIR/provider_values.zsh"
 typeset TERMINAL_LIB="$COMMON_DIR/terminal.zsh"
 typeset CREDENTIALS_LIB="$PROVIDER_DIR/credentials.zsh"
 typeset CHECK_PLACE_LIB="$PROVIDER_DIR/check_place.zsh"
+typeset SELECTION_LIB="$PROVIDER_DIR/selection.zsh"
 typeset IPREGISTRY_LIB="$PROVIDER_DIR/ipregistry.zsh"
 typeset IPAPI_LIB="$PROVIDER_DIR/ipapi.zsh"
 typeset IPWHOIS_LIB="$PROVIDER_DIR/ipwhois.zsh"
@@ -29,7 +30,7 @@ typeset RIPESTAT_LIB="$PROVIDER_DIR/ripestat.zsh"
 typeset INTERNETDB_LIB="$PROVIDER_DIR/shodan_internetdb.zsh"
 typeset REPUTATION_REPORT_LIB="$REPORT_DIR/reputation.zsh"
 typeset local_library
-for local_library in "$COMMON_DIR/json_values.jq" "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$CHECK_PLACE_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$DBIP_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for local_library in "$COMMON_DIR/json_values.jq" "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$CHECK_PLACE_LIB" "$SELECTION_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$DBIP_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$local_library" && -r "$local_library" && ! -L "$local_library" ]]||{
 print -ru2 -- "ERROR: unsafe or missing local library: $local_library"
 exit 66
@@ -43,6 +44,7 @@ typeset self_test_requested=0
 typeset help_requested=0
 typeset version_requested=0
 typeset dnsbl_concurrency=50
+typeset ipqs_dns=system
 typeset requested_ip=""
 typeset -a legacy_args=()
 Font_B=$'\033[1m'
@@ -123,6 +125,8 @@ typeset -a shelp_lines=(
 "安全默认：不加确认参数时只显示查询计划，不访问网络"
 "Live query: /bin/zsh ./bin/ip-quality --confirm-network-lookup [--scope SCOPE] [-4|-6]"
 "            --scope reputation|dnsbl|mail|mail-dnsbl|full"
+"            --sources all|independent|ID,ID Select reputation sources                 选择信誉来源"
+"            --ipqs-dns system|alidns    IPQS DNS (AliDNS DoH: direct only)      IPQS直连DNS"
 "            --dnsbl-concurrency 1..50       Bounded DNSBL workers                     DNSBL并发上限"
 "            --plan                          Print disclosure plan only                仅显示披露计划"
 "            --self-test                     Run offline source/data checks            运行离线自检"
@@ -465,6 +469,13 @@ shift
 ;;
 --scope=*)query_scope="${1#*=}"
 ;;
+--sources|--ipqs-dns)
+(( $# >= 2 ))||{ print -ru2 -- "ERROR: $1 requires a value."; return 64; }
+if [[ "$1" == --sources ]];then source_selection="$2";else ipqs_dns="$2";fi
+shift
+;;
+--sources=*)source_selection="${1#*=}" ;;
+--ipqs-dns=*)ipqs_dns="${1#*=}" ;;
 --dnsbl-concurrency)
 (( $# >= 2 ))||{
 print -ru2 -- "ERROR: --dnsbl-concurrency requires a value."
@@ -493,6 +504,17 @@ reputation|dnsbl|mail|mail-dnsbl|full) ;;
 *)print -ru2 -- "ERROR: unsupported scope: $query_scope"
 return 64
 esac
+reputation_choose_sources "$source_selection"||return $?
+case "$ipqs_dns" in
+system) ;;
+alidns)
+if [[ -n "${IPQUALITY_ISOLATED_EGRESS:-}${http_proxy:-}${https_proxy:-}${all_proxy:-}${HTTP_PROXY:-}${HTTPS_PROXY:-}${ALL_PROXY:-}" ]];then
+print -ru2 -- "ERROR: --ipqs-dns alidns requires a direct route without proxy variables."
+return 64
+fi
+;;
+*)print -ru2 -- "ERROR: --ipqs-dns must be system or alidns."; return 64 ;;
+esac
 if [[ "$dnsbl_concurrency" != <-> ]]||(( dnsbl_concurrency < 1 || dnsbl_concurrency > 50 ));then
 print -ru2 -- "ERROR: DNSBL concurrency must be an integer from 1 through 50."
 return 64
@@ -505,6 +527,10 @@ print -r -- "  scope: $query_scope"
 print -r -- "  DNSBL concurrency cap: $dnsbl_concurrency"
 print -r -- "  output: masked IP by default; local stdout/file only"
 print -r -- "  telemetry/report upload/remote code: disabled"
+scope_includes reputation&&print -r -- "  selected source IDs: ${(j:,:)selected_reputation_sources[@]}"
+scope_includes reputation&&print -r -- "  reputation lookups use selected IDs; automatic egress discovery is separate from this catalogue"
+[[ "$source_selection" == independent ]]&&print -r -- "  independent mode: no Check.Place requests; IPQS requires its official API key"
+[[ "$ipqs_dns" == alidns ]]&&print -r -- "  IPQS DNS: AliDNS DoH (https://dns.alidns.com/dns-query); resolver receives IPQS hostname, not the API key or target; system DNS is unchanged"
 scope_includes reputation&&print -r -- "  reputation sources: ipapi.is, Cloudflare IP Intelligence (when configured), Ping0, RIPEstat, Shodan InternetDB, plus configured Ipregistry/IPQS APIs"
 scope_includes reputation&&print -r -- "  public website demos: DB-IP page + one visitor-egress lookup (must match target); IPWHOIS one target lookup; no account, no guaranteed quota or availability"
 scope_includes reputation&&print -r -- "  supplementary sources: IPinfo public demo widget plus named Check.Place relays (MaxMind-labeled, Scamalytics, AbuseIPDB, IP2Location, ipdata, IPQualityScore)"
@@ -981,7 +1007,7 @@ return 1
 get_ipv4(){
 local response
 IPV4=""
-local API_NET=("https://ipinfo.io/ip" "https://myip.check.place" "https://ip.sb" "https://ping0.cc" "https://icanhazip.com" "https://api64.ipify.org" "https://ifconfig.co" "https://ident.me")
+local API_NET=("https://ipinfo.io/ip" "https://ip.sb" "https://ping0.cc" "https://icanhazip.com" "https://api64.ipify.org" "https://ifconfig.co" "https://ident.me")
 for p in "${API_NET[@]}";do
 response=$(curl -q $CurlARG -s4 --max-time 2 "$p")
 local curl_status=$?
@@ -1040,7 +1066,7 @@ return 1
 get_ipv6(){
 local response
 IPV6=""
-local API_NET=("https://myip.check.place" "https://ip.sb" "https://ping0.cc" "https://icanhazip.com" "https://api64.ipify.org" "https://ifconfig.co" "https://ident.me")
+local API_NET=("https://ip.sb" "https://ping0.cc" "https://icanhazip.com" "https://api64.ipify.org" "https://ifconfig.co" "https://ident.me")
 for p in "${API_NET[@]}";do
 response=$(curl -q $CurlARG -s6 --max-time 2 "$p")
 local curl_status=$?
@@ -1753,9 +1779,14 @@ typeset api_key="${provider_credentials[IPQS_API_KEY]:-}"
 typeset RESPONSE="" wire_response usage_response
 if [[ -n "$api_key" ]];then
 ipqs[source]="official_api"
+local -a dns_arguments=()
+ipqs[dns]="${ipqs_dns:-system}"
+if [[ "${ipqs_dns:-system}" == alidns ]];then
+dns_arguments=(--doh-url https://dns.alidns.com/dns-query)
+fi
 wire_response=$(curl_with_secret_url \
   "https://www.ipqualityscore.com/api/json/account/$api_key" \
-  $CurlARG -sS -$1 -m 10 --max-filesize 65536 --write-out $'\n%{http_code}' 2>/dev/null)
+  $CurlARG "${dns_arguments[@]}" -sS -$1 -m 10 --max-filesize 65536 --write-out $'\n%{http_code}' 2>/dev/null)
 provider_decode_http_response "$wire_response" "$?"
 ipqs[status]="${provider_http_response[status]}"
 [[ "${ipqs[status]}" == ok ]]||return 0
@@ -1781,7 +1812,7 @@ return 0
 fi
 wire_response=$(curl_with_secret_url \
   "https://www.ipqualityscore.com/api/json/ip/$api_key/$IP?strictness=0&allow_public_access_points=true" \
-  $CurlARG -sS -$1 -m 10 --max-filesize 131072 --write-out $'\n%{http_code}' 2>/dev/null)
+  $CurlARG "${dns_arguments[@]}" -sS -$1 -m 10 --max-filesize 131072 --write-out $'\n%{http_code}' 2>/dev/null)
 provider_decode_http_response "$wire_response" "$?"
 ipqs[status]="${provider_http_response[status]}"
 [[ "${ipqs[status]}" == ok ]]||return 0
@@ -1808,6 +1839,11 @@ else
 ipqs[status]=invalid_response
 fi
 else
+if [[ "${source_selection:-all}" == independent || "${ipqs_dns:-system}" == alidns ]];then
+ipqs[source]="official_api"
+ipqs[status]="not_configured"
+return 0
+fi
 ipqs[source]="check_place_relay"
 check_place_fetch_json "$1" "$IP" "db=ipqualityscore" 65536||true
 ipqs[status]="$PROVIDER_RESPONSE_STATUS"
@@ -2099,6 +2135,10 @@ fi
 fi
 }
 show_basic_lite(){
+if [[ "${ipinfo[status]:-}" == disabled ]];then
+[[ "$YY" == cn ]]&&print -r -- "一、基础信息（无可用的地理资料）"||print -r -- "1. Basic information (no geographic observation available)"
+return 0
+fi
 echo -ne "\r${sbasic[title_lite]}\n"
 if [[ -n ${ipinfo[asn]} && ${ipinfo[asn]} != "null" ]];then
 echo -ne "\r$Font_Cyan${sbasic[asn]}${Font_Green}AS${ipinfo[asn]}$Font_Suffix\n"
@@ -2106,7 +2146,7 @@ echo -ne "\r$Font_Cyan${sbasic[org]}$Font_Green${ipinfo[org]}$Font_Suffix\n"
 else
 echo -ne "\r$Font_Cyan${sbasic[asn]}${sbasic[noasn]}$Font_Suffix\n"
 fi
-if [[ ${ipinfo[dms]} != "null" && ${ipinfo[map]} != "null" ]];then
+if [[ -n "${ipinfo[dms]}" && -n "${ipinfo[map]}" && ${ipinfo[dms]} != "null" && ${ipinfo[map]} != "null" ]];then
 echo -ne "\r$Font_Cyan${sbasic[location]}$Font_Green${ipinfo[dms]}$Font_Suffix\n"
 echo -ne "\r$Font_Cyan${sbasic[map]}$Font_U$Font_Green${ipinfo[map]}$Font_Suffix\n"
 fi
@@ -2312,6 +2352,8 @@ output_fd=-1
 fi
 }
 save_json(){
+local query_target_mode=discovered_egress
+[[ -n "${requested_ip:-}" ]]&&query_target_mode=explicit_target
 local info_asn info_org info_lat info_lon info_dms info_map info_timezone
 local info_city info_post info_subcode info_sub info_countrycode info_country
 local info_continentcode info_continent info_regcountrycode info_regcountry info_type=""
@@ -2336,6 +2378,7 @@ info_regcountrycode="${maxmind[regcountrycode]:-}"
 info_regcountry="${maxmind[regcountry]:-}"
 else
 info_source="IPinfo public demo widget"
+[[ "${ipinfo[status]:-}" == disabled ]]&&info_source="none"
 info_asn="${ipinfo[asn]:-}"
 info_org="${ipinfo[org]:-}"
 info_lat="${ipinfo[lat]:-}"
@@ -2398,6 +2441,10 @@ ipjson=$(jq -n \
 --arg head_repository "${shead[git]:-}" \
 --arg head_time "${shead[time_raw]:-}" \
 --arg head_version "${script_version:-}" \
+--arg source_selection "${source_selection:-all}" \
+--arg selected_sources "${(j:,:)selected_reputation_sources[@]}" \
+--arg target_mode "$query_target_mode" \
+--arg ipqs_dns "${ipqs[dns]:-}" \
 --arg info_source "$info_source" \
 --arg info_asn "$info_asn" --arg info_org "$info_org" \
 --arg info_lat "$info_lat" --arg info_lon "$info_lon" \
@@ -2524,6 +2571,12 @@ def dnsresults($value):
   Head: {
     IP: opt($head_ip), Repository: opt($head_repository),
     Time: opt($head_time), Version: opt($head_version)
+  },
+  Query: {
+    SourceSelection: $source_selection,
+    SelectedSources: (if $reputation_enabled then ($selected_sources | split(",") | map(select(length > 0))) else [] end),
+    TargetMode: $target_mode,
+    IPQSDNS: opt($ipqs_dns)
   },
   Info: {
     Source: $info_source, ASN: opt($info_asn), Organization: opt($info_org),
@@ -2657,21 +2710,17 @@ ipjson='{
 [[ $2 -eq 4 ]]&&hide_ipv4 $IP
 [[ $2 -eq 6 ]]&&hide_ipv6 $IP
 if scope_includes reputation;then
-db_maxmind_relay $2
-db_ipinfo
-db_ipregistry $2
-db_scamalytics $2
-db_ipapi $2
-db_ipwhois $2
-db_dbip $2
-db_cloudflare $2
-db_abuseipdb $2
-db_ip2location $2
-db_ipdata $2
-db_ipqs $2
-db_ping0 $2
-db_ripestat $2
-db_shodan_internetdb $2
+mode_lite=1
+local source_id source_array
+for source_id in "${reputation_source_ids[@]}";do
+source_array="$source_id"
+[[ "$source_id" == shodan ]]&&source_array=internetdb
+# Clear all fields between families, including deselected providers.
+set -A "$source_array" status disabled risk_status disabled
+if reputation_source_selected "$source_id";then
+"${reputation_source_functions[$source_id]}" "$2"
+fi
+done
 fi
 scope_includes mail&&check_mail
 if scope_includes dnsbl&&[[ $2 -eq 4 ]];then

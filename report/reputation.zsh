@@ -108,6 +108,14 @@ done
 return 1
 }
 
+# Selected failures stay visible; deliberately deselected sources do not.
+report_source_visible(){
+typeset query_state="$1"
+shift
+[[ "$query_state" == disabled ]]&&return 1
+[[ -n "$query_state" ]]||report_any_known "$@"
+}
+
 report_type_source(){
 case "$YY:$1" in
 cn:ipinfo)print -rn -- "公开示例组件"
@@ -184,6 +192,8 @@ cn:cloudflare_blocked)state_label="Cloudflare 阻挡"
 ;;
 cn:not_configured)state_label="未配置"
 ;;
+cn:disabled)state_label="未选择"
+;;
 cn:*)state_label="查询失败"
 ;;
 en:ok)state_label="available" state_color="${Font_Green:-}"
@@ -216,6 +226,8 @@ en:cloudflare_blocked)state_label="Cloudflare blocked"
 ;;
 en:not_configured)state_label="not set"
 ;;
+en:disabled)state_label="not selected"
+;;
 *)state_label="failed"
 esac
 print -rn -- "${state_color}$state_label${Font_Suffix:-}"
@@ -237,21 +249,21 @@ terminal_table_row "$widths" "$label" "${rendered[@]}"
 
 show_type(){
 typeset -a headers sources usages companies statuses
-if [[ -n "${ipinfo[status]:-}" ]] || report_any_known "${ipinfo[susetype]}" "${ipinfo[scomtype]}";then
+if report_source_visible "${ipinfo[status]:-}" "${ipinfo[susetype]}" "${ipinfo[scomtype]}";then
 headers+=("${Font_B}${Font_Cyan}IPinfo$Font_Suffix")
 statuses+=("$(report_query_status "${ipinfo[status]:-ok}")")
 sources+=("$(report_type_source ipinfo)")
 usages+=("${ipinfo[susetype]}")
 companies+=("${ipinfo[scomtype]}")
 fi
-if [[ -n "${ipregistry[status]:-}" ]] || report_any_known "${ipregistry[susetype]}" "${ipregistry[scomtype]}";then
+if report_source_visible "${ipregistry[status]:-}" "${ipregistry[susetype]}" "${ipregistry[scomtype]}";then
 headers+=("${Font_B}${Font_Cyan}Ipregistry$Font_Suffix")
 statuses+=("$(report_query_status "${ipregistry[status]:-ok}")")
 sources+=("$(report_type_source official)")
 usages+=("${ipregistry[susetype]}")
 companies+=("${ipregistry[scomtype]}")
 fi
-if [[ -n "${ipqs[status]:-}" ]] || report_any_known "${ipqs[susetype]}";then
+if report_source_visible "${ipqs[status]:-}" "${ipqs[susetype]}";then
 headers+=("${Font_B}${Font_Cyan}IPQS$Font_Suffix")
 statuses+=("$(report_query_status "${ipqs[status]:-ok}")")
 if [[ "${ipqs[source]}" == "official_api" ]];then
@@ -262,21 +274,21 @@ fi
 usages+=("${ipqs[susetype]}")
 companies+=("")
 fi
-if [[ -n "${ipapi[status]:-}" ]] || report_any_known "${ipapi[susetype]}" "${ipapi[scomtype]}";then
+if report_source_visible "${ipapi[status]:-}" "${ipapi[susetype]}" "${ipapi[scomtype]}";then
 headers+=("${Font_B}${Font_Cyan}ipapi.is$Font_Suffix")
 statuses+=("$(report_query_status "${ipapi[status]:-ok}")")
 sources+=("$(report_type_source direct)")
 usages+=("${ipapi[susetype]}")
 companies+=("${ipapi[scomtype]}")
 fi
-if [[ -n "${ip2location[status]:-}" ]] || report_any_known "${ip2location[susetype]}" "${ip2location[scomtype]}";then
+if report_source_visible "${ip2location[status]:-}" "${ip2location[susetype]}" "${ip2location[scomtype]}";then
 headers+=("${Font_B}${Font_Cyan}IP2Location$Font_Suffix")
 statuses+=("$(report_query_status "${ip2location[status]:-ok}")")
 sources+=("$(report_type_source relay)")
 usages+=("${ip2location[susetype]}")
 companies+=("${ip2location[scomtype]}")
 fi
-if [[ -n "${abuseipdb[status]:-}" ]] || report_any_known "${abuseipdb[susetype]}";then
+if report_source_visible "${abuseipdb[status]:-}" "${abuseipdb[susetype]}";then
 headers+=("${Font_B}${Font_Cyan}AbuseIPDB$Font_Suffix")
 statuses+=("$(report_query_status "${abuseipdb[status]:-ok}")")
 sources+=("$(report_type_source relay)")
@@ -316,7 +328,7 @@ fi
 }
 
 show_cloudflare_basic(){
-[[ -n "${cloudflare[status]:-}" ]]||return 0
+report_source_visible "${cloudflare[status]:-}"||return 0
 typeset country_label type_label org_label threats_label separator
 if [[ "$YY" == cn ]];then
 country_label="ASN所属地" type_label="ASN类型" org_label="ASN组织" threats_label="威胁类别" separator="："
@@ -342,28 +354,27 @@ return 0
 
 show_score(){
 typeset -a headers scores risks scales source_statuses
-if [[ -n "${ip2location[status]:-}" ]] || report_any_known "${ip2location[score]}" "${ip2location[risk]}";then
+if report_source_visible "${ip2location[status]:-}" "${ip2location[score]}" "${ip2location[risk]}";then
 headers+=("${Font_B}${Font_Cyan}IP2Location$Font_Suffix")
 scores+=("${ip2location[score]}") risks+=("${ip2location[risk]}") scales+=("0-99 potential")
 source_statuses+=("$(report_score_source_status relay "${ip2location[status]:-ok}")")
 fi
-if [[ -n "${scamalytics[status]:-}" ]] || report_any_known "${scamalytics[score]}" "${scamalytics[risk]}";then
+if report_source_visible "${scamalytics[status]:-}" "${scamalytics[score]}" "${scamalytics[risk]}";then
 headers+=("${Font_B}${Font_Cyan}Scamalytics$Font_Suffix")
 scores+=("${scamalytics[score]}") risks+=("${scamalytics[risk]}") scales+=("0-100 fraud")
 source_statuses+=("$(report_score_source_status relay "${scamalytics[status]:-ok}")")
 fi
-if [[ -n "${ipapi[status]:-}" ]] || report_any_known "${ipapi[score]}" "${ipapi[risk]}";then
+if report_source_visible "${ipapi[status]:-}" "${ipapi[score]}" "${ipapi[risk]}";then
 headers+=("${Font_B}${Font_Cyan}ipapi.is$Font_Suffix")
 scores+=("${ipapi[score]}") risks+=("${ipapi[risk]}") scales+=("0-100% abuse")
 source_statuses+=("$(report_score_source_status direct "${ipapi[risk_status]:-${ipapi[status]:-ok}}")")
 fi
-if [[ -n "${abuseipdb[status]:-}" ]] || report_any_known "${abuseipdb[score]}" "${abuseipdb[risk]}";then
+if report_source_visible "${abuseipdb[status]:-}" "${abuseipdb[score]}" "${abuseipdb[risk]}";then
 headers+=("${Font_B}${Font_Cyan}AbuseIPDB$Font_Suffix")
 scores+=("${abuseipdb[score]}") risks+=("${abuseipdb[risk]}") scales+=("0-100 confidence")
 source_statuses+=("$(report_score_source_status relay "${abuseipdb[status]:-ok}")")
 fi
-if report_any_known "${ipqs[score]}" "${ipqs[risk]}" ||
-   [[ -n "${ipqs[source]}" || -n "${ipqs[status]}" ]];then
+if report_source_visible "${ipqs[status]:-}" "${ipqs[score]}" "${ipqs[risk]}" "${ipqs[source]}";then
 headers+=("${Font_B}${Font_Cyan}IPQS$Font_Suffix")
 scores+=("${ipqs[score]}") risks+=("${ipqs[risk]}") scales+=("0-100 fraud")
 typeset ipqs_source_kind="relay"
@@ -376,7 +387,7 @@ ipqs_query_status="ok"
 fi
 source_statuses+=("$(report_score_source_status "$ipqs_source_kind" "$ipqs_query_status")")
 fi
-if [[ -n "${dbip[status]:-}" ]];then
+if report_source_visible "${dbip[status]:-}";then
 headers+=("${Font_B}${Font_Cyan}DB-IP$Font_Suffix")
 scores+=("") risks+=("${dbip[risk]}") scales+=("low/medium/high")
 source_statuses+=("$(report_score_source_status demo "${dbip[risk_status]:-${dbip[status]}}")")
@@ -414,7 +425,7 @@ return 0
 
 show_factor(){
 typeset -a headers countries proxies vpns tors servers abusers robots statuses
-if [[ -n "${ip2location[status]:-}" ]] || report_any_known "${ip2location[countrycode]}" "${ip2location[proxy]}" "${ip2location[vpn]}" "${ip2location[tor]}" "${ip2location[server]}" "${ip2location[abuser]}" "${ip2location[robot]}";then
+if report_source_visible "${ip2location[status]:-}" "${ip2location[countrycode]}" "${ip2location[proxy]}" "${ip2location[vpn]}" "${ip2location[tor]}" "${ip2location[server]}" "${ip2location[abuser]}" "${ip2location[robot]}";then
 headers+=("${Font_B}${Font_Cyan}IP2Location$Font_Suffix")
 statuses+=("$(report_query_status "${ip2location[status]:-ok}")")
 countries+=("${ip2location[countrycode]}") proxies+=("${ip2location[proxy]}")
@@ -422,7 +433,7 @@ vpns+=("${ip2location[vpn]}") tors+=("${ip2location[tor]}")
 servers+=("${ip2location[server]}") abusers+=("${ip2location[abuser]}")
 robots+=("${ip2location[robot]}")
 fi
-if [[ -n "${ipapi[status]:-}" ]] || report_any_known "${ipapi[countrycode]}" "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ipapi[server]}" "${ipapi[abuser]}" "${ipapi[robot]}";then
+if report_source_visible "${ipapi[status]:-}" "${ipapi[countrycode]}" "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ipapi[server]}" "${ipapi[abuser]}" "${ipapi[robot]}";then
 headers+=("${Font_B}${Font_Cyan}ipapi.is$Font_Suffix")
 statuses+=("$(report_query_status "${ipapi[risk_status]:-${ipapi[status]:-ok}}")")
 countries+=("${ipapi[countrycode]}") proxies+=("${ipapi[proxy]}")
@@ -430,7 +441,7 @@ vpns+=("${ipapi[vpn]}") tors+=("${ipapi[tor]}")
 servers+=("${ipapi[server]}") abusers+=("${ipapi[abuser]}")
 robots+=("${ipapi[robot]}")
 fi
-if [[ -n "${ipregistry[status]:-}" ]] || report_any_known "${ipregistry[countrycode]}" "${ipregistry[proxy]}" "${ipregistry[vpn]}" "${ipregistry[tor]}" "${ipregistry[server]}" "${ipregistry[abuser]}";then
+if report_source_visible "${ipregistry[status]:-}" "${ipregistry[countrycode]}" "${ipregistry[proxy]}" "${ipregistry[vpn]}" "${ipregistry[tor]}" "${ipregistry[server]}" "${ipregistry[abuser]}";then
 headers+=("${Font_B}${Font_Cyan}Ipregistry$Font_Suffix")
 statuses+=("$(report_query_status "${ipregistry[status]:-ok}")")
 countries+=("${ipregistry[countrycode]}") proxies+=("${ipregistry[proxy]}")
@@ -438,7 +449,7 @@ vpns+=("${ipregistry[vpn]}") tors+=("${ipregistry[tor]}")
 servers+=("${ipregistry[server]}") abusers+=("${ipregistry[abuser]}")
 robots+=("")
 fi
-if [[ -n "${ipqs[status]:-}" ]] || report_any_known "${ipqs[countrycode]}" "${ipqs[proxy]}" "${ipqs[vpn]}" "${ipqs[tor]}" "${ipqs[server]}" "${ipqs[abuser]}" "${ipqs[robot]}";then
+if report_source_visible "${ipqs[status]:-}" "${ipqs[countrycode]}" "${ipqs[proxy]}" "${ipqs[vpn]}" "${ipqs[tor]}" "${ipqs[server]}" "${ipqs[abuser]}" "${ipqs[robot]}";then
 headers+=("${Font_B}${Font_Cyan}IPQS$Font_Suffix")
 statuses+=("$(report_query_status "${ipqs[status]:-ok}")")
 countries+=("${ipqs[countrycode]}") proxies+=("${ipqs[proxy]}")
@@ -446,7 +457,7 @@ vpns+=("${ipqs[vpn]}") tors+=("${ipqs[tor]}")
 servers+=("${ipqs[server]}") abusers+=("${ipqs[abuser]}")
 robots+=("${ipqs[robot]}")
 fi
-if [[ -n "${scamalytics[status]:-}" ]] || report_any_known "${scamalytics[countrycode]}" "${scamalytics[proxy]}" "${scamalytics[vpn]}" "${scamalytics[tor]}" "${scamalytics[server]}" "${scamalytics[abuser]}" "${scamalytics[robot]}";then
+if report_source_visible "${scamalytics[status]:-}" "${scamalytics[countrycode]}" "${scamalytics[proxy]}" "${scamalytics[vpn]}" "${scamalytics[tor]}" "${scamalytics[server]}" "${scamalytics[abuser]}" "${scamalytics[robot]}";then
 headers+=("${Font_B}${Font_Cyan}Scamalytics$Font_Suffix")
 statuses+=("$(report_query_status "${scamalytics[status]:-ok}")")
 countries+=("${scamalytics[countrycode]}") proxies+=("${scamalytics[proxy]}")
@@ -454,7 +465,7 @@ vpns+=("${scamalytics[vpn]}") tors+=("${scamalytics[tor]}")
 servers+=("${scamalytics[server]}") abusers+=("${scamalytics[abuser]}")
 robots+=("${scamalytics[robot]}")
 fi
-if [[ -n "${ipdata[status]:-}" ]] || report_any_known "${ipdata[countrycode]}" "${ipdata[proxy]}" "${ipdata[vpn]}" "${ipdata[tor]}" "${ipdata[server]}" "${ipdata[abuser]}" "${ipdata[robot]}";then
+if report_source_visible "${ipdata[status]:-}" "${ipdata[countrycode]}" "${ipdata[proxy]}" "${ipdata[vpn]}" "${ipdata[tor]}" "${ipdata[server]}" "${ipdata[abuser]}" "${ipdata[robot]}";then
 headers+=("${Font_B}${Font_Cyan}ipdata$Font_Suffix")
 statuses+=("$(report_query_status "${ipdata[status]:-ok}")")
 countries+=("${ipdata[countrycode]}") proxies+=("${ipdata[proxy]}")
@@ -462,7 +473,7 @@ vpns+=("${ipdata[vpn]}") tors+=("${ipdata[tor]}")
 servers+=("${ipdata[server]}") abusers+=("${ipdata[abuser]}")
 robots+=("${ipdata[robot]}")
 fi
-if [[ -n "${ipinfo[status]:-}" ]] || report_any_known "${ipinfo[countrycode]}" "${ipinfo[proxy]}" "${ipinfo[vpn]}" "${ipinfo[tor]}" "${ipinfo[server]}" "${ipinfo[abuser]}" "${ipinfo[robot]}";then
+if report_source_visible "${ipinfo[status]:-}" "${ipinfo[countrycode]}" "${ipinfo[proxy]}" "${ipinfo[vpn]}" "${ipinfo[tor]}" "${ipinfo[server]}" "${ipinfo[abuser]}" "${ipinfo[robot]}";then
 headers+=("${Font_B}${Font_Cyan}IPinfo$Font_Suffix")
 statuses+=("$(report_query_status "${ipinfo[status]:-ok}")")
 countries+=("${ipinfo[countrycode]}") proxies+=("${ipinfo[proxy]}")
@@ -470,7 +481,7 @@ vpns+=("${ipinfo[vpn]}") tors+=("${ipinfo[tor]}")
 servers+=("${ipinfo[server]}") abusers+=("${ipinfo[abuser]}")
 robots+=("${ipinfo[robot]}")
 fi
-if [[ -n "${ipwhois[status]:-}" ]];then
+if report_source_visible "${ipwhois[status]:-}";then
 headers+=("${Font_B}${Font_Cyan}IPWHOIS$Font_Suffix")
 statuses+=("$(report_query_status "${ipwhois[risk_status]:-${ipwhois[status]}}")")
 countries+=("${ipwhois[countrycode]}")
@@ -533,7 +544,7 @@ observations+=("${Font_Cyan}ipapi.is: ${Font_Suffix}anonymous minimal response |
 fi
 fi
 
-if report_any_known "${ripestat[status]}" "${ripestat[prefix]}" "${ripestat[origins]}";then
+if [[ "${ripestat[status]}" != disabled ]] && report_any_known "${ripestat[status]}" "${ripestat[prefix]}" "${ripestat[origins]}";then
 if [[ "$YY" == "cn" ]];then
 observations+=("${Font_Cyan}RIPEstat：${Font_Suffix}状态=$(report_neutral_or_dash "${ripestat[status]}") | 前缀=$(report_neutral_or_dash "$displayed_prefix") | 起源=$(report_neutral_or_dash "${ripestat[origins]}")")
 else
@@ -571,6 +582,7 @@ show_unavailable_sources(){
 typeset -a missing relay_cloudflare_blocked relay_http_403
 if ! report_any_known "${maxmind[asn]}" "${maxmind[countrycode]}" "${maxmind[city]}";then
 case "${maxmind[status]}" in
+disabled) ;;
 cloudflare_blocked)relay_cloudflare_blocked+=("MaxMind")
 ;;
 http_403)relay_http_403+=("MaxMind")
@@ -578,22 +590,23 @@ http_403)relay_http_403+=("MaxMind")
 *)missing+=("Check.Place/MaxMind")
 esac
 fi
-report_any_known "${ipinfo[susetype]}" "${ipinfo[scomtype]}" "${ipinfo[countrycode]}" "${ipinfo[proxy]}" "${ipinfo[vpn]}" "${ipinfo[tor]}" "${ipinfo[server]}"||missing+=("IPinfo")
-if [[ "${ipregistry[status]}" != "not_configured" ]] &&
+[[ "${ipinfo[status]}" == disabled ]]||report_any_known "${ipinfo[susetype]}" "${ipinfo[scomtype]}" "${ipinfo[countrycode]}" "${ipinfo[proxy]}" "${ipinfo[vpn]}" "${ipinfo[tor]}" "${ipinfo[server]}"||missing+=("IPinfo")
+if [[ "${ipregistry[status]}" != "not_configured" && "${ipregistry[status]}" != disabled ]] &&
    ! report_any_known "${ipregistry[susetype]}" "${ipregistry[scomtype]}" "${ipregistry[countrycode]}" "${ipregistry[proxy]}" "${ipregistry[vpn]}" "${ipregistry[tor]}" "${ipregistry[server]}" "${ipregistry[abuser]}";then
 missing+=("Ipregistry")
 fi
-report_any_known "${ipapi[susetype]}" "${ipapi[scomtype]}" "${ipapi[score]}" "${ipapi[countrycode]}" "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ipapi[server]}" "${ipapi[abuser]}" "${ipapi[robot]}" "${ipapi[anonymous_asn]}" "${ipapi[anonymous_company]}" "${ipapi[anonymous_country]}" "${ipapi[anonymous_city]}" "${ipapi[anonymous_region]}" "${ipapi[anonymous_timezone]}"||missing+=("ipapi.is")
-if [[ -n "${ipwhois[status]:-}" && "${ipwhois[status]}" != "not_configured" ]] &&
+[[ "${ipapi[status]}" == disabled ]]||report_any_known "${ipapi[susetype]}" "${ipapi[scomtype]}" "${ipapi[score]}" "${ipapi[countrycode]}" "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ipapi[server]}" "${ipapi[abuser]}" "${ipapi[robot]}" "${ipapi[anonymous_asn]}" "${ipapi[anonymous_company]}" "${ipapi[anonymous_country]}" "${ipapi[anonymous_city]}" "${ipapi[anonymous_region]}" "${ipapi[anonymous_timezone]}"||missing+=("ipapi.is")
+if [[ -n "${ipwhois[status]:-}" && "${ipwhois[status]}" != "not_configured" && "${ipwhois[status]}" != disabled ]] &&
    ! report_any_known "${ipwhois[countrycode]}" "${ipwhois[asn]}" "${ipwhois[org]}" "${ipwhois[isp]}" "${ipwhois[timezone]}";then
 missing+=("IPWHOIS")
 fi
-if [[ -n "${cloudflare[status]:-}" && "${cloudflare[status]}" != "not_configured" ]] &&
+if [[ -n "${cloudflare[status]:-}" && "${cloudflare[status]}" != "not_configured" && "${cloudflare[status]}" != disabled ]] &&
    ! report_any_known "${cloudflare[countrycode]}" "${cloudflare[network]}" "${cloudflare[org]}" "${cloudflare[infrastructure]}" "${cloudflare[threats]}";then
 missing+=("Cloudflare IP Intelligence")
 fi
 if ! report_any_known "${ip2location[susetype]}" "${ip2location[scomtype]}" "${ip2location[score]}" "${ip2location[countrycode]}" "${ip2location[proxy]}" "${ip2location[vpn]}" "${ip2location[tor]}" "${ip2location[server]}" "${ip2location[abuser]}" "${ip2location[robot]}";then
 case "${ip2location[status]}" in
+disabled) ;;
 cloudflare_blocked)relay_cloudflare_blocked+=("IP2Location")
 ;;
 http_403)relay_http_403+=("IP2Location")
@@ -603,6 +616,7 @@ esac
 fi
 if ! report_any_known "${abuseipdb[susetype]}" "${abuseipdb[score]}";then
 case "${abuseipdb[status]}" in
+disabled) ;;
 cloudflare_blocked)relay_cloudflare_blocked+=("AbuseIPDB")
 ;;
 http_403)relay_http_403+=("AbuseIPDB")
@@ -612,6 +626,7 @@ esac
 fi
 if ! report_any_known "${scamalytics[score]}" "${scamalytics[countrycode]}" "${scamalytics[proxy]}" "${scamalytics[vpn]}" "${scamalytics[tor]}" "${scamalytics[server]}" "${scamalytics[abuser]}" "${scamalytics[robot]}";then
 case "${scamalytics[status]}" in
+disabled) ;;
 cloudflare_blocked)relay_cloudflare_blocked+=("Scamalytics")
 ;;
 http_403)relay_http_403+=("Scamalytics")
@@ -621,6 +636,7 @@ esac
 fi
 if ! report_any_known "${ipdata[countrycode]}" "${ipdata[proxy]}" "${ipdata[tor]}" "${ipdata[server]}" "${ipdata[abuser]}";then
 case "${ipdata[status]}" in
+disabled) ;;
 cloudflare_blocked)relay_cloudflare_blocked+=("ipdata")
 ;;
 http_403)relay_http_403+=("ipdata")
@@ -633,11 +649,11 @@ cn:not_applicable_target)missing+=("Ping0（/geo 仅核对当前出口，指定�
 ;;
 en:not_applicable_target)missing+=("Ping0 (/geo verifies the current egress only; skipped for explicit targets)")
 ;;
-*:verified|*:ip_mismatch) ;;
+*:verified|*:ip_mismatch|*:disabled) ;;
 *)missing+=("Ping0")
 esac
 report_any_known "${ripestat[status]}" "${ripestat[prefix]}" "${ripestat[origins]}"||missing+=("RIPEstat")
-if [[ "${internetdb[status]}" != "not_found" ]] &&
+if [[ "${internetdb[status]}" != "not_found" && "${internetdb[status]}" != disabled ]] &&
    ! report_any_known "${internetdb[ports]}" "${internetdb[port_count]}" "${internetdb[hostname_count]}" "${internetdb[vulnerability_count]}" "${internetdb[tags]}";then
 missing+=("Shodan InternetDB")
 fi

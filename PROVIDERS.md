@@ -14,7 +14,7 @@ reports stay local unless the user separately moves them.
 
 When no positional target is supplied, the reporter discovers a public egress
 address before running the selected scope. IPv4 discovery tries, in order:
-IPinfo, Check.Place, `ip.sb`, Ping0, ICanHazIP, ipify, ifconfig.co, and Ident.me.
+IPinfo, `ip.sb`, Ping0, ICanHazIP, ipify, ifconfig.co, and Ident.me.
 IPv6 discovery uses the same order without IPinfo. It accepts the first
 syntactically valid, non-private address, so only services reached before that
 success receive a discovery request.
@@ -57,6 +57,57 @@ when a single JSON document is needed.
 `Media` JSON section have been removed. `--scope media-ai` now reports an invalid
 scope before any network access. Mail and DNSBL remain opt-in because their
 many DNS/TCP probes add latency and cannot describe an HTTP-proxied leaf.
+
+## Source selection
+
+Both entrypoints accept these optional choices; the default remains `all`:
+
+| Option | Reputation requests |
+| --- | --- |
+| `--sources all` | All supported sources, including the Check.Place relay datasets |
+| `--sources independent` | IPinfo, Ipregistry, ipapi, IPWHOIS, DB-IP, Cloudflare, official IPQS, Ping0, RIPEstat and Shodan; no Check.Place requests, including no unkeyed IPQS relay fallback |
+| `--sources ipinfo,ipregistry,ipapi,ipwhois,cloudflare` | Exactly these five reputation sources; an example useful when the relay and IPQS route are unavailable |
+
+The complete, case-sensitive ID list is `maxmind,ipinfo,ipregistry,scamalytics,ipapi,ipwhois,dbip,cloudflare,abuseipdb,ip2location,ipdata,ipqs,ping0,ripestat,shodan`.
+`maxmind` names the Check.Place dataset, not a direct MaxMind API. Duplicates are
+deduplicated; unknown/empty IDs stop before network access. The plan and JSON
+`Query.SelectedSources` record the selection. Deliberately unselected sources
+have `disabled` status and no terminal column; selected failures remain visible
+and unknown. A failed source cannot relabel another platform's score as its own.
+Every source's fields reset between address families. Automatic public-egress
+discovery remains a separate step unless an explicit target was supplied; it
+no longer uses Check.Place, and is not limited by this reputation-source list.
+
+`--ipqs-dns alidns` is an opt-in direct-route repair for the IPQS hostname's
+system-DNS failure. Both official account and lookup requests use curl's
+`--doh-url https://dns.alidns.com/dns-query`, with certificate verification and
+the existing ten-second request deadline. [AliDNS](https://alidns.com/) sees the
+IPQS hostname and the DNS request's egress, not the API key or target IP in the
+lookup URL. IPQS still sees the original direct egress and requested target.
+Only this provider's DNS changes; there is no system setting, fixed IP pin,
+proxy fallback, new credential, retry or paid plan. A missing IPQS key returns
+`not_configured`; proxy/leaf routes reject this choice before querying, because
+an HTTP proxy resolves its own CONNECT target. The default `system` leaves
+resolution with the system/proxy; JSON `Query.IPQSDNS` records this policy as
+`system` or `alidns`, or null when no official IPQS request was attempted.
+`Query.TargetMode` distinguishes a discovered egress from an explicit target;
+an explicit-target lookup does not test connectivity from that target itself.
+
+On October 10, a strict direct run with AliDNS completed the official IPQS
+lookup; the same-key ATT route still failed TLS. IPinfo, Ipregistry, ipapi,
+IPWHOIS and Cloudflare Intel worked on both routes. DB-IP was rate limited.
+These are dated observations, not permanent availability guarantees.
+
+The same day's NodeQuality check retrieved its website and launch script. Its
+[current launcher](https://github.com/LloydAsp/NodeQuality/blob/main/NodeQuality.sh)
+still loads `https://IP.Check.Place`, whose response matched the
+[current xykt script](https://github.com/xykt/IPQuality/blob/main/ip.sh), version
+`v2026-09-16`. That script still uses `ipinfo.check.place` for IPQS and several
+other datasets. A bounded ATT request to that same IPQS relay returned HTTP 403
+and the known Cloudflare block page. The user's linked report is dated March
+24, 2025. Neither that saved report nor today's accessible website establishes
+current end-to-end health on other nodes. The Linux/chroot benchmark installer
+was inspected as text, not executed on this Mac.
 
 ## Reputation providers
 

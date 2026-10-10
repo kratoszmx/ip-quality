@@ -33,6 +33,7 @@ the tests and claiming a complete pass.
 | `test/ip_quality_test.rb` | CLI plans and rejection gates, dependency failure, fixture DNSBL/SMTP execution |
 | `test/providers_test.rb` | Provider parsing, unknown/failure semantics, credentials, zero-credit preflight |
 | `test/check_place_test.rb` | One actual request after a relay block/429, explicit skipped results, target/family/run isolation and unaffected official sources |
+| `test/source_selection_test.rb` | Source presets/IDs, no-network validation, runner forwarding, deselected versus failed columns, relay-free independent mode and direct-only IPQS DoH/auth/target boundaries |
 | `test/dbip_test.rb` | Demo exact-IP/geography validation, no invented score, two-request visitor flow, route preservation and bounded guest tokens |
 | `test/public_demo_test.rb` | DB-IP labels/IPWHOIS boolean flags, quota errors, partial/malformed data, target binding, state reset and one-request IPWHOIS headers |
 | `test/report_test.rb` | Provider tables, ANSI/layout, JSON/file bytes, exclusive report creation |

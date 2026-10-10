@@ -23,3 +23,11 @@ The exact message and private send/verification receipts are outside repositorie
 under `/Users/zmx/codexworkspace/secrets/mail/operations/ipqs-tls-20261010/`.
 Sanitized network evidence is indexed in [../../HANDOFF.md](../../HANDOFF.md).
 No automatic resend or new reply-monitor service was created.
+
+Later the same day, the reporter's opt-in AliDNS/HTTPS resolution restored
+direct IPv4 account and lookup access. A freshly discovered ATT IP also returned
+a valid official score when explicitly queried through that direct route. ATT
+transport itself still failed TLS. This narrows the support question to the
+ATT-to-service path, without proving which remote component closes it; it is
+not an account-wide, target-wide or demonstrated global IPQS outage. This
+reporter DNS option does not change the MCP's HTTP/browser transport.

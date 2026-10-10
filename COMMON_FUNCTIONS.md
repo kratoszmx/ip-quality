@@ -48,6 +48,18 @@ status decisions, and report labels remain in `providers/`, `bin/ip-quality`,
 and `report/`. A similar `jq` expression alone is not a shared schema contract.
 The type, score and factor tables share `report_query_status` inside `report/`;
 its localized display labels are presentation policy, not a runtime provider API.
+They also share `report_source_visible STATUS [OBSERVATION...]`: `disabled`
+returns false even with stale values; any other nonempty status remains visible,
+and a legacy value-only fixture is visible when it has an observation. This
+selection/display policy belongs in `report/`, not in the common provider library.
+
+`providers/selection.zsh` owns the ordered source IDs, source-function map,
+`reputation_choose_sources all|independent|ID,ID` (validates and deduplicates),
+and `reputation_source_selected ID` (exit 0 for membership). CLI plans, live
+dispatch and JSON use the same selected list. The Ruby runner validates its
+option IDs before starting a temporary process; an offline contract compares
+its vocabulary with the zsh catalog. These names and presets are reporter
+policy rather than a general-purpose collection API, so they stay in `providers/`.
 
 `providers/check_place.zsh` owns `check_place_fetch_json FAMILY TARGET QUERY
 [MAX_BYTES]`, used by the MaxMind, Scamalytics, AbuseIPDB, IP2Location, ipdata and

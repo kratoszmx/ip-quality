@@ -17,6 +17,7 @@ module IpQuality
     REPORTER = File.expand_path("../bin/ip-quality", __dir__).freeze
     CLEANUP_SIGNALS = %w[HUP TERM].freeze
     REPORTER_STOP_TIMEOUT_SECONDS = 3
+    SOURCE_IDS = %w[maxmind ipinfo ipregistry scamalytics ipapi ipwhois dbip cloudflare abuseipdb ip2location ipdata ipqs ping0 ripestat shodan].freeze
 
     def initialize(
       stdout: $stdout,
@@ -45,6 +46,8 @@ module IpQuality
       @help_requested = false
       @report_arguments = []
       @family = nil
+      @sources = "all"
+      @ipqs_dns = "system"
       @previous_signal_handlers = {}
     end
 
@@ -88,6 +91,9 @@ module IpQuality
 
       selected = @leaf_name || select_leaf(profile.leaf_names)
       ensure_exact_leaf!(profile, selected)
+      if @ipqs_dns == "alidns"
+        raise OptionParser::InvalidArgument, "--ipqs-dns alidns requires direct or specific-IP mode; a leaf keeps its proxy DNS"
+      end
 
       unless @confirmed || @config_test_only
         print_plan(source, selected)
@@ -160,6 +166,18 @@ module IpQuality
         end
         options.on("--config-test-only", "Render and run Mihomo -t only; start no listener and make no lookup") { @config_test_only = true }
         options.on("--confirm-network-lookup", "Authorize the selected route's live network queries") { @confirmed = true }
+        options.on("--sources SOURCES", "all, independent (no Check.Place), or comma-separated source IDs") do |value|
+          ids = value.split(",", -1)
+          unless %w[all independent].include?(value) || (!ids.empty? && ids.all? { |id| SOURCE_IDS.include?(id) })
+            raise OptionParser::InvalidArgument, "sources must be all, independent, or: #{SOURCE_IDS.join(',')}"
+          end
+          @sources = value
+          @report_arguments.concat(["--sources", value])
+        end
+        options.on("--ipqs-dns DNS", %w[system alidns], "IPQS DNS: system or AliDNS DoH (direct mode only)") do |value|
+          @ipqs_dns = value
+          @report_arguments.concat(["--ipqs-dns", value])
+        end
         options.on("-4", "Test IPv4 only") { choose_family("-4") }
         options.on("-6", "Test IPv6 only") { choose_family("-6") }
         options.on("-f", "Show the full tested IP in the local report") { @report_arguments << "-f" }
@@ -320,6 +338,7 @@ module IpQuality
       @stdout.puts "  live Clash profile/selection: read only and unchanged"
       @stdout.puts "  runtime: temporary Mihomo bound only to 127.0.0.1 on a random port"
       @stdout.puts "  reporter scope: reputation only (HTTP(S) requests forced through the isolated leaf)"
+      @stdout.puts "  selected sources: #{@sources} (independent excludes Check.Place and requires an official IPQS key)"
       @stdout.puts "  Ping0: official public geo/ASN/organization observation; public endpoint has no risk score"
       @stdout.puts "  RIPEstat: official routed-prefix/origin-ASN context; not a risk score"
       @stdout.puts "  Shodan InternetDB: official IPv4 exposure context; not a risk score"
@@ -329,6 +348,10 @@ module IpQuality
     end
 
     def print_direct_plan
+      @stdout.puts "Selected sources: #{@sources}; IPQS DNS: #{@ipqs_dns}"
+      if @ipqs_dns == "alidns"
+        @stdout.puts "AliDNS DoH receives the IPQS hostname only; system DNS and the chosen route remain unchanged."
+      end
       if @specific_ip
         @stdout.puts "Specific IP lookup plan (no network access has occurred)"
         @stdout.puts "  target: #{@specific_ip}"

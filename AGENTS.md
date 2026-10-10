@@ -74,6 +74,19 @@ After authorization, a masked direct IP reputation report is:
 ```
 
 For an exact leaf, add the same confirmation flag to its reviewed plan command.
+Both entrypoints accept `--sources independent` to omit Check.Place entirely,
+or `--sources ipinfo,ipregistry,ipapi,ipwhois,cloudflare` for an explicit set.
+The default remains `--sources all`. Selected failures stay visible; deliberately
+unselected providers make no reputation request and have JSON status `disabled`.
+Automatic egress discovery is separate from reputation-source selection.
+See [source selection](PROVIDERS.md#source-selection) for all IDs and presets.
+
+For a direct IPQS query affected by system DNS, add `--ipqs-dns alidns` to
+direct/specific-IP mode. This uses AliDNS over verified HTTPS only for the
+official IPQS hostname; it changes neither system DNS nor the measurement route.
+The option requires the official key and is rejected for a proxy/leaf route.
+The default `--ipqs-dns system` preserves existing resolver behavior.
+
 The raw reporter accepts one positional public IP only with `reputation` or
 `dnsbl`; for example, this remains a plan until confirmation is added:
 
@@ -186,7 +199,8 @@ live in [PROVIDERS.md](PROVIDERS.md); consult it when changing a source.
   [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md).
 - `leaf_runner/`: cached-subscription selection, exact-leaf extraction,
   loopback Mihomo ownership, and cleanup.
-- `providers/`: fixture-testable response parsers and credential loading.
+- `providers/`: fixture-testable response parsers, credential loading and
+  reporter-specific source selection/relay policy.
 - `report/`: provider-aware terminal output without a synthetic combined score.
 - `mcp/`: IPQS and free provider-account integrations; private `.state/`,
   `node_modules/` and `dist/` stay out of Git.

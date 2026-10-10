@@ -29,6 +29,12 @@ The hashes below identify the exact upstream inputs before local modification:
 
 The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 
+- Added explicit reputation-source presets/lists, including a relay-free mode,
+  while retaining failed selected providers and distinguishing unselected ones.
+  Removed Check.Place from egress discovery. Added an opt-in, direct-only AliDNS
+  DoH path for the official IPQS API without changing system DNS, credentials,
+  certificate validation or the measurement route. Query metadata records source
+  selection, target mode and effective IPQS DNS policy.
 - Ported Bash 4+ constructs and DNSBL workers to system `/bin/zsh`; removed
   background spinners, Bash upgrades, dependency installers, and package-manager
   mutations. Added offline self-tests, fixtures, safety guidance, and disclosure.
