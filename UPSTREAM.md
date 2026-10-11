@@ -29,6 +29,13 @@ The hashes below identify the exact upstream inputs before local modification:
 
 The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 
+- Integrated direct IPv4 IPQS HTTPS DNS resolution into the normal all-source
+  flow, keeping existing IPv6/proxy routes and maintenance overrides. Added one
+  same-route Scamalytics public-page fallback when its relay fails; heading,
+  embedded target, score and labeled factors are validated without inventing
+  absent values. Reports identify the public-demo source and preserve the
+  relay failure in JSON. The user-facing command remains the full interactive
+  runner; source/DNS diagnostics are maintained as agent reference controls.
 - Added explicit reputation-source presets/lists, including a relay-free mode,
   while retaining failed selected providers and distinguishing unselected ones.
   Removed Check.Place from egress discovery. Added an opt-in, direct-only AliDNS

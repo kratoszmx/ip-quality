@@ -586,6 +586,8 @@ end
       show_score
       show_network_context
       show_unavailable_sources
+      scamalytics[source]=public_demo
+      show_unavailable_sources
     ZSH
     stdout, stderr, status = Open3.capture3(
       "/bin/zsh",
@@ -603,7 +605,7 @@ end
     assert_includes stdout, "中继/额度用完"
     assert_includes stdout, "五、官方网络观测"
     assert_includes stdout, "Shodan：无公开记录（不等于无风险）"
-    summary = stdout.lines.last
+    summary = stdout.lines[-2]
     assert_includes summary, "本次无可用资料（不等于低风险）"
     assert_includes summary, "RIPEstat"
     assert_includes summary, "Check.Place 被 Cloudflare 阻挡（MaxMind、IP2Location、AbuseIPDB、Scamalytics、ipdata）"
@@ -611,6 +613,10 @@ end
     refute_includes summary, "IPQualityScore"
     refute_includes summary, "Shodan"
     refute_includes summary, "Ipregistry"
+    public_demo_summary = stdout.lines.last
+    assert_includes public_demo_summary, "Scamalytics"
+    assert_includes public_demo_summary, "Check.Place 被 Cloudflare 阻挡（MaxMind、IP2Location、AbuseIPDB、ipdata）"
+    refute_includes public_demo_summary, "AbuseIPDB、Scamalytics、ipdata"
     refute_includes stdout, "状态：unknown"
     refute_includes stdout, "风险分数："
     assert_empty stderr

@@ -362,7 +362,9 @@ fi
 if report_source_visible "${scamalytics[status]:-}" "${scamalytics[score]}" "${scamalytics[risk]}";then
 headers+=("${Font_B}${Font_Cyan}Scamalytics$Font_Suffix")
 scores+=("${scamalytics[score]}") risks+=("${scamalytics[risk]}") scales+=("0-100 fraud")
-source_statuses+=("$(report_score_source_status relay "${scamalytics[status]:-ok}")")
+typeset scamalytics_source_kind=relay
+[[ "${scamalytics[source]:-}" == public_demo ]]&&scamalytics_source_kind=demo
+source_statuses+=("$(report_score_source_status "$scamalytics_source_kind" "${scamalytics[status]:-ok}")")
 fi
 if report_source_visible "${ipapi[status]:-}" "${ipapi[score]}" "${ipapi[risk]}";then
 headers+=("${Font_B}${Font_Cyan}ipapi.is$Font_Suffix")
@@ -625,11 +627,11 @@ http_403)relay_http_403+=("AbuseIPDB")
 esac
 fi
 if ! report_any_known "${scamalytics[score]}" "${scamalytics[countrycode]}" "${scamalytics[proxy]}" "${scamalytics[vpn]}" "${scamalytics[tor]}" "${scamalytics[server]}" "${scamalytics[abuser]}" "${scamalytics[robot]}";then
-case "${scamalytics[status]}" in
-disabled) ;;
-cloudflare_blocked)relay_cloudflare_blocked+=("Scamalytics")
+case "${scamalytics[source]:-check_place_relay}:${scamalytics[status]}" in
+*:disabled) ;;
+check_place_relay:cloudflare_blocked)relay_cloudflare_blocked+=("Scamalytics")
 ;;
-http_403)relay_http_403+=("Scamalytics")
+check_place_relay:http_403)relay_http_403+=("Scamalytics")
 ;;
 *)missing+=("Scamalytics")
 esac

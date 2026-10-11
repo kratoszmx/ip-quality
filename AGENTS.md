@@ -7,6 +7,16 @@ direct executable using the system Ruby standard library.
 
 ## Start here
 
+Give the user only the normal interactive, all-source command:
+
+```text
+cd /Users/zmx/Projects/projects/ipquality && /usr/bin/ruby --disable-gems bin/test-clash-leaf --confirm-network-lookup -4
+```
+
+It asks for direct or a subscription leaf. DNS repair and source fallback are
+automatic; do not ask the user to choose presets or diagnostic flags. The
+commands and options below are maintenance/reference entrypoints for agents.
+
 Start at the worktree root. These commands are network-free:
 
 ```text
@@ -81,11 +91,14 @@ unselected providers make no reputation request and have JSON status `disabled`.
 Automatic egress discovery is separate from reputation-source selection.
 See [source selection](PROVIDERS.md#source-selection) for all IDs and presets.
 
-For a direct IPQS query affected by system DNS, add `--ipqs-dns alidns` to
-direct/specific-IP mode. This uses AliDNS over verified HTTPS only for the
-official IPQS hostname; it changes neither system DNS nor the measurement route.
-The option requires the official key and is rejected for a proxy/leaf route.
-The default `--ipqs-dns system` preserves existing resolver behavior.
+Official IPQS automatically uses verified AliDNS HTTPS resolution on direct
+IPv4. IPv6 and proxy/leaf requests keep their existing resolver and route.
+This changes no system setting and needs no extra user argument. Maintenance
+overrides `--ipqs-dns system|alidns` remain available; forcing AliDNS is rejected
+on proxy/leaf routes. A missing key keeps the default relay contract.
+When Scamalytics' relay fails, the same route queries its public target page
+once and validates the displayed IP/score. Its source is labeled public demo;
+the relay outcome is retained in JSON alongside the final result.
 
 The raw reporter accepts one positional public IP only with `reputation` or
 `dnsbl`; for example, this remains a plan until confirmation is added:

@@ -70,9 +70,20 @@ skipped calls clear the body and retain an explicit skipped status. This is a
 Check.Place request policy, so it stays outside the project common library.
 
 The HTTP decoder replaces repeated envelope handling in public JSON retrieval,
-IPinfo, Ipregistry, ipapi, Cloudflare, both DB-IP requests and IPQS account/lookup
+IPinfo, Ipregistry, ipapi, Cloudflare, both DB-IP requests, the Scamalytics
+public-page fallback and IPQS account/lookup
 requests. It accepts text or JSON bodies; callers retain schema validation and
 any exact-200 contract.
+
+`providers/scamalytics.zsh` owns `scamalytics_parse_page HTML TARGET`. It returns
+0 only after matching the heading, embedded target and score badge, and fills
+`scamalytics_parsed` with `score`, `risk`, `countrycode`, `proxy`, `vpn`, `tor`,
+`server`, `abuser` and `robot`. Missing factor cells are empty; failure clears
+old values. The 256 KiB limit, HTML labels and source-specific semantics belong
+to Scamalytics, so this is a provider parser rather than a common HTML API.
+`db_scamalytics` owns its one-request fallback and retains the relay outcome.
+IPQS automatic DNS selection likewise stays in its adapter; it is not a
+project-wide resolver or a change to shared proxy-environment handling.
 Request sites use `curl -q`; credential-bearing URL/header functions retain
 their stdin-config handling in the reporter.
 

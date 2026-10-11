@@ -47,7 +47,7 @@ module IpQuality
       @report_arguments = []
       @family = nil
       @sources = "all"
-      @ipqs_dns = "system"
+      @ipqs_dns = "auto"
       @previous_signal_handlers = {}
     end
 
@@ -174,7 +174,7 @@ module IpQuality
           @sources = value
           @report_arguments.concat(["--sources", value])
         end
-        options.on("--ipqs-dns DNS", %w[system alidns], "IPQS DNS: system or AliDNS DoH (direct mode only)") do |value|
+        options.on("--ipqs-dns DNS", %w[auto system alidns], "IPQS DNS policy (default: automatic direct IPv4 repair)") do |value|
           @ipqs_dns = value
           @report_arguments.concat(["--ipqs-dns", value])
         end
@@ -338,7 +338,8 @@ module IpQuality
       @stdout.puts "  live Clash profile/selection: read only and unchanged"
       @stdout.puts "  runtime: temporary Mihomo bound only to 127.0.0.1 on a random port"
       @stdout.puts "  reporter scope: reputation only (HTTP(S) requests forced through the isolated leaf)"
-      @stdout.puts "  selected sources: #{@sources} (independent excludes Check.Place and requires an official IPQS key)"
+      @stdout.puts "  selected sources: #{@sources}"
+      @stdout.puts "  Scamalytics: one public target-page fallback if its relay fails; same selected leaf"
       @stdout.puts "  Ping0: official public geo/ASN/organization observation; public endpoint has no risk score"
       @stdout.puts "  RIPEstat: official routed-prefix/origin-ASN context; not a risk score"
       @stdout.puts "  Shodan InternetDB: official IPv4 exposure context; not a risk score"
@@ -349,6 +350,9 @@ module IpQuality
 
     def print_direct_plan
       @stdout.puts "Selected sources: #{@sources}; IPQS DNS: #{@ipqs_dns}"
+      if @ipqs_dns == "auto"
+        @stdout.puts "Direct IPv4 IPQS automatically uses AliDNS over verified HTTPS; IPv6 keeps system DNS."
+      end
       if @ipqs_dns == "alidns"
         @stdout.puts "AliDNS DoH receives the IPQS hostname only; system DNS and the chosen route remain unchanged."
       end

@@ -45,7 +45,7 @@ class SourceSelectionTest < ReporterTestCase
     end
   end
 
-  def test_ipqs_doh_requires_explicit_direct_selection_and_never_changes_proxy_dns
+  def test_explicit_ipqs_doh_requires_direct_selection_and_never_changes_proxy_dns
     stdout, stderr, status = run_script("--ipqs-dns", "alidns", "--sources", "ipqs", env: DIRECT_ENV)
     assert status.success?, stderr
     assert_includes stdout, "https://dns.alidns.com/dns-query"
@@ -57,6 +57,92 @@ class SourceSelectionTest < ReporterTestCase
     end
     _out, _err, result = run_script("--ipqs-dns", "invalid")
     assert_equal 64, result.exitstatus
+  end
+
+  def test_default_full_run_repairs_direct_ipv4_dns_and_uses_scamalytics_page_after_relay_failure
+    calls = File.join(reporter_workspace, "curl-arguments")
+    page = File.join(reporter_workspace, "page.html")
+    text_path = File.join(reporter_workspace, "report.txt")
+    File.write(page, File.read(File.join(ROOT, "test", "fixtures", "scamalytics", "public-page.html")).gsub("198.51.100.23", "12.217.32.68"))
+    FileUtils.mkdir_p(File.join(reporter_workspace, "secrets"))
+    File.write(File.join(reporter_workspace, "secrets", "ipqs"), "fixturekey123", perm: 0o600)
+    write_fake_command("curl", <<~'ZSH')
+      print -rl -- "$@" >> "$IPQUALITY_TEST_CALLS"
+      request=$(cat)
+      if [[ "$request" == *"/api/json/account/"* ]];then
+        print -rn -- $'{"success":true,"credits":100,"usage":1}\n200'
+      elif [[ "$request" == *"/api/json/ip/fixturekey123/12.217.32.68?"* ]];then
+        print -r -- "$(<"$IPQUALITY_TEST_RESPONSE")"
+        print -rn -- 200
+      elif [[ "$*" == *'https://scamalytics.com/ip/12.217.32.68'* ]];then
+        print -r -- "$(<"$IPQUALITY_TEST_PAGE")"
+        print -rn -- 200
+      elif [[ "$*" == *'https://ipinfo.check.place/'* ]];then
+        print -rn -- $'Sorry, you have been blocked by Cloudflare\n403'
+      else
+        print -rn -- $'\n000'
+        exit 35
+      fi
+    ZSH
+    stdout, stderr, status = run_script("--confirm-network-lookup", "-4", "-j", "-o", text_path,
+      "12.217.32.68", env: DIRECT_ENV.merge("IPQUALITY_TEST_CALLS" => calls,
+        "IPQUALITY_TEST_RESPONSE" => IPQUALITYSCORE_OFFICIAL_FIXTURE, "IPQUALITY_TEST_PAGE" => page))
+    assert status.success?, stderr
+    report = JSON.parse(stdout)
+    assert_equal "all", report.dig("Query", "SourceSelection")
+    assert_equal IpQuality::ClashLeafCommand::SOURCE_IDS, report.dig("Query", "SelectedSources")
+    refute_includes report.fetch("ProviderStatus").values, "disabled"
+    assert_equal "alidns", report.dig("Query", "IPQSDNS")
+    assert_equal "ok", report.dig("ProviderStatus", "IPQS")
+    assert_equal "87", report.dig("Score", "IPQS")
+    assert_equal "ok", report.dig("ProviderStatus", "Scamalytics")
+    assert_equal "0", report.dig("Score", "SCAMALYTICS")
+    assert_equal "public_demo", report.dig("ScoreMeta", "SCAMALYTICS", "Source")
+    assert_equal "skipped_relay_cloudflare_blocked", report.dig("ScoreMeta", "SCAMALYTICS", "RelayStatus")
+    assert_equal "public_demo", report.dig("FactorMeta", "SCAMALYTICS", "Source")
+    assert_equal false, report.dig("Factor", "Proxy", "SCAMALYTICS")
+    arguments = File.readlines(calls, chomp: true)
+    assert_equal 2, arguments.count("--doh-url")
+    assert_equal 1, arguments.count("https://scamalytics.com/ip/12.217.32.68")
+    assert_equal 1, arguments.count { |value| value.start_with?("https://ipinfo.check.place/") }
+    refute_includes File.read(calls), "fixturekey123"
+    assert_includes File.read(text_path), "公开示例/可用"
+    %w[IP2Location AbuseIPDB ipdata IPQS Scamalytics].each { |name| assert_includes File.read(text_path), name }
+  end
+
+  def test_automatic_dns_keeps_proxy_ipv6_and_explicit_system_routes_unchanged
+    calls = File.join(reporter_workspace, "calls")
+    FileUtils.mkdir_p(File.join(reporter_workspace, "secrets"))
+    File.write(File.join(reporter_workspace, "secrets", "ipqs"), "fixturekey123", perm: 0o600)
+    write_fake_command("curl", <<~'ZSH')
+      print -rl -- "$@" >> "$IPQUALITY_TEST_CALLS"
+      print -r -- "proxy=${HTTPS_PROXY:-none},isolated=${IPQUALITY_ISOLATED_EGRESS:-none}" >> "$IPQUALITY_TEST_CALLS"
+      request=$(cat)
+      if [[ "$request" == *"/api/json/account/"* ]];then
+        print -rn -- $'{"success":true,"credits":100,"usage":1}\n200'
+      else
+        print -r -- "$(<"$IPQUALITY_TEST_RESPONSE")"
+        print -rn -- 200
+      fi
+    ZSH
+    cases = [
+      ["-4", "12.217.32.68", {"HTTPS_PROXY" => "http://127.0.0.1:12345", "IPQUALITY_ISOLATED_EGRESS" => "1"}, []],
+      ["-4", "12.217.32.68", {"HTTPS_PROXY" => "http://127.0.0.1:12345"}, []],
+      ["-6", "2606:4700:4700::1111", {}, []],
+      ["-4", "12.217.32.68", {}, ["--ipqs-dns", "system"]]
+    ]
+    cases.each do |family, target, environment, options|
+      File.write(calls, "")
+      stdout, stderr, status = run_script("--confirm-network-lookup", "--sources", "ipqs", family, "-j",
+        *options, target, env: DIRECT_ENV.merge(environment).merge("IPQUALITY_TEST_CALLS" => calls,
+          "IPQUALITY_TEST_RESPONSE" => IPQUALITYSCORE_OFFICIAL_FIXTURE))
+      assert status.success?, stderr
+      assert_equal "system", JSON.parse(stdout).dig("Query", "IPQSDNS")
+      refute_includes File.read(calls), "--doh-url"
+      assert_equal 2, File.readlines(calls).count { |line| line.start_with?("proxy=#{environment.fetch('HTTPS_PROXY', 'none')},") }
+      refute_includes File.read(calls), "--noproxy"
+      refute_includes File.read(calls), "--resolve"
+    end
   end
 
   def test_only_selected_ipqs_is_queried_with_doh_at_both_stages_and_private_auth

@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-10-10-standalone.28"
+script_version="v2026-10-11-standalone.29"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset COMMON_DIR="$SCRIPT_DIR/common"
@@ -25,12 +25,13 @@ typeset IPWHOIS_LIB="$PROVIDER_DIR/ipwhois.zsh"
 typeset DBIP_LIB="$PROVIDER_DIR/dbip.zsh"
 typeset CLOUDFLARE_LIB="$PROVIDER_DIR/cloudflare.zsh"
 typeset IPQUALITYSCORE_LIB="$PROVIDER_DIR/ipqualityscore.zsh"
+typeset SCAMALYTICS_LIB="$PROVIDER_DIR/scamalytics.zsh"
 typeset PING0_LIB="$PROVIDER_DIR/ping0.zsh"
 typeset RIPESTAT_LIB="$PROVIDER_DIR/ripestat.zsh"
 typeset INTERNETDB_LIB="$PROVIDER_DIR/shodan_internetdb.zsh"
 typeset REPUTATION_REPORT_LIB="$REPORT_DIR/reputation.zsh"
 typeset local_library
-for local_library in "$COMMON_DIR/json_values.jq" "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$CHECK_PLACE_LIB" "$SELECTION_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$DBIP_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for local_library in "$COMMON_DIR/json_values.jq" "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$CHECK_PLACE_LIB" "$SELECTION_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$DBIP_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$SCAMALYTICS_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$local_library" && -r "$local_library" && ! -L "$local_library" ]]||{
 print -ru2 -- "ERROR: unsafe or missing local library: $local_library"
 exit 66
@@ -44,7 +45,7 @@ typeset self_test_requested=0
 typeset help_requested=0
 typeset version_requested=0
 typeset dnsbl_concurrency=50
-typeset ipqs_dns=system
+typeset ipqs_dns=auto
 typeset requested_ip=""
 typeset -a legacy_args=()
 Font_B=$'\033[1m'
@@ -126,7 +127,7 @@ typeset -a shelp_lines=(
 "Live query: /bin/zsh ./bin/ip-quality --confirm-network-lookup [--scope SCOPE] [-4|-6]"
 "            --scope reputation|dnsbl|mail|mail-dnsbl|full"
 "            --sources all|independent|ID,ID Select reputation sources                 选择信誉来源"
-"            --ipqs-dns system|alidns    IPQS DNS (AliDNS DoH: direct only)      IPQS直连DNS"
+"            --ipqs-dns auto|system|alidns    IPQS DNS (default: auto)          IPQS解析策略"
 "            --dnsbl-concurrency 1..50       Bounded DNSBL workers                     DNSBL并发上限"
 "            --plan                          Print disclosure plan only                仅显示披露计划"
 "            --self-test                     Run offline source/data checks            运行离线自检"
@@ -506,14 +507,14 @@ return 64
 esac
 reputation_choose_sources "$source_selection"||return $?
 case "$ipqs_dns" in
-system) ;;
+auto|system) ;;
 alidns)
 if [[ -n "${IPQUALITY_ISOLATED_EGRESS:-}${http_proxy:-}${https_proxy:-}${all_proxy:-}${HTTP_PROXY:-}${HTTPS_PROXY:-}${ALL_PROXY:-}" ]];then
 print -ru2 -- "ERROR: --ipqs-dns alidns requires a direct route without proxy variables."
 return 64
 fi
 ;;
-*)print -ru2 -- "ERROR: --ipqs-dns must be system or alidns."; return 64 ;;
+*)print -ru2 -- "ERROR: --ipqs-dns must be auto, system or alidns."; return 64 ;;
 esac
 if [[ "$dnsbl_concurrency" != <-> ]]||(( dnsbl_concurrency < 1 || dnsbl_concurrency > 50 ));then
 print -ru2 -- "ERROR: DNSBL concurrency must be an integer from 1 through 50."
@@ -530,10 +531,13 @@ print -r -- "  telemetry/report upload/remote code: disabled"
 scope_includes reputation&&print -r -- "  selected source IDs: ${(j:,:)selected_reputation_sources[@]}"
 scope_includes reputation&&print -r -- "  reputation lookups use selected IDs; automatic egress discovery is separate from this catalogue"
 [[ "$source_selection" == independent ]]&&print -r -- "  independent mode: no Check.Place requests; IPQS requires its official API key"
+[[ "$ipqs_dns" == auto ]]&&print -r -- "  IPQS DNS: automatic AliDNS HTTPS resolution for direct IPv4; IPv6/proxy routes keep their existing resolver; route unchanged"
 [[ "$ipqs_dns" == alidns ]]&&print -r -- "  IPQS DNS: AliDNS DoH (https://dns.alidns.com/dns-query); resolver receives IPQS hostname, not the API key or target; system DNS is unchanged"
+[[ "$ipqs_dns" == auto ]]&&print -r -- "  AliDNS (https://dns.alidns.com/dns-query) receives the IPQS hostname only, not the API key or target"
 scope_includes reputation&&print -r -- "  reputation sources: ipapi.is, Cloudflare IP Intelligence (when configured), Ping0, RIPEstat, Shodan InternetDB, plus configured Ipregistry/IPQS APIs"
 scope_includes reputation&&print -r -- "  public website demos: DB-IP page + one visitor-egress lookup (must match target); IPWHOIS one target lookup; no account, no guaranteed quota or availability"
 scope_includes reputation&&print -r -- "  supplementary sources: IPinfo public demo widget plus named Check.Place relays (MaxMind-labeled, Scamalytics, AbuseIPDB, IP2Location, ipdata, IPQualityScore)"
+scope_includes reputation&&print -r -- "  Scamalytics: if its relay fails, one public target page lookup on the same route; target and score must match the page"
 scope_includes reputation&&print -r -- "  Ping0 limitation: the official free /geo endpoint exposes IP/location/ASN/organization, not a risk score"
 scope_includes reputation&&print -r -- "  Cloudflare: IP Intelligence threat categories, no numeric IP score; legacy Threat Score is retired (constant zero). RIPEstat reports routing; Shodan InternetDB reports public exposure"
 scope_includes mail&&print -r -- "  mail sources: public MX DNS plus bounded SMTP greeting probes"
@@ -1369,9 +1373,39 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Scamalytics $Font_S
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-12-${sinfo[ldatabase]}))
 scamalytics=()
+scamalytics[source]=check_place_relay
 check_place_fetch_json "$1" "$IP" "db=scamalytics"||true
 scamalytics[status]="$PROVIDER_RESPONSE_STATUS"
 local RESPONSE="$PROVIDER_RESPONSE_BODY"
+if [[ "${scamalytics[status]}" == ok ]] && ! print -rn -- "$RESPONSE"|jq -e '
+  type == "object" and (.scamalytics | type == "object") and
+  (.scamalytics.scamalytics_score | tostring | test("^[0-9]{1,3}$")) and
+  (.scamalytics.scamalytics_score | tonumber | . >= 0 and . <= 100) and
+  ([.scamalytics.scamalytics_proxy, .external_datasources,
+    .external_datasources.maxmind_geolite2, .external_datasources.firehol,
+    .external_datasources.x4bnet] | all(. == null or type == "object"))
+' >/dev/null 2>&1;then
+scamalytics[status]=invalid_response
+fi
+if [[ "${scamalytics[status]}" != ok ]];then
+scamalytics[relay_status]="${scamalytics[status]}"
+scamalytics[source]=public_demo
+typeset wire_response
+wire_response=$(curl -q $CurlARG -sS -$1 -m 10 --max-filesize 262144 \
+  --write-out $'\n%{http_code}' "https://scamalytics.com/ip/$IP" 2>/dev/null)
+provider_decode_http_response "$wire_response" "$?"
+scamalytics[status]="${provider_http_response[status]}"
+[[ "${scamalytics[status]}" == ok ]]||return 0
+if ! scamalytics_parse_page "${provider_http_response[body]}" "$IP";then
+scamalytics[status]=invalid_response
+return 0
+fi
+typeset field
+for field in score risk countrycode proxy tor vpn server abuser robot;do
+scamalytics[$field]="${scamalytics_parsed[$field]}"
+done
+return 0
+fi
 scamalytics[countrycode]=$(echo "$RESPONSE"|jq -r '.external_datasources.maxmind_geolite2.ip_country_code')
 scamalytics[proxy]=$(echo "$RESPONSE"|jq -r '.external_datasources.firehol.is_proxy')
 scamalytics[tor]=$(echo "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_tor')
@@ -1780,8 +1814,14 @@ typeset RESPONSE="" wire_response usage_response
 if [[ -n "$api_key" ]];then
 ipqs[source]="official_api"
 local -a dns_arguments=()
-ipqs[dns]="${ipqs_dns:-system}"
-if [[ "${ipqs_dns:-system}" == alidns ]];then
+ipqs[dns]="${ipqs_dns:-auto}"
+if [[ "${ipqs[dns]}" == auto ]];then
+ipqs[dns]=system
+if [[ "$1" == 4 && -z "${IPQUALITY_ISOLATED_EGRESS:-}${http_proxy:-}${https_proxy:-}${all_proxy:-}${HTTP_PROXY:-}${HTTPS_PROXY:-}${ALL_PROXY:-}" ]];then
+ipqs[dns]=alidns
+fi
+fi
+if [[ "${ipqs[dns]}" == alidns ]];then
 dns_arguments=(--doh-url https://dns.alidns.com/dns-query)
 fi
 wire_response=$(curl_with_secret_url \
@@ -2479,6 +2519,8 @@ ipjson=$(jq -n \
 --arg status_ipregistry "${ipregistry[status]:-not_configured}" \
 --arg status_maxmind "${maxmind[status]:-unknown}" \
 --arg status_scamalytics "${scamalytics[status]:-unknown}" \
+--arg source_scamalytics "${scamalytics[source]:-check_place_relay}" \
+--arg relay_status_scamalytics "${scamalytics[relay_status]:-}" \
 --arg status_abuseipdb "${abuseipdb[status]:-unknown}" \
 --arg status_ip2location "${ip2location[status]:-unknown}" \
 --arg status_ipdata "${ipdata[status]:-unknown}" \
@@ -2596,7 +2638,7 @@ def dnsresults($value):
   Score: {IP2LOCATION: opt($score_ip2), SCAMALYTICS: opt($score_scam), ipapi: opt($score_ipapi), AbuseIPDB: opt($score_abuse), IPQS: opt($score_ipqs), Cloudflare: null, DBIP: null},
   ScoreMeta: {
     IP2LOCATION: {Band: opt($band_ip2), Scale: "0-99 potential risk"},
-    SCAMALYTICS: {Band: opt($band_scam), Scale: "0-100 fraud"},
+    SCAMALYTICS: {Band: opt($band_scam), Scale: "0-100 fraud", Status: $status_scamalytics, Source: $source_scamalytics, RelayStatus: opt($relay_status_scamalytics)},
     ipapi: {Band: opt($band_ipapi), Scale: "0-100% abuse"},
     AbuseIPDB: {Band: opt($band_abuse), Scale: "0-100 confidence"},
     IPQS: {Band: opt($band_ipqs), Scale: "0-100 fraud", Status: $status_ipqs, Source: $source_ipqs},
@@ -2627,6 +2669,7 @@ def dnsresults($value):
     Robot: {IP2LOCATION: factor($f_ip2_bot), ipapi: factor($f_ipapi_bot), Ipregistry: factor($f_ipregistry_bot), IPQS: factor($f_ipqs_bot), SCAMALYTICS: factor($f_scam_bot), ipdata: factor($f_ipdata_bot), IPinfo: factor($f_ipinfo_bot)}
   },
   FactorMeta: {
+    SCAMALYTICS: {Status: $status_scamalytics, Source: $source_scamalytics},
     ipapi: {Status: $ipapi_risk_status, Source: "public_api", Mode: opt($ipapi_mode), CredentialMode: opt($ipapi_credential_mode)},
     IPWhois: {Status: $ipwhois_risk_status, Source: "public_demo", Reason: "website_demo_security_flags"}
   },

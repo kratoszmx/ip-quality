@@ -1,8 +1,54 @@
 # Current handoff
 
+## Default full-flow repairs — 2026-10-11, v29
+
+Current reporter: `v2026-10-11-standalone.29` on `main`. Give the user only the
+original interactive all-source command in [AGENTS.md](AGENTS.md); source/DNS
+switches are agent diagnostics, not extra user workflows.
+
+- The ordinary direct IPv4 flow now automatically uses verified AliDNS HTTPS
+  resolution for the official IPQS hostname at both account and lookup stages.
+  The menu run with no source/DNS arguments returned IPQS `ok`, score `0`.
+  No key, system-DNS setting, TLS verification or selected transport changed.
+  IPv6 and leaf/proxy routes keep their existing resolver. Explicit overrides
+  remain for maintenance; a keyless default run still uses its relay contract.
+- When the Scamalytics relay is unavailable or malformed, one public target-page
+  request on the same route restores its own score/available factors. The parser
+  binds the heading and embedded example to the target and requires score-badge
+  agreement. Missing/conflicting fields remain unknown. Terminal/JSON identify
+  `public_demo`; JSON also preserves the relay outcome. The original relay
+  success path stays intact and never makes the extra page request.
+- Both full interactive menu runs completed: direct Scamalytics score `0`,
+  isolated `vps+sub7` / `ATT` score `9`; both were provider-supplied `low`.
+  IPinfo, Ipregistry, ipapi, IPWHOIS, DB-IP and Cloudflare Intel returned `ok`
+  on both routes. No jq error occurred. Neither score is substituted for IPQS.
+- ATT IPQS still returned `tls_error`. Check.Place still blocked its MaxMind
+  request and paused the remaining dependent relay datasets. These failures
+  remain in the full report. IPQS's current documentation also failed over ATT
+  Chrome and loaded over direct Chrome. No supported alternate API hostname or
+  provider diagnosis was established. The bound support-subject search across
+  both official sender domains returned no references; no new mail was sent.
+- The externally maintained cache advanced to `vps+sub7` (ATT fields match
+  `sub6`) and obsolete subscriptions disappeared while working. Menu numbers
+  therefore changed; an initial scripted selection stopped before any query.
+  The successful rerun selected ATT from the current menu. No live Clash state
+  was modified, no account/2FA action or new dependency was needed.
+
+Private evidence: `reports/{direct,att}-20261011-v29-full.{json,stdout,stderr}`,
+`reports/att-20261011-baseline.json`, `reports/source-public-20261011.json`, and
+`reports/scamalytics-20261011-{ATT,DIRECT}.html`. Reports use default IP masking;
+browser/curl diagnostics used the public `8.8.8.8` target. All temporary runtime
+sessions completed cleanup.
+
+Validation: complete offline entry passed **123 Ruby cases / 2,607 assertions**,
+**26 IPQS tests** and **31 provider-account tests**, with no failures or skips
+(`reports/offline-20261011-v29-final.txt`). Regression coverage includes full defaults with no
+repair flags, private key handling, retained failed columns, target/schema
+binding, same-route fallback limits and unchanged IPv6/proxy DNS behavior.
+
 ## Source selection and direct IPQS DNS repair — 2026-10-10, v28
 
-Current reporter: `v2026-10-10-standalone.28` on `main`.
+Earlier reporter: `v2026-10-10-standalone.28` on `main`.
 
 - Both entrypoints now support `--sources all|independent|ID,ID`. The default
   remains `all`; `independent` skips all Check.Place datasets and permits IPQS
@@ -190,9 +236,11 @@ for a network-free plan and route selection.
 ## Remaining issues
 
 ATT-to-IPQS TLS access and Check.Place relay denials remain unresolved.
-Direct IPv4 IPQS works with the v28 AliDNS option; ordinary system DNS still
-needs its separate owner to investigate. Source selection can omit unavailable
-providers without suppressing failures from selected providers.
+Direct IPv4 IPQS now works automatically in the normal v29 full run. The
+underlying system-DNS discrepancy remains outside this reporter's settings.
+Scamalytics can now recover through its same-route public target page. Other
+failed relay datasets remain explicit; the normal user workflow keeps all
+sources selected.
 The earlier September ipapi failure is not a current blocker:
 both October 10 ATT reports returned ipapi `ok`. Results describe those runs,
 not a lasting provider-health guarantee.

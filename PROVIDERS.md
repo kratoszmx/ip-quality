@@ -60,7 +60,8 @@ many DNS/TCP probes add latency and cannot describe an HTTP-proxied leaf.
 
 ## Source selection
 
-Both entrypoints accept these optional choices; the default remains `all`:
+The normal interactive command defaults to all sources. Users need no source
+or DNS switches. The optional choices below are maintenance controls:
 
 | Option | Reputation requests |
 | --- | --- |
@@ -78,18 +79,21 @@ Every source's fields reset between address families. Automatic public-egress
 discovery remains a separate step unless an explicit target was supplied; it
 no longer uses Check.Place, and is not limited by this reputation-source list.
 
-`--ipqs-dns alidns` is an opt-in direct-route repair for the IPQS hostname's
-system-DNS failure. Both official account and lookup requests use curl's
+The default `--ipqs-dns auto` repairs the observed direct IPv4 IPQS hostname
+resolution failure automatically. Both official account and lookup requests use curl's
 `--doh-url https://dns.alidns.com/dns-query`, with certificate verification and
 the existing ten-second request deadline. [AliDNS](https://alidns.com/) sees the
 IPQS hostname and the DNS request's egress, not the API key or target IP in the
 lookup URL. IPQS still sees the original direct egress and requested target.
 Only this provider's DNS changes; there is no system setting, fixed IP pin,
-proxy fallback, new credential, retry or paid plan. A missing IPQS key returns
-`not_configured`; proxy/leaf routes reject this choice before querying, because
-an HTTP proxy resolves its own CONNECT target. The default `system` leaves
-resolution with the system/proxy; JSON `Query.IPQSDNS` records this policy as
-`system` or `alidns`, or null when no official IPQS request was attempted.
+proxy fallback, new credential, retry or paid plan. Automatic mode preserves
+system/proxy resolution on IPv6 and proxy/leaf routes. Without an official key,
+the normal all-source run retains its Check.Place IPQS relay path.
+Maintenance overrides `system` and `alidns` remain available; forcing AliDNS
+requires an official key and a route without proxy variables. JSON
+`Query.IPQSDNS` records the effective policy as `system` or `alidns`, or null
+when no official IPQS request was attempted. This is policy metadata, not proof
+that a DNS packet left the machine. The resolver is not a transport-route fallback.
 `Query.TargetMode` distinguishes a discovered egress from an explicit target;
 an explicit-target lookup does not test connectivity from that target itself.
 
@@ -116,7 +120,7 @@ was inspected as text, not executed on this Mac.
 | Check.Place response labeled MaxMind by the upstream payload | Upstream relay | ASN, organization, city/region, registered region, coordinates, timezone |
 | IPinfo public demo widget | Direct public demo component, not the token-authenticated API | ASN/company type, country, privacy flags, location |
 | Ipregistry IP Intelligence | Direct official API when `IPREGISTRY_API_KEY` is configured | Connection/company type, country, proxy, VPN, Tor, cloud-hosting, abuse/attack signals |
-| Scamalytics via `ipinfo.check.place` | Upstream relay | Fraud score, proxy, VPN, Tor, blacklist/bot indicators |
+| Scamalytics | Check.Place relay, then one official public target-page fallback on failure | Fraud score, provider risk label when supplied, country and available proxy/VPN/Tor/server/blacklist/bot indicators; source labeled separately |
 | ipapi.is | Direct public API; anonymous or optional free-tier key | Anonymous ASN/ownership/geography context, or keyed ASN/company type, provider-supplied abuser-score label, and risk factors |
 | IPWHOIS website demo | Direct public demo, no account/key | Country, network context and any supplied proxy/VPN/Tor/hosting flags; explicit demo rate-limit status |
 | DB-IP website visitor demo | Public page token used transiently, no account | Original low/medium/high threat label plus geography, only if returned egress matches target; explicit demo failures |
@@ -248,6 +252,19 @@ schema failures do not trigger this source-specific pause.
   as owner-controlled official accounts. Its MaxMind-shaped payload does not
   prove that this machine owns a `.mmdb`, a MaxMind subscription, or a known
   edition/build.
+- If the Scamalytics relay is unavailable or malformed, one same-route request
+  to `https://scamalytics.com/ip/TARGET` can restore that provider's observations.
+  The page heading and embedded example must identify the exact target; its
+  score badge must agree with the example's 0–100 score. The sample's original
+  risk/blacklist values and unambiguous labeled Yes/No cells are retained.
+  Missing or conflicting cells remain unknown. Public/Web/Residential Proxy
+  flags use any-true/all-false semantics; robot combines the displayed search
+  engine and X4Bnet spambot flags. This public page is distinct from the paid
+  JSON API and from the relay's dataset: JSON `ScoreMeta.SCAMALYTICS` records
+  `Source`, final `Status`, and the failed `RelayStatus`; `FactorMeta` records
+  the same source. No other provider's score is substituted. The page has no
+  guaranteed automation quota; one failure stops without a browser, route
+  change, account or retry. See the [official example](https://scamalytics.com/ip/8.8.8.8).
 - Each Check.Place-backed request keeps an independent HTTP status. The parser
   distinguishes its known Cloudflare block page from an ordinary HTTP 403, and
   one relay failure cannot erase a successful sibling. JSON exposes these states
