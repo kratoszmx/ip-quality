@@ -29,6 +29,13 @@ The hashes below identify the exact upstream inputs before local modification:
 
 The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 
+- Added the user-authorized selected-route to direct-IPv4 fallback for official
+  IPQS and Cloudflare target lookups after pre-HTTP connectivity errors. The
+  target remains unchanged, IPQS preserves credit preflight and verified DNS,
+  and both terminal/JSON retain the original route failure. Egress discovery
+  and visitor/self demos stay on the measured route; quota/auth/certificate and
+  response errors do not retry. DB-IP daily-quota responses have an explicit
+  status rather than a generic rate-limit label.
 - Added same-route public-demo fallbacks for IP2Location and ipdata. The former
   reads the target-bound JSON example on IP2Location.com; the latter discovers
   its website's published demo key for one in-memory request. Explicit false

@@ -69,7 +69,8 @@ export async function verifyPublicProvider(provider, confirmation, request = req
     const error = body;
     if (record(error) && ((provider === 'dbip' && (error.errorCode === 'OVER_QUERY_LIMIT' || (typeof error.error === 'string' && /over query limit|maximum number of queries/i.test(error.error)))) ||
         (provider === 'ipwhois' && error.success === false && typeof error.message === 'string' && /rate limit|too many requests/i.test(error.message)))) {
-      return { ...metadata, usable: false, status: 'rate_limited' };
+      const daily = provider === 'dbip' && (error.errorCode === 'OVER_QUERY_LIMIT' || /maximum number of queries per day/i.test(error.error || ''));
+      return { ...metadata, usable: false, status: daily ? 'daily_quota_exhausted' : 'rate_limited' };
     }
     const expected = selfDemo ? (typeof body?.ipAddress === 'string' && isIP(body.ipAddress) ? body.ipAddress : null) : target;
     const observation = expected ? publicProviderObservation(provider, body, expected, surface) : null;

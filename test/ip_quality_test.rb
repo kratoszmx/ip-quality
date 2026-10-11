@@ -14,6 +14,9 @@ class IpQualityTest < ReporterTestCase
     refute_includes stdout, "mail sources:"
     refute_includes stdout, "DNSBL sources:"
     assert_includes stdout, "telemetry/report upload/remote code: disabled"
+    assert_includes stdout, "one direct IPv4 fallback, querying the same target IP"
+    assert_includes stdout, "same provider also sees the system-route egress"
+    assert_includes stdout, "visitor/self demos never switch routes"
     assert_includes stdout, "--confirm-network-lookup"
     assert_empty stderr
   end
@@ -69,7 +72,7 @@ class IpQualityTest < ReporterTestCase
     assert_includes stdout, "DB-IP page + one visitor-egress lookup (must match target)"
     assert_includes stdout, "IPWHOIS one target lookup"
     assert_includes stdout, "legacy Threat Score is retired"
-    assert_includes stdout, "configured Ipregistry/IPQS APIs"
+    assert_includes stdout, "configured Ipregistry/IPQS/AbuseIPDB APIs"
     assert_includes stdout, "supplementary sources"
     assert_includes stdout, "Ping0"
     assert_includes stdout, "official free /geo endpoint"

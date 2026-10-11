@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-10-11-standalone.30"
+script_version="v2026-10-11-standalone.31"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset COMMON_DIR="$SCRIPT_DIR/common"
@@ -18,6 +18,7 @@ typeset COMMON_PROVIDER_LIB="$COMMON_DIR/provider_values.zsh"
 typeset TERMINAL_LIB="$COMMON_DIR/terminal.zsh"
 typeset CREDENTIALS_LIB="$PROVIDER_DIR/credentials.zsh"
 typeset CHECK_PLACE_LIB="$PROVIDER_DIR/check_place.zsh"
+typeset QUERY_ROUTE_LIB="$PROVIDER_DIR/query_route.zsh"
 typeset SELECTION_LIB="$PROVIDER_DIR/selection.zsh"
 typeset IPREGISTRY_LIB="$PROVIDER_DIR/ipregistry.zsh"
 typeset IPAPI_LIB="$PROVIDER_DIR/ipapi.zsh"
@@ -34,7 +35,7 @@ typeset RIPESTAT_LIB="$PROVIDER_DIR/ripestat.zsh"
 typeset INTERNETDB_LIB="$PROVIDER_DIR/shodan_internetdb.zsh"
 typeset REPUTATION_REPORT_LIB="$REPORT_DIR/reputation.zsh"
 typeset local_library
-for local_library in "$COMMON_DIR/json_values.jq" "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$CHECK_PLACE_LIB" "$SELECTION_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$DBIP_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$SCAMALYTICS_LIB" "$IP2LOCATION_LIB" "$IPDATA_LIB" "$ABUSEIPDB_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for local_library in "$COMMON_DIR/json_values.jq" "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$CHECK_PLACE_LIB" "$QUERY_ROUTE_LIB" "$SELECTION_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$DBIP_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$SCAMALYTICS_LIB" "$IP2LOCATION_LIB" "$IPDATA_LIB" "$ABUSEIPDB_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$local_library" && -r "$local_library" && ! -L "$local_library" ]]||{
 print -ru2 -- "ERROR: unsafe or missing local library: $local_library"
 exit 66
@@ -534,9 +535,11 @@ print -r -- "  telemetry/report upload/remote code: disabled"
 scope_includes reputation&&print -r -- "  selected source IDs: ${(j:,:)selected_reputation_sources[@]}"
 scope_includes reputation&&print -r -- "  reputation lookups use selected IDs; automatic egress discovery is separate from this catalogue"
 [[ "$source_selection" == independent ]]&&print -r -- "  independent mode: no Check.Place requests; IPQS requires its official API key"
-[[ "$ipqs_dns" == auto ]]&&print -r -- "  IPQS DNS: automatic AliDNS HTTPS resolution for direct IPv4; IPv6/proxy routes keep their existing resolver; route unchanged"
+[[ "$ipqs_dns" == auto ]]&&print -r -- "  IPQS DNS: automatic AliDNS HTTPS resolution for direct IPv4; initial IPv6/proxy requests keep their existing resolver"
 [[ "$ipqs_dns" == alidns ]]&&print -r -- "  IPQS DNS: AliDNS DoH (https://dns.alidns.com/dns-query); resolver receives IPQS hostname, not the API key or target; system DNS is unchanged"
-[[ "$ipqs_dns" == auto ]]&&print -r -- "  AliDNS (https://dns.alidns.com/dns-query) receives the IPQS hostname only, not the API key or target"
+scope_includes reputation&&print -r -- "  targeted IPQS/Cloudflare APIs: selected route first; connectivity failure before HTTP permits one direct IPv4 fallback, querying the same target IP"
+scope_includes reputation&&print -r -- "  fallback privacy: the same provider also sees the system-route egress; egress discovery and visitor/self demos never switch routes"
+scope_includes reputation&&print -r -- "  IPQS direct fallback uses AliDNS (https://dns.alidns.com/dns-query); this resolver receives the IPQS hostname only, not the API key or target"
 scope_includes reputation&&print -r -- "  reputation sources: ipapi.is, Cloudflare IP Intelligence (when configured), Ping0, RIPEstat, Shodan InternetDB, plus configured Ipregistry/IPQS/AbuseIPDB APIs"
 scope_includes reputation&&print -r -- "  public website demos: DB-IP page + one visitor-egress lookup (must match target); IPWHOIS one target lookup; no account, no guaranteed quota or availability"
 scope_includes reputation&&print -r -- "  supplementary sources: IPinfo public demo widget plus named Check.Place relays (MaxMind-labeled, Scamalytics, AbuseIPDB, IP2Location, ipdata, IPQualityScore)"
@@ -1631,10 +1634,11 @@ cloudflare[status]="unknown"
 local query_name="ipv4"
 [[ "$IP" == *:* ]]&&query_name="ipv6"
 local endpoint="https://api.cloudflare.com/client/v4/accounts/$account_id/intel/ip?$query_name=$IP"
-local wire_response response_body
-wire_response=$(curl_with_secret_header "Authorization" "Bearer $api_token" "$endpoint" \
-  $CurlARG -sS -L -$1 -m 10 --max-filesize 131072 --write-out $'\n%{http_code}' 2>/dev/null)
-provider_decode_http_response "$wire_response" "$?"
+local response_body
+query_route_begin "$1" system system
+query_route_request "$endpoint" 131072 Authorization "Bearer $api_token"||true
+cloudflare[query_route]="${query_route[route]}"
+cloudflare[primary_status]="${query_route[primary_status]}"
 cloudflare[status]="${provider_http_response[status]}"
 [[ "${cloudflare[status]}" == ok ]]||return 0
 response_body="${provider_http_response[body]}"
@@ -1884,10 +1888,9 @@ show_progress_bar "$temp_info" $((40-5-${sinfo[ldatabase]}))
 ipqs=()
 ipqs[status]="unknown"
 typeset api_key="${provider_credentials[IPQS_API_KEY]:-}"
-typeset RESPONSE="" wire_response usage_response
+typeset RESPONSE="" usage_response
 if [[ -n "$api_key" ]];then
 ipqs[source]="official_api"
-local -a dns_arguments=()
 ipqs[dns]="${ipqs_dns:-auto}"
 if [[ "${ipqs[dns]}" == auto ]];then
 ipqs[dns]=system
@@ -1895,13 +1898,11 @@ if [[ "$1" == 4 && -z "${IPQUALITY_ISOLATED_EGRESS:-}${http_proxy:-}${https_prox
 ipqs[dns]=alidns
 fi
 fi
-if [[ "${ipqs[dns]}" == alidns ]];then
-dns_arguments=(--doh-url https://dns.alidns.com/dns-query)
-fi
-wire_response=$(curl_with_secret_url \
-  "https://www.ipqualityscore.com/api/json/account/$api_key" \
-  $CurlARG "${dns_arguments[@]}" -sS -$1 -m 10 --max-filesize 65536 --write-out $'\n%{http_code}' 2>/dev/null)
-provider_decode_http_response "$wire_response" "$?"
+query_route_begin "$1" "${ipqs[dns]}" alidns
+query_route_request "https://www.ipqualityscore.com/api/json/account/$api_key" 65536||true
+ipqs[query_route]="${query_route[route]}"
+ipqs[primary_status]="${query_route[primary_status]}"
+ipqs[dns]="${query_route[dns]}"
 ipqs[status]="${provider_http_response[status]}"
 [[ "${ipqs[status]}" == ok ]]||return 0
 usage_response="${provider_http_response[body]}"
@@ -1924,10 +1925,10 @@ else
 ipqs[status]=invalid_response
 return 0
 fi
-wire_response=$(curl_with_secret_url \
-  "https://www.ipqualityscore.com/api/json/ip/$api_key/$IP?strictness=0&allow_public_access_points=true" \
-  $CurlARG "${dns_arguments[@]}" -sS -$1 -m 10 --max-filesize 131072 --write-out $'\n%{http_code}' 2>/dev/null)
-provider_decode_http_response "$wire_response" "$?"
+query_route_request "https://www.ipqualityscore.com/api/json/ip/$api_key/$IP?strictness=0&allow_public_access_points=true" 131072||true
+ipqs[query_route]="${query_route[route]}"
+ipqs[primary_status]="${query_route[primary_status]}"
+ipqs[dns]="${query_route[dns]}"
 ipqs[status]="${provider_http_response[status]}"
 [[ "${ipqs[status]}" == ok ]]||return 0
 RESPONSE="${provider_http_response[body]}"
@@ -2588,6 +2589,7 @@ ipjson=$(jq -n \
 --arg band_abuse "$(clean_ansi "${abuseipdb[risk]:-}")" \
 --arg band_ipqs "$(clean_ansi "${ipqs[risk]:-}")" \
 --arg status_ipqs "${ipqs[status]:-unknown}" \
+--arg route_ipqs "${ipqs[query_route]:-}" --arg primary_status_ipqs "${ipqs[primary_status]:-}" \
 --arg status_ipinfo "${ipinfo[status]:-unknown}" \
 --arg source_ipqs "${ipqs[source]:-unknown}" \
 --arg status_ipregistry "${ipregistry[status]:-not_configured}" \
@@ -2622,6 +2624,7 @@ ipjson=$(jq -n \
 --arg ipwhois_proxy "${ipwhois[proxy]:-}" --arg ipwhois_vpn "${ipwhois[vpn]:-}" \
 --arg ipwhois_tor "${ipwhois[tor]:-}" --arg ipwhois_server "${ipwhois[server]:-}" \
 --arg status_cloudflare "${cloudflare[status]:-not_configured}" \
+--arg route_cloudflare "${cloudflare[query_route]:-}" --arg primary_status_cloudflare "${cloudflare[primary_status]:-}" \
 --arg cloudflare_ip "${cloudflare[ip]:+$displayed_ip}" --arg cloudflare_countrycode "${cloudflare[countrycode]:-}" \
 --arg cloudflare_network "${cloudflare[network]:-}" --arg cloudflare_org "${cloudflare[org]:-}" \
 --arg cloudflare_infrastructure "${cloudflare[infrastructure]:-}" \
@@ -2697,7 +2700,11 @@ def dnsresults($value):
     SourceSelection: $source_selection,
     SelectedSources: (if $reputation_enabled then ($selected_sources | split(",") | map(select(length > 0))) else [] end),
     TargetMode: $target_mode,
-    IPQSDNS: opt($ipqs_dns)
+    IPQSDNS: opt($ipqs_dns),
+    ProviderTransport: {
+      IPQS: {Route: opt($route_ipqs), OriginalRouteFailure: opt($primary_status_ipqs), TargetUnchanged: true},
+      Cloudflare: {Route: opt($route_cloudflare), OriginalRouteFailure: opt($primary_status_cloudflare), TargetUnchanged: true}
+    }
   },
   Info: {
     Source: $info_source, ASN: opt($info_asn), Organization: opt($info_org),

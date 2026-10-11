@@ -48,6 +48,26 @@ and AbuseIPDB's CHECK validator stay in `providers/`: their schemas and target
 contracts are provider-specific. Their requests reuse `provider_decode_http_response`;
 credential-bearing requests use the existing stdin curl configuration helpers.
 
+`providers/query_route.zsh` owns the reporter's shared IPQS/Cloudflare transport
+policy; it is deliberately outside `common/` because its fallback disclosure,
+eligible providers, DNS choice and request budgets are report-specific.
+
+| Function | Callers and contract |
+| --- | --- |
+| `query_route_begin FAMILY SELECTED_DNS DIRECT_DNS` | `db_ipqs`, `db_cloudflare`: reset per-provider route state. A proxy/isolated environment enables one selected-to-direct transition; direct runs never retry another route |
+| `query_route_request URL MAX_BYTES [HEADER VALUE]` | Both official adapters: issue a bounded credential-safe request, decode the HTTP envelope, and retry eligible pre-HTTP connectivity failure once through direct IPv4. Return 0 for transport/HTTP success; schemas and quota policy stay in the adapter |
+
+The output `query_route` contains `route`, `primary_status` and effective `dns`;
+the response is in `provider_http_response`. A direct fallback remains selected
+for subsequent requests of that provider (IPQS account then lookup), so it does
+not retry a known failed proxy twice. The caller resets the state for every new
+provider, preserves the target URL, then copies route metadata into its result.
+It does not discover an IP or apply to visitor/self endpoints, account mutations,
+HTTP rejection, quotas, certificates or malformed responses. Credentials use
+the existing curl stdin helpers; no key/header is added to process arguments.
+See [query-route policy](PROVIDERS.md#automatic-query-route-fallback) for privacy
+disclosure, credit implications and report fields.
+
 Provider schemas, request endpoints, optional credential files, source-specific
 status decisions, and report labels remain in `providers/`, `bin/ip-quality`,
 and `report/`. A similar `jq` expression alone is not a shared schema contract.
@@ -273,7 +293,8 @@ request, surface)` for DB-IP/IPWHOIS. The MCP selects `free_api` (default) or
 projection or `null`. The caller validates DB-IP's returned IP before projecting
 its egress observation; other lookups must match `1.1.1.1`. Results carry query
 status, the observation and account/MFA/risk capabilities. Missing fields stay
-null; HTTP 200 quota errors become `rate_limited`, without retries or enrollment.
+null; HTTP 200 quota errors become `rate_limited` or DB-IP's explicit
+`daily_quota_exhausted`, without retries or enrollment.
 Provider-specific workflow details belong in
 [the account guide](mcp/provider-accounts/AGENTS.md).
 Reporter and Node fixture suites share sanitized JSON inputs; their language-

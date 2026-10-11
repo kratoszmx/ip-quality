@@ -160,7 +160,7 @@ en:demo)source_label="public demo"
 ;;
 *)source_label="relay"
 esac
-print -rn -- "${Font_Cyan:-}$source_label${Font_Suffix:-}/$(report_query_status "$query_state")"
+print -rn -- "${Font_Cyan:-}$source_label${Font_Suffix:-}/$(report_query_status "$query_state" "${3:-}")"
 }
 
 report_query_status(){
@@ -171,6 +171,8 @@ cn:ok)state_label="可用" state_color="${Font_Green:-}"
 cn:upstream_insufficient_credits|cn:official_insufficient_credits)state_label="额度用完"
 ;;
 cn:rate_limited)state_label="限流"
+;;
+cn:daily_quota_exhausted)state_label="日额度用完"
 ;;
 cn:skipped_relay_cloudflare_blocked)state_label="中继封锁/暂停"
 ;;
@@ -206,6 +208,8 @@ en:upstream_insufficient_credits|en:official_insufficient_credits)state_label="n
 ;;
 en:rate_limited)state_label="rate limit"
 ;;
+en:daily_quota_exhausted)state_label="daily quota used"
+;;
 en:skipped_relay_cloudflare_blocked)state_label="relay blocked/skipped"
 ;;
 en:skipped_relay_rate_limited)state_label="relay limited/skipped"
@@ -234,7 +238,19 @@ en:disabled)state_label="not selected"
 ;;
 *)state_label="failed"
 esac
+if [[ "${2:-}" == direct_fallback ]];then
+[[ "$YY" == cn ]]&&state_label+="·直连备援"||state_label+=" via direct fallback"
+fi
 print -rn -- "${state_color}$state_label${Font_Suffix:-}"
+}
+
+report_query_route_note(){
+[[ "$2" == direct_fallback ]]||return 0
+if [[ "$YY" == cn ]];then
+print -r -- "$1 查询通路：原通路$(report_query_status "$3") → 直连备援；查询目标仍为所选 IP。"
+else
+print -r -- "$1 lookup route: original route $(report_query_status "$3") → direct fallback; the selected target IP is unchanged."
+fi
 }
 
 report_factor_row(){
@@ -269,7 +285,7 @@ companies+=("${ipregistry[scomtype]}")
 fi
 if report_source_visible "${ipqs[status]:-}" "${ipqs[susetype]}";then
 headers+=("${Font_B}${Font_Cyan}IPQS$Font_Suffix")
-statuses+=("$(report_query_status "${ipqs[status]:-ok}")")
+statuses+=("$(report_query_status "${ipqs[status]:-ok}" "${ipqs[query_route]:-}")")
 if [[ "${ipqs[source]}" == "official_api" ]];then
 sources+=("$(report_type_source official)")
 else
@@ -343,13 +359,14 @@ country_label="ASN所属地" type_label="ASN类型" org_label="ASN组织" threat
 else
 country_label="ASN country" type_label="ASN type" org_label="ASN organization" threats_label="Threat categories" separator=": "
 fi
-typeset summary="${Font_Cyan:-}Cloudflare${Font_Suffix:-}$separator$(report_score_source_status official "${cloudflare[status]}")"
+typeset summary="${Font_Cyan:-}Cloudflare${Font_Suffix:-}$separator$(report_score_source_status official "${cloudflare[status]}" "${cloudflare[query_route]:-}")"
 if [[ "${cloudflare[status]}" == ok ]];then
 report_any_known "${cloudflare[network]}"&&summary+=" | ASN=$(report_neutral_value "${cloudflare[network]}")"
 report_any_known "${cloudflare[countrycode]}"&&summary+=" | $country_label=$(report_neutral_value "${cloudflare[countrycode]}")"
 report_any_known "${cloudflare[infrastructure]}"&&summary+=" | $type_label=$(report_neutral_value "${cloudflare[infrastructure]}")"
 fi
 print -r -- "$summary"
+report_query_route_note Cloudflare "${cloudflare[query_route]:-}" "${cloudflare[primary_status]:-}"
 [[ "${cloudflare[status]}" == ok ]]||return 0
 if report_any_known "${cloudflare[org]}";then
 print -r -- "${Font_Cyan:-}Cloudflare $org_label${Font_Suffix:-}$separator$(report_neutral_value "${cloudflare[org]}")"
@@ -399,7 +416,7 @@ typeset ipqs_query_status="${ipqs[status]:-unknown}"
 if report_any_known "${ipqs[score]}" "${ipqs[risk]}" && [[ "$ipqs_query_status" == "unknown" ]];then
 ipqs_query_status="ok"
 fi
-source_statuses+=("$(report_score_source_status "$ipqs_source_kind" "$ipqs_query_status")")
+source_statuses+=("$(report_score_source_status "$ipqs_source_kind" "$ipqs_query_status" "${ipqs[query_route]:-}")")
 fi
 if report_source_visible "${dbip[status]:-}";then
 headers+=("${Font_B}${Font_Cyan}DB-IP$Font_Suffix")
@@ -434,6 +451,7 @@ terminal_table_row "$widths" "$score_label" "${rendered_scores[@]}"
 report_any_known "${risks[@]}"&&terminal_table_row "$widths" "$band_label" "${rendered_risks[@]}"
 terminal_table_row "$widths" "$scale_label" "${rendered_scales[@]}"
 terminal_table_row "$widths" "$source_status_label" "${source_statuses[@]}"
+report_query_route_note IPQS "${ipqs[query_route]:-}" "${ipqs[primary_status]:-}"
 return 0
 }
 
@@ -465,7 +483,7 @@ robots+=("")
 fi
 if report_source_visible "${ipqs[status]:-}" "${ipqs[countrycode]}" "${ipqs[proxy]}" "${ipqs[vpn]}" "${ipqs[tor]}" "${ipqs[server]}" "${ipqs[abuser]}" "${ipqs[robot]}";then
 headers+=("${Font_B}${Font_Cyan}IPQS$Font_Suffix")
-statuses+=("$(report_query_status "${ipqs[status]:-ok}")")
+statuses+=("$(report_query_status "${ipqs[status]:-ok}" "${ipqs[query_route]:-}")")
 countries+=("${ipqs[countrycode]}") proxies+=("${ipqs[proxy]}")
 vpns+=("${ipqs[vpn]}") tors+=("${ipqs[tor]}")
 servers+=("${ipqs[server]}") abusers+=("${ipqs[abuser]}")

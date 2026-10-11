@@ -56,7 +56,8 @@ proxy/VPN/Tor/hosting booleans. Values are target-bound, source-projected and
 nullable. Numeric risk scores are never invented. `observation` contains the
 validated data; `riskLabelAvailable`/`riskFactorsAvailable` say what was actually
 supplied. Missing demo security is distinct from a useful geography observation.
-HTTP 200 quota-error bodies return `usable:false`, `status:rate_limited`.
+HTTP 200 quota-error bodies return `usable:false`, with `status:rate_limited`
+or `daily_quota_exhausted` for DB-IP's explicit daily-limit response.
 Demo quotas are unspecified and separate from free geography allowances in
 [../../PROVIDERS.md](../../PROVIDERS.md). Both use the websites' request headers.
 DB-IP reads /api/core/
@@ -192,5 +193,5 @@ corrected native-HTTP requests returned a DB-IP visitor `low` label and IPWHOIS
 security booleans. This supersedes the blanket conclusion that the demos were
 unavailable, without establishing their unpublished quota policy. No new account
 or 2FA enrollment was needed. These are dated observations, not current account
-or service-health guarantees. Latest aggregate test results and the remaining
-ipapi route-specific TLS issue are in [../../HANDOFF.md](../../HANDOFF.md).
+or service-health guarantees. Latest aggregate test results, reporter recovery
+and route-specific observations are in [../../HANDOFF.md](../../HANDOFF.md).

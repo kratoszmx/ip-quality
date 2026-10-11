@@ -18,7 +18,8 @@ class PublicDemoTest < ReporterTestCase
   def test_http_200_demo_rate_limits_clear_previous_data_and_remain_unknown
     %w[dbip ipwhois].each do |provider|
       result = parse(provider, fixture(provider, "demo-rate-limited"))
-      assert_match(/\A1\|rate_limited\|\|+\z/, result)
+      expected = provider == "dbip" ? "daily_quota_exhausted" : "rate_limited"
+      assert_match(/\A1\|#{expected}\|\|+\z/, result)
       refute_includes result, "false"
       refute_includes result, "low"
     end

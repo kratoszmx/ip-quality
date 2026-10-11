@@ -96,7 +96,7 @@ test('HTTP 200 demo quota errors are unusable and never trigger retries or MFA',
     }, 'public_demo');
     assert.equal(calls, provider === 'dbip' ? 2 : 1);
     assert.equal(result.usable, false);
-    assert.equal(result.status, 'rate_limited');
+    assert.equal(result.status, provider === 'dbip' ? 'daily_quota_exhausted' : 'rate_limited');
     assert.equal(result.observation, undefined);
     assert.equal(result.riskLabelAvailable, false);
     assert.equal(result.riskFactorsAvailable, false);

@@ -45,6 +45,13 @@ IPQS uses the input name `confirm` for mutations; provider accounts uses
 
 ## Dated state and preferred access
 
+October 11 evening: DB-IP's public visitor demo returned `OVER_QUERY_LIMIT`
+with a daily-allowance message through both direct and isolated ATT. It now
+reports `daily_quota_exhausted`; the response supplied no recovery timestamp.
+This is demo availability, not a failed account login. Reporter IPQS/Cloudflare
+target-query fallback is separate from these MCP account/probe routes and does
+not alter saved sessions. See [HANDOFF.md](HANDOFF.md) for complete live reports.
+
 October 11: the user-authorized AbuseIPDB individual signup, confirmation email
 and one API-key creation completed. Native HTTP with saved private state matched
 the exact account and confirmed email verification. Both public-profile and

@@ -30,8 +30,9 @@ The route runner maintains two honest measurement boundaries:
 - Direct mode removes inherited proxy variables, starts no
   Mihomo process, defaults to IPv4, and runs `reputation` over the system route. A
   system-level VPN or TUN can still affect that route.
-- Exact-leaf mode runs only `reputation`. Its HTTP(S) requests use a verified
-  loopback Mihomo for one selected cached-subscription leaf. DNSBL, SMTP, and
+- Exact-leaf mode runs only `reputation`. Egress discovery and initial HTTP(S)
+  requests use a verified loopback Mihomo for one selected cached-subscription
+  leaf. IPQS/Cloudflare target lookups have the disclosed fallback below. DNSBL, SMTP, and
   other direct sockets are excluded because they would measure the host route.
 
 The raw `bin/ip-quality` reporter retains inherited HTTP proxy variables;
@@ -86,8 +87,8 @@ the existing ten-second request deadline. [AliDNS](https://alidns.com/) sees the
 IPQS hostname and the DNS request's egress, not the API key or target IP in the
 lookup URL. IPQS still sees the original direct egress and requested target.
 Only this provider's DNS changes; there is no system setting, fixed IP pin,
-proxy fallback, new credential, retry or paid plan. Automatic mode preserves
-system/proxy resolution on IPv6 and proxy/leaf routes. Without an official key,
+new credential or paid plan. Automatic mode preserves system/proxy resolution
+on the initial IPv6 and proxy/leaf requests. Without an official key,
 the normal all-source run retains its Check.Place IPQS relay path.
 Maintenance overrides `system` and `alidns` remain available; forcing AliDNS
 requires an official key and a route without proxy variables. JSON
@@ -96,6 +97,40 @@ when no official IPQS request was attempted. This is policy metadata, not proof
 that a DNS packet left the machine. The resolver is not a transport-route fallback.
 `Query.TargetMode` distinguishes a discovered egress from an explicit target;
 an explicit-target lookup does not test connectivity from that target itself.
+
+### Automatic query-route fallback
+
+The normal all-source command tries the selected route first. For official
+IPQS and Cloudflare IP Intelligence only, a connectivity failure before any HTTP
+response permits one direct IPv4 retry of the exact same URL/target. This
+implements the user's October 11 authorization to use alternate lookup routes.
+It never repeats egress discovery: a report for ATT still queries ATT's IP.
+IPv6 target addresses also remain unchanged when the lookup transport is IPv4.
+Direct IPv4 means proxy variables and reporter interface bindings are overridden;
+an existing system VPN/TUN can still influence that transport.
+
+IPQS retains its account-credit preflight. When that request needs fallback,
+the following IP lookup stays on direct + verified AliDNS rather than repeating
+the broken proxy request. If only the lookup fails, only that lookup is retried.
+Cloudflare's fallback uses system DNS. Each request keeps its ten-second deadline
+and size bound. HTTP rejection, exhausted quota, certificate-verification errors,
+oversized bodies and schema errors never switch route. A lost lookup response
+could already have consumed a credit, so the retry is capped at one; failures
+on direct do not trigger another provider, account or proxy chain.
+
+The same provider sees the tested target plus the fallback's system-route egress.
+The plan discloses this before confirmation. Terminal status marks direct fallback
+and retains the initial error; JSON `Query.ProviderTransport.IPQS` and
+`.Cloudflare` contain `Route` (`selected_route` or `direct_fallback`),
+`OriginalRouteFailure` and `TargetUnchanged`. Unattempted official queries have
+null route/failure. `ProviderStatus` describes the final response. This metadata
+does not claim that the selected node can now connect to that provider.
+
+Other sources keep their existing selected-route contracts. In particular,
+DB-IP's visitor/self demo and Ping0 observe the caller: changing their transport
+would change the measured IP. Egress discovery, DNS and SMTP never use this
+fallback. Source fallback (for example Check.Place to Scamalytics's own page)
+remains distinct from lookup-route fallback to the same provider.
 
 On October 10, a strict direct run with AliDNS completed the official IPQS
 lookup; the same-key ATT route still failed TLS. IPinfo, Ipregistry, ipapi,
@@ -243,9 +278,15 @@ schema failures do not trigger this source-specific pause.
   egress becomes `ip_mismatch`, never another IP's risk. It validates bounded
   geography and a `threatLevel` of low/medium/high. A missing label remains unknown. The original
   label is in section 3 and `ScoreMeta.DBIP.Band`; `Score.DBIP` remains null.
-  HTTP 200 with `OVER_QUERY_LIMIT` or explicit query-limit text means `rate_limited`. No label is
+  HTTP 200 with `OVER_QUERY_LIMIT` or an explicit daily quota message means
+  `daily_quota_exhausted`; other query-limit messages remain `rate_limited`. No label is
   converted to a 0/50/100 score. The public visitor token is used only in memory;
   no account key is obtained or saved.
+  The [official FAQ](https://db-ip.com/faq.php) documents daily API-key allowance
+  resets at midnight CET. That is 07:00 in Asia/Shanghai when interpreted as
+  CET (UTC+1); the public visitor demo supplies no reset timestamp or guaranteed
+  recovery schedule. On October 11, both direct and ATT returned the daily-limit
+  body without `Retry-After`, so changing routes was not a recovery for this demo.
   The no-key free geography contract is retained only for the MCP's optional
   `free_api` probe; unexpected premium fields there still cannot supply risk.
 - Cloudflare IP Intelligence validates the target IP, ASN reference, and bounded

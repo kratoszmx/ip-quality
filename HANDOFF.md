@@ -1,8 +1,61 @@
 # Current handoff
 
+## Automatic query-route fallback — 2026-10-11, v31
+
+Current reporter: `v2026-10-11-standalone.31` on `main`. The normal interactive
+all-source command remains unchanged; see [AGENTS.md](AGENTS.md).
+
+- The user authorized alternate query routes. Official IPQS and Cloudflare
+  now try the selected route first, then one direct IPv4 fallback only after
+  a connectivity failure before HTTP. The target stays the already discovered
+  node IP. IPQS keeps its account-credit check and uses verified AliDNS on the
+  direct fallback; account-stage fallback also selects direct for the lookup.
+- Terminal status marks direct fallback and retains the original route error.
+  JSON `Query.ProviderTransport` records both separately from final provider
+  availability. Plans disclose that the same provider sees the system-route
+  egress. No live Clash state changed. Visitor/self sources, egress discovery,
+  other providers, certificate errors, HTTP rejection and quotas do not use
+  this fallback. The policy is shared by two adapters in
+  `providers/query_route.zsh`, outside the generic common library.
+- Both complete direct and isolated `vps+sub8` / `ATT` reports returned `ok` for
+  IPinfo, Ipregistry, Scamalytics, AbuseIPDB, IP2Location, ipdata, ipapi, IPWHOIS,
+  Cloudflare and IPQS. Direct IPQS returned score `0`; ATT's unchanged target
+  returned score `95` through the automatic direct fallback, preserving
+  `OriginalRouteFailure: tls_error`. Cloudflare succeeded on its initial route
+  in both runs; its fallback is fixture-tested, not claimed live-triggered.
+- Fresh ATT IPQS probes of the apex/`www` host, TLS 1.2 and HTTP/1.1 all failed
+  before HTTP with curl 35. Together with successful same-key/direct-target
+  controls, this identifies a route-dependent TLS failure, but client evidence
+  cannot determine which remote hop closes it. Lookup recovery does not imply
+  that ATT-to-IPQS connectivity was repaired. No additional mail was sent.
+- DB-IP's visitor demo returned HTTP 200 with `OVER_QUERY_LIMIT` and a daily
+  allowance message through both direct and ATT. Reporter/MCP now expose
+  `daily_quota_exhausted`, displayed as "日额度用完", rather than generic rate
+  limiting. Neither response supplied `Retry-After` or a reset timestamp.
+  Its API FAQ documents midnight CET resets; public-demo recovery is not
+  guaranteed. Check.Place's MaxMind relay remains blocked, with named IPinfo
+  basic-data fallback. Neither missing source stops the report.
+- Direct Ping0 geography was verified; ATT returned `unknown` in the full run
+  and one selected-source recheck. Other sources supplied location/ASN context.
+  A further raw-response diagnostic was rejected by the local skill-write guard,
+  so no transport/HTTP cause is claimed for that supplementary observation.
+
+Private live evidence: `reports/{direct,att}-20261011-v31.{json,txt,stderr}`,
+`reports/att-ipqs-20261011-route-diagnostics.json` and
+`reports/dbip-20261011-route-diagnostics.json`. The final runs completed at
+approximately 19:41–19:42 Asia/Shanghai. Reports remain masked/private, no jq
+error was observed, and the owned temporary Mihomo completed cleanup.
+
+Validation: the complete offline entry passed **138 Ruby cases / 3,202
+assertions**, **26 IPQS tests** and **36 provider-account tests**, with zero
+failures/skips (`reports/offline-20261011-v31.txt`). New cases cover account-
+versus lookup-stage fallback, fixed IPv4/IPv6 targets, a failed fallback,
+no retry on quota/auth/certificate/schema/size errors, route provenance in both
+languages and JSON, private curl arguments, and DB-IP's daily-limit status.
+
 ## Independent source recovery and AbuseIPDB account — 2026-10-11, v30
 
-Current reporter: `v2026-10-11-standalone.30` on `main`. Keep the one normal
+Earlier reporter: `v2026-10-11-standalone.30` on `main`. Keep the one normal
 interactive all-source command in [AGENTS.md](AGENTS.md).
 
 - IP2Location and ipdata now recover automatically from unavailable/malformed

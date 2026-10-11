@@ -92,10 +92,18 @@ Automatic egress discovery is separate from reputation-source selection.
 See [source selection](PROVIDERS.md#source-selection) for all IDs and presets.
 
 Official IPQS automatically uses verified AliDNS HTTPS resolution on direct
-IPv4. IPv6 and proxy/leaf requests keep their existing resolver and route.
+IPv4. Initial IPv6 and proxy/leaf requests keep their existing resolver and route.
 This changes no system setting and needs no extra user argument. Maintenance
 overrides `--ipqs-dns system|alidns` remain available; forcing AliDNS is rejected
 on proxy/leaf routes. A missing key keeps the default relay contract.
+After a connection failure before HTTP, official IPQS and Cloudflare target
+lookups can retry once through direct IPv4, using the same already discovered
+leaf IP. IPQS keeps its account preflight and uses AliDNS on this fallback.
+The original failure and effective query route stay visible in terminal/JSON;
+this restores reputation data without claiming the leaf-to-provider path works.
+The plan discloses that the same provider can also see the host-route egress.
+Quota/authentication/certificate/schema errors do not change routes. Egress
+discovery, visitor/self demos, and other providers keep the selected route.
 When Scamalytics' relay fails, the same route queries its public target page
 once and validates the displayed IP/score. Its source is labeled public demo;
 the relay outcome is retained in JSON alongside the final result.

@@ -14,7 +14,7 @@ class ReportTest < ReporterTestCase
       ipqs[status]=official_insufficient_credits ipqs[source]=official_api
       ipapi[status]=tls_error ip2location[status]="$4" abuseipdb[status]=http_403
       scamalytics[status]=cloudflare_blocked ipdata[status]="$5"
-      dbip[status]=rate_limited ipwhois[status]=rate_limited
+      dbip[status]=daily_quota_exhausted ipwhois[status]=rate_limited
       show_type
       show_score
       show_factor
@@ -27,6 +27,7 @@ class ReportTest < ReporterTestCase
       assert status.success?, stderr
       assert_empty stderr
       types, scores, factors = stdout.split(/Scores\n|Factors\n/)
+      assert_includes scores, language == "cn" ? "日额度用完" : "daily quota used"
       %w[IPinfo Ipregistry IPQS ipapi.is IP2Location AbuseIPDB].each { |name| assert_includes types, name }
       %w[IP2Location Scamalytics ipapi.is AbuseIPDB IPQS DB-IP].each { |name| assert_includes scores, name }
       %w[IP2Location ipapi.is Ipregistry IPQS Scamalytics ipdata IPinfo IPWHOIS].each { |name| assert_includes factors, name }

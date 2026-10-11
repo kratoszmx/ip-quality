@@ -34,6 +34,7 @@ the tests and claiming a complete pass.
 | `test/providers_test.rb` | Provider parsing, unknown/failure semantics, credentials, zero-credit preflight |
 | `test/check_place_test.rb` | One actual request after a relay block/429, explicit skipped results, target/family/run isolation and unaffected official sources |
 | `test/source_selection_test.rb` | Source presets/IDs, no-network validation, runner forwarding, failed columns, default full-run DNS/Scamalytics repair, unchanged IPv6/proxy routes and private auth/target binding |
+| `test/query_route_test.rb` | Target-preserving IPQS/Cloudflare direct fallback; sticky IPQS account/lookup route, IPv6 targets, bounded failures, no retry on response/certificate/quota errors, credential privacy and terminal/JSON provenance |
 | `test/scamalytics_test.rb` | Target/heading/badge agreement, bounded schema, nullable/conflicting factors, one same-route page fallback and preserved relay success |
 | `test/public_fallbacks_test.rb` | IP2Location target-bound page JSON, ipdata transient demo key/booleans, full-flow fallback recovery, route/failure retention and official AbuseIPDB key privacy |
 | `test/dbip_test.rb` | Demo exact-IP/geography validation, no invented score, two-request visitor flow, route preservation and bounded guest tokens |
@@ -97,7 +98,7 @@ DB-IP's two requests keep their route/family, IPWHOIS sends website headers,
 IPinfo validates nested objects, and Shodan rejects fractional ports/control text.
 IPQS tests exercise TLS/timeout/certificate failures, HTTP rejection and malformed
 or rate-limited JSON at both account and lookup stages, plus a successful lookup.
-A failed account preflight stops before the lookup; failures clear old scores and
+A failed final account preflight stops before the lookup; failures clear old scores and
 flags, and even a success-shaped body cannot override a failing HTTP status.
 Check.Place tests count actual curl calls, distinguish an observed block from
 later skipped requests, and verify that generic 403/timeouts/schema failures do
@@ -106,7 +107,13 @@ languages without scores or risk flags.
 The default all-source fixture uses no repair switches: it proves automatic
 direct IPv4 IPQS DoH at both request stages, one Scamalytics page request after
 the relay pause, honest source metadata and retained failed columns. Separate
-cases preserve proxy and IPv6 resolution. Scamalytics fixtures reject another
+cases preserve successful proxy and IPv6 resolution. Query-route fixtures count
+the selected and direct requests, including lookup-only failure and a failed
+fallback. They prove the same IPv4/IPv6 target survives, both languages preserve
+route provenance, and quota/auth/schema/certificate/size errors never switch
+transport. Direct runs and visitor/self demos retain their original boundaries.
+DB-IP's explicit daily-limit fixture has its own status, distinct from generic
+rate limits. Scamalytics fixtures reject another
 IP, conflicting scores, ambiguous markup and changed response shapes.
 IP2Location/ipdata fixtures also cover successful relays making no demo request,
 target-bound fallback data, secret-free arguments, bounded same-route IPv6

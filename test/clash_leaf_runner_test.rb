@@ -46,6 +46,9 @@ class ClashLeafRunnerTest < Minitest::Test
       assert_includes stdout.string, "Cached subscription: Fixture Remote"
       assert_includes stdout.string, "Available inline leaves"
       assert_includes stdout.string, "exact leaf: TargetLeaf"
+      assert_includes stdout.string, "one direct IPv4 fallback queries the same leaf IP"
+      assert_includes stdout.string, "both route outcomes remain visible"
+      assert_includes stdout.string, "same provider also sees the system-route egress"
       refute_match(/\d+ inline leaves/, stdout.string)
       assert_empty stderr.string
     end

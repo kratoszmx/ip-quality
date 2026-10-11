@@ -10,7 +10,7 @@ External Supervisor checks and mail watches are owned outside this repository.
 | Reporter; direct or specific-IP runner route | Runs the reporter; starts no Mihomo |
 | Exact-leaf plan or name listing | Reads local inputs; starts no Mihomo |
 | `--config-test-only` | Runs an existing Mihomo with `-t`, then exits; no report lookup or persistent proxy listener |
-| Confirmed exact-leaf report | Starts a private Mihomo on a random `127.0.0.1` port, verifies listener ownership, then runs the reporter through it |
+| Confirmed exact-leaf report | Starts a private Mihomo on a random `127.0.0.1` port and verifies listener ownership. Egress discovery and initial queries use it; targeted IPQS/Cloudflare reads can use the disclosed direct fallback |
 | `mcp/ipqs` | Stdio account/API tools; dashboard work may retain its own Chrome on CDP 19453 |
 | `mcp/provider-accounts` | Stdio account reads use HTTP without Chrome. Explicit setup/recovery uses headless ipapi / headed Cloudflare or AbuseIPDB on CDP 19503/19504/19505; operation leases use 19603/19604/19605 |
 
