@@ -125,9 +125,9 @@ was inspected as text, not executed on this Mac.
 | IPWHOIS website demo | Direct public demo, no account/key | Country, network context and any supplied proxy/VPN/Tor/hosting flags; explicit demo rate-limit status |
 | DB-IP website visitor demo | Public page token used transiently, no account | Original low/medium/high threat label plus geography, only if returned egress matches target; explicit demo failures |
 | Cloudflare Security Center IP Intelligence | Direct official API when both Cloudflare credentials are configured | Country, ASN/provider context, infrastructure type, named threat categories; no universal numeric score |
-| AbuseIPDB via `ipinfo.check.place` | Upstream relay | Abuse-confidence score and usage type |
-| IP2Location via `ipinfo.check.place` | Upstream relay | 0-99 potential-risk score, usage/company type, proxy-category factors |
-| ipdata via `ipinfo.check.place` | Upstream relay | Country and threat factors |
+| AbuseIPDB | Official APIv2 with an owned key; otherwise Check.Place relay | Abuse-confidence score and usage type, validated against the requested IP |
+| IP2Location | Check.Place relay, then its public target page on failure | Original 0-99 potential-risk score, usage/company type and explicit proxy-category flags |
+| ipdata | Check.Place relay, then its public website demo on failure | Country and explicit proxy/VPN/Tor/datacenter/abuse factors |
 | IPQualityScore | Direct official API with `IPQS_API_KEY`; otherwise the named Check.Place relay | Connection type, 0-100 fraud score, country, proxy/VPN/Tor/abuse/bot factors |
 | Ping0 public `/geo` | Direct official public endpoint | Exact returned IP match, location, ASN, organization; no public risk score |
 | RIPEstat Network Info | Direct official public API | Covering routed prefix and origin ASNs; context, not a score |
@@ -151,7 +151,42 @@ zero/false. Explicit `not_configured` states also remain visible in applicable
 matrices. Within those matrices, a source with neither status nor observation
 is omitted.
 JSON adds IPinfo status and fills every type source's status alongside the
-existing provider statuses; query endpoints and quotas are unchanged.
+existing provider statuses.
+
+### Independent recovery for relay-backed sources
+
+The default all-source run automatically recovers three relay-backed sources:
+
+- IP2Location: after an unavailable or malformed relay response, read
+  `https://www.ip2location.com/{IP}` once. The heading and embedded `code2` JSON
+  must both match the target; scores remain within the provider's 0–99 range.
+  Missing flags stay unknown. This is a public website example, not a promise
+  that its paid Security API has a free risk tier.
+- ipdata: after the same relay failures, read `https://ipdata.co/` and extract
+  its one published demo key. Make one `https://api.ipdata.co/{IP}` lookup with
+  the website Origin/Referer. The key stays in memory and curl's stdin config;
+  it is never hard-coded, cached, put in process arguments or reported. This is
+  shared website-demo access with an unspecified allowance, not an owned key.
+- AbuseIPDB: a configured private key selects its official
+  [APIv2 CHECK endpoint](https://docs.abuseipdb.com/#check-endpoint) directly,
+  with `maxAgeInDays=90`, a private `Key` header and target-bound response
+  validation. The [free individual account](https://www.abuseipdb.com/register)
+  advertises 1,000 checks/day. No abuse report is submitted. Without a key the
+  existing named relay remains; an official failure does not switch to it.
+
+Each additional request uses the selected route/address family, a ten-second
+deadline and a response-size bound. There is no redirect, retry or direct-route
+escape. Successful IP2Location/ipdata relays need no fallback request.
+`ScoreMeta.IP2LOCATION`, `FactorMeta.IP2LOCATION` and `FactorMeta.ipdata` retain
+`Source`, final `Status` and `RelayStatus`; AbuseIPDB's score metadata records
+its chosen source. Terminal labels distinguish relay, public demo and official
+API. The provider schemas remain in `providers/`, using shared HTTP/value helpers.
+
+On October 11, the current NodeQuality launcher still delegated to Check.Place.
+Other tools such as [howismyip's IP2Location adapter](https://github.com/superagents-lab/howismyip/blob/main/packages/core/src/providers/ip2location.ts)
+use provider website observations, while its AbuseIPDB adapter uses an owned
+official key. Those access patterns informed these independently implemented
+parsers. We do not copy inferred false flags or manufacture scores from booleans.
 
 ## Interpretation rules
 
@@ -287,6 +322,7 @@ The global data-only assignment file is
 IPREGISTRY_API_KEY=...
 IPAPI_API_KEY=...
 IPQS_API_KEY=...
+ABUSEIPDB_API_KEY=...
 CLOUDFLARE_API_TOKEN=...
 CLOUDFLARE_ACCOUNT_ID=...
 ```
@@ -297,6 +333,7 @@ This checkout can instead or additionally use ignored raw-key files:
 secrets/ipregistry
 secrets/ipapi
 secrets/ipqs
+secrets/abuseipdb
 secrets/cloudflare_token
 secrets/cloudflare_account_id
 ```

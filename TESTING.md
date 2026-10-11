@@ -35,6 +35,7 @@ the tests and claiming a complete pass.
 | `test/check_place_test.rb` | One actual request after a relay block/429, explicit skipped results, target/family/run isolation and unaffected official sources |
 | `test/source_selection_test.rb` | Source presets/IDs, no-network validation, runner forwarding, failed columns, default full-run DNS/Scamalytics repair, unchanged IPv6/proxy routes and private auth/target binding |
 | `test/scamalytics_test.rb` | Target/heading/badge agreement, bounded schema, nullable/conflicting factors, one same-route page fallback and preserved relay success |
+| `test/public_fallbacks_test.rb` | IP2Location target-bound page JSON, ipdata transient demo key/booleans, full-flow fallback recovery, route/failure retention and official AbuseIPDB key privacy |
 | `test/dbip_test.rb` | Demo exact-IP/geography validation, no invented score, two-request visitor flow, route preservation and bounded guest tokens |
 | `test/public_demo_test.rb` | DB-IP labels/IPWHOIS boolean flags, quota errors, partial/malformed data, target binding, state reset and one-request IPWHOIS headers |
 | `test/report_test.rb` | Provider tables, ANSI/layout, JSON/file bytes, exclusive report creation |
@@ -107,6 +108,12 @@ direct IPv4 IPQS DoH at both request stages, one Scamalytics page request after
 the relay pause, honest source metadata and retained failed columns. Separate
 cases preserve proxy and IPv6 resolution. Scamalytics fixtures reject another
 IP, conflicting scores, ambiguous markup and changed response shapes.
+IP2Location/ipdata fixtures also cover successful relays making no demo request,
+target-bound fallback data, secret-free arguments, bounded same-route IPv6
+requests, partial flags, TLS errors and HTTP 429. AbuseIPDB fixtures cover its
+official private header, zero scores, malformed/foreign-target data and failure
+without relay/retry. HTTP account fixtures isolate the account-basics identity
+from feedback and password-change forms and report privacy settings as booleans.
 Report tests keep failed/unconfigured sources visible, preserve unknown versus
 false/zero, and place Cloudflare only in section 1 on both basic-data paths and
 in both languages. One local Ruby assertion checks ANSI/CJK table alignment

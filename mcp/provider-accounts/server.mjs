@@ -2,12 +2,14 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { buildToolDescription, textResult } from '@codex-mcp/shared-mcp-server';
-import { accountStatus, openAccount, readAccount, createFreeAccount, importIpapiKey } from './accounts.mjs';
+import { accountStatus, openAccount, readAccount, createFreeAccount, importIpapiKey, privateAccount } from './accounts.mjs';
+import { readHttpAccount } from './http-account.mjs';
+import { abuseipdbStatus, verifyAbuseipdb, openAbuseipdb } from './abuseipdb.mjs';
 import { checkCloudflareAccount, prepareCloudflareToken, createCloudflareToken, verifyCloudflareApi } from './cloudflare.mjs';
 import { enableCloudflareTotp, saveCloudflareRecoveryCodes } from './cloudflare-totp.mjs';
 import { verifyPublicProvider } from './public-api.mjs';
 
-const instructions = 'IPQuality provider accounts. Dedicated ipapi/Cloudflare profiles only. Free accounts only; no billing or plan upgrade tools. Account creation needs task authorization and CREATE_FREE_ACCOUNT. Stop for human verification; never solve CAPTCHA. Store secrets privately and never return keys, passwords, OTPs, recovery codes or cookies. A saved file is not live authentication. No automatic signup or lookup retries.';
+const instructions = 'IPQuality provider accounts. Dedicated ipapi/Cloudflare/AbuseIPDB profiles only. Free accounts only; no billing or plan upgrade tools. Account creation needs task authorization and CREATE_FREE_ACCOUNT. Stop for human verification; never solve CAPTCHA. Store secrets privately and never return keys, passwords, OTPs, recovery codes or cookies. A saved file is not live authentication. No automatic signup or lookup retries.';
 const server = new McpServer({ name: 'ipquality-provider-accounts', version: '0.1.0' }, { instructions });
 const provider = z.enum(['ipapi', 'cloudflare']);
 async function result(operation) {
@@ -53,5 +55,18 @@ server.registerTool('cloudflare_enable_totp', {
 server.registerTool('cloudflare_save_recovery_codes', {
   description: buildToolDescription('Store the initial eight Cloudflare recovery codes privately after enabled TOTP proof, then acknowledge the saved codes. No download, printing, clipboard copy or recovery-code regeneration.', instructions), inputSchema: { confirmation: z.literal('SAVE_RECOVERY_CODES') },
 }, ({ confirmation }) => result(() => saveCloudflareRecoveryCodes(confirmation)));
+
+server.registerTool('abuseipdb_account_status', {
+  description: buildToolDescription('Inspect private AbuseIPDB account/key presence without network access. Saved files do not prove a live account or quota.', instructions), inputSchema: {},
+}, () => result(abuseipdbStatus));
+server.registerTool('abuseipdb_account_check', {
+  description: buildToolDescription('Read the exact saved AbuseIPDB account over HTTP, without Chrome. Returns authentication, email-verification and public-profile setting booleans only. Does not change settings or submit abuse reports.', instructions), inputSchema: {},
+}, () => result(async () => readHttpAccount('abuseipdb', (await privateAccount('abuseipdb')).email)));
+server.registerTool('abuseipdb_verify_free_api', {
+  description: buildToolDescription('Read the official AbuseIPDB APIv2 CHECK endpoint for 1.1.1.1 once. Uses the private owned key and native HTTP. Returns only validated public observations; no abuse report, key, account identity or browser state.', instructions), inputSchema: { confirmation: z.literal('VERIFY_FREE_API') },
+}, ({ confirmation }) => result(() => verifyAbuseipdb(confirmation)));
+server.registerTool('abuseipdb_account_open', {
+  description: buildToolDescription('Open the reviewed AbuseIPDB signup or login page in its dedicated headed Chrome profile. Explicit recovery only, no form submission. Routine reputation queries use native HTTP.', instructions), inputSchema: { surface: z.enum(['signup', 'login']) },
+}, ({ surface }) => result(() => openAbuseipdb(surface)));
 
 await server.connect(new StdioServerTransport());

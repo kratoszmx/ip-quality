@@ -1,6 +1,6 @@
 # Provider accounts MCP
 
-Owns free ipapi.is and Cloudflare account setup for the IPQuality reporter.
+Owns free ipapi.is, Cloudflare and AbuseIPDB account maintenance for the IPQuality reporter.
 ipwho.is and DB-IP need no account or key for their free context APIs. This package
 reuses mcps/common/shared browser-session, http-read, secret-file, totp and
 mcp-server directly. Provider state, selectors, quotas and API contracts stay here.
@@ -39,6 +39,10 @@ The formal inventory and current account/2FA evidence are in
 | cloudflare_verify_free_api | One 1.1.1.1 lookup after VERIFY_FREE_API; records useful data, not merely a 200 status |
 | cloudflare_enable_totp | ENABLE_TOTP requires successful API evidence within 30 minutes for the same account/key; saves the textual seed before one code/password submission |
 | cloudflare_save_recovery_codes | SAVE_RECOVERY_CODES stores the initial eight numeric recovery codes privately and acknowledges the saved set |
+| abuseipdb_account_status | Local private account/key presence only; no network or claim of current quota |
+| abuseipdb_account_check | Bounded HTTP read of the exact saved account; returns authentication, email-verification and public-profile/domain-visibility booleans |
+| abuseipdb_verify_free_api | VERIFY_FREE_API makes one official APIv2 CHECK for 1.1.1.1 using the reporter's private key; no browser or abuse-report submission |
+| abuseipdb_account_open | Explicit signup/login recovery in the dedicated headed profile; no form submission |
 
 The user requires API usability before 2FA. A missing key, unavailable API,
 changed account/key or stale proof stops before authenticator enrollment. Existing
@@ -71,11 +75,17 @@ email verification even when a password form is present.
 
 Routine account reads use `http-account.mjs` and the shared bounded HTTP context
 reader with private saved state, without launching Chrome. Cloudflare uses one
-fixed GET to /api/v4/user; ipapi uses /app/home. Both bind the saved identity and
+fixed GET to /api/v4/user; ipapi uses /app/home; AbuseIPDB uses /account.
+All bind the saved identity and
 reject login/error bodies, redirects and retries. A failed HTTP check returns a
 failure rather than automatically opening a browser. HTTP-state recovery is
 described below; opening a browser alone does not refresh every provider's state.
 Intel lookups use native bounded HTTP with the saved token and no Chrome.
+AbuseIPDB uses the same shared HTTP context reader for account identity and the
+native HTTP reader for APIv2. Its identity parser scopes the email to the
+account-basics form: unrelated feedback email and password-change fields must
+not imply a different account or a login page. API observations bind the public
+test target and project only score/country; personal account fields stay private.
 
 The September 24 trial passed both HTTP identity checks with the owned Chrome
 containers closed. ipapi's isolated headless dashboard also passed, so its setup
@@ -97,16 +107,30 @@ This checks the authenticated browser's `/api/v4/user`, saves state only for the
 expected identity, and returns boolean metadata. It does not create an API token
 or change 2FA. Then `cloudflare_account_check` can validate the saved HTTP path.
 
+For AbuseIPDB, open `surface=login` only when the HTTP check requires recovery.
+After the authorized login, inspect `/account` with `withSession('abuseipdb', ...)`
+and `httpAccountIdentity` against `privateAccount('abuseipdb').email`. Save the
+context to `httpStatePath('abuseipdb')` with shared `saveStorageStateSafely` only
+after that exact identity matches. Then check HTTP with Chrome closed.
+Account creation and key import are separate reviewed maintenance operations:
+preserve one-submit receipts, inspect the free individual plan and labelled key,
+and privately write `secrets/abuseipdb` without replacing an existing different
+key. Registration email, name and additional personal disclosures need the user's
+authorization. Check public-profile/domain visibility after signup; the October
+11 registration defaulted both to on, and both were disabled. Do not submit abuse
+reports, subscribe to a paid plan or copy account HTML into Git.
+
 ## Private files and lifetime
 
 The path/format index is [../../CREDENTIALS.md](../../CREDENTIALS.md).
 Registration identity is ../../secrets/accounts/registration-email. Passwords,
 submission receipts, API proof, TOTP URI and recovery codes stay in private
 ../../secrets/accounts/provider directories; raw API keys use the reporter's
-flat secrets/ipapi and secrets/cloudflare_token paths.
+flat secrets/ipapi, secrets/cloudflare_token and secrets/abuseipdb paths.
 
-Profiles are .state/ipapi and .state/cloudflare, bound to CDP 19503/19504 with
-exclusive operation leases at 19603/19604. PROVIDER_ACCOUNTS_PROXY chooses a
+Profiles are .state/ipapi, .state/cloudflare and .state/abuseipdb, bound to CDP
+19503/19504/19505 with exclusive operation leases at 19603/19604/19605.
+PROVIDER_ACCOUNTS_PROXY chooses a
 credential-free HTTP proxy only for this package. Set it to DIRECT for explicit
 direct access: Chrome receives --no-proxy-server and bypasses macOS system proxy
 preferences. The bound process's actual routing flags are verified before reuse;
@@ -126,6 +150,16 @@ regeneration tool is exposed. Public results never include credentials, codes,
 seeds, cookies, account IDs or verification URL tokens.
 
 ## Dated account evidence
+
+On 2026-10-11 AbuseIPDB free individual signup, email verification and one owned
+API key succeeded. Its fixed-target MCP probe and both full direct/ATT reports
+returned validated official observations. Native HTTP matched the account with
+Chrome closed and confirmed email verification plus both public-visibility
+options off. The account settings exposed no 2FA enrollment entry, so no factor
+was created. No payment method or paid service was used. Fresh ATT headless
+signup was blocked; the explicit setup needed the dedicated headed profile.
+The final routine account/API paths use HTTP. These results do not promise future
+session or route availability.
 
 On 2026-09-22 the user selected the existing IPQS email and Hong Kong. ipapi
 signup and email activation succeeded on verified explicit DIRECT. Earlier proxy/system-route and

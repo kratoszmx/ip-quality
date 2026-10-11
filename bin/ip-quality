@@ -7,7 +7,7 @@ setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
 
-script_version="v2026-10-11-standalone.29"
+script_version="v2026-10-11-standalone.30"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset PROVIDER_DIR="$SCRIPT_DIR/providers"
 typeset COMMON_DIR="$SCRIPT_DIR/common"
@@ -26,12 +26,15 @@ typeset DBIP_LIB="$PROVIDER_DIR/dbip.zsh"
 typeset CLOUDFLARE_LIB="$PROVIDER_DIR/cloudflare.zsh"
 typeset IPQUALITYSCORE_LIB="$PROVIDER_DIR/ipqualityscore.zsh"
 typeset SCAMALYTICS_LIB="$PROVIDER_DIR/scamalytics.zsh"
+typeset IP2LOCATION_LIB="$PROVIDER_DIR/ip2location.zsh"
+typeset IPDATA_LIB="$PROVIDER_DIR/ipdata.zsh"
+typeset ABUSEIPDB_LIB="$PROVIDER_DIR/abuseipdb.zsh"
 typeset PING0_LIB="$PROVIDER_DIR/ping0.zsh"
 typeset RIPESTAT_LIB="$PROVIDER_DIR/ripestat.zsh"
 typeset INTERNETDB_LIB="$PROVIDER_DIR/shodan_internetdb.zsh"
 typeset REPUTATION_REPORT_LIB="$REPORT_DIR/reputation.zsh"
 typeset local_library
-for local_library in "$COMMON_DIR/json_values.jq" "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$CHECK_PLACE_LIB" "$SELECTION_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$DBIP_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$SCAMALYTICS_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for local_library in "$COMMON_DIR/json_values.jq" "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$CHECK_PLACE_LIB" "$SELECTION_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$DBIP_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$SCAMALYTICS_LIB" "$IP2LOCATION_LIB" "$IPDATA_LIB" "$ABUSEIPDB_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$local_library" && -r "$local_library" && ! -L "$local_library" ]]||{
 print -ru2 -- "ERROR: unsafe or missing local library: $local_library"
 exit 66
@@ -534,10 +537,12 @@ scope_includes reputation&&print -r -- "  reputation lookups use selected IDs; a
 [[ "$ipqs_dns" == auto ]]&&print -r -- "  IPQS DNS: automatic AliDNS HTTPS resolution for direct IPv4; IPv6/proxy routes keep their existing resolver; route unchanged"
 [[ "$ipqs_dns" == alidns ]]&&print -r -- "  IPQS DNS: AliDNS DoH (https://dns.alidns.com/dns-query); resolver receives IPQS hostname, not the API key or target; system DNS is unchanged"
 [[ "$ipqs_dns" == auto ]]&&print -r -- "  AliDNS (https://dns.alidns.com/dns-query) receives the IPQS hostname only, not the API key or target"
-scope_includes reputation&&print -r -- "  reputation sources: ipapi.is, Cloudflare IP Intelligence (when configured), Ping0, RIPEstat, Shodan InternetDB, plus configured Ipregistry/IPQS APIs"
+scope_includes reputation&&print -r -- "  reputation sources: ipapi.is, Cloudflare IP Intelligence (when configured), Ping0, RIPEstat, Shodan InternetDB, plus configured Ipregistry/IPQS/AbuseIPDB APIs"
 scope_includes reputation&&print -r -- "  public website demos: DB-IP page + one visitor-egress lookup (must match target); IPWHOIS one target lookup; no account, no guaranteed quota or availability"
 scope_includes reputation&&print -r -- "  supplementary sources: IPinfo public demo widget plus named Check.Place relays (MaxMind-labeled, Scamalytics, AbuseIPDB, IP2Location, ipdata, IPQualityScore)"
 scope_includes reputation&&print -r -- "  Scamalytics: if its relay fails, one public target page lookup on the same route; target and score must match the page"
+scope_includes reputation&&print -r -- "  IP2Location/ipdata: if their relay fails, public website lookups on the same route; ipdata reads its current demo key in memory for one target request"
+scope_includes reputation&&print -r -- "  AbuseIPDB: configured owned key selects official CHECK API directly; otherwise uses the named relay; no abuse report is submitted"
 scope_includes reputation&&print -r -- "  Ping0 limitation: the official free /geo endpoint exposes IP/location/ASN/organization, not a risk score"
 scope_includes reputation&&print -r -- "  Cloudflare: IP Intelligence threat categories, no numeric IP score; legacy Threat Score is retired (constant zero). RIPEstat reports routing; Shodan InternetDB reports public exposure"
 scope_includes mail&&print -r -- "  mail sources: public MX DNS plus bounded SMTP greeting probes"
@@ -1656,9 +1661,27 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}AbuseIPDB $Font_Suf
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-10-${sinfo[ldatabase]}))
 abuseipdb=()
+local RESPONSE wire_response api_key="${provider_credentials[ABUSEIPDB_API_KEY]:-}"
+abuseipdb[source]=check_place_relay
+if [[ -n "$api_key" ]];then
+abuseipdb[source]=official_api
+wire_response=$(curl_with_secret_header Key "$api_key" \
+  "https://api.abuseipdb.com/api/v2/check?ipAddress=$IP&maxAgeInDays=90" \
+  $CurlARG -sS -$1 -m 10 -H 'Accept: application/json' --max-filesize 65536 \
+  --write-out $'\n%{http_code}' 2>/dev/null)
+provider_decode_http_response "$wire_response" "$?"
+abuseipdb[status]="${provider_http_response[status]}"
+RESPONSE="${provider_http_response[body]}"
+else
 check_place_fetch_json "$1" "$IP" "db=abuseipdb"||true
 abuseipdb[status]="$PROVIDER_RESPONSE_STATUS"
-local RESPONSE="$PROVIDER_RESPONSE_BODY"
+RESPONSE="$PROVIDER_RESPONSE_BODY"
+fi
+[[ "${abuseipdb[status]}" == ok ]]||return 0
+if ! abuseipdb_response_is_valid "$RESPONSE" "$IP";then
+abuseipdb[status]=invalid_response
+return 0
+fi
 abuseipdb[usetype]=$(echo "$RESPONSE"|jq -r '.data.usageType')
 case ${abuseipdb[usetype]} in
 "Commercial")abuseipdb[susetype]="${stype[business]}"
@@ -1702,9 +1725,28 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}IP2LOCATION $Font_S
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-12-${sinfo[ldatabase]}))
 ip2location=()
+ip2location[source]=check_place_relay
 check_place_fetch_json "$1" "$IP" "db=ip2location"||true
 ip2location[status]="$PROVIDER_RESPONSE_STATUS"
 local RESPONSE="$PROVIDER_RESPONSE_BODY"
+if [[ "${ip2location[status]}" == ok ]] && ! ip2location_response_is_valid "$RESPONSE" "$IP";then
+ip2location[status]=invalid_response
+fi
+if [[ "${ip2location[status]}" != ok ]];then
+ip2location[relay_status]="${ip2location[status]}"
+ip2location[source]=public_demo
+typeset wire_response
+wire_response=$(curl -q $CurlARG -sS -$1 -m 10 --max-filesize 262144 \
+  --write-out $'\n%{http_code}' "https://www.ip2location.com/$IP" 2>/dev/null)
+provider_decode_http_response "$wire_response" "$?"
+ip2location[status]="${provider_http_response[status]}"
+[[ "${ip2location[status]}" == ok ]]||return 0
+if ! RESPONSE=$(ip2location_page_response "${provider_http_response[body]}" "$IP") ||
+   ! ip2location_response_is_valid "$RESPONSE" "$IP";then
+ip2location[status]=invalid_response
+return 0
+fi
+fi
 ip2location[usetype]=$(echo "$RESPONSE"|jq -r '.usage_type')
 ip2location[comtype]=$(echo "$RESPONSE"|jq -r '.as_info.as_usage_type')
 local first_use="${ip2location[usetype]%%/*}"
@@ -1791,11 +1833,43 @@ local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}ipdata $Font_Suffix
 ((ibar_step+=3))
 show_progress_bar "$temp_info" $((40-7-${sinfo[ldatabase]}))
 ipdata=()
+ipdata[source]=check_place_relay
 check_place_fetch_json "$1" "$IP" "db=ipdata"||true
 ipdata[status]="$PROVIDER_RESPONSE_STATUS"
 local RESPONSE="$PROVIDER_RESPONSE_BODY"
+if [[ "${ipdata[status]}" == ok ]] && ! ipdata_response_is_valid "$RESPONSE" "$IP";then
+ipdata[status]=invalid_response
+fi
+if [[ "${ipdata[status]}" != ok ]];then
+ipdata[relay_status]="${ipdata[status]}"
+ipdata[source]=public_demo
+typeset wire_response demo_key
+wire_response=$(curl -q $CurlARG -sS -$1 -m 10 --max-filesize 262144 \
+  --write-out $'\n%{http_code}' 'https://ipdata.co/' 2>/dev/null)
+provider_decode_http_response "$wire_response" "$?"
+ipdata[status]="${provider_http_response[status]}"
+[[ "${ipdata[status]}" == ok ]]||return 0
+if ! demo_key=$(ipdata_demo_key_from_page "${provider_http_response[body]}");then
+ipdata[status]=invalid_response
+return 0
+fi
+wire_response=$(curl_with_secret_url "https://api.ipdata.co/$IP?api-key=$demo_key" \
+  $CurlARG -sS -$1 -m 10 --max-filesize 262144 \
+  -H 'Referer: https://ipdata.co/' -H 'Origin: https://ipdata.co' \
+  --write-out $'\n%{http_code}' 2>/dev/null)
+provider_decode_http_response "$wire_response" "$?"
+demo_key=""
+ipdata[status]="${provider_http_response[status]}"
+[[ "${ipdata[status]}" == ok ]]||return 0
+RESPONSE="${provider_http_response[body]}"
+if ! ipdata_response_is_valid "$RESPONSE" "$IP";then
+ipdata[status]=invalid_response
+return 0
+fi
+fi
 ipdata[countrycode]=$(echo "$RESPONSE"|jq -r '.country_code')
 ipdata[proxy]=$(echo "$RESPONSE"|jq -r '.threat.is_proxy')
+ipdata[vpn]=$(echo "$RESPONSE"|jq -r '.threat.is_vpn')
 ipdata[tor]=$(echo "$RESPONSE"|jq -r '.threat.is_tor')
 ipdata[server]=$(echo "$RESPONSE"|jq -r '.threat.is_datacenter')
 ipdata[abuser1]=$(echo "$RESPONSE"|jq -r '.threat.is_threat')
@@ -2522,8 +2596,13 @@ ipjson=$(jq -n \
 --arg source_scamalytics "${scamalytics[source]:-check_place_relay}" \
 --arg relay_status_scamalytics "${scamalytics[relay_status]:-}" \
 --arg status_abuseipdb "${abuseipdb[status]:-unknown}" \
+--arg source_abuseipdb "${abuseipdb[source]:-check_place_relay}" \
 --arg status_ip2location "${ip2location[status]:-unknown}" \
+--arg source_ip2location "${ip2location[source]:-check_place_relay}" \
+--arg relay_status_ip2location "${ip2location[relay_status]:-}" \
 --arg status_ipdata "${ipdata[status]:-unknown}" \
+--arg source_ipdata "${ipdata[source]:-check_place_relay}" \
+--arg relay_status_ipdata "${ipdata[relay_status]:-}" \
 --arg status_ipapi "${ipapi[status]:-unknown}" \
 --arg ipapi_risk_status "${ipapi[risk_status]:-${ipapi[status]:-unknown}}" --arg ipapi_credential_mode "${ipapi[credential_mode]:-}" \
 --arg ipapi_mode "${ipapi[mode]:-}" --arg ipapi_ip "${ipapi[ip]:+$displayed_ip}" \
@@ -2637,10 +2716,10 @@ def dnsresults($value):
   },
   Score: {IP2LOCATION: opt($score_ip2), SCAMALYTICS: opt($score_scam), ipapi: opt($score_ipapi), AbuseIPDB: opt($score_abuse), IPQS: opt($score_ipqs), Cloudflare: null, DBIP: null},
   ScoreMeta: {
-    IP2LOCATION: {Band: opt($band_ip2), Scale: "0-99 potential risk"},
+    IP2LOCATION: {Band: opt($band_ip2), Scale: "0-99 potential risk", Status: $status_ip2location, Source: $source_ip2location, RelayStatus: opt($relay_status_ip2location)},
     SCAMALYTICS: {Band: opt($band_scam), Scale: "0-100 fraud", Status: $status_scamalytics, Source: $source_scamalytics, RelayStatus: opt($relay_status_scamalytics)},
     ipapi: {Band: opt($band_ipapi), Scale: "0-100% abuse"},
-    AbuseIPDB: {Band: opt($band_abuse), Scale: "0-100 confidence"},
+    AbuseIPDB: {Band: opt($band_abuse), Scale: "0-100 confidence", Status: $status_abuseipdb, Source: $source_abuseipdb},
     IPQS: {Band: opt($band_ipqs), Scale: "0-100 fraud", Status: $status_ipqs, Source: $source_ipqs},
     Cloudflare: {Band: null, Scale: null, Status: $status_cloudflare, Source: "official_api", Reason: "numeric_score_not_provided", LegacyThreatScore: "retired_constant_zero", ThreatCategories: $cloudflare_threats},
     DBIP: {Band: opt($band_dbip), Scale: "low/medium/high (provider label)", Status: $dbip_risk_status, Source: "public_demo", Reason: "provider_label_only"}
@@ -2669,6 +2748,8 @@ def dnsresults($value):
     Robot: {IP2LOCATION: factor($f_ip2_bot), ipapi: factor($f_ipapi_bot), Ipregistry: factor($f_ipregistry_bot), IPQS: factor($f_ipqs_bot), SCAMALYTICS: factor($f_scam_bot), ipdata: factor($f_ipdata_bot), IPinfo: factor($f_ipinfo_bot)}
   },
   FactorMeta: {
+    IP2LOCATION: {Status: $status_ip2location, Source: $source_ip2location, RelayStatus: opt($relay_status_ip2location)},
+    ipdata: {Status: $status_ipdata, Source: $source_ipdata, RelayStatus: opt($relay_status_ipdata)},
     SCAMALYTICS: {Status: $status_scamalytics, Source: $source_scamalytics},
     ipapi: {Status: $ipapi_risk_status, Source: "public_api", Mode: opt($ipapi_mode), CredentialMode: opt($ipapi_credential_mode)},
     IPWhois: {Status: $ipwhois_risk_status, Source: "public_demo", Reason: "website_demo_security_flags"}

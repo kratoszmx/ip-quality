@@ -1,0 +1,8 @@
+{
+  "ip": "198.51.100.23", "country_code": "US",
+  "threat": {
+    "is_proxy": false, "is_vpn": false, "is_tor": false,
+    "is_datacenter": true, "is_threat": false,
+    "is_known_abuser": false, "is_known_attacker": false
+  }
+}

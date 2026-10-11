@@ -29,6 +29,13 @@ The hashes below identify the exact upstream inputs before local modification:
 
 The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 
+- Added same-route public-demo fallbacks for IP2Location and ipdata. The former
+  reads the target-bound JSON example on IP2Location.com; the latter discovers
+  its website's published demo key for one in-memory request. Explicit false
+  and zero survive, absent fields stay unknown, and JSON preserves both source
+  and relay outcomes. Added owned-key AbuseIPDB APIv2 support and account-MCP
+  maintenance. No new paid plan, hard-coded demo key or browser dependency was
+  introduced into the reporter.
 - Integrated direct IPv4 IPQS HTTPS DNS resolution into the normal all-source
   flow, keeping existing IPv6/proxy routes and maintenance overrides. Added one
   same-route Scamalytics public-page fallback when its relay fails; heading,

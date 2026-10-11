@@ -14,7 +14,7 @@ The optional Node account MCPs reuse the mcps JavaScript library described below
 | Definition | Production callers | Responsibility |
 | --- | --- | --- |
 | `common/provider_values.zsh` | Provider parsers and `bin/ip-quality` | Validate/normalize provider values without source-specific schemas |
-| `common/json_values.jq` | ipapi, Cloudflare, IPWHOIS, DB-IP and Shodan parsers | Optional bounded text/integer predicates; source schemas stay in each parser |
+| `common/json_values.jq` | ipapi, Cloudflare, IPWHOIS, DB-IP, IP2Location, AbuseIPDB and Shodan parsers | Optional bounded text/integer predicates; source schemas stay in each parser |
 | `common/terminal.zsh` | `bin/ip-quality`; type, score and factor renderers in `report/reputation.zsh` | ANSI cleanup, display-cell measurement and aligned table layout with independent column widths |
 | `common/text.rb` | `leaf_runner/profile.rb`, `leaf_runner/subscription_catalog.rb` | Validate bounded printable metadata |
 | `common/safe_snapshot.rb` | Profile, catalog, and isolated Mihomo session | Read or verify owner-controlled local files and compare snapshots |
@@ -42,6 +42,11 @@ provider_merge_boolean_signals false unknown  # empty: missing evidence stays un
 provider_decode_http_response $'{"example":true}\n200' 0
 print -r -- "${provider_http_response[status]}"
 ```
+
+IP2Location's page/JSON validators, ipdata's transient demo-key/schema readers,
+and AbuseIPDB's CHECK validator stay in `providers/`: their schemas and target
+contracts are provider-specific. Their requests reuse `provider_decode_http_response`;
+credential-bearing requests use the existing stdin curl configuration helpers.
 
 Provider schemas, request endpoints, optional credential files, source-specific
 status decisions, and report labels remain in `providers/`, `bin/ip-quality`,
@@ -239,13 +244,19 @@ HTTP helpers live in `mcp/provider-accounts/http-account.mjs`:
 
 | Function | Input / output |
 | --- | --- |
-| `httpStatePath(provider)` | Validates `ipapi`/`cloudflare` and returns its absolute private HTTP-state path |
+| `httpStatePath(provider)` | Validates `ipapi`/`cloudflare`/`abuseipdb` and returns its absolute private HTTP-state path |
 | `httpAccountIdentity(provider, status, contentType, body, expectedEmail)` | Pure provider-specific identity check; returns booleans/status metadata without email or response content |
 | `readHttpAccount(provider, expectedEmail, dependencies = {})` | One bounded HTTP GET using private saved state; returns identity/status metadata, disposes its HTTP context, and starts no Chrome. Tests can inject secret/context/response readers |
 
 Cloudflare's `identityOnPage(page)` verifies the active browser's server identity
 before refreshing saved HTTP state. Ordinary HTTP checks only consume that state;
 see [recovery guidance](mcp/provider-accounts/AGENTS.md#http-state-recovery).
+
+AbuseIPDB's account identity scopes the saved email to the account-basics form,
+requires the logout action and projects public-profile/domain settings as
+booleans. Its API observation validation stays in `abuseipdb.mjs`; it is not a
+generic reputation schema. Both request paths reuse the existing shared HTTP
+and private-file implementations directly.
 
 The same MCP owns `public-api.mjs::verifyPublicProvider(provider, confirmation,
 request, surface)` for DB-IP/IPWHOIS. The MCP selects `free_api` (default) or

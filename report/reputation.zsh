@@ -120,6 +120,8 @@ report_type_source(){
 case "$YY:$1" in
 cn:ipinfo)print -rn -- "公开示例组件"
 ;;
+cn:demo)print -rn -- "公开示例"
+;;
 cn:direct)print -rn -- "直接公开 API"
 ;;
 cn:relay)print -rn -- "上游中继"
@@ -127,6 +129,8 @@ cn:relay)print -rn -- "上游中继"
 cn:official)print -rn -- "官方 API"
 ;;
 en:ipinfo)print -rn -- "public demo widget"
+;;
+en:demo)print -rn -- "public demo"
 ;;
 en:direct)print -rn -- "direct public API"
 ;;
@@ -284,14 +288,18 @@ fi
 if report_source_visible "${ip2location[status]:-}" "${ip2location[susetype]}" "${ip2location[scomtype]}";then
 headers+=("${Font_B}${Font_Cyan}IP2Location$Font_Suffix")
 statuses+=("$(report_query_status "${ip2location[status]:-ok}")")
-sources+=("$(report_type_source relay)")
+typeset ip2location_source_kind=relay
+[[ "${ip2location[source]:-}" == public_demo ]]&&ip2location_source_kind=demo
+sources+=("$(report_type_source "$ip2location_source_kind")")
 usages+=("${ip2location[susetype]}")
 companies+=("${ip2location[scomtype]}")
 fi
 if report_source_visible "${abuseipdb[status]:-}" "${abuseipdb[susetype]}";then
 headers+=("${Font_B}${Font_Cyan}AbuseIPDB$Font_Suffix")
 statuses+=("$(report_query_status "${abuseipdb[status]:-ok}")")
-sources+=("$(report_type_source relay)")
+typeset abuse_source_kind=relay
+[[ "${abuseipdb[source]:-}" == official_api ]]&&abuse_source_kind=official
+sources+=("$(report_type_source "$abuse_source_kind")")
 usages+=("${abuseipdb[susetype]}")
 companies+=("")
 fi
@@ -357,7 +365,9 @@ typeset -a headers scores risks scales source_statuses
 if report_source_visible "${ip2location[status]:-}" "${ip2location[score]}" "${ip2location[risk]}";then
 headers+=("${Font_B}${Font_Cyan}IP2Location$Font_Suffix")
 scores+=("${ip2location[score]}") risks+=("${ip2location[risk]}") scales+=("0-99 potential")
-source_statuses+=("$(report_score_source_status relay "${ip2location[status]:-ok}")")
+typeset ip2location_source_kind=relay
+[[ "${ip2location[source]:-}" == public_demo ]]&&ip2location_source_kind=demo
+source_statuses+=("$(report_score_source_status "$ip2location_source_kind" "${ip2location[status]:-ok}")")
 fi
 if report_source_visible "${scamalytics[status]:-}" "${scamalytics[score]}" "${scamalytics[risk]}";then
 headers+=("${Font_B}${Font_Cyan}Scamalytics$Font_Suffix")
@@ -374,7 +384,9 @@ fi
 if report_source_visible "${abuseipdb[status]:-}" "${abuseipdb[score]}" "${abuseipdb[risk]}";then
 headers+=("${Font_B}${Font_Cyan}AbuseIPDB$Font_Suffix")
 scores+=("${abuseipdb[score]}") risks+=("${abuseipdb[risk]}") scales+=("0-100 confidence")
-source_statuses+=("$(report_score_source_status relay "${abuseipdb[status]:-ok}")")
+typeset abuse_source_kind=relay
+[[ "${abuseipdb[source]:-}" == official_api ]]&&abuse_source_kind=official
+source_statuses+=("$(report_score_source_status "$abuse_source_kind" "${abuseipdb[status]:-ok}")")
 fi
 if report_source_visible "${ipqs[status]:-}" "${ipqs[score]}" "${ipqs[risk]}" "${ipqs[source]}";then
 headers+=("${Font_B}${Font_Cyan}IPQS$Font_Suffix")
@@ -469,7 +481,9 @@ robots+=("${scamalytics[robot]}")
 fi
 if report_source_visible "${ipdata[status]:-}" "${ipdata[countrycode]}" "${ipdata[proxy]}" "${ipdata[vpn]}" "${ipdata[tor]}" "${ipdata[server]}" "${ipdata[abuser]}" "${ipdata[robot]}";then
 headers+=("${Font_B}${Font_Cyan}ipdata$Font_Suffix")
-statuses+=("$(report_query_status "${ipdata[status]:-ok}")")
+typeset ipdata_source_kind=relay
+[[ "${ipdata[source]:-}" == public_demo ]]&&ipdata_source_kind=demo
+statuses+=("$(report_score_source_status "$ipdata_source_kind" "${ipdata[status]:-ok}")")
 countries+=("${ipdata[countrycode]}") proxies+=("${ipdata[proxy]}")
 vpns+=("${ipdata[vpn]}") tors+=("${ipdata[tor]}")
 servers+=("${ipdata[server]}") abusers+=("${ipdata[abuser]}")
@@ -607,21 +621,21 @@ if [[ -n "${cloudflare[status]:-}" && "${cloudflare[status]}" != "not_configured
 missing+=("Cloudflare IP Intelligence")
 fi
 if ! report_any_known "${ip2location[susetype]}" "${ip2location[scomtype]}" "${ip2location[score]}" "${ip2location[countrycode]}" "${ip2location[proxy]}" "${ip2location[vpn]}" "${ip2location[tor]}" "${ip2location[server]}" "${ip2location[abuser]}" "${ip2location[robot]}";then
-case "${ip2location[status]}" in
-disabled) ;;
-cloudflare_blocked)relay_cloudflare_blocked+=("IP2Location")
+case "${ip2location[source]:-check_place_relay}:${ip2location[status]}" in
+*:disabled) ;;
+check_place_relay:cloudflare_blocked)relay_cloudflare_blocked+=("IP2Location")
 ;;
-http_403)relay_http_403+=("IP2Location")
+check_place_relay:http_403)relay_http_403+=("IP2Location")
 ;;
 *)missing+=("IP2Location")
 esac
 fi
 if ! report_any_known "${abuseipdb[susetype]}" "${abuseipdb[score]}";then
-case "${abuseipdb[status]}" in
-disabled) ;;
-cloudflare_blocked)relay_cloudflare_blocked+=("AbuseIPDB")
+case "${abuseipdb[source]:-check_place_relay}:${abuseipdb[status]}" in
+*:disabled) ;;
+check_place_relay:cloudflare_blocked)relay_cloudflare_blocked+=("AbuseIPDB")
 ;;
-http_403)relay_http_403+=("AbuseIPDB")
+check_place_relay:http_403)relay_http_403+=("AbuseIPDB")
 ;;
 *)missing+=("AbuseIPDB")
 esac
@@ -637,11 +651,11 @@ check_place_relay:http_403)relay_http_403+=("Scamalytics")
 esac
 fi
 if ! report_any_known "${ipdata[countrycode]}" "${ipdata[proxy]}" "${ipdata[tor]}" "${ipdata[server]}" "${ipdata[abuser]}";then
-case "${ipdata[status]}" in
-disabled) ;;
-cloudflare_blocked)relay_cloudflare_blocked+=("ipdata")
+case "${ipdata[source]:-check_place_relay}:${ipdata[status]}" in
+*:disabled) ;;
+check_place_relay:cloudflare_blocked)relay_cloudflare_blocked+=("ipdata")
 ;;
-http_403)relay_http_403+=("ipdata")
+check_place_relay:http_403)relay_http_403+=("ipdata")
 ;;
 *)missing+=("ipdata")
 esac

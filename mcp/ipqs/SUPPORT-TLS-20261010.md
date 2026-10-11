@@ -32,9 +32,14 @@ ATT-to-service path, without proving which remote component closes it; it is
 not an account-wide, target-wide or demonstrated global IPQS outage. This
 reporter DNS option does not change the MCP's HTTP/browser transport.
 
-October 11: the reporter now applies that DNS repair automatically for direct
-IPv4, and its full default run returned a valid IPQS score. The full ATT run
-still failed TLS. A bounded search for the inquiry subject since October 9
-across both `ipqualityscore.com` and `ipqs.com` sender domains returned no
-message references; this is not an exhaustive mailbox or delivery check.
-No resend occurred. The reporter fix still does not change MCP transport.
+October 11, 17:25 Asia/Shanghai: the reporter now applies that DNS repair
+automatically for direct IPv4, and its full default run returned a valid IPQS
+score. ATT still failed TLS. A fresh exact-thread metadata read contained only
+the original Sent message. A bounded search since October 9, including Spam and
+Trash and both official sender domains/the inquiry subject, likewise matched
+only the sent inquiry. An earlier bounded bounce search returned none. There is
+no support reply or confirmed provider diagnosis in these checked surfaces.
+The inquiry was sent Saturday and checked Sunday, less than 24 hours later;
+no duplicate follow-up was sent. A normal business-day response window is more
+useful than another immediate message; no automatic mail job was created.
+The reporter DNS repair still does not change MCP transport.

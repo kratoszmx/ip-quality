@@ -11,21 +11,26 @@ The reporter's accepted names and precedence are documented in
 | Shared IPQS API key | `secrets/ipqs`, one raw key shared by reporter and `mcp/ipqs` |
 | Existing IPQS login | Fixed private two-line bundle under `/Users/zmx/codexworkspace/secrets/infrastructure/network/ipqs/`; discovered by `mcp/ipqs/src/credentials.ts` |
 | ipapi full API key | `secrets/ipapi`, verified free-plan raw key shared by reporter and account MCP |
+| AbuseIPDB CHECK key | `secrets/abuseipdb`, one raw owned key shared by reporter and account MCP; global `ABUSEIPDB_API_KEY` assignment is also supported |
 | Cloudflare Intel token | `secrets/cloudflare_token`, one account-scoped Intel Read token |
 | Cloudflare account ID | `secrets/cloudflare_account_id`, 32 lowercase hexadecimal characters |
 | Registration identity | `secrets/accounts/registration-email`, the email confirmed by the user |
-| Provider login | `secrets/accounts/{ipapi,cloudflare}/credentials.json`, private email/password |
+| Provider login | `secrets/accounts/{ipapi,cloudflare,abuseipdb}/credentials.json`, private email/password and any explicitly authorized registration fields |
 | Cloudflare authenticator | `secrets/accounts/cloudflare/totp-uri`, private RFC 6238 provisioning URI |
 | Cloudflare recovery codes | `secrets/accounts/cloudflare/recovery-codes.json`, private recovery data after enrollment |
 | IPQS authenticator | `secrets/accounts/ipqs/totp-uri`, private exact-account provisioning URI; issuer provisions an 80-bit seed |
 | IPQS emergency recovery | `secrets/accounts/ipqs/recovery-code`; `enrollment-attempt.json` prevents duplicate activation |
-| Browserless account sessions | `mcp/provider-accounts/.state/{ipapi,cloudflare}-http.json`, owner-only saved state; never emitted or committed |
+| Browserless account sessions | `mcp/provider-accounts/.state/{ipapi,cloudflare,abuseipdb}-http.json`, owner-only saved state; never emitted or committed |
 | Account action evidence | Provider-local registration/token/enrollment receipts and `availability.json` under `secrets/accounts/` |
 
 A saved registration password does not establish that an account was created.
 A saved API key does not establish available quota. `cloudflare_verify_free_api`
 records a real useful lookup before its TOTP tool can run, bound to the same
 account and key. Existing factors and different local keys are preserved.
+AbuseIPDB registration, privacy-setting and key-creation receipts stay under its
+private account directory. Its public profile and domain visibility were both
+disabled and read back on October 11. Documents and fixtures contain no real
+registration identity, key, session cookie or email-verification URL.
 
 Browser profiles belong to their MCP's private `.state/` directories. Private
 HTTP state serves account checks only; the reporter uses no cookies or duplicate keys. Textual provider setup

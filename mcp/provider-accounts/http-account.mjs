@@ -25,6 +25,28 @@ export function httpAccountIdentity(provider, status, contentType, body, expecte
   // Only server-rendered, labelled account inputs prove the saved identity.
   // Scripts/comments and password/login forms cannot supply that evidence.
   const html = body.replace(/<!--[\s\S]*?-->|<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '');
+  if (provider === 'abuseipdb') {
+    // The account page also has a password-change form and a feedback email.
+    // Bind only the account-basics form, never those unrelated inputs.
+    const forms = [...html.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form\s*>/gi)]
+      .filter(([, attrs]) => /\baction=["']\/account\/update-basics["']/i.test(attrs));
+    const accountForm = forms.length === 1 ? forms[0][2] : '';
+    const inputs = [...accountForm.matchAll(/<input\b[^>]*>/gi)].map(([tag]) => ({
+      ...Object.fromEntries([...tag.matchAll(/([\w-]+)\s*=\s*(["'])(.*?)\2/g)]
+        .map(([, key, , value]) => [key.toLowerCase(), value])),
+      checked: /\schecked(?:\s|=|\/?>)/i.test(tag),
+    }));
+    const emails = inputs.filter(input => input.name === 'email');
+    const authenticated = emails.length === 1 && emails[0].value === expectedEmail &&
+      /<form\b[^>]*\baction=["']\/logout["']/i.test(html);
+    const privacy = name => {
+      const fields = inputs.filter(input => input.name === name && input.type === 'checkbox');
+      return authenticated && fields.length === 1 ? fields[0].checked : null;
+    };
+    return { ...unavailable, authenticated, state: authenticated ? 'authenticated' : 'login_required',
+      ...(authenticated ? { emailVerificationPending: /\/account\/resend-email-verification/.test(html),
+        publicProfile: privacy('public'), publicDomain: privacy('domain-visibility') } : {}) };
+  }
   if (/<input\b[^>]*\btype\s*=\s*(?:"password"|'password'|password(?=[\s/>]))/i.test(html)) return { ...unavailable, state: 'login_required' };
   const inputs = [...html.matchAll(/<input\b[^>]*>/gi)].map(([tag]) => Object.fromEntries(
     [...tag.matchAll(/([\w-]+)\s*=\s*(["'])(.*?)\2/g)].map(([, key, , value]) => [key.toLowerCase(), value])));

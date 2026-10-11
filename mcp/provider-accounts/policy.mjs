@@ -1,6 +1,7 @@
 export const PROVIDERS = Object.freeze({
   ipapi: { origin: 'https://ipapi.is', signup: '/app/signup', login: '/app/', dashboard: '/app/home', security: null, port: 19503, passwordField: 'pass', signupButton: 'Create Free Account' },
   cloudflare: { origin: 'https://dash.cloudflare.com', signup: '/sign-up', login: '/login', dashboard: '/', security: '/profile/authentication', port: 19504, passwordField: 'password', signupButton: 'Sign up' },
+  abuseipdb: { origin: 'https://www.abuseipdb.com', signup: '/register', login: '/login', dashboard: '/account', security: null, port: 19505, passwordField: 'password', signupButton: 'REGISTER' },
 });
 
 export function providerConfig(provider) {

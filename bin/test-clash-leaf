@@ -340,6 +340,8 @@ module IpQuality
       @stdout.puts "  reporter scope: reputation only (HTTP(S) requests forced through the isolated leaf)"
       @stdout.puts "  selected sources: #{@sources}"
       @stdout.puts "  Scamalytics: one public target-page fallback if its relay fails; same selected leaf"
+      @stdout.puts "  IP2Location/ipdata: public website fallback if their relay fails; transient ipdata demo key, same selected leaf"
+      @stdout.puts "  AbuseIPDB: official CHECK API with the configured key, otherwise its named relay; no abuse report is submitted"
       @stdout.puts "  Ping0: official public geo/ASN/organization observation; public endpoint has no risk score"
       @stdout.puts "  RIPEstat: official routed-prefix/origin-ASN context; not a risk score"
       @stdout.puts "  Shodan InternetDB: official IPv4 exposure context; not a risk score"

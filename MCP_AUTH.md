@@ -1,8 +1,9 @@
 # MCP guide and authentication
 
-Owner: `ipquality`. Inventory and tool schemas reviewed 2026-09-24. The account
-evidence below records the earlier v25 authentication audit; documentation
-validation does not repeat live logins. File existence alone is not a login check.
+Owner: `ipquality`. Inventory and tool schemas reviewed 2026-10-11. AbuseIPDB's
+new live evidence is dated separately from the September authentication audit.
+Documentation validation does not repeat every login. File existence alone is
+not a login check.
 Private paths/formats are in [CREDENTIALS.md](CREDENTIALS.md), process lifetime
 in [SERVICES.md](SERVICES.md), and offline checks in [TESTING.md](TESTING.md).
 
@@ -11,7 +12,7 @@ in [SERVICES.md](SERVICES.md), and offline checks in [TESTING.md](TESTING.md).
 | Server | Owner / start from repository root | Use it for |
 | --- | --- | --- |
 | `codex-ipqs-mcp` | [IPQS guide](mcp/ipqs/AGENTS.md); build with `npm --prefix mcp/ipqs run build`, start with `npm --prefix mcp/ipqs start` | Official IPQS API usage/lookups, dashboard, saved login and private TOTP |
-| `ipquality-provider-accounts` | [Provider-account guide](mcp/provider-accounts/AGENTS.md); `npm --prefix mcp/provider-accounts start` | ipapi/Cloudflare identity and setup; DB-IP/IPWHOIS account-free probes |
+| `ipquality-provider-accounts` | [Provider-account guide](mcp/provider-accounts/AGENTS.md); `npm --prefix mcp/provider-accounts start` | ipapi/Cloudflare/AbuseIPDB account maintenance; DB-IP/IPWHOIS account-free probes |
 
 Both are optional on-demand stdio servers; the reporter needs neither running.
 Runtime/dependency and shutdown details are in [SERVICES.md](SERVICES.md).
@@ -21,13 +22,16 @@ are private recovery/audit state, not disposable temporary MCPs.
 ## Choose a first call
 
 These are server-local tool names and JSON arguments; a client may add its own
-prefix. The first two calls are offline. Live MCP reads run when called; the
+prefix. Local-readiness calls are offline. Live MCP reads run when called; the
 reporter's `--confirm-network-lookup` flag does not apply to MCP tools.
 
 | Need | Tool | Arguments | Network / meaning |
 | --- | --- | --- | --- |
 | IPQS local readiness | `ipqs_status` | `{"probeBrowser":false}` | None; saved files are not proof of login or credits |
 | ipapi/Cloudflare local readiness | `provider_account_status` | `{"provider":"ipapi"}` | None; use `cloudflare` for that account |
+| AbuseIPDB local readiness | `abuseipdb_account_status` | `{}` | None; account/key presence only |
+| AbuseIPDB identity and privacy settings | `abuseipdb_account_check` | `{}` | Live HTTP; exact saved account, email-verification and public-profile booleans only |
+| AbuseIPDB free API proof | `abuseipdb_verify_free_api` | `{"confirmation":"VERIFY_FREE_API"}` | One official `1.1.1.1` CHECK lookup; no browser or abuse-report submission |
 | IPQS account/API acceptance | `ipqs_account_usage` | `{}` | One live account read; no reputation lookup credit |
 | ipapi saved-session identity | `provider_account_read` | `{"provider":"ipapi","mode":"http"}` | Live HTTP, no Chrome; inspect `authenticated` and `state` |
 | Cloudflare identity and 2FA state | `cloudflare_account_check` | `{}` | Live HTTP, no Chrome or Intel lookup |
@@ -40,6 +44,22 @@ IPQS uses the input name `confirm` for mutations; provider accounts uses
 `confirmation`. Account operations follow task intent and the tool's own schema.
 
 ## Dated state and preferred access
+
+October 11: the user-authorized AbuseIPDB individual signup, confirmation email
+and one API-key creation completed. Native HTTP with saved private state matched
+the exact account and confirmed email verification. Both public-profile and
+domain-visibility checkboxes were disabled and read back as false. Its official
+key returned useful data through the MCP probe and both complete direct/ATT
+reports. The account settings exposed no 2FA enrollment entry, so no factor was
+created. This records the inspected surface, not a guarantee that the provider
+will never offer 2FA. No payment method or upgrade was used.
+
+AbuseIPDB's routine account and API checks use HTTP with Chrome closed. Its fresh
+ATT headless signup was blocked; the reviewed setup used a dedicated headed
+container. The owned container was closed after saving the private HTTP state.
+Use `abuseipdb_account_open` with `surface=login` only for explicit recovery;
+signup, privacy settings and key creation are reviewed maintenance operations,
+not automatic retries. See the package recovery guide before restoring state.
 
 On October 10, official IPQS account reads passed over direct IPv6 and `awshk`;
 the initial balance was 5020 credits / usage 1. A lookup of the ATT target through

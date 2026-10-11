@@ -34,3 +34,24 @@ test('HTTP reads use private state without starting Chrome; reject redirects and
   assert.equal(JSON.stringify(failed).includes('private cookie value'), false);
   assert.equal(disposed, 2);
 });
+
+test('AbuseIPDB HTTP identity ignores feedback/change-password forms and exposes privacy booleans only', () => {
+  const form = `<form action="/account/update-basics"><input name="email" value="${email}">
+    <input name="public" type="checkbox"><input name="domain-visibility" type="checkbox"></form>`;
+  const body = `${form}<form action="/logout"></form><input name="email" value="feedback@example.test"><input type="password">`;
+  const observed = httpAccountIdentity('abuseipdb', 200, 'text/html', body, email);
+  assert.equal(observed.authenticated, true);
+  assert.equal(observed.publicProfile, false);
+  assert.equal(observed.publicDomain, false);
+  assert.equal(observed.emailVerificationPending, false);
+  assert.equal(JSON.stringify(observed).includes(email), false);
+  const pending = httpAccountIdentity('abuseipdb', 200, 'text/html', body.replace('name="public"', 'checked name="public"') +
+    '<form action="/account/resend-email-verification"></form>', email);
+  assert.equal(pending.publicProfile, true);
+  assert.equal(pending.emailVerificationPending, true);
+  for (const invalid of [body.replace(email, 'other@example.test'), body + form, `<script>${body}</script>`,
+    body.replace('/logout', '/login'), '<form action="/login"><input name="email" value="fixture@example.test"></form>']) {
+    assert.equal(httpAccountIdentity('abuseipdb', 200, 'text/html', invalid, email).authenticated, false);
+  }
+  assert.equal(httpAccountIdentity('abuseipdb', 302, 'text/html', body, email).authenticated, false);
+});

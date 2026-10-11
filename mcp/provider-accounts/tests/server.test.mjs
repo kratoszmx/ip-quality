@@ -10,7 +10,10 @@ test('stdio exposes bounded provider actions and rejects unknown providers befor
   try {
     await client.connect(transport);
     const { tools } = await client.listTools();
-    assert.equal(tools.length, 12);
+    assert.equal(tools.length, 16);
+    for (const name of ['abuseipdb_account_status', 'abuseipdb_account_check', 'abuseipdb_verify_free_api', 'abuseipdb_account_open']) {
+      assert.ok(tools.some(tool => tool.name === name));
+    }
     for (const tool of tools) assert.match(tool.description, /Free accounts only/);
     const response = await client.callTool({ name: 'provider_account_status', arguments: { provider: 'foreign.invalid' } });
     assert.equal(response.isError, true);

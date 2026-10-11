@@ -99,6 +99,10 @@ on proxy/leaf routes. A missing key keeps the default relay contract.
 When Scamalytics' relay fails, the same route queries its public target page
 once and validates the displayed IP/score. Its source is labeled public demo;
 the relay outcome is retained in JSON alongside the final result.
+IP2Location also falls back to its target-specific public JSON example; ipdata
+reads its website's current demo key and performs one target lookup. Both stay
+on the selected route, require target/schema agreement, and retain source and
+relay status in JSON. An owned `secrets/abuseipdb` key selects APIv2 directly.
 
 The raw reporter accepts one positional public IP only with `reputation` or
 `dnsbl`; for example, this remains a plan until confirmation is added:
@@ -146,7 +150,7 @@ API keys are optional; private file formats and precedence are in
   account probe, API integration and private browser profile. Reporter and MCP
   share the same private `secrets/ipqs` key.
 - [mcp/provider-accounts/AGENTS.md](mcp/provider-accounts/AGENTS.md) owns free
-  ipapi/Cloudflare account setup and account-free DB-IP/IPWHOIS probes. Free
+  ipapi/Cloudflare/AbuseIPDB account management and account-free DB-IP/IPWHOIS probes. Free
   geography APIs and website risk demos have separate contracts; see
   [PROVIDERS.md](PROVIDERS.md).
 

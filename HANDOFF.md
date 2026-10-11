@@ -1,8 +1,70 @@
 # Current handoff
 
+## Independent source recovery and AbuseIPDB account — 2026-10-11, v30
+
+Current reporter: `v2026-10-11-standalone.30` on `main`. Keep the one normal
+interactive all-source command in [AGENTS.md](AGENTS.md).
+
+- IP2Location and ipdata now recover automatically from unavailable/malformed
+  Check.Place responses using their current public website examples on the
+  same route. Both bind returned data to the requested target, validate values,
+  preserve missing flags as unknown and retain relay/final provenance in JSON.
+  ipdata's public demo key is discovered for one in-memory request, never
+  hard-coded or cached. Successful relays make no extra request.
+- The user-authorized free AbuseIPDB individual account completed signup and
+  email verification. One owned key now selects its official APIv2 CHECK in the
+  normal report. Key/password/session data remain private. The website defaulted
+  public profile/domain visibility to on; both were turned off and confirmed by
+  HTTP readback. The inspected account settings exposed no 2FA entry. API and
+  account checks work through native HTTP with the setup browser closed.
+- The existing `mcp/provider-accounts/` server now has four AbuseIPDB tools:
+  local readiness, exact-account HTTP check, a fixed free API probe and explicit
+  login/signup-page recovery. No new standalone MCP, wrapper, paid plan or
+  dependency was introduced. See [MCP_AUTH.md](MCP_AUTH.md) for dated login and
+  privacy evidence and the package guide for recovery.
+- Both full direct and isolated `vps+sub7` / `ATT` reports returned `ok` for
+  IPinfo, Ipregistry, Scamalytics, AbuseIPDB, IP2Location, ipdata, ipapi and
+  IPWHOIS. The repaired three sources succeeded on both routes. Direct IPQS
+  returned `ok`, while ATT still failed TLS before HTTP. DB-IP returned its
+  actual rate-limit state on both. Check.Place's MaxMind dataset remains blocked;
+  the basic section still uses its named IPinfo fallback.
+- Cloudflare Intel succeeded on the initial direct/ATT runs and the final
+  direct run. The final full ATT run had a TLS failure; one targeted ATT recheck
+  succeeded. This is evidence of intermittent transport failure, not permanent
+  credential failure or a fixed network path. Both outcomes remain in private
+  evidence; no automatic retry or route substitution was added.
+- Current NodeQuality source still launches IP.Check.Place; it has no separate
+  recovery strategy for our blocked relay. Other projects' direct provider API
+  and website-example approaches informed the repaired paths, without copying
+  synthetic scores or inferring false from missing data. Details and primary
+  links are in [PROVIDERS.md](PROVIDERS.md#independent-recovery-for-relay-backed-sources).
+- At 17:25 Asia/Shanghai, the IPQS support thread still contained only the
+  original Sent message. A domain/subject search including Spam/Trash also
+  matched only that message. No follow-up was sent less than 24 hours after the
+  Saturday inquiry. Direct success, the earlier same-target/other-route controls
+  and ATT failures across clients exclude a demonstrated global account/key
+  failure, but do not identify the remote hop closing ATT TLS. See the
+  [support note](mcp/ipqs/SUPPORT-TLS-20261010.md).
+
+Private evidence: `reports/{direct,att}-20261011-v30-final.{json,txt,stderr}`,
+`reports/{direct,att}-20261011-v30.{json,txt,stderr}` and
+`reports/att-cloudflare-20261011-v30-recheck.{json,txt,stderr}`. API/account action
+receipts remain under `secrets/accounts/abuseipdb/`; useful login state remains
+under the MCP's private `.state/`. Setup scripts, consumed verification links
+and token-bearing exploratory pages were removed after use. No active Clash
+profile or selection was changed.
+
+Validation: complete offline entry passed **131 Ruby cases / 2,820 assertions**,
+**26 IPQS tests** and **36 provider-account tests**, zero failures/skips
+(`reports/offline-20261011-v30-final.txt`). New regression cases check relay
+success without fallbacks, public-example target/schema binding, hidden keys,
+same-route failures, official AbuseIPDB errors without retry/relay, and HTTP
+account recognition with privacy settings. Fixture success and the dated live
+observations are separate evidence.
+
 ## Default full-flow repairs — 2026-10-11, v29
 
-Current reporter: `v2026-10-11-standalone.29` on `main`. Give the user only the
+Earlier reporter: `v2026-10-11-standalone.29` on `main`. Give the user only the
 original interactive all-source command in [AGENTS.md](AGENTS.md); source/DNS
 switches are agent diagnostics, not extra user workflows.
 
