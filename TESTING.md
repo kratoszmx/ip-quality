@@ -154,6 +154,9 @@ passes do not prove a live account session.
   `test/support/` and `test/fixtures/`. Add a sanitized parser fixture with each
   provider. Prefer observable results over exact implementation strings; keep
   source checks for explicit provenance and prohibited-runtime constraints.
+  Internal variable names, retired helper filenames and optional-section
+  numbering are not contracts. Keep ANSI byte checks in the table-rendering
+  case instead of repeating the same fixture in a separate color-output test.
 
 Before committing, also run `git diff --check`. Record the current aggregate
 result in [HANDOFF.md](HANDOFF.md). A passing suite proves the local code against

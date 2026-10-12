@@ -64,17 +64,19 @@ actions, and only its verified owner should close it before changing routes.
 
 ## External checks
 
-Supervisor owns the schedule; these are bounded weekly jobs, not project daemons:
+Supervisor owns the schedule. Its current project entry is a bounded weekly
+test job, not a project daemon:
 
 | Check | Purpose |
 | --- | --- |
 | `test.mcps.ipqs-mcp.test-offline` | IPQS build and offline tests only; excludes reporter/provider-account suites and the synthetic browser test |
-| `mcp.ipqs` | One sanitized account API probe; no Chrome or reputation lookup |
-| `api.ipqs` | Local API-key expiry metadata; no provider request |
 
 Use [TESTING.md](TESTING.md) for complete project validation. The scheduler and
-its service are owned by `/Users/zmx/Projects/supervisor`; these checks remain
-useful and do not require a retained project browser. Historical support-mail
+its service are owned by `/Users/zmx/Projects/supervisor`; this check remains
+useful and does not require a retained project browser. The 2026-10-12
+`inventory` contains neither the former `mcp.ipqs` account probe nor the
+`api.ipqs` expiry check. Manual account probes remain available when needed;
+their existence does not imply scheduled monitoring. Historical support-mail
 receipts are not background services or instructions to restart a watch.
 
 ## Network-free checks

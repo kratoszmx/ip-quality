@@ -187,9 +187,10 @@ end
   end
 
   def test_only_implemented_report_languages_are_advertised_and_accepted
-    source = File.read(SCRIPT, encoding: "UTF-8")
-    assert_includes source, "-l cn|en"
-    refute_match(/cn\|en\|jp|\"jp\"\|\"es\"/, source)
+    help, errors, result = run_script("--help")
+    assert result.success?, errors
+    assert_includes help, "-l cn|en"
+    assert_empty errors
 
     stdout, stderr, status = run_script(
       "--confirm-network-lookup",

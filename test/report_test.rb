@@ -280,13 +280,6 @@ class ReportTest < ReporterTestCase
     end
   end
 
-def test_optional_mail_section_follows_reputation_context
-  source = File.read(SCRIPT)
-  assert_includes source, 'smail[title]="6. Email service availability and blacklist detection"'
-  assert_includes source, 'smail[title]="六、邮局连通性及黑名单检测"'
-  refute_match(/MediaUnlockTest|OpenAITest|media_trace_country_code/, source)
-end
-
   def test_report_files_preserve_json_escapes_ansi_bytes_and_plain_layout
     value = "tab\tline\nterminal\e[31mred\e[0m"
     json = JSON.generate("value" => value)
@@ -304,38 +297,6 @@ end
       end
       assert_equal value, JSON.parse(File.read(File.join(directory, "report.JSON"))).fetch("value")
     end
-  end
-
-  def test_terminal_stdout_keeps_real_green_and_red_ansi_bytes
-    output_probe = <<~'ZSH'
-      setopt KSH_ARRAYS
-      Font_B=$'\033[1m' Font_Red=$'\033[31m' Font_Green=$'\033[32m'
-      Font_Purple=$'\033[35m' Font_Cyan=$'\033[36m' Font_Suffix=$'\033[0m'
-      YY=cn
-      typeset -A sfactor ipinfo ipapi ip2location abuseipdb scamalytics ipqs ipdata
-      sfactor[title]='四、风险因子'
-      ipapi[proxy]=false
-      ipapi[vpn]=true
-      source "$1"
-      source "$2"
-      report=$(show_factor)
-      print -r -- "$report"
-    ZSH
-    stdout, stderr, status = Open3.capture3(
-      "/bin/zsh",
-      "-f",
-      "-c",
-      output_probe,
-      "report-color-output-test",
-      REPUTATION_REPORT,
-      TERMINAL_LIBRARY
-    )
-
-    assert status.success?, stderr
-    assert_includes stdout, "\e[32m\e[1m否"
-    assert_includes stdout, "\e[31m\e[1m是"
-    refute_includes stdout, "\\033["
-    assert_empty stderr
   end
 
   def test_shared_terminal_cleanup_preserves_layout_and_normalizes_values
@@ -471,8 +432,9 @@ end
     )
 
     assert status.success?, stderr
-    assert_includes stdout, "\e[32m"
-    assert_includes stdout, "\e[31m"
+    assert_includes stdout, "\e[32m\e[1m否"
+    assert_includes stdout, "\e[31m\e[1m是"
+    refute_includes stdout, "\\033["
     plain = stdout.gsub(/\e\[[0-9;]*m/, "")
     assert_match(/^分段\/标签\s+\|/, plain)
     assert_match(/参数\s+\|.*Ipregistry.*IPQS.*ipapi\.is/, plain)
@@ -691,9 +653,6 @@ end
     assert_includes source, "Check.Place 中继；上游标注 MaxMind"
     assert_includes source, "Check.Place relay; MaxMind-labeled upstream data"
     assert_includes source, "IPinfo public demo widget"
-    assert_includes source, 'info_source="IPinfo public demo widget"'
-    assert_includes source, '--arg info_source "$info_source"'
-    refute_includes source, '--arg info_source "Check.Place upstream relay; MaxMind-labeled response"'
     refute_includes source, "/Users/zmx/gitrepos/ipquality.git"
     refute_includes source, "/Users/zmx/gitrepos/network-manager.git"
     refute_includes source, "Maxmind 数据库"

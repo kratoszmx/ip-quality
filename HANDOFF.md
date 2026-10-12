@@ -1,5 +1,36 @@
 # Current handoff
 
+## Test and service audit — 2026-10-12
+
+Reporter remains `v2026-10-11-standalone.31`; no production behavior changed.
+The pre-change full suite passed 138 Ruby cases / 3,202 assertions, 26 IPQS
+tests and 36 provider-account tests. Review found no runtime failure to repair.
+
+- Removed the retired Git-helper filename check and optional-mail heading
+  numbering test. Consolidated duplicate ANSI-output coverage into the existing
+  full table-rendering case, preserving actual green/red bytes and rejection of
+  literal escape text. Removed internal variable/assignment checks and exact
+  prose requirements for candidate-provider documentation. Language help now
+  runs the CLI instead of scanning its implementation.
+- Retained source provenance/license checks and the observable disclosure,
+  unknown/failure, credential, route, exclusive-output and process-cleanup
+  contracts. Both MCP suites retain their authentication, submission, TOTP,
+  private-output and transport cases.
+- Final `/bin/zsh -f scripts/test-offline`: **135 Ruby cases / 3,146
+  assertions**, **26 IPQS tests** plus build/static doctor, and **36
+  provider-account tests**; no failures/errors/skips. Evidence:
+  `reports/offline-20261012-test-audit.txt`. The separate IPQS browser-text
+  suite also passed all **10 synthetic cases**, reporting zero live requests
+  and no real profile use. These results do not establish provider availability.
+- Read-only Supervisor `inventory` confirms only the weekly IPQS offline-test
+  job is registered for this project. Corrected the obsolete account/expiry
+  monitoring entries in [SERVICES.md](SERVICES.md#external-checks). No project
+  launchd job, user cron job, retained account-browser listener or project
+  daemon was found; no service was stopped or removed.
+- Removed four ignored `.DS_Store` files from the root and MCP directories.
+  No obsolete maintained document or orphaned IPQS build output was found.
+  Historical report/account/support evidence remains private and retained.
+
 ## Automatic query-route fallback — 2026-10-11, v31
 
 Current reporter: `v2026-10-11-standalone.31` on `main`. The normal interactive
@@ -415,13 +446,12 @@ padding counts with score values plus alignment checks. The full offline and
 ten-case synthetic browser suites passed again; tracked files stayed unchanged
 during the final full run. Both MCP test guides remain current.
 
-The service audit found no project launchd entry or user cron job, owned account
-browser or listener on 19453/19503/19504. Node processes sharing this worktree were external
-text-browser-kernel clients, not project daemons. Supervisor's three weekly
-checks remain useful; its saved metadata confirms `mail.ipqs-quota-20260916`
-was cancelled on September 22. No service needed removal or shutdown.
-[SERVICES.md](SERVICES.md#external-checks) now distinguishes the weekly IPQS-only
-test from complete project validation.
+The September 24 service audit found no project launchd entry or user cron job,
+owned account browser or listener on 19453/19503/19504. Node processes sharing
+this worktree were external text-browser-kernel clients, not project daemons.
+Its saved mail-watch metadata confirmed `mail.ipqs-quota-20260916` was cancelled
+on September 22. No service needed removal or shutdown. Current Supervisor
+registration is documented in [SERVICES.md](SERVICES.md#external-checks).
 
 Follow-up test hardening bounds the TERM test's runner-exit wait to 15 seconds
 and makes IPQS stdio shutdown errors fail the test. Fault injection confirmed
