@@ -40,7 +40,7 @@ the tests and claiming a complete pass.
 | `test/dbip_test.rb` | Demo exact-IP/geography validation, no invented score, two-request visitor flow, route preservation and bounded guest tokens |
 | `test/public_demo_test.rb` | DB-IP labels/IPWHOIS boolean flags, quota errors, partial/malformed data, target binding, state reset and one-request IPWHOIS headers |
 | `test/report_test.rb` | Provider tables, ANSI/layout, JSON/file bytes, exclusive report creation |
-| `test/repository_test.rb` | Source/data safety, vendored references, provenance, removed runtime paths |
+| `test/repository_test.rb` | Source/data safety, vendored references and AGPL provenance |
 | `test/clash_leaf_runner_test.rb` | Cached selection, YAML safety, exact leaf/dependencies, proxy isolation, process cleanup |
 | `test/support/reporter_test_case.rb` | Shared paths, named zsh function probes, isolated reporter copies and fake commands |
 | `test/fixtures/` | Sanitized provider responses; data only |
@@ -93,45 +93,13 @@ See [SERVICES.md](SERVICES.md#external-checks) for scheduling ownership.
 
 ## Maintain the boundary
 
-Provider tests cover transport/schema failures, state reset and request boundaries:
-DB-IP's two requests keep their route/family, IPWHOIS sends website headers,
-IPinfo validates nested objects, and Shodan rejects fractional ports/control text.
-IPQS tests exercise TLS/timeout/certificate failures, HTTP rejection and malformed
-or rate-limited JSON at both account and lookup stages, plus a successful lookup.
-A failed final account preflight stops before the lookup; failures clear old scores and
-flags, and even a success-shaped body cannot override a failing HTTP status.
-Check.Place tests count actual curl calls, distinguish an observed block from
-later skipped requests, and verify that generic 403/timeouts/schema failures do
-not pause other datasets. Report fixtures keep paused sources visible in both
-languages without scores or risk flags.
-The default all-source fixture uses no repair switches: it proves automatic
-direct IPv4 IPQS DoH at both request stages, one Scamalytics page request after
-the relay pause, honest source metadata and retained failed columns. Separate
-cases preserve successful proxy and IPv6 resolution. Query-route fixtures count
-the selected and direct requests, including lookup-only failure and a failed
-fallback. They prove the same IPv4/IPv6 target survives, both languages preserve
-route provenance, and quota/auth/schema/certificate/size errors never switch
-transport. Direct runs and visitor/self demos retain their original boundaries.
-DB-IP's explicit daily-limit fixture has its own status, distinct from generic
-rate limits. Scamalytics fixtures reject another
-IP, conflicting scores, ambiguous markup and changed response shapes.
-IP2Location/ipdata fixtures also cover successful relays making no demo request,
-target-bound fallback data, secret-free arguments, bounded same-route IPv6
-requests, partial flags, TLS errors and HTTP 429. AbuseIPDB fixtures cover its
-official private header, zero scores, malformed/foreign-target data and failure
-without relay/retry. HTTP account fixtures isolate the account-basics identity
-from feedback and password-change forms and report privacy settings as booleans.
-Report tests keep failed/unconfigured sources visible, preserve unknown versus
-false/zero, and place Cloudflare only in section 1 on both basic-data paths and
-in both languages. One local Ruby assertion checks ANSI/CJK table alignment
-independently of production helpers; value checks avoid fixed padding counts.
-Shared table fixtures also check width calculation and option scope.
-
-MCP fixtures cover HTTP identity, bounded reads/cleanup, demo target/redaction and
-no-retry behavior. TOTP tests bind issuer/account and reviewed forms; the separate
-synthetic browser suite rejects challenges with dashboard navigation and redacts
-emergency recovery data. MCP shutdown errors fail the stdio tests. These fixture
-passes do not prove a live account session.
+Use the ownership table above to find existing coverage before adding tests.
+Preserve distinct outcomes: unknown versus false/zero, original route failures
+versus fallback results, selected versus disabled sources, and HTTP success
+versus authenticated account identity. Request counts, target/route binding,
+credential redaction, consent gates and owned-process cleanup are behavior
+contracts, even when several providers need similar cases. These fixture passes
+do not prove a live account session or current provider availability.
 
 - Reporter CLI tests copy only runtime source/data into an owned temporary
   directory, use an empty credentials configuration directory, and replace

@@ -16,6 +16,10 @@ tests and 36 provider-account tests. Review found no runtime failure to repair.
   unknown/failure, credential, route, exclusive-output and process-cleanup
   contracts. Both MCP suites retain their authentication, submission, TOTP,
   private-output and transport cases.
+- Condensed [TESTING.md](TESTING.md) by keeping detailed suite responsibilities
+  in one table and removing their repeated narrative. Fresh-session prerequisites,
+  complete/focused commands, the separate browser-text suite and maintenance
+  boundaries remain explicit; both child-package guides still route here.
 - Final `/bin/zsh -f scripts/test-offline`: **135 Ruby cases / 3,146
   assertions**, **26 IPQS tests** plus build/static doctor, and **36
   provider-account tests**; no failures/errors/skips. Evidence:
