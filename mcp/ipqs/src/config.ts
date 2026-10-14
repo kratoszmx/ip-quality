@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 import { ensurePrivateDirectoryStrict } from "@myutils/browser-session";
-import { fingerprintSecret, inspectPrivateSecretFile, readPrivateSecretFile } from "@codex-mcp/shared-secret-file";
+import { fingerprintSecret, inspectPrivateSecretFile, readPrivateSecretFile } from "@myutils/secret-file";
 
 function findPackageRoot(startDir: string) {
   let directory = startDir;

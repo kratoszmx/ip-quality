@@ -6,7 +6,7 @@ import {
   inspectPrivateTwoLineSecretBundle,
   parseTwoLineSecretBundle,
   readPrivateTwoLineSecretBundle,
-} from "@codex-mcp/shared-secret-file";
+} from "@myutils/secret-file";
 
 export const IPQS_ACCOUNT_SECRET_DIR = path.resolve(
   homedir(),

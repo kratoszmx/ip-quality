@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { request } from 'playwright-core';
-import { readPrivateSecretFile } from '@codex-mcp/shared-secret-file';
+import { readPrivateSecretFile } from '@myutils/secret-file';
 import { requestBinaryWithBrowserContext } from '@myutils/browser-session';
 import { providerConfig, accountNetworkOptions } from './policy.mjs';
 import { cloudflareIdentity } from './cloudflare-policy.mjs';

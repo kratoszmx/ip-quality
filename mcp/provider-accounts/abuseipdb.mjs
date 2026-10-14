@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { Agent } from 'node:https';
 import { requestHttpRead } from '@myutils/http-read';
-import { inspectPrivateSecretFile, readPrivateSecretFile } from '@codex-mcp/shared-secret-file';
+import { inspectPrivateSecretFile, readPrivateSecretFile } from '@myutils/secret-file';
 import { withSession } from './accounts.mjs';
 import { accountNetworkOptions, validApiKey } from './policy.mjs';
 

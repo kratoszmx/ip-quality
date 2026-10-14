@@ -7,8 +7,8 @@ import {
   withLoopbackOperationLease,
   waitForEnter,
 } from "@myutils/browser-session";
-import { reserveOneUseRecord, takeOneUseRecord } from "@codex-mcp/shared-one-use-token";
-import { writePrivateSecretFile } from "@codex-mcp/shared-secret-file";
+import { reserveOneUseRecord, takeOneUseRecord } from "@myutils/one-use-token";
+import { writePrivateSecretFile } from "@myutils/secret-file";
 import { chromium, type Page } from "playwright-core";
 
 import { validateIpqsApiCredential } from "./api.js";

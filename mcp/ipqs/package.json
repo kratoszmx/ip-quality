@@ -37,11 +37,11 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@codex-mcp/shared-totp": "file:../../../../mcps/common/shared/totp",
+    "@myutils/totp": "file:../../../../myutils/other_utils/node/totp",
     "@myutils/browser-session": "file:../../../../myutils/net_utils/node/browser-session",
     "@codex-mcp/shared-mcp-server": "file:../../../../mcps/common/shared/mcp-server",
-    "@codex-mcp/shared-one-use-token": "file:../../../../mcps/common/shared/one-use-token",
-    "@codex-mcp/shared-secret-file": "file:../../../../mcps/common/shared/secret-file",
+    "@myutils/one-use-token": "file:../../../../myutils/other_utils/node/one-use-token",
+    "@myutils/secret-file": "file:../../../../myutils/file_utils/node/secret-file",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "playwright-core": "^1.61.1",
     "zod": "^4.4.3"

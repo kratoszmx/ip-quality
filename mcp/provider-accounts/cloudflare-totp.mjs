@@ -1,5 +1,5 @@
-import { generateTotp, inspectTotpUri, isTotpUri } from '@codex-mcp/shared-totp';
-import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@codex-mcp/shared-secret-file';
+import { generateTotp, inspectTotpUri, isTotpUri } from '@myutils/totp';
+import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@myutils/secret-file';
 import { withSession, privateAccount } from './accounts.mjs';
 import { assertAccountOrigin } from './policy.mjs';
 import { usableBeforeMfa } from './cloudflare-policy.mjs';

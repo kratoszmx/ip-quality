@@ -1,5 +1,13 @@
 # Current handoff
 
+## Shared utility consumers — 2026-10-14
+
+IPQS and provider-accounts import private-file, TOTP and one-use records
+directly from myutils. Local file dependencies and locks match the new owner,
+without forwarding packages or third-party version upgrades. IPQS offline
+26 tests, provider-accounts 36 tests and isolated browser-text validation
+passed. These checks do not establish live provider or account readiness.
+
 Reviewed 2026-10-14. Worktree: `/Users/zmx/Projects/projects/ipquality`, branch
 `main`. Reporter remains `v2026-10-11-standalone.31`; this maintenance changes
 shared-code placement and documentation, not query policy or account backends.

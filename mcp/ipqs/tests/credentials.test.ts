@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { writePrivateSecretFile } from "@codex-mcp/shared-secret-file";
+import { writePrivateSecretFile } from "@myutils/secret-file";
 
 import {
   inspectIpqsCredentials,

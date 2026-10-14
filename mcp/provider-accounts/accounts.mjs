@@ -6,7 +6,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { chromium } from 'playwright-core';
 import { connectOrLaunchChromeOverCDP, ensurePrivateDirectoryStrict, verifyChromeProfileBinding, withLoopbackOperationLease, saveStorageStateSafely } from '@myutils/browser-session';
-import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@codex-mcp/shared-secret-file';
+import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@myutils/secret-file';
 import { requestHttpRead } from '@myutils/http-read';
 import { providerConfig, accountUrl, accountPagePath, accountNetworkOptions, accountRouteMatches, assertAccountOrigin, redactAccountText, classifyAccountPage, ipapiDashboardAccepted, validApiKey, ipapiKeyAccepted } from './policy.mjs';
 import { submitReviewedSignup } from './signup.mjs';

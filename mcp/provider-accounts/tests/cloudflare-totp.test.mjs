@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { inspectTotpUri } from '@codex-mcp/shared-totp';
+import { inspectTotpUri } from '@myutils/totp';
 import { cloudflareTotpUri, submitCloudflareTotpForm, validateCloudflareRecoveryCodes } from '../cloudflare-totp.mjs';
 const seed = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
 const text = `Configure your authenticator app manually using code:\n${seed}\nNext`;

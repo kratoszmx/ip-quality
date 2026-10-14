@@ -1,6 +1,6 @@
 import path from "node:path";
-import { inspectTotpUri, generateTotp } from "@codex-mcp/shared-totp";
-import { readPrivateSecretFile, writePrivateSecretFile, inspectPrivateSecretFile } from "@codex-mcp/shared-secret-file";
+import { inspectTotpUri, generateTotp } from "@myutils/totp";
+import { readPrivateSecretFile, writePrivateSecretFile, inspectPrivateSecretFile } from "@myutils/secret-file";
 import type { Page } from "playwright-core";
 import { IPQS_ORIGIN, REPO_ROOT } from "./config.js";
 import { readIpqsCredentials } from "./credentials.js";

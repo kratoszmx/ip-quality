@@ -1,6 +1,6 @@
 import { isIP } from "node:net";
 
-import { fingerprintSecret } from "@codex-mcp/shared-secret-file";
+import { fingerprintSecret } from "@myutils/secret-file";
 
 import { classifyIpqsAccountUsage } from "./account-policy.js";
 import { IPQS_API_BASE, isLikelyIpqsApiKey, resolveApiCredential } from "./config.js";

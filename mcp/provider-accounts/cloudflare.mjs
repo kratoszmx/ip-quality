@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { Agent } from 'node:https';
 import { requestHttpRead } from '@myutils/http-read';
-import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@codex-mcp/shared-secret-file';
+import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@myutils/secret-file';
 import { withLoopbackOperationLease, requestBinaryWithBrowserContext, saveStorageStateSafely } from '@myutils/browser-session';
 import { SECRETS, withSession, privateAccount } from './accounts.mjs';
 import { accountNetworkOptions, assertAccountOrigin, validApiKey } from './policy.mjs';
