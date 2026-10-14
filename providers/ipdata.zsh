@@ -11,12 +11,13 @@ print -rn -- "$1"|jq -Rrse '
 
 ipdata_response_is_valid(){
 emulate -LR zsh
-print -rn -- "$1"|jq -e --arg target "$2" '
+print -rn -- "$1"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg target "$2" '
+  include "json_values";
   type == "object" and .ip == $target and .message == null and .error == null and
   (.country_code | type == "string" and test("^[A-Z]{2}$")) and
   (.threat | type == "object") and
   ([.threat.is_proxy, .threat.is_vpn, .threat.is_tor, .threat.is_datacenter,
     .threat.is_threat, .threat.is_known_abuser, .threat.is_known_attacker] |
-    all(. == null or type == "boolean") and any(. != null))
+    all(boolean_or_null(.)) and any(. != null))
 ' >/dev/null 2>&1
 }

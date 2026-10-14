@@ -26,6 +26,7 @@ class RepositoryTest < ReporterTestCase
     source = File.binread(SCRIPT)
 
     assert source.start_with?("#!/bin/zsh\n")
+    source += File.binread(COMMON_HTTP_LIBRARY)
     commands = source.lines.reject { |line| line.lstrip.start_with?("#", "local -a required=") }.grep(/\bcurl\s/)
     assert commands.all? { |line| line.match?(/\bcurl -q\s/) }, "curl must ignore user curlrc"
     assert_includes source, 'curl -q "$@" --config -'

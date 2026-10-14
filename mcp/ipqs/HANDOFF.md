@@ -1,65 +1,40 @@
 # IPQS handoff
 
-API transport checked 2026-10-10; browser evidence remains dated September 24.
-Start with [AGENTS.md](AGENTS.md);
-repository-wide status and validation live in [../../HANDOFF.md](../../HANDOFF.md).
+Reviewed 2026-10-14. Use [AGENTS.md](AGENTS.md) for package tools and
+[../../HANDOFF.md](../../HANDOFF.md) for current reporter behavior and validation.
 
-## Current integration
+## Maintained access
 
-October 10: ATT account and reputation requests fail at TLS (curl 35 / HTTP 000),
-while account reads over direct IPv6/`awshk` and an `awshk` lookup of the same
-target succeed. The account has usable credits. Reporter v26 preserves these
-transport failures and stops before lookup if account preflight fails. The exact
-route/edge cause remains unconfirmed; repository [HANDOFF.md](../../HANDOFF.md)
-contains the fresh evidence. No dashboard login or credential rotation was needed.
-The user-authorized [TLS support inquiry](SUPPORT-TLS-20261010.md) was sent and
-independently verified in Gmail Sent; a provider diagnosis remains pending.
+Official usage/lookups use the private API key over HTTP. Dashboard reads and
+saved-login recovery use retained headed Chrome/CDP; background/hidden windows
+are still headed Chrome. The September 24 audit restored login, enabled TOTP,
+and verified a real challenge plus fresh-profile login. Independent HTTP and
+headless trials did not establish dashboard authentication; that observation
+is not proof that these methods can never work.
 
-IPQS moved from mcps to `ipquality/mcp/ipqs` on 2026-09-22, including its private
-Chrome profile and support receipts. There is no forwarding package at the old
-path. The MCP and reporter share `../../secrets/ipqs`; the byte-equal old key was
-removed. Shared libraries still come directly from the sibling mcps repository.
-External orchestration retained its existing check identities with updated paths.
+Modes, dates, recovery tools and 2FA evidence are centralized in
+[../../MCP_AUTH.md](../../MCP_AUTH.md). A code/documentation audit does not repeat
+login or enrollment. API credentials are shared with the reporter through the
+private path indexed in [../../CREDENTIALS.md](../../CREDENTIALS.md).
 
-On 2026-09-22 the sanitized account probe returned `authenticated`, and an
-explicitly authorized reporter lookup returned official IPQS `ok`. This
-supersedes the September 14–16 zero-allocation diagnosis as an active blocker.
-It proves usability at that time; the cause of recovery and any support reply
-are not established by the API result.
+## Open transport case
 
-## Dashboard access
+The October 10–11 ATT probes failed before HTTP at TLS while the same key/target
+worked through other routes. The reporter now recovers eligible target lookups
+through its direct IPv4 fallback and keeps the original TLS failure visible.
+That reporter policy does not change this MCP's HTTP/browser route.
 
-The September 24 v25 account audit verified usable API credits, restored login,
-enabled TOTP after saving its bound seed/emergency code, and passed a real
-challenge plus fresh-profile login. The proof profile was closed and removed;
-the normal profile and API key remain. This documentation review did not repeat
-those live actions.
+The user-authorized [TLS inquiry](SUPPORT-TLS-20261010.md) was sent October 10
+and independently verified in Gmail Sent. The last mailbox check, October 11,
+found no reply; no claim is made about today's mailbox state. A specific
+provider-side cause remains unconfirmed. Exact messages/receipts are private.
 
-The supported dashboard path remains retained headed Chrome; usage/lookups use
-the official HTTP API. Independent HTTP/headless trials did not establish
-dashboard authentication. Their exact outcomes and current recovery commands are
-centralized in [../../MCP_AUTH.md](../../MCP_AUTH.md). Closing/restarting the
-container lost usable authentication in an earlier experiment, so `auth:check`
-retains it; this is observed behavior, not proof that other backends can never work.
+The old September zero-credit case was superseded by successful account/API
+checks from September 22 onward. Its obsolete public message copy was removed;
+private sent-message receipts remain under `.state/support/20260916/`. No
+follow-up, resend or new mail-watch task is implied by this maintenance.
 
-The user authorized existing saved credentials on 2026-09-15. The continuing
-IPQS account task may reuse that permission; a documentation/test task does not
-itself call for login. Support messages and purchases need their own task intent.
-
-Tool behavior is in [AGENTS.md](AGENTS.md); regression commands and coverage are
-in [../../TESTING.md](../../TESTING.md).
-
-## Historical support case
-
-The earlier dashboard showed `0 / 0` and a duplicate-free-account restriction;
-the account API accepted the key but reported no credits. This was the vendor's
-classification, not proof of duplicate accounts or of its underlying cause.
-
-One authorized support email was sent on 2026-09-16 at 19:36:24 +08:00 and
-independently matched in Gmail Sent. [SUPPORT-REQUEST.md](SUPPORT-REQUEST.md)
-preserves that exact message; private receipts remain under
-`.state/support/20260916/`. Delivery/read and a human support reply were not
-verified here. The external mail-watch identifier is `mail.ipqs-quota-20260916`;
-its live status belongs to Supervisor, not this package. No follow-up is queued
-by this handoff. The September 22 API recovery removes the old request to wait
-for quota restoration.
+The package has no old-path forwarding MCP. Shared HTTP/Chrome/TOTP primitives
+come directly from the sibling myutils/mcps libraries; IPQS account, form,
+identity and quota policy stay here. [../../TESTING.md](../../TESTING.md) owns
+regression commands; [../../SERVICES.md](../../SERVICES.md) owns process lifetime.

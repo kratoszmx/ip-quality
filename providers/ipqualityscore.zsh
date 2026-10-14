@@ -41,12 +41,13 @@ emulate -LR zsh
 typeset response="$1"
 
 ipqualityscore_parsed=()
-print -rn -- "$response"|jq -e '
+print -rn -- "$response"|jq -L "${${(%):-%x}:A:h:h}/common" -e '
+  include "json_values";
   type == "object" and .success == true and
   (.fraud_score | type == "number" and . >= 0 and . <= 100) and
   (.country_code == null or (.country_code | type == "string")) and
   ([.proxy, .vpn, .tor, .recent_abuse, .bot_status]
-    | all(. == null or type == "boolean")) and
+    | all(boolean_or_null(.))) and
   (.connection_type == null or (.connection_type | type == "string"))
 ' >/dev/null 2>&1||return 1
 

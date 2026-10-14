@@ -116,7 +116,7 @@ class PublicFallbacksTest < ReporterTestCase
 
   def test_fallbacks_preserve_route_stop_on_failure_and_leave_missing_flags_unknown
     probe = <<~'ZSH'
-      source "$1"; source "$2"; source "$3"; eval "$4"
+      source "$1"; source "$2"; source "$3"; eval "$4"; source "$9"
       typeset -A ip2location ipdata sinfo stype
       IP=198.51.100.23 ibar_step=0 sinfo[ldatabase]=0
       CurlARG='--proxy http://127.0.0.1:12345'; setopt SH_WORD_SPLIT
@@ -150,7 +150,7 @@ class PublicFallbacksTest < ReporterTestCase
         File.write(calls, "")
         out, err, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "route",
           COMMON_PROVIDER_LIBRARY, IP2_LIBRARY, IPDATA_LIBRARY,
-          reporter_functions("db_ip2location", "db_ipdata", "curl_with_secret_url"), calls, page, IPDATA_RESPONSE, scenario)
+          reporter_functions("db_ip2location", "db_ipdata"), calls, page, IPDATA_RESPONSE, scenario, COMMON_HTTP_LIBRARY)
         assert status.success?, err
         assert_empty err
         assert_equal expected, out
@@ -208,7 +208,7 @@ class PublicFallbacksTest < ReporterTestCase
 
   def test_abuseipdb_failures_clear_stale_scores_without_retry_or_relay
     probe = <<~'ZSH'
-      source "$1"; source "$2"; eval "$3"
+      source "$1"; source "$2"; eval "$3"; source "$7"
       typeset -A abuseipdb sinfo stype provider_credentials
       IP=198.51.100.23 ibar_step=0 sinfo[ldatabase]=0
       provider_credentials[ABUSEIPDB_API_KEY]=fixturekey123
@@ -230,7 +230,7 @@ class PublicFallbacksTest < ReporterTestCase
       calls = File.join(reporter_workspace, "abuse-calls")
       File.write(calls, "")
       out, err, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "abuse-errors", COMMON_PROVIDER_LIBRARY,
-        File.join(ROOT, "providers", "abuseipdb.zsh"), reporter_functions("db_abuseipdb", "curl_with_secret_header"), response, code.to_s, calls)
+        File.join(ROOT, "providers", "abuseipdb.zsh"), reporter_functions("db_abuseipdb"), response, code.to_s, calls, COMMON_HTTP_LIBRARY)
       assert status.success?, err
       assert_empty err
       assert_equal "one-request\n", File.read(calls)

@@ -659,7 +659,7 @@ class ProvidersTest < ReporterTestCase
       refute File.exist?(marker)
     end
 
-    source = File.read(SCRIPT, encoding: "UTF-8")
+    source = File.read(SCRIPT, encoding: "UTF-8") + File.read(COMMON_HTTP_LIBRARY, encoding: "UTF-8")
     assert_includes source, "--config -"
     refute_match(/\bcurl\s[^\n]*\$api_key/, source)
   end

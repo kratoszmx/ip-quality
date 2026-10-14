@@ -14,7 +14,8 @@ The optional Node account MCPs reuse the mcps JavaScript library described below
 | Definition | Production callers | Responsibility |
 | --- | --- | --- |
 | `common/provider_values.zsh` | Provider parsers and `bin/ip-quality` | Validate/normalize provider values without source-specific schemas |
-| `common/json_values.jq` | ipapi, Cloudflare, IPWHOIS, DB-IP, IP2Location, AbuseIPDB and Shodan parsers | Optional bounded text/integer predicates; source schemas stay in each parser |
+| `common/http_request.zsh` | Credential-bearing adapters in `bin/ip-quality`; IPQS/Cloudflare requests in `providers/query_route.zsh` | Send validated secret URL/header options to curl over stdin without exposing them in process arguments |
+| `common/json_values.jq` | ipapi, Cloudflare, IPWHOIS, DB-IP, IP2Location, ipdata, Ipregistry, IPQS, AbuseIPDB and Shodan parsers | Nullable boolean and bounded text/integer predicates; source schemas stay in each parser |
 | `common/terminal.zsh` | `bin/ip-quality`; type, score and factor renderers in `report/reputation.zsh` | ANSI cleanup, display-cell measurement and aligned table layout with independent column widths |
 | `common/text.rb` | `leaf_runner/profile.rb`, `leaf_runner/subscription_catalog.rb` | Validate bounded printable metadata |
 | `common/safe_snapshot.rb` | Profile, catalog, and isolated Mihomo session | Read or verify owner-controlled local files and compare snapshots |
@@ -46,7 +47,7 @@ print -r -- "${provider_http_response[status]}"
 IP2Location's page/JSON validators, ipdata's transient demo-key/schema readers,
 and AbuseIPDB's CHECK validator stay in `providers/`: their schemas and target
 contracts are provider-specific. Their requests reuse `provider_decode_http_response`;
-credential-bearing requests use the existing stdin curl configuration helpers.
+credential-bearing requests use `common/http_request.zsh`.
 
 `providers/query_route.zsh` owns the reporter's shared IPQS/Cloudflare transport
 policy; it is deliberately outside `common/` because its fallback disclosure,
@@ -109,8 +110,38 @@ to Scamalytics, so this is a provider parser rather than a common HTML API.
 `db_scamalytics` owns its one-request fallback and retains the relay outcome.
 IPQS automatic DNS selection likewise stays in its adapter; it is not a
 project-wide resolver or a change to shared proxy-environment handling.
-Request sites use `curl -q`; credential-bearing URL/header functions retain
-their stdin-config handling in the reporter.
+Request sites use `curl -q`; credential-bearing URL/header functions share
+the stdin-config handling below.
+
+## zsh credential-bearing HTTP requests
+
+Source `common/http_request.zsh` before making a request. It owns the curl
+configuration encoding, not provider routing, retry or response parsing.
+
+| Function and input | Output / result |
+| --- | --- |
+| `curl_with_secret_url URL [CURL_ARG...]` | Sends the validated URL through curl's stdin configuration, forwards each remaining argument intact, and preserves curl's stdout/stderr and exit status |
+| `curl_with_secret_header NAME VALUE URL [CURL_ARG...]` | Sends both the validated header and URL through the same private stdin configuration; otherwise has the same contract |
+
+Both put `-q` first to ignore user curl configuration. Callers supply bounded
+timeouts/body sizes and the selected route, validate the endpoint, and use
+credential formats excluding quotes, backslashes and line breaks. Secret values
+belong only in the named URL/header parameters, never in `CURL_ARG`. No request
+runs while sourcing the module, and both functions preserve caller zsh options.
+
+```zsh
+source common/http_request.zsh
+source common/provider_values.zsh
+# After the caller has validated the credential and chosen the route:
+wire=$(curl_with_secret_header Authorization "Bearer $api_key" "$endpoint" \
+  -sS --max-time 10 --max-filesize 131072 --write-out $'\n%{http_code}')
+curl_exit=$?
+provider_decode_http_response "$wire" "$curl_exit"
+```
+
+The reporter imports this implementation directly; there is no old-path
+forwarder. Its Ipregistry, ipapi, DB-IP, AbuseIPDB and ipdata callers share the
+same secret handling with the separate IPQS/Cloudflare query-route policy.
 
 ## jq value predicates
 
@@ -121,6 +152,7 @@ the module exists as a readable regular file before any lookup.
 
 | Predicate | Contract |
 | --- | --- |
+| `boolean_or_null($value)` | True only for null or a JSON boolean; rejects strings, numbers and containers without converting missing values to false |
 | `text_or_null($value; $max)` | True for null or a string of at most `$max` Unicode codepoints with no C0/DEL controls; empty string is allowed |
 | `integer_or_null($value; $min; $max)` | True for null or an integer JSON number within the inclusive numeric bounds; rejects numeric strings and booleans |
 
@@ -128,7 +160,7 @@ the module exists as a readable regular file before any lookup.
 jq -n -L common 'include "json_values"; text_or_null("香港"; 2)'
 ```
 
-These predicates unify repeated value validation in five providers. They
+These predicates unify repeated value validation across provider parsers. They
 do not interpret absence as false or validate IP/ASN/source schemas. Text control
 characters are rejected before they reach the terminal. String-form ASNs are
 still accepted only by providers whose contracts explicitly allow them.
@@ -310,6 +342,9 @@ overrides, file-size/mode limits, verification-only symlink rejection, and
 snapshot replacement. Runner tests retain cleanup, signal, link rejection, and
 route-isolation coverage. `test/providers_test.rb` exercises shared provider
 values; `test/common_test.rb` also checks jq value types, bounds and controls.
+Its curl stub checks secret configuration bytes, argument boundaries, transport
+exit status and caller options without making a request. The six nullable-boolean
+callers retain their source-specific field lists and missing-observation rules.
 `test/public_demo_test.rb` checks source contracts rather than promoting their
 schema/quotas into the common library. `test/report_test.rb` checks terminal functions and real file/ANSI bytes.
 The CLI self-test retains typed JSON checks.
@@ -317,3 +352,10 @@ The CLI self-test retains typed JSON checks.
 Mihomo process lifecycle and cleanup remain in `leaf_runner/`; they carry
 session state, listener ownership, and recovery policy. Shared modules contain
 the reusable operations, while their callers retain those state transitions.
+
+The October 14 boundary review found no single-provider schema or lifecycle
+policy left in `common/`: its Ruby APIs have multiple runner callers, and its
+zsh/jq APIs serve multiple adapters or renderers. Keep IPQS connection types,
+Check.Place pause state, query-route fallbacks and localized source labels in
+their existing provider/report owners. No ownership move was needed for those
+already specialized implementations.

@@ -36,7 +36,7 @@ print -rn -- "$response"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg expected "$
   (.security == null or
     ((.security | type) == "object" and
       ([.security.proxy, .security.vpn, .security.tor, .security.hosting]
-        | all(. == null or type == "boolean"))))
+        | all(boolean_or_null(.)))))
 ' >/dev/null 2>&1||return 1
 
 ipwhois_parsed[country_code]=$(print -rn -- "$response"|jq -r 'if (.country_code|type) == "string" then .country_code else empty end')

@@ -9,6 +9,43 @@ require_relative "../common/safe_snapshot"
 require_relative "../common/text"
 
 class CommonTest < Minitest::Test
+  def test_secret_curl_options_stay_on_stdin_and_preserve_arguments_and_exit_status
+    probe = <<~'ZSH'
+      setopt KSH_ARRAYS SH_WORD_SPLIT NO_CASE_MATCH
+      curl(){ print -u2 -- unexpected-request-on-load; return 99; }
+      source "$1"
+      capture_dir="$2"
+      curl(){
+        print -rl -- "$@" > "$capture_dir/$request_kind.args"
+        cat > "$capture_dir/$request_kind.config"
+        print -rn -- fixture-response
+        return 35
+      }
+      request_kind=url
+      curl_with_secret_url 'https://fixture.invalid/account/fixture-secret' --proxy 'http://127.0.0.1:12345' --max-time 10
+      print -r -- "|$?"
+      request_kind=header
+      curl_with_secret_header Authorization 'Bearer fixture-secret' 'https://fixture.invalid/lookup?ip=1.1.1.1' --noproxy '*' --max-filesize 1024
+      print -r -- "|$?"
+      [[ -o KSH_ARRAYS && -o SH_WORD_SPLIT && -o NO_CASE_MATCH ]]
+    ZSH
+    Dir.mktmpdir("ip-quality-http-request-") do |directory|
+      stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
+        "secret-http", File.expand_path("../common/http_request.zsh", __dir__), directory)
+      assert status.success?, stderr
+      assert_empty stderr
+      assert_equal "fixture-response|35\nfixture-response|35\n", stdout
+      assert_equal ["-q", "--proxy", "http://127.0.0.1:12345", "--max-time", "10", "--config", "-"],
+        File.readlines(File.join(directory, "url.args"), chomp: true)
+      assert_equal ["-q", "--noproxy", "*", "--max-filesize", "1024", "--config", "-"],
+        File.readlines(File.join(directory, "header.args"), chomp: true)
+      assert_equal "url = \"https://fixture.invalid/account/fixture-secret\"\n",
+        File.read(File.join(directory, "url.config"))
+      assert_equal "header = \"Authorization: Bearer fixture-secret\"\nurl = \"https://fixture.invalid/lookup?ip=1.1.1.1\"\n",
+        File.read(File.join(directory, "header.config"))
+    end
+  end
+
   def test_http_envelope_preserves_transport_failures_and_clears_previous_bodies
     probe = <<~'ZSH'
       setopt KSH_ARRAYS SH_WORD_SPLIT
@@ -77,6 +114,7 @@ class CommonTest < Minitest::Test
     filter = <<~'JQ'
       include "json_values";
       {
+        boolean: [null, false, true, "false", 0, [], {}] | map(boolean_or_null(.)),
         text: [null, "", "香港", "abc", "abcd", false, [], {}, "\u0000", "\n", "\u001b[31m", "\u007f"] | map(text_or_null(.; 3)),
         integer: [null, 0, 3, -1, 4, 1.5, "1", false, [], {}] | map(integer_or_null(.; 0; 3))
       }
@@ -85,6 +123,7 @@ class CommonTest < Minitest::Test
     assert status.success?, stderr
     assert_empty stderr
     result = JSON.parse(stdout)
+    assert_equal [true, true, true, false, false, false, false], result["boolean"]
     assert_equal [true, true, true, true, false, false, false, false, false, false, false, false], result["text"]
     assert_equal [true, true, true, false, false, false, false, false, false, false], result["integer"]
   end

@@ -13,6 +13,7 @@ class ReporterTestCase < Minitest::Test
   DNSBL = File.join(ROOT, "ref", "dnsbl.list")
   ISO3166 = File.join(ROOT, "ref", "iso3166.json")
   COMMON_PROVIDER_LIBRARY = File.join(ROOT, "common", "provider_values.zsh")
+  COMMON_HTTP_LIBRARY = File.join(ROOT, "common", "http_request.zsh")
   TERMINAL_LIBRARY = File.join(ROOT, "common", "terminal.zsh")
   CREDENTIALS_LIBRARY = File.join(ROOT, "providers", "credentials.zsh")
   IPREGISTRY_LIBRARY = File.join(ROOT, "providers", "ipregistry.zsh")

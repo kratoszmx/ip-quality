@@ -8,7 +8,8 @@ typeset response="$1"
 typeset expected_ip="$2"
 
 ipregistry_parsed=()
-print -rn -- "$response"|jq -e --arg expected "$expected_ip" '
+print -rn -- "$response"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg expected "$expected_ip" '
+  include "json_values";
   type == "object" and .ip == $expected and
   (.connection | type == "object") and
   (.company | type == "object") and
@@ -19,7 +20,7 @@ print -rn -- "$response"|jq -e --arg expected "$expected_ip" '
   ([.security.is_proxy, .security.is_vpn, .security.is_tor,
     .security.is_tor_exit, .security.is_cloud_provider,
     .security.is_abuser, .security.is_attacker, .security.is_threat]
-    | all(. == null or type == "boolean"))
+    | all(boolean_or_null(.)))
 ' >/dev/null 2>&1||return 1
 
 ipregistry_parsed[usage_type]=$(print -rn -- "$response"|jq -r '.connection.type // empty')

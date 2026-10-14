@@ -27,7 +27,7 @@ print -rn -- "$1"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg target "$2" '
   integer_or_null(.fraud_score; 0; 99) and
   ([.is_proxy, .proxy.is_public_proxy, .proxy.is_web_proxy, .proxy.is_tor,
     .proxy.is_vpn, .proxy.is_data_center, .proxy.is_spammer, .proxy.is_web_crawler,
-    .proxy.is_scanner, .proxy.is_botnet] | all(. == null or type == "boolean")) and
+    .proxy.is_scanner, .proxy.is_botnet] | all(boolean_or_null(.))) and
   ([.fraud_score, .is_proxy, .proxy.is_vpn, .proxy.is_tor, .proxy.is_data_center] | any(. != null))
 ' >/dev/null 2>&1
 }

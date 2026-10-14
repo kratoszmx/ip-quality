@@ -40,7 +40,7 @@ print -rn -- "$response"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg expected "$
   def valid_boolean_fields:
     ([.is_bogon, .is_mobile, .is_satellite, .is_proxy, .is_tor, .is_vpn,
       .is_datacenter, .is_abuser, .is_crawler]
-      | all(. == null or type == "boolean"));
+      | all(boolean_or_null(.)));
   def valid_ip:
     (.ip | type == "string" and length <= 128 and (contains("\u0000") | not));
   def valid_full_response:

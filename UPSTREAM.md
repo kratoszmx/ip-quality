@@ -123,7 +123,7 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
 - Split runner, provider, and report responsibilities. Consolidated verified
   file snapshots, proxy-environment overrides, printable metadata validation,
   provider value normalization, and terminal text helpers under `common/`.
-  Shared bounded text/integer jq predicates now serve five provider parsers,
+  Shared bounded text/integer and nullable-boolean jq predicates serve provider parsers,
   including Shodan's integer-port and control-text validation;
   IPQS-only connection-type classification lives back in its provider module.
   IPQS official account and lookup requests also retain curl/TLS/HTTP failures;
@@ -137,6 +137,9 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
   type/score/factor matrices use independent column widths. Removed the runner's
   clock forwarding method and unused media/AI progress labels.
   Shared curl response-envelope decoding now serves six retrieval paths;
+  credential-bearing URL/header configuration lives in `common/http_request.zsh`
+  for the reporter adapters and the separate query-route policy, keeping secrets
+  on curl's stdin and preserving the caller's request arguments and exit status;
   removed the pure curl forwarding function. IPinfo validates nested objects
   before jq field reads and both IPinfo/Ipregistry retain precise failures.
 - Extracted the complete `network-manager/ip-quality/` history into standalone

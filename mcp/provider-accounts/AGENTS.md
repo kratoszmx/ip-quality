@@ -2,8 +2,9 @@
 
 Owns free ipapi.is, Cloudflare and AbuseIPDB account maintenance for the IPQuality reporter.
 ipwho.is and DB-IP need no account or key for their free context APIs. This package
-reuses mcps/common/shared browser-session, http-read, secret-file, totp and
-mcp-server directly. Provider state, selectors, quotas and API contracts stay here.
+reuses myutils' browser-session/http-read and mcps/common/shared's secret-file,
+totp and mcp-server directly. Provider state, selectors, quotas and API contracts
+stay here.
 
 ## Start here
 

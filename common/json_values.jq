@@ -1,4 +1,7 @@
 # Value predicates shared by provider schemas. No endpoints or provider fields.
+def boolean_or_null($value):
+  $value == null or ($value | type) == "boolean";
+
 def text_or_null($value; $max):
   $value == null or
     (($value | type) == "string" and ($value | length) <= $max and

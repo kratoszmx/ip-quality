@@ -1,469 +1,100 @@
 # Current handoff
 
-## Test and service audit — 2026-10-12
+Reviewed 2026-10-14. Worktree: `/Users/zmx/Projects/projects/ipquality`, branch
+`main`. Reporter remains `v2026-10-11-standalone.31`; this maintenance changes
+shared-code placement and documentation, not query policy or account backends.
+Start with [AGENTS.md](AGENTS.md); give users its one normal interactive command.
 
-Reporter remains `v2026-10-11-standalone.31`; no production behavior changed.
-The pre-change full suite passed 138 Ruby cases / 3,202 assertions, 26 IPQS
-tests and 36 provider-account tests. Review found no runtime failure to repair.
+## Current behavior and ownership
 
-- Removed the retired Git-helper filename check and optional-mail heading
-  numbering test. Consolidated duplicate ANSI-output coverage into the existing
-  full table-rendering case, preserving actual green/red bytes and rejection of
-  literal escape text. Removed internal variable/assignment checks and exact
-  prose requirements for candidate-provider documentation. Language help now
-  runs the CLI instead of scanning its implementation.
-- Retained source provenance/license checks and the observable disclosure,
-  unknown/failure, credential, route, exclusive-output and process-cleanup
-  contracts. Both MCP suites retain their authentication, submission, TOTP,
-  private-output and transport cases.
-- Condensed [TESTING.md](TESTING.md) by keeping detailed suite responsibilities
-  in one table and removing their repeated narrative. Fresh-session prerequisites,
-  complete/focused commands, the separate browser-text suite and maintenance
-  boundaries remain explicit; both child-package guides still route here.
-- Final `/bin/zsh -f scripts/test-offline`: **135 Ruby cases / 3,146
-  assertions**, **26 IPQS tests** plus build/static doctor, and **36
-  provider-account tests**; no failures/errors/skips. Evidence:
-  `reports/offline-20261012-test-audit.txt`. The separate IPQS browser-text
-  suite also passed all **10 synthetic cases**, reporting zero live requests
-  and no real profile use. These results do not establish provider availability.
-- Read-only Supervisor `inventory` confirms only the weekly IPQS offline-test
-  job is registered for this project. Corrected the obsolete account/expiry
-  monitoring entries in [SERVICES.md](SERVICES.md#external-checks). No project
-  launchd job, user cron job, retained account-browser listener or project
-  daemon was found; no service was stopped or removed.
-- Removed four ignored `.DS_Store` files from the root and MCP directories.
-  No obsolete maintained document or orphaned IPQS build output was found.
-  Historical report/account/support evidence remains private and retained.
+- The runner uses `reputation` and all sources by default. Direct and isolated
+  subscription routes share the report; media/AI probes were removed. Every
+  attempted source remains visible on failure, with unknown risk rather than a
+  clean result. Cloudflare network context belongs only in section 1.
+- Official direct IPv4 IPQS uses verified AliDNS HTTPS resolution automatically.
+  Official IPQS/Cloudflare target queries can recover from pre-HTTP connection
+  failures through one direct IPv4 fallback, preserving the discovered target,
+  original failure and effective query route. IPQS retains its credit preflight.
+  This does not establish that the failed node-to-provider path works.
+- Check.Place block/429 handling suppresses repeated relay calls for the same
+  target/family. Scamalytics, IP2Location and ipdata can use their target-bound
+  public examples on the selected route; owned AbuseIPDB credentials choose its
+  official API. Basic data has a named IPinfo fallback. DB-IP's visitor demo stays
+  on the tested egress and reports quota exhaustion without a fabricated score.
+  Full contracts and fallback limits live in [PROVIDERS.md](PROVIDERS.md).
+- `common/` holds provider values, nullable jq predicates, credential-safe curl
+  configuration, terminal layout and Ruby file/text/proxy primitives. Provider
+  schemas, query-route policy, display labels and Mihomo lifecycle remain with
+  their owners. APIs/callers are in [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md).
+- Two optional MCPs live under `mcp/`. The IPQS API uses HTTP; its dashboard uses
+  retained headed Chrome. ipapi/Cloudflare/AbuseIPDB routine account reads reuse
+  saved HTTP state. Recovery modes and dated 2FA proofs are in
+  [MCP_AUTH.md](MCP_AUTH.md); private formats are in [CREDENTIALS.md](CREDENTIALS.md).
+- No project daemon is required. The October 12 service audit found only the
+  external weekly IPQS offline-test registration, with no resident project
+  browser/listener, launchd job or cron job. Current process ownership and the
+  external registration are documented in [SERVICES.md](SERVICES.md).
 
-## Automatic query-route fallback — 2026-10-11, v31
+## October 14 maintenance
 
-Current reporter: `v2026-10-11-standalone.31` on `main`. The normal interactive
-all-source command remains unchanged; see [AGENTS.md](AGENTS.md).
+- Moved the actual URL/header stdin-configuration functions from the reporter
+  into `common/http_request.zsh`, used by reporter adapters and query-route
+  policy directly. No forwarding copy remains. Added an offline curl stub that
+  checks credential privacy, intact arguments, exit status and option scope.
+- Unified nullable-boolean validation in six provider parsers through
+  `common/json_values.jq`. Source-specific field lists, required observations
+  and missing/false distinctions stay in those parsers.
+- Reviewed every existing common module. Each has multiple production callers;
+  no provider-specific implementation needed moving out. Existing provider,
+  report and lifecycle boundaries remain appropriate.
+- Updated the account-method inventory, including key-only Ipregistry and
+  account-free sources. No live login, enrollment, account mutation or reputation
+  measurement was performed for this maintenance.
+- Removed the resolved September zero-credit support-message copy, obsolete
+  version-by-version handoff prose, 36 abandoned patch/preview/research artifacts
+  and the empty project `tmp/` directory. Actual reports, current TLS
+  evidence, credentials, browser state and private support receipts are retained.
+  No `human_docs` content was edited.
 
-- The user authorized alternate query routes. Official IPQS and Cloudflare
-  now try the selected route first, then one direct IPv4 fallback only after
-  a connectivity failure before HTTP. The target stays the already discovered
-  node IP. IPQS keeps its account-credit check and uses verified AliDNS on the
-  direct fallback; account-stage fallback also selects direct for the lookup.
-- Terminal status marks direct fallback and retains the original route error.
-  JSON `Query.ProviderTransport` records both separately from final provider
-  availability. Plans disclose that the same provider sees the system-route
-  egress. No live Clash state changed. Visitor/self sources, egress discovery,
-  other providers, certificate errors, HTTP rejection and quotas do not use
-  this fallback. The policy is shared by two adapters in
-  `providers/query_route.zsh`, outside the generic common library.
-- Both complete direct and isolated `vps+sub8` / `ATT` reports returned `ok` for
-  IPinfo, Ipregistry, Scamalytics, AbuseIPDB, IP2Location, ipdata, ipapi, IPWHOIS,
-  Cloudflare and IPQS. Direct IPQS returned score `0`; ATT's unchanged target
-  returned score `95` through the automatic direct fallback, preserving
-  `OriginalRouteFailure: tls_error`. Cloudflare succeeded on its initial route
-  in both runs; its fallback is fixture-tested, not claimed live-triggered.
-- Fresh ATT IPQS probes of the apex/`www` host, TLS 1.2 and HTTP/1.1 all failed
-  before HTTP with curl 35. Together with successful same-key/direct-target
-  controls, this identifies a route-dependent TLS failure, but client evidence
-  cannot determine which remote hop closes it. Lookup recovery does not imply
-  that ATT-to-IPQS connectivity was repaired. No additional mail was sent.
-- DB-IP's visitor demo returned HTTP 200 with `OVER_QUERY_LIMIT` and a daily
-  allowance message through both direct and ATT. Reporter/MCP now expose
-  `daily_quota_exhausted`, displayed as "日额度用完", rather than generic rate
-  limiting. Neither response supplied `Retry-After` or a reset timestamp.
-  Its API FAQ documents midnight CET resets; public-demo recovery is not
-  guaranteed. Check.Place's MaxMind relay remains blocked, with named IPinfo
-  basic-data fallback. Neither missing source stops the report.
-- Direct Ping0 geography was verified; ATT returned `unknown` in the full run
-  and one selected-source recheck. Other sources supplied location/ASN context.
-  A further raw-response diagnostic was rejected by the local skill-write guard,
-  so no transport/HTTP cause is claimed for that supplementary observation.
+Validation: `/bin/zsh -f scripts/test-offline` passed **136 Ruby cases / 3,159
+assertions**, **26 IPQS tests** plus build/static doctor, and **36 provider-account
+tests**, with no failures/errors/skips. Evidence:
+`reports/offline-20261014-maintenance-final.txt`. Shell/Ruby syntax, maintained
+local documentation links and `git diff --check` also passed. The separate
+synthetic browser-text suite was unchanged; its last 10-case pass remains dated
+October 12. No live provider availability is inferred from these checks.
 
-Private live evidence: `reports/{direct,att}-20261011-v31.{json,txt,stderr}`,
-`reports/att-ipqs-20261011-route-diagnostics.json` and
-`reports/dbip-20261011-route-diagnostics.json`. The final runs completed at
-approximately 19:41–19:42 Asia/Shanghai. Reports remain masked/private, no jq
-error was observed, and the owned temporary Mihomo completed cleanup.
+## Latest saved live evidence
 
-Validation: the complete offline entry passed **138 Ruby cases / 3,202
-assertions**, **26 IPQS tests** and **36 provider-account tests**, with zero
-failures/skips (`reports/offline-20261011-v31.txt`). New cases cover account-
-versus lookup-stage fallback, fixed IPv4/IPv6 targets, a failed fallback,
-no retry on quota/auth/certificate/schema/size errors, route provenance in both
-languages and JSON, private curl arguments, and DB-IP's daily-limit status.
+These observations are dated; offline success is not a current availability
+claim. Reports remain private/ignored and active Clash state was not changed.
 
-## Independent source recovery and AbuseIPDB account — 2026-10-11, v30
-
-Earlier reporter: `v2026-10-11-standalone.30` on `main`. Keep the one normal
-interactive all-source command in [AGENTS.md](AGENTS.md).
-
-- IP2Location and ipdata now recover automatically from unavailable/malformed
-  Check.Place responses using their current public website examples on the
-  same route. Both bind returned data to the requested target, validate values,
-  preserve missing flags as unknown and retain relay/final provenance in JSON.
-  ipdata's public demo key is discovered for one in-memory request, never
-  hard-coded or cached. Successful relays make no extra request.
-- The user-authorized free AbuseIPDB individual account completed signup and
-  email verification. One owned key now selects its official APIv2 CHECK in the
-  normal report. Key/password/session data remain private. The website defaulted
-  public profile/domain visibility to on; both were turned off and confirmed by
-  HTTP readback. The inspected account settings exposed no 2FA entry. API and
-  account checks work through native HTTP with the setup browser closed.
-- The existing `mcp/provider-accounts/` server now has four AbuseIPDB tools:
-  local readiness, exact-account HTTP check, a fixed free API probe and explicit
-  login/signup-page recovery. No new standalone MCP, wrapper, paid plan or
-  dependency was introduced. See [MCP_AUTH.md](MCP_AUTH.md) for dated login and
-  privacy evidence and the package guide for recovery.
-- Both full direct and isolated `vps+sub7` / `ATT` reports returned `ok` for
-  IPinfo, Ipregistry, Scamalytics, AbuseIPDB, IP2Location, ipdata, ipapi and
-  IPWHOIS. The repaired three sources succeeded on both routes. Direct IPQS
-  returned `ok`, while ATT still failed TLS before HTTP. DB-IP returned its
-  actual rate-limit state on both. Check.Place's MaxMind dataset remains blocked;
-  the basic section still uses its named IPinfo fallback.
-- Cloudflare Intel succeeded on the initial direct/ATT runs and the final
-  direct run. The final full ATT run had a TLS failure; one targeted ATT recheck
-  succeeded. This is evidence of intermittent transport failure, not permanent
-  credential failure or a fixed network path. Both outcomes remain in private
-  evidence; no automatic retry or route substitution was added.
-- Current NodeQuality source still launches IP.Check.Place; it has no separate
-  recovery strategy for our blocked relay. Other projects' direct provider API
-  and website-example approaches informed the repaired paths, without copying
-  synthetic scores or inferring false from missing data. Details and primary
-  links are in [PROVIDERS.md](PROVIDERS.md#independent-recovery-for-relay-backed-sources).
-- At 17:25 Asia/Shanghai, the IPQS support thread still contained only the
-  original Sent message. A domain/subject search including Spam/Trash also
-  matched only that message. No follow-up was sent less than 24 hours after the
-  Saturday inquiry. Direct success, the earlier same-target/other-route controls
-  and ATT failures across clients exclude a demonstrated global account/key
-  failure, but do not identify the remote hop closing ATT TLS. See the
-  [support note](mcp/ipqs/SUPPORT-TLS-20261010.md).
-
-Private evidence: `reports/{direct,att}-20261011-v30-final.{json,txt,stderr}`,
-`reports/{direct,att}-20261011-v30.{json,txt,stderr}` and
-`reports/att-cloudflare-20261011-v30-recheck.{json,txt,stderr}`. API/account action
-receipts remain under `secrets/accounts/abuseipdb/`; useful login state remains
-under the MCP's private `.state/`. Setup scripts, consumed verification links
-and token-bearing exploratory pages were removed after use. No active Clash
-profile or selection was changed.
-
-Validation: complete offline entry passed **131 Ruby cases / 2,820 assertions**,
-**26 IPQS tests** and **36 provider-account tests**, zero failures/skips
-(`reports/offline-20261011-v30-final.txt`). New regression cases check relay
-success without fallbacks, public-example target/schema binding, hidden keys,
-same-route failures, official AbuseIPDB errors without retry/relay, and HTTP
-account recognition with privacy settings. Fixture success and the dated live
-observations are separate evidence.
-
-## Default full-flow repairs — 2026-10-11, v29
-
-Earlier reporter: `v2026-10-11-standalone.29` on `main`. Give the user only the
-original interactive all-source command in [AGENTS.md](AGENTS.md); source/DNS
-switches are agent diagnostics, not extra user workflows.
-
-- The ordinary direct IPv4 flow now automatically uses verified AliDNS HTTPS
-  resolution for the official IPQS hostname at both account and lookup stages.
-  The menu run with no source/DNS arguments returned IPQS `ok`, score `0`.
-  No key, system-DNS setting, TLS verification or selected transport changed.
-  IPv6 and leaf/proxy routes keep their existing resolver. Explicit overrides
-  remain for maintenance; a keyless default run still uses its relay contract.
-- When the Scamalytics relay is unavailable or malformed, one public target-page
-  request on the same route restores its own score/available factors. The parser
-  binds the heading and embedded example to the target and requires score-badge
-  agreement. Missing/conflicting fields remain unknown. Terminal/JSON identify
-  `public_demo`; JSON also preserves the relay outcome. The original relay
-  success path stays intact and never makes the extra page request.
-- Both full interactive menu runs completed: direct Scamalytics score `0`,
-  isolated `vps+sub7` / `ATT` score `9`; both were provider-supplied `low`.
-  IPinfo, Ipregistry, ipapi, IPWHOIS, DB-IP and Cloudflare Intel returned `ok`
-  on both routes. No jq error occurred. Neither score is substituted for IPQS.
-- ATT IPQS still returned `tls_error`. Check.Place still blocked its MaxMind
-  request and paused the remaining dependent relay datasets. These failures
-  remain in the full report. IPQS's current documentation also failed over ATT
-  Chrome and loaded over direct Chrome. No supported alternate API hostname or
-  provider diagnosis was established. The bound support-subject search across
-  both official sender domains returned no references; no new mail was sent.
-- The externally maintained cache advanced to `vps+sub7` (ATT fields match
-  `sub6`) and obsolete subscriptions disappeared while working. Menu numbers
-  therefore changed; an initial scripted selection stopped before any query.
-  The successful rerun selected ATT from the current menu. No live Clash state
-  was modified, no account/2FA action or new dependency was needed.
-
-Private evidence: `reports/{direct,att}-20261011-v29-full.{json,stdout,stderr}`,
-`reports/att-20261011-baseline.json`, `reports/source-public-20261011.json`, and
-`reports/scamalytics-20261011-{ATT,DIRECT}.html`. Reports use default IP masking;
-browser/curl diagnostics used the public `8.8.8.8` target. All temporary runtime
-sessions completed cleanup.
-
-Validation: complete offline entry passed **123 Ruby cases / 2,607 assertions**,
-**26 IPQS tests** and **31 provider-account tests**, with no failures or skips
-(`reports/offline-20261011-v29-final.txt`). Regression coverage includes full defaults with no
-repair flags, private key handling, retained failed columns, target/schema
-binding, same-route fallback limits and unchanged IPv6/proxy DNS behavior.
-
-## Source selection and direct IPQS DNS repair — 2026-10-10, v28
-
-Earlier reporter: `v2026-10-10-standalone.28` on `main`.
-
-- Both entrypoints now support `--sources all|independent|ID,ID`. The default
-  remains `all`; `independent` skips all Check.Place datasets and permits IPQS
-  only with its official key. Explicitly omitted sources become `disabled`,
-  are absent from terminal columns, and make no reputation request. Selected
-  failures stay visible. Egress discovery no longer depends on Check.Place.
-- `--ipqs-dns alidns` is a direct/specific-IP-only, opt-in repair. It uses verified
-  HTTPS DNS for the official IPQS hostname at both account and lookup stages.
-  There is no fixed destination pin, system-DNS change, route switch, retry or
-  certificate weakening. A missing key stops before a relay fallback. JSON
-  records source selection, explicit/discovered target mode and IPQS DNS policy.
-- A complete direct independent report with AliDNS returned IPQS `ok` and a
-  numeric score. A fresh ATT egress was then explicitly queried through direct
-  + AliDNS using the unchanged key: IPQS also returned `ok` and a score. This is
-  an alternate-route lookup of the ATT IP, not an ATT-origin connectivity pass.
-  The earlier same-day official account check returned credits=5020, usage=2;
-  that usage predates these successful lookups and is not a current balance.
-- ATT's independent report still returned IPQS `tls_error`. IPinfo, Ipregistry,
-  ipapi, IPWHOIS and Cloudflare Intel succeeded on both direct and ATT. DB-IP
-  returned `rate_limited`. These independent sources keep the project useful
-  while the relay and ATT-to-IPQS path are unavailable.
-- Strict direct Cloudflare/Google DoH were unavailable in this environment;
-  only the verified AliDNS option was retained. The normal system-DNS path
-  still needs a separate network-owner repair if it should work without the
-  explicit reporter option. No active Clash or system network setting changed.
-- NodeQuality's site/launcher were accessible; its current launcher still calls
-  IP.Check.Place, which matched xykt's `v2026-09-16` script byte-for-byte. A
-  bounded request to its current IPQS relay through ATT returned the known
-  Cloudflare HTTP 403 block. The linked user report is dated March 24, 2025.
-  No full Linux/chroot benchmark was executed, and no global outage is claimed.
-- The IPQS support message remains relevant to ATT edge/path attribution.
-  A bounded search for replies from IPQS with the inquiry's subject returned no
-  references. We still have no provider-side diagnosis; the evidence does not
-  establish that ATT's failure is caused by IPQS rather than another hop.
-
-Private evidence: `reports/direct-20261010-v28-alidns.json`,
-`reports/att-20261010-v28-independent.json`,
-`reports/ipqs-20261010-v28-att-target-via-direct.json`,
-`reports/ipqs-20261010-alidns-account-proof.json`, and
-`reports/nodequality-20261010-{browser.jsonl,loaded-report.json,upstream-probe.json}`.
-The earlier `direct-20261010-v28-independent.json` is the failed Cloudflare-DNS
-experiment, not the final direct success. All temporary processes were stopped.
-
-Validation: complete offline entry passed **116 Ruby cases / 2,423 assertions**,
-**26 IPQS tests** and **31 provider-account tests**. Selection tests check real
-fixture curl counts, no relay use, no silent DNS fallback, key privacy, target
-binding, option validation and failed versus deselected columns. The shared
-column-visibility rule stays in `report/`; source policy stays in `providers/`.
-
-## Direct/ATT follow-up — 2026-10-10
-
-Earlier reporter: `v2026-10-10-standalone.27` on `main`. The preceding v26 fix
-preserved errors; it did not restore either blocked upstream path.
-
-Fresh complete v26 runs confirmed the user's updated observation: direct IPv4
-and isolated `vps+sub5` / `ATT` both received Check.Place Cloudflare blocks for
-five relay sources. Cloudflare's separate official Intel API succeeded on both.
-IPQS timed out on direct IPv4 and failed TLS on ATT.
-
-- Check.Place also returned the same 403 block in ATT headless Chrome and direct
-  headed Chrome. The upstream project's [issue 79](https://github.com/xykt/IPQuality/issues/79)
-  records another user's similar block, but establishes neither our trigger nor
-  a recovery deadline. No client change has restored Check.Place access.
-- Direct IPv4 IPQS reached HTTP 200 with valid TLS after resolving to an address
-  independently verified through encrypted DNS; the account endpoint accepted
-  the unchanged key (credits 5020, usage 2). Default system resolution timed
-  out. The resolver/address path therefore contributes to the direct failure.
-  No production DNS or hosts pin was added.
-- ATT still failed with HTTP CONNECT, SOCKS remote DNS, LibreSSL, SecureTransport,
-  verified IPv4/IPv6 destination addresses, and Chrome (`ERR_CONNECTION_CLOSED`).
-  Restoring the source subscription's DNS in a temporary instance, without its
-  listener or geodata downloads, also did not restore IPQS. The failing remote
-  component remains unconfirmed; the already-sent IPQS support inquiry stands.
-- v27 pauses subsequent Check.Place requests for the same target/family after
-  its first confirmed block or HTTP 429. The source-specific policy lives in
-  `providers/check_place.zsh`; skipped columns keep unknown values and explicit
-  statuses. This reduces unnecessary blocked requests; it does not unblock the
-  website. Other sources continue on their selected route.
-
-Private evidence: `reports/{direct,att}-20261010-followup.*`,
-`reports/providers-20261010-{browser,endpoint}-followup.json`,
-`reports/ipqs-20261010-{tls,source-dns}-followup.json`, and
-`reports/ipqs-20261010-direct-dns-account-proof.json`. Temporary browser and
-Mihomo processes were closed; no active Clash or account state was changed.
-
-Validation: **109 Ruby cases / 2,310 assertions**, **26 IPQS tests** and **31
-provider-account tests** passed through the complete offline entry. The live
-acceptance report `reports/att-20261010-v27-sub6.json` shows the first relay
-block, four explicitly skipped relays, Cloudflare Intel `ok` and IPQS
-`tls_error`. The externally maintained subscription advanced to `vps+sub6`
-during this investigation; its ATT leaf fields match the frozen `vps+sub5`
-release exactly, and the cached leaf matches the corresponding new release. The reporter
-did not perform that subscription update.
-
-## Earlier ATT provider investigation — 2026-10-10, v26
-
-The earlier `v2026-10-10-standalone.26` authorized live reruns used
-the current cached `vps+sub5` / `ATT` leaf and left live Clash unchanged.
-
-- Cloudflare IP Intelligence succeeded, with the expected AS7018/US context.
-  Check.Place's separate Cloudflare protection blocked its MaxMind, Scamalytics,
-  AbuseIPDB, IP2Location and ipdata relay requests. Direct and `awshk` controls
-  also returned HTTP 403 from Check.Place; their bodies did not carry the same
-  Cloudflare block signature. This is not proof that ATT is unclean or that the
-  Cloudflare Intel token failed.
-- IPQS on ATT failed before HTTP, with curl 35 / HTTP 000. Its account API
-  succeeded over direct IPv6 and `awshk`, initially reporting credits=5020 and
-  usage=1. The same ATT target queried through `awshk` returned a valid official
-  fraud score. No account/key/quota failure was established. A separate native
-  HTTP client, header authentication, verified-DNS pinning and TLS 1.2 did not
-  establish the ATT path. The exact failing network/edge component is unknown.
-- Fixed a reporter bug that discarded IPQS curl/HTTP errors and continued from
-  a failed account preflight into another lookup. Both stages now use the shared
-  decoder; account failures stop before lookup, malformed bodies remain unknown,
-  and table/JSON status correctly reports `tls_error`. No alternate route, DNS
-  address or weaker certificate policy was added to production.
-- Private evidence: `reports/att-20261010-investigation.*`,
-  `reports/att-20261010-v26.*`, `reports/*20261010*diagnostics.json`,
-  `reports/ipqs-20261010-dns-proof.json`,
-  `reports/providers-20261010-route-comparison.json`, and
-  `reports/ipqs-20261010-lookup-control.json`.
-
-The user-authorized [IPQS support inquiry](mcp/ipqs/SUPPORT-TLS-20261010.md) was
-sent at 17:36:37 Asia/Shanghai and independently verified in Gmail Sent.
-No provider diagnosis is established yet; earlier September account/browser
-evidence is historical.
-
-Validation for v26: the complete offline entry passed **106 Ruby cases / 2,128
-assertions**, **26 IPQS tests** and **31 provider-account tests**. Shell syntax,
-diff whitespace and 82 local documentation links/anchors passed. The final ATT
-rerun exited successfully, kept Cloudflare Intel available, and explicitly
-reported the unresolved IPQS `tls_error` and Check.Place denials. A successful
-report process does not mean every source succeeded.
-
-## Shared HTTP/Chrome reuse — 2026-10-07
-
-IPQS and provider-accounts now import `@myutils/browser-session` and/or
-`@myutils/http-read` directly, with matching local dependencies/lockfiles and
-documentation. MCP-specific helpers stay in mcps; IP/provider identity,
-authentication, exact-leaf isolation and zsh/Ruby route policy stay here.
-[Shared API](/Users/zmx/Projects/myutils/docs/NETWORK_API.md).
-
-The full offline entry passes **105 Ruby cases / 2,043 assertions**, IPQS's
-**26** tests and provider-accounts' **31** tests. IPQS's separate isolated
-browser-text suite also passes. No live reputation lookup, provider login,
-route/credential change or new third-party version was needed.
-
-Worktree: `/Users/zmx/Projects/projects/ipquality`, branch
-`main`. Start with [AGENTS.md](AGENTS.md)
-for a network-free plan and route selection.
-
-## Current behavior
-
-- Reporter and every runner route default to `reputation`. Raw mail/DNSBL
-  scopes remain optional; media/AI probes are removed.
-- Cloudflare is in section 1 only: query status, ASN, ASN-country, ASN-type,
-  organization and any supplied threat categories follow the relay or fallback
-  basic data. Section 3 no longer has its column or ASN rows. Missing threat data
-  is not a connection failure or a zero score; ASN type does not classify the individual
-  IP as residential or VPN.
-- Every attempted source stays in its applicable type/score/factor tables with
-  aligned query statuses, including timeouts, TLS/certificate failures, rate
-  limits and invalid responses. Unconfigured sources are also explicit. Repeated provider explanation
-  footers are removed; credential mode, response tier and interpretation stay
-  in JSON and [PROVIDERS.md](PROVIDERS.md). JSON now records every type source's
-  status and adds IPinfo to `ProviderStatus`; unknown results never become clean.
-- DB-IP uses a page plus one visitor lookup and accepts a label only for the
-  tested egress. IPWHOIS uses its website request headers. Corrected requests
-  returned risk data on September 24, superseding the earlier blanket
-  unavailable-demo conclusion. Actual rate limits still remain unknown risk,
-  without retries or route switching. Contracts and the historical NodeQuality
-  comparison belong in [PROVIDERS.md](PROVIDERS.md).
-- Shared helpers cover curl response envelopes, independent table-column widths
-  and bounded jq values. IPinfo rejects changed nested objects; IPinfo/Ipregistry
-  preserve transport failures; Shodan rejects fractional ports and control text.
-  [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md) owns API/caller details, while
-  [UPSTREAM.md](UPSTREAM.md) records removed wrappers and other modifications.
-- [MCP_AUTH.md](MCP_AUTH.md) is the maintained MCP guide: server selection,
-  first-call arguments, live/offline boundaries and dated login/2FA evidence.
-  ipapi/Cloudflare routine account reads use saved-state HTTP without Chrome;
-  recovery choices and the separate Cloudflare state-refresh step are documented
-  there. IPQS TOTP enrollment and fresh-login proof belong to the earlier v25
-  account audit; they are not repeated by documentation validation.
-
-## Remaining issues
-
-ATT-to-IPQS TLS access and Check.Place relay denials remain unresolved.
-Direct IPv4 IPQS now works automatically in the normal v29 full run. The
-underlying system-DNS discrepancy remains outside this reporter's settings.
-Scamalytics can now recover through its same-route public target page. Other
-failed relay datasets remain explicit; the normal user workflow keeps all
-sources selected.
-The earlier September ipapi failure is not a current blocker:
-both October 10 ATT reports returned ipapi `ok`. Results describe those runs,
-not a lasting provider-health guarantee.
-
-## Recorded live evidence
-
-These are earlier authorized reputation measurements. The earlier v25 account
-audit performed the login checks recorded in MCP_AUTH.md without reputation
-lookups. Reports remain private ignored outputs.
-
-| Date / scope | Result and evidence |
+| Date / scope | Result / private evidence |
 | --- | --- |
-| September 24, v22 Cloudflare only, isolated vps+yyssr22 / ATT | HTTP 200, exact target match; AS7018, US, isp, AT&T Enterprises, LLC. `risk_types` absent, `ip_lists`/`threat_summary` null. Sanitized receipt: `reports/cloudflare-v22-proof.json` |
-| September 24, v22 display preview | `reports/cloudflare-v22-preview.txt` renders that single Cloudflare receipt; it is not a new multi-provider measurement |
-| September 24, v21 ATT report | Exit 0 in 21.1 seconds, no jq errors; ten providers `ok`, including DB-IP, IPWHOIS, Cloudflare and IPQS. DB-IP supplied `low`; IPWHOIS supplied US and false proxy/VPN/Tor/hosting, with missing abuse/bot fields null. ipapi had a transport failure. Evidence: `reports/risk-v21-att-20260924-121527.json` and matching ANSI/text/stderr files |
-| September 24, direct account-free MCP probes | Corrected DB-IP visitor and IPWHOIS requests supplied risk data; no account or 2FA was created |
-| September 22, IPQS recovery | Account probe and authorized official lookup passed; the older zero-credit support case is historical. Details: [mcp/ipqs/HANDOFF.md](mcp/ipqs/HANDOFF.md) |
+| October 12, ATT IP2Location-only check | `ok`; `reports/att-ip2location-20261012-baseline.{json,txt,stderr}` |
+| October 12, ATT full v31 report | All 11 table providers returned `ok`, including IP2Location and DB-IP; Check.Place MaxMind remained blocked. `reports/att-20261012-v31-baseline.{json,txt,stderr}` |
+| October 11, full direct/ATT reports | Ten table providers returned `ok`; DB-IP reported daily quota exhaustion. ATT IPQS recovered through direct fallback while retaining `tls_error`; Cloudflare succeeded on its selected route. `reports/{direct,att}-20261011-v31.{json,txt,stderr}` |
+| October 11, route diagnostics | ATT IPQS failed TLS before HTTP on multiple host/TLS variants, while the same key/target succeeded through another route. DB-IP supplied no recovery timestamp. `reports/att-ipqs-20261011-route-diagnostics.json`, `reports/dbip-20261011-route-diagnostics.json` |
 
-The v21 report predates the specific TLS-error labels; later diagnostics and
-fixtures establish that distinction. Measurement owners stopped their temporary
-Mihomo instances and left live Clash unchanged.
+The user paused the proposed extra IP2Location route change on October 12 after
+successful baseline checks, pending their own run. That change was not shipped;
+the abandoned patch was removed during this cleanup. Existing selected-route
+public-example fallback remains in place.
 
-## Ownership and validation
+## Unresolved external observations
 
-IPQS lives in `mcp/ipqs` and shares `secrets/ipqs` with the reporter. Provider
-HTTP/browser state, existing Cloudflare TOTP and the new IPQS TOTP remain private.
-Both MCPs reuse the sibling mcps shared libraries. [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md)
-maps APIs and owners; [SERVICES.md](SERVICES.md) explains stdio and browser lifetime.
-There is no project-specific skill or duplicate README.
+- ATT-to-IPQS TLS access and Check.Place relay denial were not repaired at their
+  source. Reporter fallbacks recover other usable data; attribution to a specific
+  remote edge is unconfirmed. The last support-mail check was October 11, with
+  no reply then. Current inquiry/evidence: [IPQS TLS support](mcp/ipqs/SUPPORT-TLS-20261010.md).
+- DB-IP returned `ok` on October 12 after October 11's quota failure. There is no
+  guaranteed demo reset/recovery time. Failed or expired source sessions remain
+  explicit; do not interpret saved account files as live authentication.
+- Earlier direct Ping0 geography was verified; ATT's October 11 supplemental
+  observation remained unknown. Other providers supplied location/ASN context.
 
-Validation on v25:
-
-- `/bin/zsh -f scripts/test-offline`: **105 Ruby tests / 2,043 assertions**,
-  **26 IPQS tests** plus build/static doctor, and **31 provider-account tests**;
-  no failures or skips.
-- Report cases verify Cloudflare appears only in section 1, in both languages
-  and both relay/fallback basic-data paths. Failed queries cannot show stale
-  context, and absent threat categories produce no extra line.
-- `reports/basic-v24-layout-preview.txt` shows the new placement using fields
-  supplied by the user (AS9808 / China Mobile); it is not a new network measurement.
-- `npm --prefix mcp/ipqs run test:browser-text`: **10 synthetic cases** passed,
-  including TOTP-challenge rejection and emergency-code redaction; no external
-  requests or real profile used. Both rendered and inert text authentication
-  checks reject a TOTP challenge even when dashboard navigation is present.
-- Shell/Ruby syntax and `git diff --check` passed; maintained local documentation
-  links and anchors were checked separately.
-
-The subsequent documentation audit re-ran the full offline and synthetic suites,
-reviewed all 13 maintained guides, and inspected both servers' actual
-instructions/tool schemas over stdio without invoking account tools. It corrected
-Ipregistry's unconfigured-column behavior, clarified HTTP-state recovery, and
-consolidated repeated audit history. No new provider or account check was made.
-
-The September 24 test/service audit retained all test cases, consolidated four
-table-alignment checks into one independent Ruby assertion, and replaced exact
-padding counts with score values plus alignment checks. The full offline and
-ten-case synthetic browser suites passed again; tracked files stayed unchanged
-during the final full run. Both MCP test guides remain current.
-
-The September 24 service audit found no project launchd entry or user cron job,
-owned account browser or listener on 19453/19503/19504. Node processes sharing
-this worktree were external text-browser-kernel clients, not project daemons.
-Its saved mail-watch metadata confirmed `mail.ipqs-quota-20260916` was cancelled
-on September 22. No service needed removal or shutdown. Current Supervisor
-registration is documented in [SERVICES.md](SERVICES.md#external-checks).
-
-Follow-up test hardening bounds the TERM test's runner-exit wait to 15 seconds
-and makes IPQS stdio shutdown errors fail the test. Fault injection confirmed
-that an ignored TERM times out and both fixture children stop, and that a close
-error is reported. The complete offline entrypoint passed again with the counts
-above; no runtime or service behavior changed.
-
-[TESTING.md](TESTING.md) owns complete/focused commands and their limits.
-Configured remotes are `github-kratoszmx` (`kratoszmx/ip-quality`) and
-`github-kratosbackup` (`kratosbackup/ipquality`); final synchronization receipts
-belong to the completing task's report.
+[TESTING.md](TESTING.md) owns complete/focused validation commands and their
+limits. Earlier change history remains in Git rather than duplicated handoff
+sections. Enabled GitHub remotes are `github-kratoszmx` (`kratoszmx/ip-quality`)
+and `github-kratosbackup` (`kratosbackup/ipquality`); synchronize and read back
+both after validating owned changes.

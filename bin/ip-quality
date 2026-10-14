@@ -15,6 +15,7 @@ typeset REPORT_DIR="$SCRIPT_DIR/report"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
 typeset COMMON_PROVIDER_LIB="$COMMON_DIR/provider_values.zsh"
+typeset COMMON_HTTP_LIB="$COMMON_DIR/http_request.zsh"
 typeset TERMINAL_LIB="$COMMON_DIR/terminal.zsh"
 typeset CREDENTIALS_LIB="$PROVIDER_DIR/credentials.zsh"
 typeset CHECK_PLACE_LIB="$PROVIDER_DIR/check_place.zsh"
@@ -35,7 +36,7 @@ typeset RIPESTAT_LIB="$PROVIDER_DIR/ripestat.zsh"
 typeset INTERNETDB_LIB="$PROVIDER_DIR/shodan_internetdb.zsh"
 typeset REPUTATION_REPORT_LIB="$REPORT_DIR/reputation.zsh"
 typeset local_library
-for local_library in "$COMMON_DIR/json_values.jq" "$COMMON_PROVIDER_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$CHECK_PLACE_LIB" "$QUERY_ROUTE_LIB" "$SELECTION_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$DBIP_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$SCAMALYTICS_LIB" "$IP2LOCATION_LIB" "$IPDATA_LIB" "$ABUSEIPDB_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
+for local_library in "$COMMON_DIR/json_values.jq" "$COMMON_PROVIDER_LIB" "$COMMON_HTTP_LIB" "$TERMINAL_LIB" "$CREDENTIALS_LIB" "$CHECK_PLACE_LIB" "$QUERY_ROUTE_LIB" "$SELECTION_LIB" "$IPREGISTRY_LIB" "$IPAPI_LIB" "$IPWHOIS_LIB" "$DBIP_LIB" "$CLOUDFLARE_LIB" "$IPQUALITYSCORE_LIB" "$SCAMALYTICS_LIB" "$IP2LOCATION_LIB" "$IPDATA_LIB" "$ABUSEIPDB_LIB" "$PING0_LIB" "$RIPESTAT_LIB" "$INTERNETDB_LIB" "$REPUTATION_REPORT_LIB";do
 [[ -f "$local_library" && -r "$local_library" && ! -L "$local_library" ]]||{
 print -ru2 -- "ERROR: unsafe or missing local library: $local_library"
 exit 66
@@ -376,26 +377,6 @@ local decimal_pattern='^[0-9]+([.][0-9]+)?$'
 is_signed_decimal(){
 local decimal_pattern='^-?[0-9]+([.][0-9]+)?$'
 [[ "$1" =~ $decimal_pattern ]]
-}
-
-# Feed credential-bearing curl options over stdin so API keys never appear in
-# process arguments, Git configuration, or the report. Callers validate every
-# interpolated key and IP before reaching these helpers.
-curl_with_secret_url(){
-typeset secret_url="$1"
-shift
-print -r -- "url = \"$secret_url\""|curl -q "$@" --config -
-}
-
-curl_with_secret_header(){
-typeset header_name="$1"
-typeset header_value="$2"
-typeset endpoint="$3"
-shift 3
-{
-print -r -- "header = \"$header_name: $header_value\""
-print -r -- "url = \"$endpoint\""
-}|curl -q "$@" --config -
 }
 
 typeset -g PROVIDER_RESPONSE_BODY=""

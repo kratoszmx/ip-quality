@@ -29,7 +29,7 @@ the tests and claiming a complete pass.
 
 | File | Responsibility |
 | --- | --- |
-| `test/common_test.rb` | HTTP envelopes/transport errors/state reset, printable text, jq predicates, table widths/shape, proxy overrides and snapshots |
+| `test/common_test.rb` | Secret curl stdin/argument boundaries and exit status, HTTP envelopes/transport errors/state reset, printable text, nullable jq predicates, table widths/shape, proxy overrides and snapshots |
 | `test/ip_quality_test.rb` | CLI plans and rejection gates, dependency failure, fixture DNSBL/SMTP execution |
 | `test/providers_test.rb` | Provider parsing, unknown/failure semantics, credentials, zero-credit preflight |
 | `test/check_place_test.rb` | One actual request after a relay block/429, explicit skipped results, target/family/run isolation and unaffected official sources |
