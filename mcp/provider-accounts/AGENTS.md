@@ -91,7 +91,8 @@ test target and project only score/country; personal account fields stay private
 
 The September 24 trial passed both HTTP identity checks with the owned Chrome
 containers closed. ipapi's isolated headless dashboard also passed, so its setup
-default now adds `--headless=new`. Cloudflare headless returned 403; its explicit
+default now selects shared `headless:true`; the shared launcher suppresses GUI
+launch/window flags without consumer-built headless arguments. Cloudflare headless returned 403; its explicit
 setup/recovery browser stays headed. Switching an existing container's mode
 requires closing that verified owned container first.
 

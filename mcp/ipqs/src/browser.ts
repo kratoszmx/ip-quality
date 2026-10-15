@@ -94,7 +94,7 @@ async function openSession({ headless = false, statusOnly = false } = {}) {
     proxyServer: getProxyServer(),
     timeoutMs: getTimeoutMs(),
     startUrl: "about:blank",
-    extraArgs: headless ? ["--headless=new"] : [],
+    headless,
     viewport: { width: 1440, height: 1000 },
     startMaximized: !headless,
     newWindow: false,

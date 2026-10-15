@@ -1,5 +1,17 @@
 # Current handoff
 
+## Shared headless launch selection — 2026-10-15
+
+IPQS's explicit headless option and provider-accounts' existing ipapi headless
+mode now pass `headless` directly to myutils. Shared launch construction omits
+GUI/window flags instead of mixing those flags with a consumer-built argument.
+Provider mode defaults, retained account state, route policy and login behavior
+are unchanged; no account/site was opened during this maintenance.
+
+Complete offline runner passed: **136 Ruby tests / 3159 assertions**, **26 IPQS**
+and **36 provider-account** tests, with zero failures/skips. No new dependency,
+wrapper, reporter query or live network configuration change was introduced.
+
 ## Shared utility consumers — 2026-10-14
 
 IPQS and provider-accounts import private-file, TOTP and one-use records

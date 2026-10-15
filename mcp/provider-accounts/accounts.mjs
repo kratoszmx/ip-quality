@@ -27,7 +27,7 @@ export async function withSession(provider, operation, { foreground = false } = 
     const headless = provider === 'ipapi' && !foreground;
     const session = await connectOrLaunchChromeOverCDP(chromium, {
       profileDir, cdpPort: config.port, proxyServer: routing.proxyServer,
-      extraArgs: [...routing.chromeArgs, ...(headless ? ['--headless=new'] : [])], startUrl: 'about:blank',
+      headless, extraArgs: routing.chromeArgs, startUrl: 'about:blank',
       background: !foreground, hidden: !foreground, detached: true, unref: true,
       preserveContextSettings: true, timeoutMs: 20_000, killLaunchedProcessOnClose: false,
     });

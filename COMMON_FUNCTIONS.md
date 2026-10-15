@@ -7,7 +7,10 @@ network access, credential read, or environment mutation.
 
 The reporter runs in zsh and the route runner in system Ruby.
 `provider_json_is_object` uses `jq`; terminal text cleanup uses system `sed`.
-The optional Node account MCPs reuse the mcps JavaScript library described below.
+The optional Node account MCPs directly reuse myutils browser/session utilities
+and mcps formatting helpers described below. `headless` is a shared launch option,
+not an argument assembled by each provider; account defaults and authentication
+policy remain in IPQS/provider-accounts.
 
 ## File and caller map
 
