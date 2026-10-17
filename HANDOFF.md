@@ -1,29 +1,35 @@
 # Current handoff
 
-## Shared headless launch selection — 2026-10-15
+## Structure and reliability maintenance — 2026-10-17
 
-IPQS's explicit headless option and provider-accounts' existing ipapi headless
-mode now pass `headless` directly to myutils. Shared launch construction omits
-GUI/window flags instead of mixing those flags with a consumer-built argument.
-Provider mode defaults, retained account state, route policy and login behavior
-are unchanged; no account/site was opened during this maintenance.
+Reviewed 2026-10-17. Worktree: `/Users/zmx/Projects/projects/ipquality`, branch
+`main`. Reporter is `v2026-10-17-standalone.32`; query policy, sources and
+fallbacks are unchanged. Start with [AGENTS.md](AGENTS.md) and give users its one
+normal interactive command.
 
-Complete offline runner passed: **136 Ruby tests / 3159 assertions**, **26 IPQS**
-and **36 provider-account** tests, with zero failures/skips. No new dependency,
-wrapper, reporter query or live network configuration change was introduced.
+- Locale: from a C/POSIX shell (empty `LANG`, as in agent shells and launchd) the
+  offline suite failed with 3 failures and 28 errors, and the runner could not
+  match non-ASCII `--subscription`/`--leaf` names. Reporter, runner and test
+  suites now pin UTF-8; `scripts/test-offline` runs every suite before reporting
+  failures.
+- Reporter split: `bin/ip-quality` went from 2,933 to about 800 lines. Each
+  `providers/*.zsh` holds its parser and live `db_*` adapter; mail/DNSBL probes,
+  labels, report sections and JSON assembly have their own modules. Sourcing the
+  reporter loads definitions only, which `test/support/self_test.zsh` uses
+  (`--self-test` left the CLI). Short options are validated before the plan;
+  the unused random user agent and progress-width state are gone; `mode_lite`
+  became `basic_source`.
+- MCPs: one npm workspace (`mcp/package.json`, `mcp/package-lock.json`). The
+  merged lock contains only versions from the two earlier reviewed locks: IPQS
+  moved to the provider-accounts SDK transitive versions, playwright-core 1.63.0
+  and zod 4.6.2. Both MCPs use myutils `generateFreshTotp`.
+- Supervisor's weekly check is `test.ipquality.test-offline` (complete suite),
+  replacing the IPQS-only check.
+- AGENTS.md (14 KB to 7.6 KB) and COMMON_FUNCTIONS.md (23 KB to 8.4 KB) were
+  condensed; provider-account module APIs moved to their own guide.
 
-## Shared utility consumers — 2026-10-14
-
-IPQS and provider-accounts import private-file, TOTP and one-use records
-directly from myutils. Local file dependencies and locks match the new owner,
-without forwarding packages or third-party version upgrades. IPQS offline
-26 tests, provider-accounts 36 tests and isolated browser-text validation
-passed. These checks do not establish live provider or account readiness.
-
-Reviewed 2026-10-14. Worktree: `/Users/zmx/Projects/projects/ipquality`, branch
-`main`. Reporter remains `v2026-10-11-standalone.31`; this maintenance changes
-shared-code placement and documentation, not query policy or account backends.
-Start with [AGENTS.md](AGENTS.md); give users its one normal interactive command.
+The validation result is in the commit message that adds this section. No live
+provider, account or node lookup was performed.
 
 ## Current behavior and ownership
 
@@ -54,35 +60,6 @@ Start with [AGENTS.md](AGENTS.md); give users its one normal interactive command
   external weekly IPQS offline-test registration, with no resident project
   browser/listener, launchd job or cron job. Current process ownership and the
   external registration are documented in [SERVICES.md](SERVICES.md).
-
-## October 14 maintenance
-
-- Moved the actual URL/header stdin-configuration functions from the reporter
-  into `common/http_request.zsh`, used by reporter adapters and query-route
-  policy directly. No forwarding copy remains. Added an offline curl stub that
-  checks credential privacy, intact arguments, exit status and option scope.
-- Unified nullable-boolean validation in six provider parsers through
-  `common/json_values.jq`. Source-specific field lists, required observations
-  and missing/false distinctions stay in those parsers.
-- Reviewed every existing common module. Each has multiple production callers;
-  no provider-specific implementation needed moving out. Existing provider,
-  report and lifecycle boundaries remain appropriate.
-- Updated the account-method inventory, including key-only Ipregistry and
-  account-free sources. No live login, enrollment, account mutation or reputation
-  measurement was performed for this maintenance.
-- Removed the resolved September zero-credit support-message copy, obsolete
-  version-by-version handoff prose, 36 abandoned patch/preview/research artifacts
-  and the empty project `tmp/` directory. Actual reports, current TLS
-  evidence, credentials, browser state and private support receipts are retained.
-  No `human_docs` content was edited.
-
-Validation: `/bin/zsh -f scripts/test-offline` passed **136 Ruby cases / 3,159
-assertions**, **26 IPQS tests** plus build/static doctor, and **36 provider-account
-tests**, with no failures/errors/skips. Evidence:
-`reports/offline-20261014-maintenance-final.txt`. Shell/Ruby syntax, maintained
-local documentation links and `git diff --check` also passed. The separate
-synthetic browser-text suite was unchanged; its last 10-case pass remains dated
-October 12. No live provider availability is inferred from these checks.
 
 ## Latest saved live evidence
 

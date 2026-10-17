@@ -1,364 +1,133 @@
 # Project common functions
 
-`common/` contains implementations used by multiple production callers in this
-repository. Load the needed file directly; there is no forwarding layer or
-compatibility copy at the former paths. Loading these modules performs no
-network access, credential read, or environment mutation.
+`common/` holds implementations with several production callers. Load the file
+directly; there are no forwarding copies. Loading performs no network access,
+credential read or environment mutation. zsh functions preserve caller options
+(including `KSH_ARRAYS`); predicates answer through exit status and value
+functions print without a trailing newline.
 
-The reporter runs in zsh and the route runner in system Ruby.
-`provider_json_is_object` uses `jq`; terminal text cleanup uses system `sed`.
-The optional Node account MCPs directly reuse myutils browser/session utilities
-and mcps formatting helpers described below. `headless` is a shared launch option,
-not an argument assembled by each provider; account defaults and authentication
-policy remain in IPQS/provider-accounts.
-
-## File and caller map
-
-| Definition | Production callers | Responsibility |
+| File | Production callers | Responsibility |
 | --- | --- | --- |
-| `common/provider_values.zsh` | Provider parsers and `bin/ip-quality` | Validate/normalize provider values without source-specific schemas |
-| `common/http_request.zsh` | Credential-bearing adapters in `bin/ip-quality`; IPQS/Cloudflare requests in `providers/query_route.zsh` | Send validated secret URL/header options to curl over stdin without exposing them in process arguments |
-| `common/json_values.jq` | ipapi, Cloudflare, IPWHOIS, DB-IP, IP2Location, ipdata, Ipregistry, IPQS, AbuseIPDB and Shodan parsers | Nullable boolean and bounded text/integer predicates; source schemas stay in each parser |
-| `common/terminal.zsh` | `bin/ip-quality`; type, score and factor renderers in `report/reputation.zsh` | ANSI cleanup, display-cell measurement and aligned table layout with independent column widths |
-| `common/text.rb` | `leaf_runner/profile.rb`, `leaf_runner/subscription_catalog.rb` | Validate bounded printable metadata |
-| `common/safe_snapshot.rb` | Profile, catalog, and isolated Mihomo session | Read or verify owner-controlled local files and compare snapshots |
-| `common/network_environment.rb` | Direct route command and isolated Mihomo session | Produce child-process overrides removing inherited proxies |
+| `common/provider_values.zsh` | Provider parsers/adapters and `bin/ip-quality` | Validate/normalize provider values and HTTP envelopes, no source schemas |
+| `common/http_request.zsh` | Credential-bearing adapters in `providers/`, `providers/query_route.zsh` | Pass secret URL/header options to curl over stdin, never in process arguments |
+| `common/json_values.jq` | ipapi, Cloudflare, IPWHOIS, DB-IP, IP2Location, ipdata, Ipregistry, IPQS, AbuseIPDB, Shodan parsers | Nullable boolean and bounded text/integer predicates |
+| `common/terminal.zsh` | `report/` sections and tables, `bin/ip-quality` | ANSI cleanup, display width and aligned tables |
+| `common/text.rb` | `leaf_runner/profile.rb`, `leaf_runner/subscription_catalog.rb` | Bounded printable metadata |
+| `common/safe_snapshot.rb` | Profile, catalog, isolated Mihomo session | Verified owner-controlled file reads and snapshot comparison |
+| `common/network_environment.rb` | Direct route command, isolated Mihomo session | Child-process overrides removing inherited proxies |
 
-## zsh provider values
+## zsh provider values (`provider_values.zsh`)
 
-Source `common/provider_values.zsh` before the provider adapters. Each function
-uses local zsh option scope. Predicates communicate through the exit status;
-value functions print without a trailing newline.
-
-| Function and input | Output / result |
+| Function | Result |
 | --- | --- |
-| `provider_json_is_object JSON` | Exit 0 only for JSON accepted by `jq` as an object; suppresses parser output/errors |
-| `provider_integer_in_range VALUE MIN MAX` | Exit 0 for three nonnegative integer strings when `MIN <= VALUE <= MAX` |
-| `provider_merge_boolean_signals SIGNAL...` | `true` if any signal is exactly `true`; `false` only for a nonempty all-`false` list; otherwise empty (unknown) |
-| `provider_has_observation VALUE...` | Exit 0 if any value is not empty, `null`, or `unknown` (case-insensitive); `false` is an observation |
-| `provider_http_failure_status CODE BODY` | `cloudflare_blocked` for the known 403/block-page signature, `rate_limited` for HTTP 429; otherwise `http_NNN` for a three-digit nonzero status, or `network_error`; never echoes the body |
-| `provider_decode_http_response WIRE CURL_EXIT` | Resets `provider_http_response` (`status`, `http_code`, `body`); exit 0 only for a successful curl and 2xx envelope. Curl 28/35/60 retain timeout/TLS/certificate distinctions. Failure clears the body and returns 1; no network or JSON parsing |
+| `provider_json_is_object JSON` | Exit 0 only for a JSON object accepted by `jq`; parser output suppressed |
+| `provider_integer_in_range VALUE MIN MAX` | Exit 0 for three nonnegative integer strings with `MIN <= VALUE <= MAX` |
+| `provider_merge_boolean_signals SIGNAL...` | `true` if any signal is `true`; `false` only for a nonempty all-`false` list; otherwise empty (unknown) |
+| `provider_has_observation VALUE...` | Exit 0 if any value is not empty, `null` or `unknown` (case-insensitive); `false` counts |
+| `provider_http_failure_status CODE BODY` | `cloudflare_blocked` (403 block page), `rate_limited` (429), `http_NNN`, or `network_error`; never echoes the body |
+| `provider_decode_http_response WIRE CURL_EXIT` | Resets `provider_http_response` (`status`, `http_code`, `body`); exit 0 only for curl success plus a 2xx envelope. Curl 28/35/60 keep timeout/TLS/certificate statuses; failure clears the body |
 
 ```zsh
 source common/provider_values.zsh
-provider_integer_in_range 99 0 99
 provider_merge_boolean_signals false unknown  # empty: missing evidence stays unknown
 provider_decode_http_response $'{"example":true}\n200' 0
 print -r -- "${provider_http_response[status]}"
 ```
 
-IP2Location's page/JSON validators, ipdata's transient demo-key/schema readers,
-and AbuseIPDB's CHECK validator stay in `providers/`: their schemas and target
-contracts are provider-specific. Their requests reuse `provider_decode_http_response`;
-credential-bearing requests use `common/http_request.zsh`.
+## zsh credential-bearing requests (`http_request.zsh`)
 
-`providers/query_route.zsh` owns the reporter's shared IPQS/Cloudflare transport
-policy; it is deliberately outside `common/` because its fallback disclosure,
-eligible providers, DNS choice and request budgets are report-specific.
-
-| Function | Callers and contract |
+| Function | Result |
 | --- | --- |
-| `query_route_begin FAMILY SELECTED_DNS DIRECT_DNS` | `db_ipqs`, `db_cloudflare`: reset per-provider route state. A proxy/isolated environment enables one selected-to-direct transition; direct runs never retry another route |
-| `query_route_request URL MAX_BYTES [HEADER VALUE]` | Both official adapters: issue a bounded credential-safe request, decode the HTTP envelope, and retry eligible pre-HTTP connectivity failure once through direct IPv4. Return 0 for transport/HTTP success; schemas and quota policy stay in the adapter |
+| `curl_with_secret_url URL [CURL_ARG...]` | Sends the URL through curl's stdin configuration; forwards other arguments intact; keeps curl's output and exit status |
+| `curl_with_secret_header NAME VALUE URL [CURL_ARG...]` | Same, also sending one header through stdin |
 
-The output `query_route` contains `route`, `primary_status` and effective `dns`;
-the response is in `provider_http_response`. A direct fallback remains selected
-for subsequent requests of that provider (IPQS account then lookup), so it does
-not retry a known failed proxy twice. The caller resets the state for every new
-provider, preserves the target URL, then copies route metadata into its result.
-It does not discover an IP or apply to visitor/self endpoints, account mutations,
-HTTP rejection, quotas, certificates or malformed responses. Credentials use
-the existing curl stdin helpers; no key/header is added to process arguments.
-See [query-route policy](PROVIDERS.md#automatic-query-route-fallback) for privacy
-disclosure, credit implications and report fields.
-
-Provider schemas, request endpoints, optional credential files, source-specific
-status decisions, and report labels remain in `providers/`, `bin/ip-quality`,
-and `report/`. A similar `jq` expression alone is not a shared schema contract.
-The type, score and factor tables share `report_query_status` inside `report/`;
-its localized display labels are presentation policy, not a runtime provider API.
-They also share `report_source_visible STATUS [OBSERVATION...]`: `disabled`
-returns false even with stale values; any other nonempty status remains visible,
-and a legacy value-only fixture is visible when it has an observation. This
-selection/display policy belongs in `report/`, not in the common provider library.
-
-`providers/selection.zsh` owns the ordered source IDs, source-function map,
-`reputation_choose_sources all|independent|ID,ID` (validates and deduplicates),
-and `reputation_source_selected ID` (exit 0 for membership). CLI plans, live
-dispatch and JSON use the same selected list. The Ruby runner validates its
-option IDs before starting a temporary process; an offline contract compares
-its vocabulary with the zsh catalog. These names and presets are reporter
-policy rather than a general-purpose collection API, so they stay in `providers/`.
-
-`providers/check_place.zsh` owns `check_place_fetch_json FAMILY TARGET QUERY
-[MAX_BYTES]`, used by the MaxMind, Scamalytics, AbuseIPDB, IP2Location, ipdata and
-unkeyed IPQS relay paths. It builds the fixed relay URL, uses the reporter's
-`provider_fetch_public_json`, and pauses subsequent relay calls after a confirmed
-Cloudflare block or HTTP 429. Pauses are in-memory and bound to target/family;
-skipped calls clear the body and retain an explicit skipped status. This is a
-Check.Place request policy, so it stays outside the project common library.
-
-The HTTP decoder replaces repeated envelope handling in public JSON retrieval,
-IPinfo, Ipregistry, ipapi, Cloudflare, both DB-IP requests, the Scamalytics
-public-page fallback and IPQS account/lookup
-requests. It accepts text or JSON bodies; callers retain schema validation and
-any exact-200 contract.
-
-`providers/scamalytics.zsh` owns `scamalytics_parse_page HTML TARGET`. It returns
-0 only after matching the heading, embedded target and score badge, and fills
-`scamalytics_parsed` with `score`, `risk`, `countrycode`, `proxy`, `vpn`, `tor`,
-`server`, `abuser` and `robot`. Missing factor cells are empty; failure clears
-old values. The 256 KiB limit, HTML labels and source-specific semantics belong
-to Scamalytics, so this is a provider parser rather than a common HTML API.
-`db_scamalytics` owns its one-request fallback and retains the relay outcome.
-IPQS automatic DNS selection likewise stays in its adapter; it is not a
-project-wide resolver or a change to shared proxy-environment handling.
-Request sites use `curl -q`; credential-bearing URL/header functions share
-the stdin-config handling below.
-
-## zsh credential-bearing HTTP requests
-
-Source `common/http_request.zsh` before making a request. It owns the curl
-configuration encoding, not provider routing, retry or response parsing.
-
-| Function and input | Output / result |
-| --- | --- |
-| `curl_with_secret_url URL [CURL_ARG...]` | Sends the validated URL through curl's stdin configuration, forwards each remaining argument intact, and preserves curl's stdout/stderr and exit status |
-| `curl_with_secret_header NAME VALUE URL [CURL_ARG...]` | Sends both the validated header and URL through the same private stdin configuration; otherwise has the same contract |
-
-Both put `-q` first to ignore user curl configuration. Callers supply bounded
-timeouts/body sizes and the selected route, validate the endpoint, and use
-credential formats excluding quotes, backslashes and line breaks. Secret values
-belong only in the named URL/header parameters, never in `CURL_ARG`. No request
-runs while sourcing the module, and both functions preserve caller zsh options.
+Both put `-q` first to ignore user curl configuration. Callers validate the
+endpoint and credential format (no quotes, backslashes or line breaks), choose
+the route, and bound timeouts and body sizes. Secrets go only in the named
+URL/header parameters, never in `CURL_ARG`.
 
 ```zsh
-source common/http_request.zsh
-source common/provider_values.zsh
-# After the caller has validated the credential and chosen the route:
 wire=$(curl_with_secret_header Authorization "Bearer $api_key" "$endpoint" \
   -sS --max-time 10 --max-filesize 131072 --write-out $'\n%{http_code}')
-curl_exit=$?
-provider_decode_http_response "$wire" "$curl_exit"
+provider_decode_http_response "$wire" "$?"
 ```
 
-The reporter imports this implementation directly; there is no old-path
-forwarder. Its Ipregistry, ipapi, DB-IP, AbuseIPDB and ipdata callers share the
-same secret handling with the separate IPQS/Cloudflare query-route policy.
+## jq value predicates (`json_values.jq`)
 
-## jq value predicates
+Use `jq -L /absolute/path/to/ipquality/common` with `include "json_values";`;
+provider functions resolve the path from their own source file.
 
-Use `jq -L /absolute/path/to/ipquality/common` with `include "json_values";`.
-Provider functions resolve this path from their own source file, so standalone
-fixture calls also work from another current directory. The reporter verifies
-the module exists as a readable regular file before any lookup.
-
-| Predicate | Contract |
+| Predicate | True for |
 | --- | --- |
-| `boolean_or_null($value)` | True only for null or a JSON boolean; rejects strings, numbers and containers without converting missing values to false |
-| `text_or_null($value; $max)` | True for null or a string of at most `$max` Unicode codepoints with no C0/DEL controls; empty string is allowed |
-| `integer_or_null($value; $min; $max)` | True for null or an integer JSON number within the inclusive numeric bounds; rejects numeric strings and booleans |
+| `boolean_or_null($value)` | null or a JSON boolean; strings, numbers and containers are rejected, absence is never false |
+| `text_or_null($value; $max)` | null or a string of at most `$max` codepoints without C0/DEL controls |
+| `integer_or_null($value; $min; $max)` | null or an in-range integer JSON number; numeric strings and booleans rejected |
 
-```sh
-jq -n -L common 'include "json_values"; text_or_null("香港"; 2)'
-```
+## zsh terminal text (`terminal.zsh`)
 
-These predicates unify repeated value validation across provider parsers. They
-do not interpret absence as false or validate IP/ASN/source schemas. Text control
-characters are rejected before they reach the terminal. String-form ASNs are
-still accepted only by providers whose contracts explicitly allow them.
-Shodan requires non-null elements before applying the optional predicates;
-fractional/out-of-range ports and control characters in text arrays are rejected.
-
-IPQS connection-type classification belongs to
-`providers/ipqualityscore.zsh::ipqualityscore_connection_type_server_flag`.
-Its official and relay callers share IPQS vocabulary, not a general classifier.
-
-## zsh terminal text
-
-Source `common/terminal.zsh` before the reporter or report renderers. The shared
-functions do not depend on report colors, language, or provider state.
-
-| Function and input | Output / result |
+| Function | Result |
 | --- | --- |
-| `clean_ansi TEXT [preserve]` | Decodes literal `\033`, removes ANSI sequences ending in `m`, `G`, `K`, `H`, or `F`, and trims each line's surrounding whitespace by default; `preserve` retains layout whitespace; adds no newline |
-| `display_width TEXT` | Decimal cell count for a single-line label after ANSI cleanup, including visible leading/trailing spaces; ASCII characters count as one cell and other characters as two |
-| `terminal_table_widths MIN COLUMNS CELL...` | Space-separated widths, one per column, computed from complete rows supplied in row order; each width is at least nonnegative `MIN`. Returns 2 for invalid dimensions or an incomplete row |
-| `terminal_table_cell TEXT WIDTH` | Prints the original text and padding to a nonnegative width; longer text is preserved without truncation |
-| `terminal_table_row "WIDTH..." CELL...` | Prints one row with ` | ` separators and a newline. Requires one nonnegative width per cell; invalid shape returns 2 before printing |
-| `terminal_table_rule "WIDTH..."` | Prints the matching `-+-` rule; invalid widths return 2 before printing |
+| `clean_ansi TEXT [preserve]` | Decodes literal `\033`, strips ANSI `m/G/K/H/F` sequences and trims each line unless `preserve` |
+| `display_width TEXT` | Cells for one label after ANSI cleanup: ASCII one, other characters two |
+| `terminal_table_widths MIN COLUMNS CELL...` | One width per column from complete rows, each at least `MIN`; 2 for invalid shape |
+| `terminal_table_cell TEXT WIDTH` | Text plus padding; longer text is never truncated |
+| `terminal_table_row "WIDTH..." CELL...` | One ` \| `-separated row; 2 before printing on invalid shape |
+| `terminal_table_rule "WIDTH..."` | Matching `-+-` rule |
 
-```zsh
-source common/terminal.zsh
-widths=$(terminal_table_widths 4 2 Name Region 'Example network' HK)
-terminal_table_row "$widths" Name Region
-terminal_table_rule "$widths"
-terminal_table_row "$widths" 'Example network' HK
-```
+Render values before measuring them; one long label widens only its own column.
+The width rule is an approximation, not full `wcwidth` (combining marks, emoji
+and ambiguous-width characters can differ). It needs a UTF-8 locale, which both
+entrypoints and the test suites pin.
 
-Render values before measuring them. Each renderer prepends its label-column
-width and uses the same resulting width list for its header, rule and data rows.
-One long organization or error label expands only its own provider column.
-These functions preserve the caller's zsh options, including `KSH_ARRAYS`.
+## Ruby helpers
 
-The width rule is the existing report-table approximation, now also used by
-headers. It is not a full Unicode `wcwidth` implementation: combining marks,
-emoji sequences, and ambiguous-width characters can differ between terminals.
-Source labels, status colors, missing-value policy and provider-row selection
-stay in `report/`; the common table code knows none of them.
-
-## Ruby metadata
-
-```ruby
-require_relative "../common/text"
-IpQuality::Text.printable?(name, max_bytes: 512)
-```
-
-`printable?` returns a boolean. A valid value is a nonempty, validly encoded
-String within the byte limit and without control characters. The default limit
-is 512 bytes; this is a byte limit, not a character limit. Profile names,
-subscription names, and subscription IDs share this rule. Filename confinement,
-uniqueness, and YAML structure remain the callers' responsibility.
-
-## Ruby verified snapshots
-
-```ruby
-require_relative "../common/safe_snapshot"
-snapshot = IpQuality::SafeSnapshot.read(path, max_bytes: 1024)
-executable = IpQuality::SafeSnapshot.read(
-  binary_path, allowed_modes: [0o700, 0o750, 0o755], max_bytes: nil
-)
-```
-
-| API | Input / output |
+| API | Contract |
 | --- | --- |
-| `SafeSnapshot.read(path, allowed_modes: [0o600, 0o644], max_bytes: 16 * 1024 * 1024)` | Returns `Snapshot(path, bytes, stat)`; `path` is expanded, read bytes are frozen, and `stat` comes from the opened descriptor. `max_bytes: nil` verifies metadata without reading contents and returns `bytes == nil` |
-| `SafeSnapshot.verify_directory(path)` | Returns the expanded path for a real directory owned by the effective user and not writable by group/others |
-| `SafeSnapshot.same?(left, right)` | Compares captured bytes, device, inode, and owner; no new filesystem read |
-| `SafeSnapshot::Error#reason` | Symbol identifying the rejected condition; the error message also contains the path |
+| `Text.printable?(value, max_bytes: 512)` | Nonempty, validly encoded String within the byte limit and without control characters |
+| `SafeSnapshot.read(path, allowed_modes: [0o600, 0o644], max_bytes: 16 MiB)` | `Snapshot(path, bytes, stat)` after owner, regular-file, single-link, mode and descriptor/path identity checks before and after reading; `max_bytes: nil` checks metadata only |
+| `SafeSnapshot.verify_directory(path)` | Expanded path of a real directory owned by the effective user, not group/other-writable |
+| `SafeSnapshot.same?(left, right)` | Compares captured bytes, device, inode and owner without a new read |
+| `SafeSnapshot::Error#reason` | `symlink`, `not_regular`, `wrong_owner`, `hard_link`, `unsafe_mode`, `changed_while_reading`, `too_large`, `missing_or_replaced`, `unreadable`, `not_directory`, `writable_by_other_users` |
+| `NetworkEnvironment.without_proxy_variables(env = ENV)` | New Hash mapping each present `all/http/https/no_proxy` key (any case) to `nil` for `Process.spawn`; does not affect VPN/TUN routing |
 
-File reads check ownership, regular-file type, single link, allowed mode, and
-descriptor/path identity before and after reading. They reject oversized
-contents and final-component symlinks, using `NOFOLLOW` where available. The
-snapshot is point-in-time evidence; callers separately enforce trusted parent
-directories and revalidate at their own state transitions. The catalog compares
-two content snapshots to detect registry replacement while selecting a leaf.
-Metadata-only snapshots are not a content-integrity check.
+A snapshot is point-in-time evidence; callers enforce trusted parents and
+revalidate at their own state transitions.
 
-Current reasons: `symlink`, `not_regular`, `wrong_owner`, `hard_link`,
-`unsafe_mode`, `changed_while_reading`, `too_large`, `missing_or_replaced`,
-`unreadable`, `not_directory`, `writable_by_other_users`.
+## Deliberately not common
 
-## Ruby child-process proxy overrides
+These are reporter or provider policy and stay with their owners:
 
-```ruby
-require_relative "../common/network_environment"
-overrides = IpQuality::NetworkEnvironment.without_proxy_variables(ENV)
-Process.spawn(overrides, "/bin/zsh", "-f", reporter_path, *arguments)
-```
-
-`without_proxy_variables(environment = ENV)` returns a new Hash mapping every
-present `all_proxy`, `http_proxy`, `https_proxy`, or `no_proxy` key to `nil`,
-case-insensitively. Ruby's process APIs interpret those values as removals.
-Other variables are omitted from the override Hash; the input and parent
-environment are unchanged. Isolated routes add their verified loopback proxy
-values to this Hash. This helper does not change system VPN/TUN routing.
-
-## Account MCP shared APIs
-
-`mcp/ipqs` and `mcp/provider-accounts` reference the sibling repository
-`/Users/zmx/Projects/myutils` through direct local package dependencies.
-They do not copy those implementations or leave forwarding packages in mcps.
-
-| Shared package | Callers and use |
+| Owner | Policy |
 | --- | --- |
-| `browser-session` | Both MCPs: dedicated Chrome lifecycle and verified profile binding; provider accounts also reuse private storage-state saving and bounded HTTP context reads |
-| `secret-file` | Both MCPs: inspect/read/write private data-only files; reporter and IPQS share `secrets/ipqs` |
-| `mcp-server` | Both MCPs: tool descriptions and structured text results |
-| `one-use-token` | IPQS: prepared setting-change reservation and expiry |
-| `http-read` | Provider accounts: bounded API reads with no redirects or automatic retries |
-| `totp` | Cloudflare and IPQS: validate textual provisioning URIs and generate RFC 6238 codes; IPQS alone opts into its issuer's 80-bit seed format |
+| `providers/query_route.zsh` | IPQS/Cloudflare selected-route request with one pre-HTTP direct-IPv4 retry; see [PROVIDERS.md](PROVIDERS.md#automatic-query-route-fallback) |
+| `providers/selection.zsh` | Ordered source IDs, presets, `reputation_choose_sources`, `reputation_source_selected` |
+| `providers/check_place.zsh` | `check_place_fetch_json` relay URL and in-memory block/429 pauses per target and family |
+| `providers/<source>.zsh` | Each source's schema, endpoint, fallback and `db_*` adapter (for example Scamalytics page parsing, IPQS connection types) |
+| `report/` | Localized labels, `report_query_status`, `report_source_visible`, missing-value display |
+| `leaf_runner/` | Mihomo lifecycle, listener ownership and cleanup |
 
-Provider origins, form selectors, account identity, API contracts and registration
-receipts remain inside their owning MCP. Shared helpers do not decide whether an
-account is usable; each account workflow owns its API-before-2FA check.
+A similar `jq` expression alone is not a shared schema contract.
 
-Inside `mcp/provider-accounts`, `accounts.mjs::withSession` owns the shared
-provider profile binding and lease, `privateAccount` validates saved identities,
-and `policy.mjs::accountNetworkOptions` validates a task-scoped browser/API route.
-Its explicit `DIRECT` mode emits Chrome's `--no-proxy-server`, overriding macOS
-system proxy preferences; `accountRouteMatches` checks the actual bound process
-before reusing it for an explicitly chosen route. `cloudflare.mjs`
-owns its fixed account paths, server identity check and token policy; its TOTP
-consumer reuses these directly. `cloudflare-policy.mjs` contains fixture-testable
-identity, token scope, response and API-before-MFA decisions. MCP action entrypoints
-return metadata only; secrets stay inside their private-file and HTTP/form calls.
+## Account MCP shared packages
 
-IPQS enrollment/challenge policy stays in `mcp/ipqs/src/totp.ts`. Provider-account
-HTTP helpers live in `mcp/provider-accounts/http-account.mjs`:
+Both MCPs depend directly on sibling `/Users/zmx/Projects/myutils` packages:
 
-| Function | Input / output |
+| Package | Use |
 | --- | --- |
-| `httpStatePath(provider)` | Validates `ipapi`/`cloudflare`/`abuseipdb` and returns its absolute private HTTP-state path |
-| `httpAccountIdentity(provider, status, contentType, body, expectedEmail)` | Pure provider-specific identity check; returns booleans/status metadata without email or response content |
-| `readHttpAccount(provider, expectedEmail, dependencies = {})` | One bounded HTTP GET using private saved state; returns identity/status metadata, disposes its HTTP context, and starts no Chrome. Tests can inject secret/context/response readers |
+| `browser-session` | Dedicated Chrome lifecycle and profile binding; provider accounts also save storage state and read bounded HTTP contexts |
+| `secret-file` | Private data-only files; reporter and IPQS share `secrets/ipqs` |
+| `mcp-server` | Tool descriptions and structured text results |
+| `one-use-token` | IPQS prepared setting-change reservations |
+| `http-read` | Provider accounts: bounded API reads without redirects or retries |
+| `totp` | Provisioning URI validation and `generateFreshTotp` for Cloudflare and IPQS (IPQS opts into its 80-bit seed) |
 
-Cloudflare's `identityOnPage(page)` verifies the active browser's server identity
-before refreshing saved HTTP state. Ordinary HTTP checks only consume that state;
-see [recovery guidance](mcp/provider-accounts/AGENTS.md#http-state-recovery).
+Provider origins, selectors, identities and API-before-2FA checks stay in the
+owning MCP; provider-account module APIs are in
+[its guide](mcp/provider-accounts/AGENTS.md#module-apis).
 
-AbuseIPDB's account identity scopes the saved email to the account-basics form,
-requires the logout action and projects public-profile/domain settings as
-booleans. Its API observation validation stays in `abuseipdb.mjs`; it is not a
-generic reputation schema. Both request paths reuse the existing shared HTTP
-and private-file implementations directly.
+## Validation
 
-The same MCP owns `public-api.mjs::verifyPublicProvider(provider, confirmation,
-request, surface)` for DB-IP/IPWHOIS. The MCP selects `free_api` (default) or
-`public_demo`, with literal confirmation `VERIFY_FREE_API`; the optional
-`request` function injects the offline transport in place of shared `http-read`.
-
-| Surface | Requests and observation |
-| --- | --- |
-| Either provider's `free_api` | One lookup for `1.1.1.1`; geography/network context |
-| IPWHOIS `public_demo` | One lookup for `1.1.1.1` with website headers; supplied security booleans |
-| DB-IP `public_demo` | One page, then one visitor lookup using an in-memory guest token; `request_egress`, with an optional threat label |
-
-`publicProviderObservation(provider, body, expected, surface)` returns a validated
-projection or `null`. The caller validates DB-IP's returned IP before projecting
-its egress observation; other lookups must match `1.1.1.1`. Results carry query
-status, the observation and account/MFA/risk capabilities. Missing fields stay
-null; HTTP 200 quota errors become `rate_limited` or DB-IP's explicit
-`daily_quota_exhausted`, without retries or enrollment.
-Provider-specific workflow details belong in
-[the account guide](mcp/provider-accounts/AGENTS.md).
-Reporter and Node fixture suites share sanitized JSON inputs; their language-
-specific parsers remain local and do not invoke one another through wrappers.
-
-## Validation and maintenance
-
-Run `/bin/zsh -f scripts/test-offline` from the worktree root; focused commands
-and test-only helpers are in [TESTING.md](TESTING.md). The suite includes the
-Ruby common contracts, provider/terminal fixtures, and route integration tests.
-`test/common_test.rb` checks encoding/byte/control-character boundaries, proxy
-overrides, file-size/mode limits, verification-only symlink rejection, and
-snapshot replacement. Runner tests retain cleanup, signal, link rejection, and
-route-isolation coverage. `test/providers_test.rb` exercises shared provider
-values; `test/common_test.rb` also checks jq value types, bounds and controls.
-Its curl stub checks secret configuration bytes, argument boundaries, transport
-exit status and caller options without making a request. The six nullable-boolean
-callers retain their source-specific field lists and missing-observation rules.
-`test/public_demo_test.rb` checks source contracts rather than promoting their
-schema/quotas into the common library. `test/report_test.rb` checks terminal functions and real file/ANSI bytes.
-`test/support/self_test.zsh` retains typed JSON checks.
-
-Mihomo process lifecycle and cleanup remain in `leaf_runner/`; they carry
-session state, listener ownership, and recovery policy. Shared modules contain
-the reusable operations, while their callers retain those state transitions.
-
-The October 14 boundary review found no single-provider schema or lifecycle
-policy left in `common/`: its Ruby APIs have multiple runner callers, and its
-zsh/jq APIs serve multiple adapters or renderers. Keep IPQS connection types,
-Check.Place pause state, query-route fallbacks and localized source labels in
-their existing provider/report owners. No ownership move was needed for those
-already specialized implementations.
+Run `/bin/zsh -f scripts/test-offline`. `test/common_test.rb` covers encoding,
+byte and control-character limits, jq predicates, terminal tables, the curl
+stdin stub, proxy overrides and snapshot boundaries; [TESTING.md](TESTING.md)
+maps the other suites.

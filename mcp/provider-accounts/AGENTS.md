@@ -197,3 +197,53 @@ unavailable, without establishing their unpublished quota policy. No new account
 or 2FA enrollment was needed. These are dated observations, not current account
 or service-health guarantees. Latest aggregate test results, reporter recovery
 and route-specific observations are in [../../HANDOFF.md](../../HANDOFF.md).
+
+## Module APIs
+
+Inside `mcp/provider-accounts`, `accounts.mjs::withSession` owns the shared
+provider profile binding and lease, `privateAccount` validates saved identities,
+and `policy.mjs::accountNetworkOptions` validates a task-scoped browser/API route.
+Its explicit `DIRECT` mode emits Chrome's `--no-proxy-server`, overriding macOS
+system proxy preferences; `accountRouteMatches` checks the actual bound process
+before reusing it for an explicitly chosen route. `cloudflare.mjs`
+owns its fixed account paths, server identity check and token policy; its TOTP
+consumer reuses these directly. `cloudflare-policy.mjs` contains fixture-testable
+identity, token scope, response and API-before-MFA decisions. MCP action entrypoints
+return metadata only; secrets stay inside their private-file and HTTP/form calls.
+
+IPQS enrollment/challenge policy stays in `mcp/ipqs/src/totp.ts`. Provider-account
+HTTP helpers live in `mcp/provider-accounts/http-account.mjs`:
+
+| Function | Input / output |
+| --- | --- |
+| `httpStatePath(provider)` | Validates `ipapi`/`cloudflare`/`abuseipdb` and returns its absolute private HTTP-state path |
+| `httpAccountIdentity(provider, status, contentType, body, expectedEmail)` | Pure provider-specific identity check; returns booleans/status metadata without email or response content |
+| `readHttpAccount(provider, expectedEmail, dependencies = {})` | One bounded HTTP GET using private saved state; returns identity/status metadata, disposes its HTTP context, and starts no Chrome. Tests can inject secret/context/response readers |
+
+Cloudflare's `identityOnPage(page)` verifies the active browser's server identity
+before refreshing saved HTTP state. Ordinary HTTP checks only consume that state;
+see [recovery guidance](#http-state-recovery).
+
+AbuseIPDB's account identity scopes the saved email to the account-basics form,
+requires the logout action and projects public-profile/domain settings as
+booleans. Its API observation validation stays in `abuseipdb.mjs`; it is not a
+generic reputation schema. Both request paths reuse the existing shared HTTP
+and private-file implementations directly.
+
+The same MCP owns `public-api.mjs::verifyPublicProvider(provider, confirmation,
+request, surface)` for DB-IP/IPWHOIS. The MCP selects `free_api` (default) or
+`public_demo`, with literal confirmation `VERIFY_FREE_API`; the optional
+`request` function injects the offline transport in place of shared `http-read`.
+
+| Surface | Requests and observation |
+| --- | --- |
+| Either provider's `free_api` | One lookup for `1.1.1.1`; geography/network context |
+| IPWHOIS `public_demo` | One lookup for `1.1.1.1` with website headers; supplied security booleans |
+| DB-IP `public_demo` | One page, then one visitor lookup using an in-memory guest token; `request_egress`, with an optional threat label |
+
+`publicProviderObservation(provider, body, expected, surface)` returns a validated
+projection or `null`. The caller validates DB-IP's returned IP before projecting
+its egress observation; other lookups must match `1.1.1.1`. Results carry query
+status, the observation and account/MFA/risk capabilities. Missing fields stay
+null; HTTP 200 quota errors become `rate_limited` or DB-IP's explicit
+`daily_quota_exhausted`, without retries or enrollment.

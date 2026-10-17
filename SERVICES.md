@@ -69,7 +69,7 @@ test job, not a project daemon:
 
 | Check | Purpose |
 | --- | --- |
-| `test.mcps.ipqs-mcp.test-offline` | IPQS build and offline tests only; excludes reporter/provider-account suites and the synthetic browser test |
+| `test.ipquality.test-offline` | Complete `scripts/test-offline`: reporter, route runner and both account MCPs (replaced the IPQS-only check on 2026-10-17) |
 
 Use [TESTING.md](TESTING.md) for complete project validation. The scheduler and
 its service are owned by `/Users/zmx/Projects/supervisor`; this check remains
