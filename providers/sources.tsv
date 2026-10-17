@@ -1,0 +1,18 @@
+# Reporter source catalog, read by providers/selection.zsh and the Ruby runner.
+# Columns (tab-separated): id, label, independent preset (yes/no), disclosure,
+# explicit-target disclosure ("-" = same). Plans print only selected sources.
+maxmind	MaxMind	no	Check.Place relay of MaxMind-labeled basic data; IPinfo supplies basic data when it fails	-
+ipinfo	IPinfo	yes	public demo widget: basic location and network	-
+ipregistry	Ipregistry	yes	official API, only with a configured key	-
+scamalytics	Scamalytics	no	Check.Place relay; if it fails, one public target page on the same route (target and score must match)	-
+ipapi	ipapi.is	yes	official API (owned key optional): company abuse ratio and network flags	-
+ipwhois	IPWHOIS	yes	public website demo, one target lookup; no account or guaranteed quota	-
+dbip	DB-IP	yes	public page + one visitor-egress lookup (must match target); no account or guaranteed quota	not applicable to an explicit target (visitor egress only); no request
+cloudflare	Cloudflare	yes	IP Intelligence threat categories when configured; no numeric score (legacy Threat Score is retired)	-
+abuseipdb	AbuseIPDB	no	official CHECK API with an owned key, otherwise its named Check.Place relay; no abuse report is submitted	-
+ip2location	IP2Location	no	Check.Place relay; if it fails, its target-bound public website JSON on the same route	-
+ipdata	ipdata	no	Check.Place relay; if it fails, the website's current demo key (in memory) for one target request on the same route	-
+ipqs	IPQS	yes	official API with credit preflight when a key is configured, otherwise its named Check.Place relay (never in independent mode)	-
+ping0	Ping0	yes	official free /geo endpoint: IP, location, ASN, organization; not a risk score	not applicable to an explicit target (/geo reports only the caller's egress); no request
+ripestat	RIPEstat	yes	routed prefix and origin ASN; not a risk score	-
+shodan	Shodan InternetDB	yes	public exposure (ports, hostnames), IPv4 only; not a risk score	-

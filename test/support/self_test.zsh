@@ -10,7 +10,7 @@ print -ru2 -- "SELF-TEST FAILED: not running under zsh"
 return 1
 }
 local reference_file
-for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json";do
+for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json" "$REF_DIR/non_public_ipv4.txt";do
 [[ -f "$reference_file" && -r "$reference_file" && ! -L "$reference_file" ]]||{
 print -ru2 -- "SELF-TEST FAILED: unsafe or missing reference file: $reference_file"
 return 1

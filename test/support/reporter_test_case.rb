@@ -73,7 +73,7 @@ class ReporterTestCase < Minitest::Test
 
     @reporter_workspace = Dir.mktmpdir("ipquality-offline-")
     # Copy explicit runtime inputs only: never traverse project secrets/reports.
-    %w[bin/ip-quality common/*.zsh common/*.jq providers/*.zsh report/*.zsh ref/*].each do |pattern|
+    %w[bin/ip-quality common/*.zsh common/*.jq providers/*.zsh providers/*.tsv report/*.zsh ref/*].each do |pattern|
       Dir.glob(File.join(ROOT, pattern)).each do |source|
         destination = File.join(@reporter_workspace, source.delete_prefix(ROOT + "/"))
         FileUtils.mkdir_p(File.dirname(destination))

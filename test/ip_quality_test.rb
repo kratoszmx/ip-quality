@@ -77,16 +77,44 @@ class IpQualityTest < ReporterTestCase
     stdout, stderr, status = run_script("--scope", "reputation")
 
     assert status.success?, stderr
-    assert_includes stdout, "reputation sources"
-    assert_includes stdout, "DB-IP page + one visitor-egress lookup (must match target)"
-    assert_includes stdout, "IPWHOIS one target lookup"
+    assert_includes stdout, "reputation sources:"
+    assert_includes stdout, "    DB-IP: public page + one visitor-egress lookup (must match target)"
+    assert_includes stdout, "    IPWHOIS: public website demo, one target lookup"
     assert_includes stdout, "legacy Threat Score is retired"
-    assert_includes stdout, "configured Ipregistry/IPQS/AbuseIPDB APIs"
-    assert_includes stdout, "supplementary sources"
-    assert_includes stdout, "Ping0"
-    assert_includes stdout, "official free /geo endpoint"
+    assert_includes stdout, "    Ipregistry: official API, only with a configured key"
+    assert_includes stdout, "    Ping0: official free /geo endpoint"
     assert_includes stdout, "not a risk score"
     assert_empty stderr
+  end
+
+  def test_plan_discloses_only_selected_sources_and_explicit_target_limits
+    stdout, stderr, status = run_script("--sources", "ripestat,shodan")
+    assert status.success?, stderr
+    sources = stdout[/  reputation sources:\n((?:    .*\n)+)/, 1]
+    assert_equal ["    RIPEstat", "    Shodan InternetDB"], sources.lines.map { |line| line.split(":").first }
+    refute_includes stdout, "IPQS"
+    refute_includes stdout, "Cloudflare APIs"
+
+    stdout, stderr, status = run_script("--sources", "dbip,ping0,ipqs", "-4", "8.8.8.8")
+    assert status.success?, stderr
+    assert_includes stdout, "  target: explicit IP"
+    assert_includes stdout, "    DB-IP: not applicable to an explicit target (visitor egress only); no request"
+    assert_includes stdout, "    Ping0: not applicable to an explicit target"
+    refute_includes stdout, "visitor-egress lookup"
+    assert_includes stdout, "IPQS direct fallback uses AliDNS"
+  end
+
+  def test_short_option_clusters_parse_like_getopts_and_removed_flags_fail
+    [%w[-4fj], %w[-len -4], %w[-l en -E], %w[-4 -- 8.8.8.8]].each do |arguments|
+      stdout, stderr, status = run_script(*arguments)
+      assert status.success?, "#{arguments.join(' ')}: #{stderr}"
+      assert_includes stdout, "query plan"
+    end
+    [%w[-p], %w[--bogus], %w[-o], %w[-4 8.8.8.8 1.1.1.1]].each do |arguments|
+      stdout, _stderr, status = run_script(*arguments)
+      assert_equal 1, status.exitstatus, arguments.join(" ")
+      refute_includes stdout, "query plan"
+    end
   end
 
 def test_full_scope_keeps_optional_mail_and_dnsbl_but_rejects_retired_media

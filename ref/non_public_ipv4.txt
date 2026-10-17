@@ -1,0 +1,21 @@
+# IPv4 ranges that are never accepted as public lookup targets or egress.
+# Read by bin/ip-quality (is_private_ipv4) and leaf_runner/prefix_sample.rb so
+# both entrypoints enforce one boundary.
+# Source: IANA IPv4 Special-Purpose Address Registry (RFC 6890 and updates:
+# RFC 6598 shared space, RFC 7526 deprecated 6to4 relay, RFC 5737 documentation,
+# RFC 2544 benchmarking) plus 224.0.0.0/3 multicast/reserved space (RFC 5771,
+# RFC 1112).
+0.0.0.0/8
+10.0.0.0/8
+100.64.0.0/10
+127.0.0.0/8
+169.254.0.0/16
+172.16.0.0/12
+192.0.0.0/24
+192.0.2.0/24
+192.88.99.0/24
+192.168.0.0/16
+198.18.0.0/15
+198.51.100.0/24
+203.0.113.0/24
+224.0.0.0/3

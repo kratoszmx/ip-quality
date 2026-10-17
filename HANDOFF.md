@@ -1,5 +1,18 @@
 # Current handoff
 
+## Disclosure catalog and CLI cleanup — 2026-10-18
+
+Version `v2026-10-18-standalone.35`; query behavior, sources and fallbacks are
+unchanged. `providers/sources.tsv` is now the one source catalog (IDs, labels,
+independent preset, disclosures). Reporter and runner plans list only selected
+sources; explicit targets (specific IP, prefix samples) show DB-IP and Ping0 as
+not applicable. The old plans listed every source and still promised a DB-IP
+visitor lookup for explicit targets. `ref/non_public_ipv4.txt` is the shared
+public-IPv4 boundary, compared at every range edge by an offline contract.
+The reporter parses long and clustered short options in one pass; the runner's
+`--select` and the reporter's `-p` no-op flags are gone; menu numbering comes
+from one route table. Validation is in the commit message; no live lookup.
+
 ## Interactive IPv4 prefix sampling — 2026-10-18
 
 Version `v2026-10-18-standalone.34` adds menu **3** to the same normal all-source
@@ -123,8 +136,8 @@ provider, account or node lookup was performed.
   retained headed Chrome. ipapi/Cloudflare/AbuseIPDB routine account reads reuse
   saved HTTP state. Recovery modes and dated 2FA proofs are in
   [MCP_AUTH.md](MCP_AUTH.md); private formats are in [CREDENTIALS.md](CREDENTIALS.md).
-- No project daemon is required. The October 12 service audit found only the
-  external weekly IPQS offline-test registration, with no resident project
+- No project daemon is required. The only external registration is the weekly
+  complete offline suite (`test.ipquality.test-offline`), with no resident project
   browser/listener, launchd job or cron job. Current process ownership and the
   external registration are documented in [SERVICES.md](SERVICES.md).
 

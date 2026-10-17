@@ -8,6 +8,7 @@ require_relative "../leaf_runner/profile"
 require_relative "../leaf_runner/subscription_catalog"
 require_relative "../leaf_runner/isolated_mihomo_session"
 require_relative "../leaf_runner/prefix_sample"
+require_relative "../leaf_runner/source_catalog"
 
 module IpQuality
   class ClashLeafCommand
@@ -18,7 +19,13 @@ module IpQuality
     REPORTER = File.expand_path("../bin/ip-quality", __dir__).freeze
     CLEANUP_SIGNALS = %w[HUP TERM].freeze
     REPORTER_STOP_TIMEOUT_SECONDS = 3
-    SOURCE_IDS = %w[maxmind ipinfo ipregistry scamalytics ipapi ipwhois dbip cloudflare abuseipdb ip2location ipdata ipqs ping0 ripestat shodan].freeze
+# Fixed menu entries precede cached subscriptions; numbering derives from this list.
+    FIXED_ROUTES = [
+      [:direct, "Direct IP reputation report (system IPv4 route)"],
+      [:specific_ip, "Specific IP lookup (enter one public target; current system route)"],
+      [:prefix_samples, "IPv4 /24 samples / 網段抽樣（貼上多個三段 IP，每段抽查 3 個地址）"]
+    ].freeze
+    SOURCE_IDS = SourceCatalog::IDS
 
     def initialize(
       stdout: $stdout,
@@ -160,7 +167,6 @@ module IpQuality
         BANNER
         options.on("--list-subscriptions", "List cached remote subscription names without network access") { @list_subscriptions = true }
         options.on("--list-leaves", "List exact inline leaf names without network access") { @list_leaves = true }
-        options.on("--select", "Compatibility flag; interactive selection is now the default") { nil }
         options.on("--direct", "Run the reputation report over the current system route (default IPv4)") { @direct = true }
         options.on("--subscription NAME", "Select one cached remote subscription by exact display name") { |value| @subscription_name = value }
         options.on("--leaf NAME", "Select one exact leaf name non-interactively") { |value| @leaf_name = value }
@@ -239,7 +245,7 @@ module IpQuality
           entries = []
         end
         entry = select_route(entries)
-        return entry if %i[direct specific_ip prefix_samples].include?(entry)
+        return entry if FIXED_ROUTES.any? { |route, _label| route == entry }
       else
         entry = @subscription_name ? subscription_catalog.find_exact(@subscription_name) : select_subscription(subscription_catalog.entries)
       end
@@ -260,26 +266,14 @@ module IpQuality
       entries.each_with_index { |entry, index| @stdout.printf("%3d  %s\n", index + 1, entry.name) }
     end
 
-    def print_route_list(entries)
-      @stdout.puts "Available test routes:"
-      @stdout.puts "  1  Direct IP reputation report (system IPv4 route)"
-      @stdout.puts "  2  Specific IP lookup (enter one public target; current system route)"
-      @stdout.puts "  3  IPv4 /24 samples / 網段抽樣（貼上多個三段 IP，每段抽查 3 個地址）"
-      entries.each_with_index do |entry, index|
-        @stdout.printf("%3d  Cached subscription: %s\n", index + 4, entry.name)
-      end
-    end
-
     def select_route(entries)
-      print_route_list(entries)
+      choices = FIXED_ROUTES.map(&:first) + entries
+      labels = FIXED_ROUTES.map(&:last) + entries.map { |entry| "Cached subscription: #{entry.name}" }
+      @stdout.puts "Available test routes:"
+      labels.each_with_index { |label, index| @stdout.printf("%3d  %s\n", index + 1, label) }
       @stdout.print "Select one route number: "
       @stdout.flush
-      selected = read_selection(entries.length + 3, "route")
-      return :direct if selected.zero?
-      return :specific_ip if selected == 1
-      return :prefix_samples if selected == 2
-
-      entries.fetch(selected - 3)
+      choices.fetch(read_selection(choices.length, "route"))
     end
 
     def run_prefix_samples
@@ -380,15 +374,9 @@ module IpQuality
       @stdout.puts "  reporter scope: reputation only; egress discovery and initial HTTP(S) requests use the isolated leaf"
       @stdout.puts "  IPQS/Cloudflare: on a connection failure before HTTP, one direct IPv4 fallback queries the same leaf IP; both route outcomes remain visible"
       @stdout.puts "  fallback disclosure: the same provider also sees the system-route egress; IPQS uses AliDNS HTTPS resolution (hostname only, no key or target)"
-      @stdout.puts "  selected sources: #{@sources}"
-      @stdout.puts "  Scamalytics: one public target-page fallback if its relay fails; same selected leaf"
-      @stdout.puts "  IP2Location/ipdata: public website fallback if their relay fails; transient ipdata demo key, same selected leaf"
-      @stdout.puts "  AbuseIPDB: official CHECK API with the configured key, otherwise its named relay; no abuse report is submitted"
-      @stdout.puts "  Ping0: official public geo/ASN/organization observation; public endpoint has no risk score"
-      @stdout.puts "  RIPEstat: official routed-prefix/origin-ASN context; not a risk score"
-      @stdout.puts "  Shodan InternetDB: official IPv4 exposure context; not a risk score"
-      @stdout.puts "  DB-IP: public page + one visitor-egress lookup (must match target); IPWHOIS: one public website target lookup; rate limits remain unknown"
-      @stdout.puts "  Cloudflare: configured IP Intelligence categories; legacy Threat Score is retired, not a clean-IP score"
+      @stdout.puts "  selected sources: #{@sources}; fallbacks stay on the selected leaf unless stated"
+      @stdout.puts "  reputation sources:"
+      @stdout.puts SourceCatalog.disclosure_lines(@sources, explicit_target: false)
       @stdout.puts "  start gate: add --confirm-network-lookup"
     end
 
@@ -406,7 +394,8 @@ module IpQuality
         @stdout.puts "  route: current system route with inherited proxy environment removed"
         @stdout.puts "  runtime: reporter only; no temporary Mihomo process"
         @stdout.puts "  reporter scope: reputation only; providers receive the explicit target"
-        @stdout.puts "  Ping0: skipped because its public /geo endpoint reports only the caller's egress"
+        @stdout.puts "  reputation sources:"
+        @stdout.puts SourceCatalog.disclosure_lines(@sources, explicit_target: true)
         @stdout.puts "  start gate: add --confirm-network-lookup"
         return
       end
@@ -416,6 +405,8 @@ module IpQuality
       @stdout.puts "  runtime: reporter only; no temporary Mihomo process"
       @stdout.puts "  reporter scope: reputation only"
       @stdout.puts "  measurement boundary: current system route only; no subscription leaf is claimed"
+      @stdout.puts "  reputation sources:"
+      @stdout.puts SourceCatalog.disclosure_lines(@sources, explicit_target: false)
       @stdout.puts "  note: an active system-level VPN or TUN can still influence the system route"
       @stdout.puts "  start gate: add --confirm-network-lookup"
     end

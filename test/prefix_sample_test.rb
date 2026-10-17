@@ -30,10 +30,25 @@ class PrefixSampleTest < ReporterTestCase
     IpQuality::PrefixSample::NON_PUBLIC.each do |network|
       prefix = network.to_s.split(".").first(3).join(".")
       assert_raises(IpQuality::PrefixSample::Error) { IpQuality::PrefixSample.new(prefix) }
-      _out, errors, result = Open3.capture3("/bin/zsh", "-f", "-c",
-        "setopt KSH_ARRAYS; #{reporter_functions('is_private_ipv4')}; is_private_ipv4 \"$1\"", "boundary", "#{prefix}.23")
-      assert result.success?, errors
     end
+    # Both entrypoints read ref/non_public_ipv4.txt; compare them at every range
+    # edge and at the neighbouring addresses just outside it.
+    edges = IpQuality::PrefixSample::NON_PUBLIC.flat_map do |network|
+      first = network.to_range.first.to_i
+      last = network.to_range.last.to_i
+      [first - 1, first, last, last + 1].select { |value| value.between?(0, 2**32 - 1) }
+    end.uniq.map { |value| IPAddr.new(value, Socket::AF_INET).to_s }
+    stdout, errors, result = Open3.capture3("/bin/zsh", "-f", "-c",
+      'source "$1"; shift; for ip in "$@";do is_private_ipv4 "$ip"&&print -r -- "$ip private"||print -r -- "$ip public";done',
+      "boundary", SCRIPT, *edges)
+    assert result.success?, errors
+    expected = edges.map do |ip|
+      address = IPAddr.new(ip)
+      "#{ip} #{IpQuality::PrefixSample::NON_PUBLIC.any? { |range| range.include?(address) } ? 'private' : 'public'}"
+    end
+    assert_equal expected, stdout.lines(chomp: true)
+    assert_includes expected, "100.63.255.255 public"
+    assert_includes expected, "198.20.0.0 public"
     assert_equal 60, IpQuality::PrefixSample.new((1..20).map { |n| "8.8.#{n}" }.join(" ")).samples.length
   end
 
@@ -45,6 +60,8 @@ class PrefixSampleTest < ReporterTestCase
       assert_includes out.string, "No network access has occurred"
       assert_includes out.string, "sources: all"
       assert_includes out.string, "IPQS DNS policy: system"
+      assert_includes out.string, "    DB-IP: not applicable to an explicit target"
+      assert_includes out.string, "    Ping0: not applicable to an explicit target"
       assert_includes err.string, "Cached subscriptions unavailable"
       refute File.exist?(File.join(directory, "reports"))
     end

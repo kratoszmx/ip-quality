@@ -100,7 +100,7 @@ These are reporter or provider policy and stay with their owners:
 | Owner | Policy |
 | --- | --- |
 | `providers/query_route.zsh` | IPQS/Cloudflare selected-route request with one pre-HTTP direct-IPv4 retry; see [PROVIDERS.md](PROVIDERS.md#automatic-query-route-fallback) |
-| `providers/selection.zsh` | Ordered source IDs, presets, `reputation_choose_sources`, `reputation_source_selected` |
+| `providers/selection.zsh`, `providers/sources.tsv` | Source catalog (IDs, labels, independent preset, plan disclosures; also read by `leaf_runner/source_catalog.rb`), `reputation_choose_sources`, `reputation_source_selected`, `reputation_source_disclosure_lines` |
 | `providers/check_place.zsh` | `check_place_fetch_json` relay URL and in-memory block/429 pauses; `maxmind_response_is_valid` guards primary/English basic responses before IPinfo fallback |
 | `providers/<source>.zsh` | Each source's schema, endpoint, fallback and `db_*` adapter (for example Scamalytics page parsing, IPQS connection types) |
 | `report/` | Localized labels, `report_query_status`, `report_source_visible`, missing-value display |

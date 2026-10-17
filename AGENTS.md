@@ -135,12 +135,14 @@ never clean. Exact-leaf mode stays reputation-only. DNSBL concurrency is 1–50.
 - `common/`: credential-safe HTTP, provider values, jq predicates, terminal
   layout, printable metadata, verified snapshots, proxy overrides.
 - `providers/`: one file per source (fixture-testable parser plus its live
-  `db_*` adapter), mail/DNSBL probes, credentials and source/relay policy.
+  `db_*` adapter), mail/DNSBL probes, credentials and source/relay policy;
+  `sources.tsv` is the source catalog both entrypoints read for IDs and plans.
 - `report/`: cn/en labels, terminal sections and JSON assembly.
 - `leaf_runner/`: cached-subscription selection, exact-leaf extraction,
-  loopback Mihomo ownership/cleanup, prefix sampling and local batch evidence.
+  loopback Mihomo ownership/cleanup, prefix sampling, local batch evidence and
+  the Ruby reader of the source catalog.
 - `mcp/`: account MCP workspaces; `.state/`, `node_modules/`, `dist/` are private.
-- `ref/`: vendored runtime data. `test/`: offline suites, `test/support/`
+- `ref/`: vendored runtime data, including the shared non-public IPv4 ranges. `test/`: offline suites, `test/support/`
   helpers (including the zsh self-test) and sanitized `test/fixtures/`.
 
 ## Development guidance

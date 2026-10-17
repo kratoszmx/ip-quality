@@ -659,6 +659,31 @@ class ClashLeafRunnerTest < Minitest::Test
     end
   end
 
+  def test_runner_plans_disclose_the_reporter_source_catalog
+    stdout = StringIO.new
+    command = IpQuality::ClashLeafCommand.new(stdout: stdout, stderr: StringIO.new,
+      stdin: StringIO.new("2\n8.8.8.8\n"), app_root: File.join(Dir.tmpdir, "ipquality-absent-clash"))
+    assert_equal 0, command.run(["--sources", "dbip,ping0,ripestat"])
+    assert_includes stdout.string, "    DB-IP: not applicable to an explicit target"
+    assert_includes stdout.string, "    Ping0: not applicable to an explicit target"
+    assert_includes stdout.string, "    RIPEstat: routed prefix and origin ASN"
+    refute_includes stdout.string, "IPQS:"
+
+    stdout = StringIO.new
+    command = IpQuality::ClashLeafCommand.new(stdout: stdout, stderr: StringIO.new)
+    assert_equal 0, command.run(["--direct", "--sources", "independent"])
+    assert_includes stdout.string, "    DB-IP: public page + one visitor-egress lookup"
+    refute_includes stdout.string, "Scamalytics"
+    assert_equal IpQuality::SourceCatalog::IDS, IpQuality::ClashLeafCommand::SOURCE_IDS
+  end
+
+  def test_removed_select_compatibility_flag_is_rejected
+    stderr = StringIO.new
+    command = IpQuality::ClashLeafCommand.new(stdout: StringIO.new, stderr: stderr)
+    assert_equal IpQuality::ClashLeafCommand::EX_USAGE, command.run(["--select", "--direct"])
+    assert_includes stderr.string, "--select"
+  end
+
   def test_leaf_runner_rejects_unimplemented_report_languages_before_network_access
     stdout = StringIO.new
     stderr = StringIO.new

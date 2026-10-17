@@ -65,7 +65,8 @@ many DNS/TCP probes add latency and cannot describe an HTTP-proxied leaf.
 The normal route menu also accepts incomplete IPv4 prefixes. Menu 3 treats
 three octets as an assumed /24, accepts explicit `.0/24` notation, deduplicates
 up to 20 networks and queries `.23`, `.127`, `.231` from each. All input must
-pass the reporter's public-IPv4 boundary before any lookup starts. A blank line
+pass the public-IPv4 boundary in `ref/non_public_ipv4.txt` (IANA special-purpose
+ranges, shared with the reporter) before any lookup starts. A blank line
 finishes a multiline paste. Queries run sequentially over the current system
 IPv4 route with proxy variables removed, with the normal sources and fallback
 policy. The lookup transport is not the sampled IP's transport.
@@ -95,7 +96,11 @@ or DNS switches. The optional choices below are maintenance controls:
 | `--sources ipinfo,ipregistry,ipapi,ipwhois,cloudflare` | Exactly these five reputation sources; an example useful when the relay and IPQS route are unavailable |
 
 The complete, case-sensitive ID list is `maxmind,ipinfo,ipregistry,scamalytics,ipapi,ipwhois,dbip,cloudflare,abuseipdb,ip2location,ipdata,ipqs,ping0,ripestat,shodan`.
-`maxmind` names the Check.Place dataset, not a direct MaxMind API. Duplicates are
+[providers/sources.tsv](providers/sources.tsv) is the single catalog of IDs, labels,
+the independent preset and plan disclosures; the reporter and route runner both
+read it, and plans list only the selected sources (explicit targets show DB-IP
+and Ping0 as not applicable). `maxmind` names the Check.Place dataset, not a
+direct MaxMind API. Duplicates are
 deduplicated; unknown/empty IDs stop before network access. The plan and JSON
 `Query.SelectedSources` record the selection. Deliberately unselected sources
 have `disabled` status and no terminal column; selected failures remain visible

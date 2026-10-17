@@ -29,7 +29,9 @@ The hashes below identify the exact upstream inputs before local modification:
 
 The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified.
 Its provider adapters, labels, report sections and JSON assembly were later
-split into `providers/` and `report/` modules that carry the same notice:
+split into `providers/` and `report/` modules that carry the same notice. One
+parser now handles long options and getopts-style short clusters, and the
+retired `-p` compatibility flag was removed:
 
 - Added interactive sampling of incomplete IPv4 prefixes: three explicit
   public targets per assumed /24, separate provider scores, private per-sample

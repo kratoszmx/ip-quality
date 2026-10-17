@@ -5,6 +5,7 @@ require "json"
 require "time"
 require "tmpdir"
 require_relative "../common/safe_snapshot"
+require_relative "source_catalog"
 
 module IpQuality
   # Target sampling policy and local batch evidence, not a network scanner.
@@ -15,11 +16,10 @@ module IpQuality
     MAX_PREFIXES = 20
     MAX_INPUT_BYTES = 4096
     HOST_OCTETS = [23, 127, 231].freeze
-    # Match the reporter's public-IPv4 boundary before starting ANY sample.
-    NON_PUBLIC = %w[0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8
-      169.254.0.0/16 172.16.0.0/12 192.0.0.0/24 192.0.2.0/24
-      192.88.99.0/24 192.168.0.0/16 198.18.0.0/15 198.51.100.0/24
-      203.0.113.0/24 224.0.0.0/3].map { |cidr| IPAddr.new(cidr) }.freeze
+    # The reporter reads the same list, so both reject one public-IPv4 boundary.
+    NON_PUBLIC = File.readlines(File.expand_path("../ref/non_public_ipv4.txt", __dir__), chomp: true)
+      .reject { |line| line.empty? || line.start_with?("#") }
+      .map { |cidr| IPAddr.new(cidr) }.freeze
     SCORE_SOURCES = {"IPQS" => "IPQS", "SCAMALYTICS" => "Scamalytics",
       "ipapi" => "ipapi", "AbuseIPDB" => "AbuseIPDB", "IP2LOCATION" => "IP2Location"}.freeze
     NON_FAILURE = %w[ok verified available announced not_announced not_found disabled not_applicable_target not_provided].freeze
@@ -56,16 +56,15 @@ module IpQuality
     end
 
     def plan
-      <<~TEXT
-        IPv4 /24 sampling plan / 網段抽樣計畫
-          #{samples.length / 3} 段，共 #{samples.length} 個樣本；每段固定 .23、.127、.231（不代表整段，也不是節點連線或速度測試）。
-          targets: #{samples.map { |sample| sample.fetch("ip") }.join(', ')}
-          sources: #{@sources}; providers receive each target plus the system-route egress.
-          route: current system IPv4 route; inherited proxies removed; live Clash state unchanged.
-          IPQS DNS policy: #{@ipqs_dns}; auto/alidns use verified AliDNS HTTPS (hostname only, not key or target).
-          DB-IP / Ping0: not applicable to arbitrary targets; no visitor-egress requests.
-          本機保存完整樣本 IP、各來源結果及失敗狀態；依序查詢，會消耗現有 API 額度，不自動重跑失敗樣本。
-      TEXT
+      lines = ["IPv4 /24 sampling plan / 網段抽樣計畫",
+        "  #{samples.length / 3} 段，共 #{samples.length} 個樣本；每段固定 .23、.127、.231（不代表整段，也不是節點連線或速度測試）。",
+        "  targets: #{samples.map { |sample| sample.fetch('ip') }.join(', ')}",
+        "  sources: #{@sources}; providers receive each target plus the system-route egress.",
+        "  route: current system IPv4 route; inherited proxies removed; live Clash state unchanged.",
+        "  IPQS DNS policy: #{@ipqs_dns}; auto/alidns use verified AliDNS HTTPS (hostname only, not key or target).",
+        "  reputation sources:", *SourceCatalog.disclosure_lines(@sources, explicit_target: true),
+        "  本機保存完整樣本 IP、各來源結果及失敗狀態；依序查詢，會消耗現有 API 額度，不自動重跑失敗樣本。"]
+      lines.join("\n") + "\n"
     end
 
     def run(reports_root:, stdout:, stderr:)

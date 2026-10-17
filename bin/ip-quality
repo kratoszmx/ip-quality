@@ -9,14 +9,14 @@ umask 077
 # Display widths and byte validation need UTF-8 whatever the caller locale is.
 export LC_ALL=en_US.UTF-8
 
-script_version="v2026-10-18-standalone.34"
+script_version="v2026-10-18-standalone.35"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
 # Load order: shared helpers, source policy, providers (parser + adapter), report.
 typeset -a reporter_modules=(
 common/json_values.jq common/provider_values.zsh common/http_request.zsh common/terminal.zsh
-providers/credentials.zsh providers/check_place.zsh providers/query_route.zsh providers/selection.zsh
+providers/credentials.zsh providers/check_place.zsh providers/query_route.zsh providers/sources.tsv providers/selection.zsh
 providers/ipinfo.zsh providers/ipregistry.zsh providers/scamalytics.zsh providers/ipapi.zsh
 providers/ipwhois.zsh providers/dbip.zsh providers/cloudflare.zsh providers/abuseipdb.zsh
 providers/ip2location.zsh providers/ipdata.zsh providers/ipqualityscore.zsh providers/ping0.zsh
@@ -39,7 +39,6 @@ typeset version_requested=0
 typeset dnsbl_concurrency=50
 typeset ipqs_dns=auto
 typeset requested_ip=""
-typeset -a short_args=()
 Font_B=$'\033[1m'
 Font_D=$'\033[2m'
 Font_I=$'\033[3m'
@@ -131,7 +130,6 @@ typeset -a shelp_lines=(
 "            -o /path/to/file.ansi          Output ANSI report to file                 输出ANSI报告至文件"
 "               /path/to/file.json          Output JSON result to file                 输出JSON结果至文件"
 "               /path/to/file.anyother      Output plain text report to file           输出纯文本报告至文件"
-"            -p                             Retained privacy-mode compatibility        保留隐私模式兼容参数"
 "            -E                             Specify English Output                     指定英文输出")
 shelp=$(printf "%s\n" "${shelp_lines[@]}")
 set_report_time(){
@@ -214,58 +212,113 @@ inactive|reserved)print -rn -- "${stype[reserved]}"
 esac
 }
 
+set_cli_error(){
+(( ERRORcode ))||ERRORcode=$1
+}
+
+# One pass over long options, getopts-style short clusters (-4fj, -len, -l en)
+# and at most one positional target. Long-option errors return 64 in English;
+# short-option errors keep the first localized ERRORcode for after set_language.
 parse_cli(){
-short_args=()
+local argument cluster option value output_parent
+local interface_pattern='^[A-Za-z0-9][A-Za-z0-9._:%-]*$'
+local -a positional=()
 while (( $# > 0 ));do
-case "$1" in
---confirm-network-lookup)network_lookup_confirmed=1
-;;
---plan)plan_only=1
-;;
---help|-h)help_requested=1
-;;
---version)version_requested=1
-;;
---scope)
-(( $# >= 2 ))||{
-print -ru2 -- "ERROR: --scope requires a value."
-return 64
-}
-query_scope="$2"
+argument="$1"
 shift
-;;
---scope=*)query_scope="${1#*=}"
-;;
---sources|--ipqs-dns)
-(( $# >= 2 ))||{ print -ru2 -- "ERROR: $1 requires a value."; return 64; }
-if [[ "$1" == --sources ]];then source_selection="$2";else ipqs_dns="$2";fi
+case "$argument" in
+--confirm-network-lookup)network_lookup_confirmed=1 ;;
+--plan)plan_only=1 ;;
+--help)help_requested=1 ;;
+--version)version_requested=1 ;;
+--scope|--sources|--ipqs-dns|--dnsbl-concurrency|--scope=*|--sources=*|--ipqs-dns=*|--dnsbl-concurrency=*)
+if [[ "$argument" == *=* ]];then
+value="${argument#*=}"
+argument="${argument%%=*}"
+else
+(( $# > 0 ))||{ print -ru2 -- "ERROR: $argument requires a value."; return 64; }
+value="$1"
 shift
-;;
---sources=*)source_selection="${1#*=}" ;;
---ipqs-dns=*)ipqs_dns="${1#*=}" ;;
---dnsbl-concurrency)
-(( $# >= 2 ))||{
-print -ru2 -- "ERROR: --dnsbl-concurrency requires a value."
-return 64
-}
-dnsbl_concurrency="$2"
-shift
-;;
---dnsbl-concurrency=*)dnsbl_concurrency="${1#*=}"
+fi
+case "$argument" in
+--scope)query_scope="$value" ;;
+--sources)source_selection="$value" ;;
+--ipqs-dns)ipqs_dns="$value" ;;
+--dnsbl-concurrency)dnsbl_concurrency="$value"
+esac
 ;;
 -x|-x*|-y|-y*|-M|-M*)
 print -ru2 -- "ERROR: proxy arguments, automatic installers, and remote menus are disabled."
 print -ru2 -- "Use bin/test-clash-leaf for a supervised isolated proxy path."
 return 64
 ;;
---)shift
-short_args+=("$@")
+--)positional+=("$@")
 break
 ;;
-*)short_args+=("$1")
-esac
+--*)set_cli_error 1 ;;
+-?*)
+cluster="${argument#-}"
+while [[ -n "$cluster" ]];do
+option="${cluster:0:1}"
+cluster="${cluster:1}"
+value=""
+if [[ "$option" == [ilo] ]];then
+if [[ -n "$cluster" ]];then
+value="$cluster"
+cluster=""
+elif (( $# > 0 ));then
+value="$1"
 shift
+else
+set_cli_error 1
+break
+fi
+fi
+case "$option" in
+4)if (( IPV4check ));then IPV6check=0;else set_cli_error 4;fi ;;
+6)if (( IPV6check ));then IPV4check=0;else set_cli_error 6;fi ;;
+f)fullIP=1 ;;
+h)help_requested=1 ;;
+j)mode_json=1 ;;
+E)YY="en" ;;
+i)
+if [[ "$value" =~ $interface_pattern ]];then
+useNIC=" --interface $value"
+else
+set_cli_error 7
+fi
+;;
+l)
+case "${value:l}" in
+cn|en)YY="${value:l}" ;;
+*)set_cli_error 1
+esac
+;;
+o)
+mode_output=1
+outputfile="${value:A}"
+output_parent="${outputfile:h}"
+if [[ -z "$value" ]];then
+set_cli_error 1
+elif [[ -e "$outputfile" || -L "$outputfile" ]];then
+set_cli_error 10
+elif [[ ! -d "$output_parent" || -L "$output_parent" || ! -w "$output_parent" ]];then
+set_cli_error 11
+fi
+;;
+*)set_cli_error 1
+esac
 done
+;;
+*)positional+=("$argument")
+esac
+done
+if (( ${#positional[@]} > 1 ));then
+set_cli_error 1
+elif (( ${#positional[@]} == 1 ));then
+requested_ip="${positional[0]}"
+fi
+CurlARG="$useNIC"
 case "$query_scope" in
 reputation|dnsbl|mail|mail-dnsbl|full) ;;
 *)print -ru2 -- "ERROR: unsupported scope: $query_scope"
@@ -294,22 +347,23 @@ print -r -- "  scope: $query_scope"
 print -r -- "  DNSBL concurrency cap: $dnsbl_concurrency"
 print -r -- "  output: masked IP by default; local stdout/file only"
 print -r -- "  telemetry/report upload/remote code: disabled"
-scope_includes reputation&&print -r -- "  selected source IDs: ${(j:,:)selected_reputation_sources[@]}"
-scope_includes reputation&&print -r -- "  reputation lookups use selected IDs; automatic egress discovery is separate from this catalogue"
+[[ -n "$requested_ip" ]]&&print -r -- "  target: explicit IP, sent to providers as a lookup parameter"
+if scope_includes reputation;then
+print -r -- "  selected source IDs: ${(j:,:)selected_reputation_sources[@]}"
+print -r -- "  reputation lookups use selected IDs; automatic egress discovery is separate from this catalogue"
 [[ "$source_selection" == independent ]]&&print -r -- "  independent mode: no Check.Place requests; IPQS requires its official API key"
+if reputation_source_selected ipqs;then
 [[ "$ipqs_dns" == auto ]]&&print -r -- "  IPQS DNS: automatic AliDNS HTTPS resolution for direct IPv4; initial IPv6/proxy requests keep their existing resolver"
 [[ "$ipqs_dns" == alidns ]]&&print -r -- "  IPQS DNS: AliDNS DoH (https://dns.alidns.com/dns-query); resolver receives IPQS hostname, not the API key or target; system DNS is unchanged"
-scope_includes reputation&&print -r -- "  targeted IPQS/Cloudflare APIs: selected route first; connectivity failure before HTTP permits one direct IPv4 fallback, querying the same target IP"
-scope_includes reputation&&print -r -- "  fallback privacy: the same provider also sees the system-route egress; egress discovery and visitor/self demos never switch routes"
-scope_includes reputation&&print -r -- "  IPQS direct fallback uses AliDNS (https://dns.alidns.com/dns-query); this resolver receives the IPQS hostname only, not the API key or target"
-scope_includes reputation&&print -r -- "  reputation sources: ipapi.is, Cloudflare IP Intelligence (when configured), Ping0, RIPEstat, Shodan InternetDB, plus configured Ipregistry/IPQS/AbuseIPDB APIs"
-scope_includes reputation&&print -r -- "  public website demos: DB-IP page + one visitor-egress lookup (must match target); IPWHOIS one target lookup; no account, no guaranteed quota or availability"
-scope_includes reputation&&print -r -- "  supplementary sources: IPinfo public demo widget plus named Check.Place relays (MaxMind-labeled, Scamalytics, AbuseIPDB, IP2Location, ipdata, IPQualityScore)"
-scope_includes reputation&&print -r -- "  Scamalytics: if its relay fails, one public target page lookup on the same route; target and score must match the page"
-scope_includes reputation&&print -r -- "  IP2Location/ipdata: if their relay fails, public website lookups on the same route; ipdata reads its current demo key in memory for one target request"
-scope_includes reputation&&print -r -- "  AbuseIPDB: configured owned key selects official CHECK API directly; otherwise uses the named relay; no abuse report is submitted"
-scope_includes reputation&&print -r -- "  Ping0 limitation: the official free /geo endpoint exposes IP/location/ASN/organization, not a risk score"
-scope_includes reputation&&print -r -- "  Cloudflare: IP Intelligence threat categories, no numeric IP score; legacy Threat Score is retired (constant zero). RIPEstat reports routing; Shodan InternetDB reports public exposure"
+fi
+if reputation_source_selected ipqs||reputation_source_selected cloudflare;then
+print -r -- "  targeted IPQS/Cloudflare APIs: selected route first; connectivity failure before HTTP permits one direct IPv4 fallback, querying the same target IP"
+print -r -- "  fallback privacy: the same provider also sees the system-route egress; egress discovery and visitor/self demos never switch routes"
+reputation_source_selected ipqs&&print -r -- "  IPQS direct fallback uses AliDNS (https://dns.alidns.com/dns-query); this resolver receives the IPQS hostname only, not the API key or target"
+fi
+print -r -- "  reputation sources:"
+reputation_source_disclosure_lines "$requested_ip"
+fi
 scope_includes mail&&print -r -- "  mail sources: public MX DNS plus bounded SMTP greeting probes"
 scope_includes dnsbl&&print -r -- "  DNSBL sources: vendored $DNSBL_FILE (up to $dnsbl_concurrency concurrent DNS lookups)"
 print -r -- ""
@@ -336,7 +390,7 @@ fi
 
 check_reference_files(){
 local reference_file
-for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json";do
+for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json" "$REF_DIR/non_public_ipv4.txt";do
 [[ -f "$reference_file" && -r "$reference_file" && ! -L "$reference_file" ]]||{
 print -ru2 -- "ERROR: unsafe or missing reference file: $reference_file"
 return 66
@@ -360,29 +414,29 @@ IPV4work=0
 return 1
 fi
 }
+# Non-public ranges come from ref/non_public_ipv4.txt, shared with prefix
+# sampling. An unreadable list fails closed: every address counts as non-public.
+typeset -ga non_public_ipv4_ranges=()
 is_private_ipv4(){
 local ip_address=$1
-if [[ -z $ip_address ]];then
-return 0
-fi
 local ipv4_pattern='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
-[[ $ip_address =~ $ipv4_pattern ]]||return 0
-local -a parts=("${(@s:.:)ip_address}")
-local first=$(( 10#${parts[0]} ))
-local second=$(( 10#${parts[1]} ))
-local third=$(( 10#${parts[2]} ))
-if (( first == 0 || first == 10 || first == 127 || first >= 224 ||
-      (first == 100 && second >= 64 && second <= 127) ||
-      (first == 169 && second == 254) ||
-      (first == 172 && second >= 16 && second <= 31) ||
-      (first == 192 && second == 168) ||
-      (first == 192 && second == 0 && (third == 0 || third == 2)) ||
-      (first == 192 && second == 88 && third == 99) ||
-      (first == 198 && (second == 18 || second == 19)) ||
-      (first == 198 && second == 51 && third == 100) ||
-      (first == 203 && second == 0 && third == 113) ));then
-return 0
+[[ -n $ip_address && $ip_address =~ $ipv4_pattern ]]||return 0
+if (( ${#non_public_ipv4_ranges[@]} == 0 ));then
+local line
+[[ -f "$REF_DIR/non_public_ipv4.txt" && -r "$REF_DIR/non_public_ipv4.txt" ]]||return 0
+while IFS= read -r line;do
+[[ -z "$line" || "$line" == \#* ]]||non_public_ipv4_ranges+=("$line")
+done < "$REF_DIR/non_public_ipv4.txt"
 fi
+local -a parts=("${(@s:.:)ip_address}") network
+local address=$(( (10#${parts[0]} << 24) | (10#${parts[1]} << 16) | (10#${parts[2]} << 8) | 10#${parts[3]} ))
+local range prefix_length mask
+for range in "${non_public_ipv4_ranges[@]}";do
+network=("${(@s:.:)${range%/*}}")
+prefix_length="${range#*/}"
+mask=$(( prefix_length == 0 ? 0 : (0xFFFFFFFF << (32 - prefix_length)) & 0xFFFFFFFF ))
+(( (address & mask) == (((network[0] << 24) | (network[1] << 16) | (network[2] << 8) | network[3]) & mask) ))&&return 0
+done
 return 1
 }
 get_ipv4(){
@@ -577,81 +631,6 @@ zoom_level=14
 fi
 echo "https://check.place/$lat,$lon,$zoom_level,$YY"
 }
-parse_short_options(){
-OPTIND=1
-while getopts "i:l:o:fjphE46" opt;do
-case $opt in
-4)if
-[[ IPV4check -ne 0 ]]
-then
-IPV6check=0
-else
-ERRORcode=4
-fi
-;;
-6)if
-[[ IPV6check -ne 0 ]]
-then
-IPV4check=0
-else
-ERRORcode=6
-fi
-;;
-f)fullIP=1
-;;
-h)show_help
-;;
-i)iface="$OPTARG"
-local interface_pattern='^[A-Za-z0-9][A-Za-z0-9._:%-]*$'
-if ! [[ "$iface" =~ $interface_pattern ]];then
-ERRORcode=7
-break
-fi
-useNIC=" --interface $iface"
-CurlARG="$useNIC"
-;;
-j)mode_json=1
-;;
-l)YY=$(echo "$OPTARG"|tr '[:upper:]' '[:lower:]')
-case "$YY" in
-cn|en) ;;
-*)ERRORcode=1
-YY="cn"
-break
-;;
-esac
-;;
-o)mode_output=1
-outputfile="${OPTARG:A}"
-[[ -z $outputfile ]]&&{
-ERRORcode=1
-break
-}
-[[ -e $outputfile || -L $outputfile ]]&&{
-ERRORcode=10
-break
-}
-local output_parent="${outputfile:h}"
-[[ -d "$output_parent" && ! -L "$output_parent" && -w "$output_parent" ]]||{
-ERRORcode=11
-break
-}
-;;
-p):
-;;
-E)YY="en"
-;;
-\?)ERRORcode=1
-esac
-done
-shift $((OPTIND-1))
-if (( $# > 1 ));then
-ERRORcode=1
-elif (( $# == 1 ));then
-requested_ip="$1"
-fi
-CurlARG="$useNIC"
-}
 show_help(){
 echo -ne "\r$shelp\n"
 exit 0
@@ -766,7 +745,6 @@ fi
 if [[ $help_requested -eq 1 ]];then
 show_help
 fi
-parse_short_options "${short_args[@]}"
 set_language
 if [[ -n "$requested_ip" ]];then
 prepare_explicit_target||true
