@@ -1,5 +1,5 @@
 import path from "node:path";
-import { inspectTotpUri, generateTotp } from "@myutils/totp";
+import { inspectTotpUri, generateFreshTotp } from "@myutils/totp";
 import { readPrivateSecretFile, writePrivateSecretFile, inspectPrivateSecretFile } from "@myutils/secret-file";
 import type { Page } from "playwright-core";
 import { IPQS_ORIGIN, REPO_ROOT } from "./config.js";
@@ -23,12 +23,7 @@ export function ipqsSetup(qrSource: string, text: string, email: string) {
 }
 
 export async function ipqsTotpCode(uri: string) {
-  let generated = generateTotp(uri, options);
-  if (generated.remainingMs < 5000) {
-    await new Promise(resolve => setTimeout(resolve, generated.remainingMs + 100));
-    generated = generateTotp(uri, options);
-  }
-  return generated.code;
+  return (await generateFreshTotp(uri, options)).code;
 }
 
 export async function enrollIpqsTotp(page: Page) {

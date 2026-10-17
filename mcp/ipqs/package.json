@@ -9,7 +9,6 @@
     "ipqs-mcp": "dist/src/server.js"
   },
   "scripts": {
-    "dev": "npm run build && node dist/src/server.js",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/src/server.js",
     "login": "npm run build && node dist/scripts/login.js",
@@ -20,7 +19,6 @@
     "test:offline:raw": "tsx --test tests/*.test.ts",
     "test:offline": "npm run build && npm run test:offline:raw",
     "test:browser-text": "npm run build && node dist/scripts/test-browser-text.js",
-    "smoke:offline": "npm run test:offline",
     "check": "npm run test:offline && npm run doctor",
     "audit:prod": "npm audit --omit=dev"
   },

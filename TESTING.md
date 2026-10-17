@@ -75,8 +75,9 @@ For a reporter-only aggregate, run from the root:
 MCP dependencies reference `/Users/zmx/Projects/myutils` and the HTTP/Chrome
 libraries in `/Users/zmx/Projects/myutils/net_utils/node` through local
 `file:` paths. Both sibling checkouts and cached registry packages must be present
-before restoring dependencies with `npm install --offline --ignore-scripts`
-inside each MCP package. The complete runner needs both packages; reporter-only
+before restoring dependencies with `npm ci --offline --ignore-scripts` in `mcp/`.
+Both packages are npm workspaces of `mcp/package.json`, sharing one reviewed
+`mcp/package-lock.json` and one `mcp/node_modules`. The complete runner needs both packages; reporter-only
 validation does not. No install runs as part of the test entrypoint.
 
 To include every test, also run the separate IPQS browser-text suite below. It

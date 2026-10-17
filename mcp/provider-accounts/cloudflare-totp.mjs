@@ -1,4 +1,4 @@
-import { generateTotp, inspectTotpUri, isTotpUri } from '@myutils/totp';
+import { generateFreshTotp, inspectTotpUri, isTotpUri } from '@myutils/totp';
 import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@myutils/secret-file';
 import { withSession, privateAccount } from './accounts.mjs';
 import { assertAccountOrigin } from './policy.mjs';
@@ -25,11 +25,7 @@ export async function submitCloudflareTotpForm(page, account, uri, reserveAttemp
   const next = form.getByRole('button', { name: 'Next', exact: true });
   if (await next.count() !== 1 || !await next.isEnabled()) throw new Error('TOTP setup is not ready.');
   await reserveAttempt();
-  let totp = generateTotp(uri);
-  if (totp.remainingMs < 5000) {
-    await new Promise(resolve => setTimeout(resolve, totp.remainingMs + 100));
-    totp = generateTotp(uri);
-  }
+  const totp = await generateFreshTotp(uri);
   await form.locator('input[name="password"]').fill(account.password);
   await form.locator('input[name="google_authenticator_code"]').fill(totp.code);
   await next.click({ timeout: 10000 });

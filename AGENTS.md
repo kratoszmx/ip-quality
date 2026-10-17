@@ -186,8 +186,8 @@ report. Other implementation details may be chosen pragmatically.
   exact-leaf runner may use `/usr/bin/ruby --disable-gems` and the bundled
   standard library, but no gems or language installer.
 - Reporter and route-runner runtime installs nothing and executes no downloaded
-  code. MCP development uses its reviewed lockfiles; local dependency restoration
-  can use `npm install --offline --ignore-scripts` without third-party installers.
+  code. Both MCPs are workspaces sharing the reviewed `mcp/package-lock.json`;
+  local restoration uses `npm ci --offline --ignore-scripts` in `mcp/`.
 - Keep the default reporter and route-runner invocations network-free. Only the
   exact `--confirm-network-lookup` flag authorizes live provider, DNS, or TCP
   queries. Each live source can observe the tested egress IP and request

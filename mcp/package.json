@@ -1,0 +1,9 @@
+{
+  "name": "ipquality-mcps",
+  "private": true,
+  "description": "Workspace root: both account MCPs share one reviewed lockfile and node_modules.",
+  "workspaces": [
+    "ipqs",
+    "provider-accounts"
+  ]
+}
