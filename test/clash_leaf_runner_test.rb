@@ -34,7 +34,7 @@ class ClashLeafRunnerTest < Minitest::Test
       command = IpQuality::ClashLeafCommand.new(
         stdout: stdout,
         stderr: stderr,
-        stdin: StringIO.new("3\n2\n"),
+        stdin: StringIO.new("4\n2\n"),
         app_root: directory
       )
 

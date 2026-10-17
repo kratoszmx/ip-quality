@@ -180,6 +180,8 @@ cn:skipped_relay_rate_limited)state_label="中继限流/暂停"
 ;;
 cn:not_provided)state_label="未提供风险"
 ;;
+cn:not_applicable_target)state_label="不支持指定 IP"
+;;
 cn:ip_mismatch)state_label="出口与目标不符"
 ;;
 cn:network_error)state_label="连接失败"
@@ -215,6 +217,8 @@ en:skipped_relay_cloudflare_blocked)state_label="relay blocked/skipped"
 en:skipped_relay_rate_limited)state_label="relay limited/skipped"
 ;;
 en:not_provided)state_label="risk not supplied"
+;;
+en:not_applicable_target)state_label="explicit target unsupported"
 ;;
 en:ip_mismatch)state_label="egress/target mismatch"
 ;;

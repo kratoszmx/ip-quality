@@ -21,9 +21,10 @@ success receive a discovery request.
 
 A positional public IP skips egress discovery and is accepted only for
 `reputation` or `dnsbl`. Reputation providers receive that target while also
-seeing the connection's real transport egress. Ping0 is skipped for positional
-targets because its public `/geo` endpoint reports the caller's egress, not an
-arbitrary address.
+seeing the connection's real transport egress. Ping0 and the DB-IP visitor demo
+are skipped for positional targets: their `/geo` and `/self` endpoints report
+the caller's egress, not an arbitrary address. They remain visible as
+`not_applicable_target`; neither makes a request in this mode.
 
 The route runner maintains two honest measurement boundaries:
 
@@ -60,6 +61,29 @@ scope before any network access. Mail and DNSBL remain opt-in because their
 many DNS/TCP probes add latency and cannot describe an HTTP-proxied leaf.
 
 ## Source selection
+
+The normal route menu also accepts incomplete IPv4 prefixes. Menu 3 treats
+three octets as an assumed /24, accepts explicit `.0/24` notation, deduplicates
+up to 20 networks and queries `.23`, `.127`, `.231` from each. All input must
+pass the reporter's public-IPv4 boundary before any lookup starts. A blank line
+finishes a multiline paste. Queries run sequentially over the current system
+IPv4 route with proxy variables removed, with the normal sources and fallback
+policy. The lookup transport is not the sampled IP's transport.
+
+Each sample can consume the configured providers' API quota; there is no batch
+retry loop for timeouts, blocks or rate limits. Per-source failures stay visible
+and never become clean scores. The comparison retains each source's scale and
+uses Cloudflare or IPWHOIS country/ASN context, without a combined score or a
+claim about every IP in a prefix. DB-IP/Ping0 are inapplicable as above.
+
+Batch artifacts contain **full sample IPs** under a unique private directory
+in `reports/`: `summary.md`, `summary.json`, and each target's JSON, text report
+and stderr log. Summary JSON has `schema_version: 1`, input prefixes/suffixes,
+query route, per-sample scores, provider statuses and links to raw evidence.
+The summary updates after every sample; Ctrl-C/TERM stops the owned reporter
+process group, preserves completed results and marks pending samples. A failed
+reporter or malformed/mismatched report is retained as such, while later samples
+still run. An empty field is never substituted with another provider's score.
 
 The normal interactive command defaults to all sources. Users need no source
 or DNS switches. The optional choices below are maintenance controls:

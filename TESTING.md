@@ -44,6 +44,7 @@ the tests and claiming a complete pass.
 | `test/report_test.rb` | Provider tables, ANSI/layout, JSON/file bytes, exclusive report creation |
 | `test/repository_test.rb` | Source/data safety, vendored references and AGPL provenance |
 | `test/clash_leaf_runner_test.rb` | Cached selection, YAML safety, exact leaf/dependencies, proxy isolation, process cleanup |
+| `test/prefix_sample_test.rb` | Multiline /24 sampling and deduplication, bounded/public input parity, no-consent/no-cache menu, proxy isolation, private result files, provider failures/percent scores, malformed/mismatched reports, interruption/TERM cleanup and DB-IP/Ping0 explicit-target request suppression |
 | `test/support/reporter_test_case.rb` | Shared paths, named zsh function probes, isolated reporter copies and fake commands |
 | `test/fixtures/` | Sanitized provider responses; data only |
 | `mcp/ipqs/tests/` | Official account/API, saved login, TOTP issuer/account/form policy, secrets and MCP contracts |

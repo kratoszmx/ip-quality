@@ -13,7 +13,7 @@ functions print without a trailing newline.
 | `common/json_values.jq` | Check.Place/MaxMind, ipapi, Cloudflare, IPWHOIS, DB-IP, IP2Location, ipdata, Ipregistry, IPQS, AbuseIPDB, Shodan parsers | Nullable boolean and bounded text/integer predicates |
 | `common/terminal.zsh` | `report/` sections and tables, `bin/ip-quality` | ANSI cleanup, display width and aligned tables |
 | `common/text.rb` | `leaf_runner/profile.rb`, `leaf_runner/subscription_catalog.rb` | Bounded printable metadata |
-| `common/safe_snapshot.rb` | Profile, catalog, isolated Mihomo session | Verified owner-controlled file reads and snapshot comparison |
+| `common/safe_snapshot.rb` | Profile, catalog, isolated Mihomo session, prefix batch evidence | Verified owner-controlled file reads and snapshot comparison |
 | `common/network_environment.rb` | Direct route command, isolated Mihomo session | Child-process overrides removing inherited proxies |
 
 ## zsh provider values (`provider_values.zsh`)
@@ -105,6 +105,7 @@ These are reporter or provider policy and stay with their owners:
 | `providers/<source>.zsh` | Each source's schema, endpoint, fallback and `db_*` adapter (for example Scamalytics page parsing, IPQS connection types) |
 | `report/` | Localized labels, `report_query_status`, `report_source_visible`, missing-value display |
 | `leaf_runner/` | Mihomo lifecycle, listener ownership and cleanup |
+| `leaf_runner/prefix_sample.rb` | /24 input policy, fixed sample expansion, target-bound batch results and private summaries; single product caller, not a general network utility |
 
 A similar `jq` expression alone is not a shared schema contract.
 

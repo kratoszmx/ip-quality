@@ -13,7 +13,7 @@ Give the user only the normal interactive, all-source command:
 cd /Users/zmx/Projects/projects/ipquality && /usr/bin/ruby --disable-gems bin/test-clash-leaf --confirm-network-lookup -4
 ```
 
-It asks for direct or a subscription leaf. DNS repair and source fallback are
+It asks for direct, a public IP, IPv4 prefix samples, or a subscription leaf. DNS repair and source fallback are
 automatic; do not ask the user to choose presets or diagnostic flags. Everything
 below is for agents. These commands are network-free:
 
@@ -54,9 +54,20 @@ Discover cached node names with `--list-subscriptions` and
 `--subscription 'NAME' --list-leaves`. Only inline leaf proxies and their
 `dialer-proxy` dependencies are supported, not groups or remote providers.
 `--profile PATH` uses a local profile; `--config-test-only` runs Mihomo's local
-check only. The no-option menu (direct, specific IP or subscription) needs a
-readable Clash Verge cache; `--direct` avoids it. A system VPN/TUN can still
+check only. When the Clash Verge cache is unavailable, the menu still offers
+direct, specific IP and prefix sampling; only subscriptions need that cache. A system VPN/TUN can still
 affect direct traffic.
+
+Menu **3** accepts pasted three-octet prefixes (`128.241.47`) or explicit
+`128.241.47.0/24` networks, separated by newlines, whitespace or commas; a blank
+line finishes input. Up to 20 distinct public /24s are checked sequentially at
+`.23`, `.127`, `.231`. These are database samples, not whole-network verdicts,
+assigned-IP validation, scans or tests through those IPs. The runner saves full
+sample addresses, individual JSON/text/logs and a comparison under a new private
+`reports/prefix-samples-*` directory. Failure and interruption keep partial
+evidence. DB-IP/Ping0 are visibly inapplicable to explicit targets and make no
+visitor requests. This mode saves its own files, so `-o`/`-j` are single-report
+options only. Source/DNS policy and provider fallback remain unchanged.
 
 Both entrypoints default to `--sources all` and accept `--sources independent`
 or an explicit ID list; unselected providers make no request and report
@@ -67,7 +78,8 @@ automatic and disclosed in the plan; their contracts are in
 Reports mask the tested IP and routed prefix (`-f` reveals them). `-j` prints
 JSON, `-E`/`-l en` selects English (default `cn`), and `-o FILE` creates a new
 `.json`, `.ansi` or plain-text report; existing files and symlinks are rejected.
-The specific-IP menu's plan and progress messages include the entered target.
+The specific-IP menu's plan and progress messages include the entered target;
+prefix sampling deliberately saves full sample IPs for per-address comparison.
 
 ## Runtime requirements
 
@@ -126,7 +138,7 @@ never clean. Exact-leaf mode stays reputation-only. DNSBL concurrency is 1–50.
   `db_*` adapter), mail/DNSBL probes, credentials and source/relay policy.
 - `report/`: cn/en labels, terminal sections and JSON assembly.
 - `leaf_runner/`: cached-subscription selection, exact-leaf extraction,
-  loopback Mihomo ownership and cleanup.
+  loopback Mihomo ownership/cleanup, prefix sampling and local batch evidence.
 - `mcp/`: account MCP workspaces; `.state/`, `node_modules/`, `dist/` are private.
 - `ref/`: vendored runtime data. `test/`: offline suites, `test/support/`
   helpers (including the zsh self-test) and sanitized `test/fixtures/`.

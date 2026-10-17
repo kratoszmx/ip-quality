@@ -55,6 +55,11 @@ show_progress "${sinfo[database]}DB-IP public demo"
 dbip=()
 dbip[source]="public_demo"
 dbip[status]=unknown
+if [[ -n "${requested_ip:-}" ]];then
+dbip[status]=not_applicable_target
+dbip[risk_status]=not_applicable_target
+return 0
+fi
 typeset wire_response response_body guest_key endpoint
 typeset -a demo_headers
 demo_headers=(-A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' \

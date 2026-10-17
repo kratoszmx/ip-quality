@@ -31,6 +31,10 @@ The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified.
 Its provider adapters, labels, report sections and JSON assembly were later
 split into `providers/` and `report/` modules that carry the same notice:
 
+- Added interactive sampling of incomplete IPv4 prefixes: three explicit
+  public targets per assumed /24, separate provider scores, private per-sample
+  files and partial-result preservation. Visitor-only DB-IP and Ping0 requests
+  are skipped for explicit targets instead of querying the caller's egress.
 - Added the user-authorized selected-route to direct-IPv4 fallback for official
   IPQS and Cloudflare target lookups after pre-HTTP connectivity errors. The
   target remains unchanged, IPQS preserves credit preflight and verified DNS,
