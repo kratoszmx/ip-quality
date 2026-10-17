@@ -1,0 +1,9 @@
+<!-- Sanitized https://ipdata.co/ fetch syntax observed 2026-10-18.
+     This is synthetic data, not a live demo credential. -->
+<script>
+var suffix = ip ? '/' + encodeURIComponent(ip).replace(/%3A/gi, ':') : '';
+window.__ipdataEarly = {
+  ipSuffix: suffix,
+  promise: fetch('https://api.ipdata.co' + suffix + '?api-key=abcdef0123456789abcdef0123456789')
+};
+</script>

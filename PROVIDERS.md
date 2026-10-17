@@ -198,7 +198,9 @@ The default all-source run automatically recovers three relay-backed sources:
   Missing flags stay unknown. This is a public website example, not a promise
   that its paid Security API has a free risk tier.
 - ipdata: after the same relay failures, read `https://ipdata.co/` and extract
-  its one published demo key. Make one `https://api.ipdata.co/{IP}` lookup with
+  its one published demo key from the legacy `$.get` or current `fetch` call
+  to the exact official API origin; ambiguous keys are rejected. Make one
+  `https://api.ipdata.co/{IP}` lookup with
   the website Origin/Referer. The key stays in memory and curl's stdin config;
   it is never hard-coded, cached, put in process arguments or reported. This is
   shared website-demo access with an unspecified allowance, not an owned key.
@@ -345,6 +347,14 @@ schema failures do not trigger this source-specific pause.
   distinguishes its known Cloudflare block page from an ordinary HTTP 403, and
   one relay failure cannot erase a successful sibling. JSON exposes these states
   in `ProviderStatus`.
+- The MaxMind-labeled basic response must contain one valid observation object.
+  Wrong nested types, error-only bodies and empty observations become
+  `invalid_response`; basic information then uses the existing IPinfo fallback.
+  Missing optional fields and zero coordinates remain valid. An English
+  supplement fills only missing fields after the same validation, so a failed
+  translation cannot erase valid primary data. JSON text is passed unchanged
+  to jq, including literal backslashes. The other provider adapters use the same
+  literal-input rule so unrelated escaped text cannot corrupt their JSON reads.
 - Ping0 accepts exactly four bounded lines and requires the returned IP to match.
   RIPEstat validates prefix/ASN structure. Shodan validates the target IP and
   bounded arrays. Ports must be integers from 1 through 65535, and text array

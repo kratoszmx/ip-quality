@@ -82,17 +82,17 @@ scamalytics[$field]="${scamalytics_parsed[$field]}"
 done
 return 0
 fi
-scamalytics[countrycode]=$(echo "$RESPONSE"|jq -r '.external_datasources.maxmind_geolite2.ip_country_code')
-scamalytics[proxy]=$(echo "$RESPONSE"|jq -r '.external_datasources.firehol.is_proxy')
-scamalytics[tor]=$(echo "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_tor')
-scamalytics[vpn]=$(echo "$RESPONSE"|jq -r '.scamalytics.scamalytics_proxy.is_vpn')
-scamalytics[server]=$(echo "$RESPONSE"|jq -r '.scamalytics.scamalytics_proxy.is_datacenter')
-scamalytics[abuser]=$(echo "$RESPONSE"|jq -r '.scamalytics.is_blacklisted_external')
-scamalytics[robot1]=$(echo "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_blacklisted_spambot')
-scamalytics[robot2]=$(echo "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_bot_operamini')
-scamalytics[robot3]=$(echo "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_bot_semrush')
+scamalytics[countrycode]=$(print -rn -- "$RESPONSE"|jq -r '.external_datasources.maxmind_geolite2.ip_country_code')
+scamalytics[proxy]=$(print -rn -- "$RESPONSE"|jq -r '.external_datasources.firehol.is_proxy')
+scamalytics[tor]=$(print -rn -- "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_tor')
+scamalytics[vpn]=$(print -rn -- "$RESPONSE"|jq -r '.scamalytics.scamalytics_proxy.is_vpn')
+scamalytics[server]=$(print -rn -- "$RESPONSE"|jq -r '.scamalytics.scamalytics_proxy.is_datacenter')
+scamalytics[abuser]=$(print -rn -- "$RESPONSE"|jq -r '.scamalytics.is_blacklisted_external')
+scamalytics[robot1]=$(print -rn -- "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_blacklisted_spambot')
+scamalytics[robot2]=$(print -rn -- "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_bot_operamini')
+scamalytics[robot3]=$(print -rn -- "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_bot_semrush')
 scamalytics[robot]=$(provider_merge_boolean_signals "${scamalytics[robot1]}" "${scamalytics[robot2]}" "${scamalytics[robot3]}")
-scamalytics[score]=$(echo "$RESPONSE"|jq -r '.scamalytics.scamalytics_score')
+scamalytics[score]=$(print -rn -- "$RESPONSE"|jq -r '.scamalytics.scamalytics_score')
 if ! provider_integer_in_range "${scamalytics[score]}" 0 100;then
 scamalytics[score]=""
 fi

@@ -37,7 +37,7 @@ if ! abuseipdb_response_is_valid "$RESPONSE" "$IP";then
 abuseipdb[status]=invalid_response
 return 0
 fi
-abuseipdb[usetype]=$(echo "$RESPONSE"|jq -r '.data.usageType')
+abuseipdb[usetype]=$(print -rn -- "$RESPONSE"|jq -r '.data.usageType')
 case ${abuseipdb[usetype]} in
 "Commercial")abuseipdb[susetype]="${stype[business]}"
 ;;
@@ -69,7 +69,7 @@ case ${abuseipdb[usetype]} in
 ;;
 *)abuseipdb[susetype]="${stype[other]}"
 esac
-abuseipdb[score]=$(echo "$RESPONSE"|jq -r '.data.abuseConfidenceScore')
+abuseipdb[score]=$(print -rn -- "$RESPONSE"|jq -r '.data.abuseConfidenceScore')
 if ! provider_integer_in_range "${abuseipdb[score]}" 0 100;then
 abuseipdb[score]=""
 fi

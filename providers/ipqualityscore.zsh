@@ -172,19 +172,19 @@ RESPONSE="$PROVIDER_RESPONSE_BODY"
 if ipqualityscore_parse_unavailability "$RESPONSE";then
 ipqs[status]="${ipqualityscore_unavailable[status]}"
 fi
-ipqs[score]=$(echo "$RESPONSE"|jq -r '.fraud_score')
+ipqs[score]=$(print -rn -- "$RESPONSE"|jq -r '.fraud_score')
 if ! provider_integer_in_range "${ipqs[score]}" 0 100;then
 ipqs[score]=""
 fi
-ipqs[countrycode]=$(echo "$RESPONSE"|jq -r '.country_code')
-ipqs[usetype]=$(echo "$RESPONSE"|jq -r 'if (.connection_type | type) == "string" and (.connection_type | length) <= 64 then .connection_type else empty end')
+ipqs[countrycode]=$(print -rn -- "$RESPONSE"|jq -r '.country_code')
+ipqs[usetype]=$(print -rn -- "$RESPONSE"|jq -r 'if (.connection_type | type) == "string" and (.connection_type | length) <= 64 then .connection_type else empty end')
 ipqs[susetype]=$(styled_provider_type "${ipqs[usetype]}")
-ipqs[proxy]=$(echo "$RESPONSE"|jq -r '.proxy')
-ipqs[tor]=$(echo "$RESPONSE"|jq -r '.tor')
-ipqs[vpn]=$(echo "$RESPONSE"|jq -r '.vpn')
+ipqs[proxy]=$(print -rn -- "$RESPONSE"|jq -r '.proxy')
+ipqs[tor]=$(print -rn -- "$RESPONSE"|jq -r '.tor')
+ipqs[vpn]=$(print -rn -- "$RESPONSE"|jq -r '.vpn')
 ipqs[server]=$(ipqualityscore_connection_type_server_flag "${ipqs[usetype]}")
-ipqs[abuser]=$(echo "$RESPONSE"|jq -r '.recent_abuse')
-ipqs[robot]=$(echo "$RESPONSE"|jq -r '.bot_status')
+ipqs[abuser]=$(print -rn -- "$RESPONSE"|jq -r '.recent_abuse')
+ipqs[robot]=$(print -rn -- "$RESPONSE"|jq -r '.bot_status')
 if provider_has_observation "${ipqs[score]}" "${ipqs[countrycode]}" "${ipqs[proxy]}" "${ipqs[tor]}" "${ipqs[vpn]}" "${ipqs[abuser]}" "${ipqs[robot]}";then
 ipqs[status]="ok"
 fi

@@ -6,7 +6,11 @@ ipdata_demo_key_from_page(){
 emulate -LR zsh
 (( ${#1} <= 262144 ))||return 1
 print -rn -- "$1"|jq -Rrse '
-  [match("\\$\\.get\\(\"https://api\\.ipdata\\.co/\" \\+ ip \\+ \u0027\\?api-key=(?<key>[a-f0-9]{32,128})\u0027"; "g") | .captures[0].string] |
+  [
+    match("\\$\\.get\\(\"https://api\\.ipdata\\.co/\" \\+ ip \\+ \u0027\\?api-key=(?<key>[a-f0-9]{32,128})\u0027"; "g"),
+    match("fetch\\(\\s*[\u0027\"]https://api\\.ipdata\\.co/?[\u0027\"]\\s*\\+\\s*suffix\\s*\\+\\s*[\u0027\"]\\?api-key=(?<key>[a-f0-9]{32,128})[\u0027\"]"; "g")
+    | .captures[0].string
+  ] |
   select(length == 1) | .[0]
 ' 2>/dev/null
 }
@@ -61,13 +65,13 @@ ipdata[status]=invalid_response
 return 0
 fi
 fi
-ipdata[countrycode]=$(echo "$RESPONSE"|jq -r '.country_code')
-ipdata[proxy]=$(echo "$RESPONSE"|jq -r '.threat.is_proxy')
-ipdata[vpn]=$(echo "$RESPONSE"|jq -r '.threat.is_vpn')
-ipdata[tor]=$(echo "$RESPONSE"|jq -r '.threat.is_tor')
-ipdata[server]=$(echo "$RESPONSE"|jq -r '.threat.is_datacenter')
-ipdata[abuser1]=$(echo "$RESPONSE"|jq -r '.threat.is_threat')
-ipdata[abuser2]=$(echo "$RESPONSE"|jq -r '.threat.is_known_abuser')
-ipdata[abuser3]=$(echo "$RESPONSE"|jq -r '.threat.is_known_attacker')
+ipdata[countrycode]=$(print -rn -- "$RESPONSE"|jq -r '.country_code')
+ipdata[proxy]=$(print -rn -- "$RESPONSE"|jq -r '.threat.is_proxy')
+ipdata[vpn]=$(print -rn -- "$RESPONSE"|jq -r '.threat.is_vpn')
+ipdata[tor]=$(print -rn -- "$RESPONSE"|jq -r '.threat.is_tor')
+ipdata[server]=$(print -rn -- "$RESPONSE"|jq -r '.threat.is_datacenter')
+ipdata[abuser1]=$(print -rn -- "$RESPONSE"|jq -r '.threat.is_threat')
+ipdata[abuser2]=$(print -rn -- "$RESPONSE"|jq -r '.threat.is_known_abuser')
+ipdata[abuser3]=$(print -rn -- "$RESPONSE"|jq -r '.threat.is_known_attacker')
 ipdata[abuser]=$(provider_merge_boolean_signals "${ipdata[abuser1]}" "${ipdata[abuser2]}" "${ipdata[abuser3]}")
 }

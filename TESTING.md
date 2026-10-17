@@ -33,12 +33,12 @@ the tests and claiming a complete pass.
 | --- | --- |
 | `test/common_test.rb` | Secret curl stdin/argument boundaries and exit status, HTTP envelopes/transport errors/state reset, printable text, nullable jq predicates, table widths/shape, proxy overrides and snapshots |
 | `test/ip_quality_test.rb` | CLI plans and rejection gates, dependency failure, fixture DNSBL/SMTP execution |
-| `test/providers_test.rb` | Provider parsing, unknown/failure semantics, credentials, zero-credit preflight |
-| `test/check_place_test.rb` | One actual request after a relay block/429, explicit skipped results, target/family/run isolation and unaffected official sources |
+| `test/providers_test.rb` | Provider parsing, literal JSON escaping across legacy adapters, unknown/failure semantics, credentials, zero-credit preflight |
+| `test/check_place_test.rb` | Relay block/429 pauses and target/family/run isolation; MaxMind schema validation, stale-field clearing, translation failure, literal text/zero coordinates, and actual JSON/terminal IPinfo fallback |
 | `test/source_selection_test.rb` | Source presets/IDs, no-network validation, runner forwarding, failed columns, default full-run DNS/Scamalytics repair, unchanged IPv6/proxy routes and private auth/target binding |
 | `test/query_route_test.rb` | Target-preserving IPQS/Cloudflare direct fallback; sticky IPQS account/lookup route, IPv6 targets, bounded failures, no retry on response/certificate/quota errors, credential privacy and terminal/JSON provenance |
 | `test/scamalytics_test.rb` | Target/heading/badge agreement, bounded schema, nullable/conflicting factors, one same-route page fallback and preserved relay success |
-| `test/public_fallbacks_test.rb` | IP2Location target-bound page JSON, ipdata transient demo key/booleans, full-flow fallback recovery, route/failure retention and official AbuseIPDB key privacy |
+| `test/public_fallbacks_test.rb` | IP2Location target-bound page JSON, old/current ipdata demo-key syntax and booleans, full-flow fallback recovery, route/failure retention and official AbuseIPDB key privacy |
 | `test/dbip_test.rb` | Demo exact-IP/geography validation, no invented score, two-request visitor flow, route preservation and bounded guest tokens |
 | `test/public_demo_test.rb` | DB-IP labels/IPWHOIS boolean flags, quota errors, partial/malformed data, target binding, state reset and one-request IPWHOIS headers |
 | `test/report_test.rb` | Provider tables, ANSI/layout, JSON/file bytes, exclusive report creation |
@@ -91,8 +91,8 @@ live IPQS service. Also run it whenever `dashboard-text.ts` changes; see the
 npm --prefix mcp/ipqs run test:browser-text
 ```
 
-The external Supervisor weekly test entry runs only the IPQS offline suite;
-it does not replace the complete runner or the separate browser-text check.
+The external Supervisor weekly test entry runs the complete offline runner;
+the separate browser-text check remains manual.
 See [SERVICES.md](SERVICES.md#external-checks) for scheduling ownership.
 
 ## Maintain the boundary

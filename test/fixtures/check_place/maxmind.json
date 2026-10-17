@@ -1,0 +1,22 @@
+{
+  "ASN": {
+    "AutonomousSystemNumber": 64500,
+    "AutonomousSystemOrganization": "Example Network"
+  },
+  "City": {
+    "Name": "Example City",
+    "PostalCode": "00000",
+    "Latitude": 0,
+    "Longitude": 0,
+    "AccuracyRadius": 100,
+    "Continent": {"Code": "AS", "Name": "Asia"},
+    "Country": {"IsoCode": "HK", "Name": "Hong Kong"},
+    "Location": {"TimeZone": "Asia/Hong_Kong"},
+    "Subdivisions": [{"IsoCode": "EX", "Name": "Example Region"}]
+  },
+  "Country": {
+    "IsoCode": "HK",
+    "Name": "Hong Kong",
+    "RegisteredCountry": {"IsoCode": "HK", "Name": "Hong Kong"}
+  }
+}

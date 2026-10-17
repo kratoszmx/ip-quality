@@ -3,6 +3,44 @@
 require_relative "support/reporter_test_case"
 
 class ProvidersTest < ReporterTestCase
+  def test_provider_adapters_read_literal_json_without_interpreting_backslash_escapes
+    cases = [
+      ["ipinfo", {data: {asn: {asn: "AS64500", name: "Example Network"}, country: "US", loc: "0,0"}}, "64500"],
+      ["scamalytics", {scamalytics: {scamalytics_score: 7}}, "7"],
+      ["abuseipdb", {data: {ipAddress: "198.51.100.23", abuseConfidenceScore: 3}}, "3"],
+      ["ip2location", {ip: "198.51.100.23", fraud_score: 4}, "4"],
+      ["ipdata", JSON.parse(File.read(File.join(ROOT, "test", "fixtures", "ipdata", "public-response.json"))), "false"],
+      ["ipqs", JSON.parse(File.read(IPQUALITYSCORE_OFFICIAL_FIXTURE)), "87"]
+    ]
+    probe = <<~'ZSH'
+      source "$1"
+      fixture_response="$2" adapter="$3"
+      IP=198.51.100.23
+      show_progress(){ :; }
+      curl(){ print -r -- "$fixture_response"; print -rn -- 200; }
+      check_place_fetch_json(){ PROVIDER_RESPONSE_STATUS=ok; PROVIDER_RESPONSE_BODY="$fixture_response"; }
+      "db_$adapter" 4
+      case "$adapter" in
+      ipinfo) print -r -- "${ipinfo[status]}|${ipinfo[asn]}" ;;
+      scamalytics) print -r -- "${scamalytics[status]}|${scamalytics[score]}" ;;
+      abuseipdb) print -r -- "${abuseipdb[status]}|${abuseipdb[score]}" ;;
+      ip2location) print -r -- "${ip2location[status]}|${ip2location[score]}" ;;
+      ipdata) print -r -- "${ipdata[status]}|${ipdata[proxy]}" ;;
+      ipqs) print -r -- "${ipqs[status]}|${ipqs[score]}" ;;
+      esac
+    ZSH
+    cases.each do |name, payload, expected|
+      # Unknown text fields are allowed; their JSON escapes must not corrupt
+      # an otherwise valid response before the requested observations are read.
+      payload["description"] = 'Example \\quality'
+      out, err, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
+        "literal-json", SCRIPT, JSON.generate(payload), name)
+      assert status.success?, "#{name}: #{err}"
+      assert_empty err, name
+      assert_equal "ok|#{expected}\n", out, name
+    end
+  end
+
   def test_ipinfo_and_ipregistry_keep_transport_and_schema_failures_without_old_values
     probe = <<~'ZSH'
       source "$1"

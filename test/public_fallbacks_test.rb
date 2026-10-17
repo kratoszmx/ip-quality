@@ -7,6 +7,7 @@ class PublicFallbacksTest < ReporterTestCase
   IPDATA_LIBRARY = File.join(ROOT, "providers", "ipdata.zsh")
   IP2_PAGE = File.join(ROOT, "test", "fixtures", "ip2location", "public-page.html")
   IPDATA_PAGE = File.join(ROOT, "test", "fixtures", "ipdata", "public-page.html")
+  IPDATA_FETCH_PAGE = File.join(ROOT, "test", "fixtures", "ipdata", "public-fetch-page.html")
   IPDATA_RESPONSE = File.join(ROOT, "test", "fixtures", "ipdata", "public-response.json")
 
   def test_ip2location_page_binds_both_heading_and_json_without_executing_scripts
@@ -39,14 +40,18 @@ class PublicFallbacksTest < ReporterTestCase
   end
 
   def test_ipdata_demo_key_requires_one_exact_public_origin_and_safe_value
-    page = File.read(IPDATA_PAGE)
-    [page, page + page, page.sub("api.ipdata.co", "attacker.invalid"),
-      page.sub("abcdef0123456789abcdef0123456789", 'unsafe"value'), page + " " * 262_144].each_with_index do |body, index|
+    pages = [File.read(IPDATA_PAGE), File.read(IPDATA_FETCH_PAGE)]
+    invalid = pages.flat_map do |page|
+      [page + page, page.sub("api.ipdata.co", "attacker.invalid"),
+       page.sub("api.ipdata.co", "api.ipdata.co.attacker.invalid"),
+       page.sub("abcdef0123456789abcdef0123456789", 'unsafe"value'), page + " " * 262_144]
+    end + [pages.join]
+    (pages + invalid).each_with_index do |body, index|
       out, err, status = Open3.capture3("/bin/zsh", "-f", "-c",
         'source "$1"; ipdata_demo_key_from_page "$(cat)"', "ipdata-key", IPDATA_LIBRARY, stdin_data: body)
       assert_empty err
-      assert_equal index.zero?, status.success?
-      assert_equal(index.zero? ? "abcdef0123456789abcdef0123456789\n" : "", out)
+      assert_equal index < pages.length, status.success?
+      assert_equal(index < pages.length ? "abcdef0123456789abcdef0123456789\n" : "", out)
     end
   end
 
@@ -88,7 +93,7 @@ class PublicFallbacksTest < ReporterTestCase
     ZSH
     out, err, status = run_script("--confirm-network-lookup", "-4", "-j", "-o", text_report, "8.8.8.8",
       env: {"IPQUALITY_TEST_CALLS" => calls, "IPQUALITY_TEST_IP2_PAGE" => IP2_PAGE,
-        "IPQUALITY_TEST_IPDATA_PAGE" => IPDATA_PAGE, "IPQUALITY_TEST_IPDATA_RESPONSE" => IPDATA_RESPONSE})
+        "IPQUALITY_TEST_IPDATA_PAGE" => IPDATA_FETCH_PAGE, "IPQUALITY_TEST_IPDATA_RESPONSE" => IPDATA_RESPONSE})
     assert status.success?, err
     refute_match(/jq: error/, err)
     report = JSON.parse(out)

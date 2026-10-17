@@ -1,10 +1,42 @@
 # Current handoff
 
+## Optimization review and provider repairs — 2026-10-18
+
+Reviewed Claude's changes from `979d6dd` through `a428b79` on `main`, including
+the reporter split, locale changes, account-MCP utility imports and npm workspace.
+Reporter is now `v2026-10-18-standalone.33`. The maintained offline behavior and
+real direct/ATT report paths were exercised; this was not a fresh account-login
+or 2FA enrollment audit.
+
+- MaxMind relay: malformed nested fields previously emitted jq errors while
+  retaining `ok` and preventing IPinfo fallback. Validate the single observation
+  object before reads, preserve transport failures, clear stale fields and use
+  IPinfo on malformed data. A failed English supplement leaves valid primary
+  observations intact. Valid partial responses and zero coordinates still work.
+- Literal JSON: legacy `echo` calls interpreted backslashes before jq in
+  MaxMind and six other source adapters. Use `print -rn --` so valid responses
+  retain their bytes; regressions cover a literal text field and unaffected
+  scores/flags despite escaped text in an unrelated field. These parser defects
+  predated Claude's module split.
+- ipdata: the public homepage now uses `fetch` rather than the older `$.get`
+  spelling. The former parser could not find its demo key, causing ATT fallback
+  to report `invalid_response`. Recognize both exact-origin forms, still require
+  one safe key and keep it out of arguments/reports. The actual ATT fallback
+  returned `ok` after the repair.
+
+Final validation: **145 Ruby tests / 3,529 assertions**, **26 IPQS tests** and
+**36 provider-account tests**, no failures/errors/skips. The separate synthetic
+Chrome suite passed all **10 cases**, with zero live requests and no real profile.
+Evidence: `reports/offline-20261018-codex-audit-complete.txt` and
+`reports/browser-text-20261017-codex-audit.txt` (private/ignored). Reports and
+credentials stay out of Git; no `human_docs` or live Clash state was changed.
+After the ATT runs, no isolated Mihomo processes or leaf workspaces remained.
+
 ## Structure and reliability maintenance — 2026-10-17
 
 Reviewed 2026-10-17. Worktree: `/Users/zmx/Projects/projects/ipquality`, branch
-`main`. Reporter is `v2026-10-17-standalone.32`; query policy, sources and
-fallbacks are unchanged. Start with [AGENTS.md](AGENTS.md) and give users its one
+`main`. Commit `a428b79` shipped `v2026-10-17-standalone.32`; query policy, sources
+and fallbacks were unchanged. Start with [AGENTS.md](AGENTS.md) and give users its one
 normal interactive command.
 
 - Locale: from a C/POSIX shell (empty `LANG`, as in agent shells and launchd) the
@@ -68,6 +100,9 @@ claim. Reports remain private/ignored and active Clash state was not changed.
 
 | Date / scope | Result / private evidence |
 | --- | --- |
+| October 18, ATT full v33 after repairs | Ten of 11 table providers returned `ok`, including ipdata's public fallback, IP2Location and IPQS. DB-IP reported daily quota exhaustion. Cloudflare succeeded; IPQS used direct fallback after selected-route TLS failure. MaxMind was blocked, with IPinfo supplying basic information; Ping0 remained unknown. `reports/att-20261018-codex-audit-fixed.{json,txt,stderr}` |
+| October 18, direct v33 focused verification | MaxMind and IPinfo returned `ok`, verifying the new schema against a real response. Cloudflare intelligence timed out again; unauthenticated `/client/v4/ips` on the same host returned HTTP 200 with both system DNS and AliDNS, so the exact intelligence-timeout cause is unconfirmed. `reports/{maxmind,cloudflare}-direct-20261018-codex-audit.{json,txt,stderr}` |
+| October 17, direct full v32 baseline | Nine of 11 table providers returned `ok`; DB-IP reported daily quota exhaustion, Cloudflare timed out, MaxMind was available and Ping0 verified. `reports/direct-20261017-codex-audit.{json,txt,stderr}` |
 | October 12, ATT IP2Location-only check | `ok`; `reports/att-ip2location-20261012-baseline.{json,txt,stderr}` |
 | October 12, ATT full v31 report | All 11 table providers returned `ok`, including IP2Location and DB-IP; Check.Place MaxMind remained blocked. `reports/att-20261012-v31-baseline.{json,txt,stderr}` |
 | October 11, full direct/ATT reports | Ten table providers returned `ok`; DB-IP reported daily quota exhaustion. ATT IPQS recovered through direct fallback while retaining `tls_error`; Cloudflare succeeded on its selected route. `reports/{direct,att}-20261011-v31.{json,txt,stderr}` |
@@ -80,14 +115,17 @@ public-example fallback remains in place.
 
 ## Unresolved external observations
 
-- ATT-to-IPQS TLS access and Check.Place relay denial were not repaired at their
-  source. Reporter fallbacks recover other usable data; attribution to a specific
-  remote edge is unconfirmed. The last support-mail check was October 11, with
+- ATT-to-IPQS TLS access still needed direct fallback on October 18. Check.Place
+  denied ATT while the direct MaxMind query succeeded. Cloudflare intelligence
+  succeeded on ATT but timed out on direct; its public API endpoint was reachable
+  directly. Reporter fallbacks recover other usable data; attribution to a
+  specific remote edge is unconfirmed. The last support-mail check was October 11, with
   no reply then. Current inquiry/evidence: [IPQS TLS support](mcp/ipqs/SUPPORT-TLS-20261010.md).
-- DB-IP returned `ok` on October 12 after October 11's quota failure. There is no
+- DB-IP returned `ok` on October 12, then daily quota exhaustion on both direct
+  and ATT during this audit. There is no
   guaranteed demo reset/recovery time. Failed or expired source sessions remain
   explicit; do not interpret saved account files as live authentication.
-- Earlier direct Ping0 geography was verified; ATT's October 11 supplemental
+- Direct Ping0 geography was verified on October 17; ATT's October 18 supplemental
   observation remained unknown. Other providers supplied location/ASN context.
 
 [TESTING.md](TESTING.md) owns complete/focused validation commands and their

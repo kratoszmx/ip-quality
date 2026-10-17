@@ -19,8 +19,8 @@ if ! print -rn -- "$RESPONSE"|jq -e 'type == "object" and (.data | type == "obje
 ipinfo[status]=invalid_response
 return 0
 fi
-ipinfo[usetype]=$(echo "$RESPONSE"|jq -r '.data.asn.type')
-ipinfo[comtype]=$(echo "$RESPONSE"|jq -r '.data.company.type')
+ipinfo[usetype]=$(print -rn -- "$RESPONSE"|jq -r '.data.asn.type')
+ipinfo[comtype]=$(print -rn -- "$RESPONSE"|jq -r '.data.company.type')
 case ${ipinfo[usetype]} in
 "business")ipinfo[susetype]="${stype[business]}"
 ;;
@@ -47,25 +47,25 @@ case ${ipinfo[comtype]} in
 ;;
 *)ipinfo[scomtype]="${stype[other]}"
 esac
-ipinfo[countrycode]=$(echo "$RESPONSE"|jq -r '.data.country')
-ipinfo[proxy]=$(echo "$RESPONSE"|jq -r '.data.privacy.proxy')
-ipinfo[tor]=$(echo "$RESPONSE"|jq -r '.data.privacy.tor')
-ipinfo[vpn]=$(echo "$RESPONSE"|jq -r '.data.privacy.vpn')
-ipinfo[server]=$(echo "$RESPONSE"|jq -r '.data.privacy.hosting')
+ipinfo[countrycode]=$(print -rn -- "$RESPONSE"|jq -r '.data.country')
+ipinfo[proxy]=$(print -rn -- "$RESPONSE"|jq -r '.data.privacy.proxy')
+ipinfo[tor]=$(print -rn -- "$RESPONSE"|jq -r '.data.privacy.tor')
+ipinfo[vpn]=$(print -rn -- "$RESPONSE"|jq -r '.data.privacy.vpn')
+ipinfo[server]=$(print -rn -- "$RESPONSE"|jq -r '.data.privacy.hosting')
 local ISO3166=$(<"$REF_DIR/iso3166.json")
-ipinfo[asn]=$(echo "$RESPONSE"|jq -r '.data.asn.asn'|sed 's/^AS//')
-ipinfo[org]=$(echo "$RESPONSE"|jq -r '.data.asn.name')
-ipinfo[city]=$(echo "$RESPONSE"|jq -r '.data.city')
-ipinfo[post]=$(echo "$RESPONSE"|jq -r '.data.postal')
-ipinfo[timezone]=$(echo "$RESPONSE"|jq -r '.data.timezone')
-local tmp_str=$(echo "$RESPONSE"|jq -r '.data.loc')
+ipinfo[asn]=$(print -rn -- "$RESPONSE"|jq -r '.data.asn.asn'|sed 's/^AS//')
+ipinfo[org]=$(print -rn -- "$RESPONSE"|jq -r '.data.asn.name')
+ipinfo[city]=$(print -rn -- "$RESPONSE"|jq -r '.data.city')
+ipinfo[post]=$(print -rn -- "$RESPONSE"|jq -r '.data.postal')
+ipinfo[timezone]=$(print -rn -- "$RESPONSE"|jq -r '.data.timezone')
+local tmp_str=$(print -rn -- "$RESPONSE"|jq -r '.data.loc')
 ipinfo[lat]=$(echo "$tmp_str"|cut -d',' -f1)
 ipinfo[lon]=$(echo "$tmp_str"|cut -d',' -f2)
-ipinfo[countrycode]=$(echo "$RESPONSE"|jq -r '.data.country')
-ipinfo[country]=$(echo "$ISO3166"|jq --arg code "${ipinfo[countrycode]}" -r '.[] | select(.["alpha-2"] == $code) | .name')
-ipinfo[continent]=$(echo "$ISO3166"|jq --arg code "${ipinfo[countrycode]}" -r '.[] | select(.["alpha-2"] == $code) | .region')
-ipinfo[regcountrycode]=$(echo "$RESPONSE"|jq -r '.data.abuse.country')
-ipinfo[regcountry]=$(echo "$ISO3166"|jq --arg code "${ipinfo[regcountrycode]}" -r '.[] | select(.["alpha-2"] == $code) | .name')
+ipinfo[countrycode]=$(print -rn -- "$RESPONSE"|jq -r '.data.country')
+ipinfo[country]=$(print -rn -- "$ISO3166"|jq --arg code "${ipinfo[countrycode]}" -r '.[] | select(.["alpha-2"] == $code) | .name')
+ipinfo[continent]=$(print -rn -- "$ISO3166"|jq --arg code "${ipinfo[countrycode]}" -r '.[] | select(.["alpha-2"] == $code) | .region')
+ipinfo[regcountrycode]=$(print -rn -- "$RESPONSE"|jq -r '.data.abuse.country')
+ipinfo[regcountry]=$(print -rn -- "$ISO3166"|jq --arg code "${ipinfo[regcountrycode]}" -r '.[] | select(.["alpha-2"] == $code) | .name')
 if is_signed_decimal "${ipinfo[lat]}"&&is_signed_decimal "${ipinfo[lon]}";then
 ipinfo[dms]=$(generate_dms "${ipinfo[lat]}" "${ipinfo[lon]}")
 ipinfo[map]=$(generate_googlemap_url "${ipinfo[lat]}" "${ipinfo[lon]}" "1001")

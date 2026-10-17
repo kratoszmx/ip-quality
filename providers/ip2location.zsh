@@ -59,8 +59,8 @@ ip2location[status]=invalid_response
 return 0
 fi
 fi
-ip2location[usetype]=$(echo "$RESPONSE"|jq -r '.usage_type')
-ip2location[comtype]=$(echo "$RESPONSE"|jq -r '.as_info.as_usage_type')
+ip2location[usetype]=$(print -rn -- "$RESPONSE"|jq -r '.usage_type')
+ip2location[comtype]=$(print -rn -- "$RESPONSE"|jq -r '.as_info.as_usage_type')
 local first_use="${ip2location[usetype]%%/*}"
 case $first_use in
 "COM")ip2location[susetype]="${stype[business]}"
@@ -121,20 +121,20 @@ case $first_use in
 ;;
 *)ip2location[scomtype]="${stype[other]}"
 esac
-ip2location[countrycode]=$(echo "$RESPONSE"|jq -r '.country_code')
-ip2location[proxy0]=$(echo "$RESPONSE"|jq -r '.is_proxy')
-ip2location[proxy1]=$(echo "$RESPONSE"|jq -r '.proxy.is_public_proxy')
-ip2location[proxy2]=$(echo "$RESPONSE"|jq -r '.proxy.is_web_proxy')
+ip2location[countrycode]=$(print -rn -- "$RESPONSE"|jq -r '.country_code')
+ip2location[proxy0]=$(print -rn -- "$RESPONSE"|jq -r '.is_proxy')
+ip2location[proxy1]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_public_proxy')
+ip2location[proxy2]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_web_proxy')
 ip2location[proxy]=$(provider_merge_boolean_signals "${ip2location[proxy0]}" "${ip2location[proxy1]}" "${ip2location[proxy2]}")
-ip2location[tor]=$(echo "$RESPONSE"|jq -r '.proxy.is_tor')
-ip2location[vpn]=$(echo "$RESPONSE"|jq -r '.proxy.is_vpn')
-ip2location[server]=$(echo "$RESPONSE"|jq -r '.proxy.is_data_center')
-ip2location[abuser]=$(echo "$RESPONSE"|jq -r '.proxy.is_spammer')
-ip2location[robot1]=$(echo "$RESPONSE"|jq -r '.proxy.is_web_crawler')
-ip2location[robot2]=$(echo "$RESPONSE"|jq -r '.proxy.is_scanner')
-ip2location[robot3]=$(echo "$RESPONSE"|jq -r '.proxy.is_botnet')
+ip2location[tor]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_tor')
+ip2location[vpn]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_vpn')
+ip2location[server]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_data_center')
+ip2location[abuser]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_spammer')
+ip2location[robot1]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_web_crawler')
+ip2location[robot2]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_scanner')
+ip2location[robot3]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_botnet')
 ip2location[robot]=$(provider_merge_boolean_signals "${ip2location[robot1]}" "${ip2location[robot2]}" "${ip2location[robot3]}")
-ip2location[score]=$(echo "$RESPONSE"|jq -r '.fraud_score')
+ip2location[score]=$(print -rn -- "$RESPONSE"|jq -r '.fraud_score')
 if ! provider_integer_in_range "${ip2location[score]}" 0 99;then
 ip2location[score]=""
 fi
