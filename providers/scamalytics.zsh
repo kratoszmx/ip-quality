@@ -1,3 +1,5 @@
+# Derived from xykt/IPQuality. See UPSTREAM.md and LICENSE before modifying or
+# redistributing this file.
 # Scamalytics public target page. This is not its subscription JSON API.
 # Match both page identity and its embedded example, then project only known
 # labels. Missing/conflicting table cells remain unknown rather than false.
@@ -42,4 +44,57 @@ while IFS=$'\t' read -r field value;do
 scamalytics_parsed[$field]="$value"
 done <<< "$projection"
 return 0
+}
+
+db_scamalytics(){
+show_progress "${sinfo[database]}Scamalytics"
+scamalytics=()
+scamalytics[source]=check_place_relay
+check_place_fetch_json "$1" "$IP" "db=scamalytics"||true
+scamalytics[status]="$PROVIDER_RESPONSE_STATUS"
+local RESPONSE="$PROVIDER_RESPONSE_BODY"
+if [[ "${scamalytics[status]}" == ok ]] && ! print -rn -- "$RESPONSE"|jq -e '
+  type == "object" and (.scamalytics | type == "object") and
+  (.scamalytics.scamalytics_score | tostring | test("^[0-9]{1,3}$")) and
+  (.scamalytics.scamalytics_score | tonumber | . >= 0 and . <= 100) and
+  ([.scamalytics.scamalytics_proxy, .external_datasources,
+    .external_datasources.maxmind_geolite2, .external_datasources.firehol,
+    .external_datasources.x4bnet] | all(. == null or type == "object"))
+' >/dev/null 2>&1;then
+scamalytics[status]=invalid_response
+fi
+if [[ "${scamalytics[status]}" != ok ]];then
+scamalytics[relay_status]="${scamalytics[status]}"
+scamalytics[source]=public_demo
+typeset wire_response
+wire_response=$(curl -q $CurlARG -sS -$1 -m 10 --max-filesize 262144 \
+  --write-out $'\n%{http_code}' "https://scamalytics.com/ip/$IP" 2>/dev/null)
+provider_decode_http_response "$wire_response" "$?"
+scamalytics[status]="${provider_http_response[status]}"
+[[ "${scamalytics[status]}" == ok ]]||return 0
+if ! scamalytics_parse_page "${provider_http_response[body]}" "$IP";then
+scamalytics[status]=invalid_response
+return 0
+fi
+typeset field
+for field in score risk countrycode proxy tor vpn server abuser robot;do
+scamalytics[$field]="${scamalytics_parsed[$field]}"
+done
+return 0
+fi
+scamalytics[countrycode]=$(echo "$RESPONSE"|jq -r '.external_datasources.maxmind_geolite2.ip_country_code')
+scamalytics[proxy]=$(echo "$RESPONSE"|jq -r '.external_datasources.firehol.is_proxy')
+scamalytics[tor]=$(echo "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_tor')
+scamalytics[vpn]=$(echo "$RESPONSE"|jq -r '.scamalytics.scamalytics_proxy.is_vpn')
+scamalytics[server]=$(echo "$RESPONSE"|jq -r '.scamalytics.scamalytics_proxy.is_datacenter')
+scamalytics[abuser]=$(echo "$RESPONSE"|jq -r '.scamalytics.is_blacklisted_external')
+scamalytics[robot1]=$(echo "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_blacklisted_spambot')
+scamalytics[robot2]=$(echo "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_bot_operamini')
+scamalytics[robot3]=$(echo "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_bot_semrush')
+scamalytics[robot]=$(provider_merge_boolean_signals "${scamalytics[robot1]}" "${scamalytics[robot2]}" "${scamalytics[robot3]}")
+scamalytics[score]=$(echo "$RESPONSE"|jq -r '.scamalytics.scamalytics_score')
+if ! provider_integer_in_range "${scamalytics[score]}" 0 100;then
+scamalytics[score]=""
+fi
+scamalytics[risk]=""
 }

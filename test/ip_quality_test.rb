@@ -57,11 +57,20 @@ class IpQualityTest < ReporterTestCase
   end
 
   def test_offline_self_test_covers_zsh_validators_and_dnsbl_aggregation
-    stdout, stderr, status = run_script("--self-test")
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", SELF_TEST, File.join(reporter_workspace, "bin", "ip-quality"))
 
     assert status.success?, stderr
     assert_match(/SELF-TEST OK: zsh runtime, validators, provider parsers, and \d+ DNSBL entries/, stdout)
     assert_empty stderr
+  end
+
+  def test_invalid_short_options_fail_before_the_plan
+    [%w[-l jp], %w[--scope dnsbl -6], %w[--scope mail 8.8.8.8]].each do |arguments|
+      stdout, _stderr, status = run_script(*arguments)
+
+      refute status.success?, arguments.join(" ")
+      refute_includes stdout, "query plan", arguments.join(" ")
+    end
   end
 
   def test_reputation_plan_discloses_ping0_public_result_and_risk_limitation

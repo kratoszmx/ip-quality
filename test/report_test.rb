@@ -197,7 +197,7 @@ class ReportTest < ReporterTestCase
       source "$2"
       source "$5"
       YY="$3"
-      fixture_lite="$4" mode_json=0 mode_output=0
+      fixture_basic_source="$4" mode_json=0 mode_output=0
       typeset -A sbasic stype sscore sfactor smail smailstatus smail_response maxmind ipinfo ip2location cloudflare dbip ipregistry scamalytics ipapi ipwhois abuseipdb ipdata ipqs ping0 ripestat internetdb
       sbasic[title]='1. Basic Information (relay)' sbasic[title_lite]='1. Basic Information (fallback)'
       stype[title]='2. IP Type' sscore[title]='3. Risk Score' sfactor[title]='4. Risk Factors'
@@ -208,7 +208,7 @@ class ReportTest < ReporterTestCase
         db_ripestat db_shodan_internetdb;do
         functions[$operation]='return 0'
       done
-      db_maxmind_relay(){ mode_lite="$fixture_lite"; maxmind[dms]=null; }
+      db_maxmind_relay(){ basic_source="$fixture_basic_source"; maxmind[dms]=null; }
       db_ipinfo(){ ipinfo[status]=ok; ipinfo[dms]=null; }
       db_ip2location(){ ip2location[status]=ok; ip2location[susetype]=ISP; ip2location[score]=0; }
       db_dbip(){ dbip[status]=ok; dbip[risk_status]=ok; dbip[risk]=low; }
@@ -220,13 +220,13 @@ class ReportTest < ReporterTestCase
       }
       check_IP 198.51.100.23 4
     ZSH
-    %w[cn en].product(%w[0 1]).each do |language, lite|
+    %w[cn en].product(%w[maxmind ipinfo]).each do |language, basic_source|
       stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-        "cloudflare-basic-context", REPUTATION_REPORT, TERMINAL_LIBRARY, language, lite, File.join(ROOT, "providers", "selection.zsh"))
+        "cloudflare-basic-context", REPUTATION_REPORT, TERMINAL_LIBRARY, language, basic_source, File.join(ROOT, "providers", "selection.zsh"))
       assert status.success?, stderr
       assert_empty stderr
       basic, remaining = stdout.split("2. IP Type", 2)
-      assert_includes basic, lite == "0" ? "1. Basic Information (relay)" : "1. Basic Information (fallback)"
+      assert_includes basic, basic_source == "maxmind" ? "1. Basic Information (relay)" : "1. Basic Information (fallback)"
       assert_includes basic, "Cloudflare"
       assert_includes basic, "ASN=AS9808"
       assert_includes basic, language == "cn" ? "ASN所属地=CN" : "ASN country=CN"
@@ -647,7 +647,7 @@ class ReportTest < ReporterTestCase
   end
 
   def test_report_identifies_the_relay_and_online_repository_without_claiming_a_local_maxmind_database
-    source = File.read(SCRIPT, encoding: "UTF-8")
+    source = REPORTER_SOURCES.map { |path| File.read(path, encoding: "UTF-8") }.join("\n")
 
     assert_includes source, "https://github.com/kratoszmx/ip-quality"
     assert_includes source, "Check.Place 中继；上游标注 MaxMind"

@@ -57,7 +57,7 @@ class ScamalyticsTest < ReporterTestCase
       source "$2"
       eval "$3"
       typeset -A scamalytics sinfo
-      IP=198.51.100.23 ibar_step=0 sinfo[ldatabase]=0
+      IP=198.51.100.23
       CurlARG='--proxy http://127.0.0.1:12345'
       setopt SH_WORD_SPLIT
       show_progress(){ :; }
@@ -105,7 +105,7 @@ class ScamalyticsTest < ReporterTestCase
       source "$1"
       eval "$2"
       typeset -A scamalytics sinfo
-      IP=198.51.100.23 ibar_step=0 sinfo[ldatabase]=0
+      IP=198.51.100.23
       show_progress(){ :; }
       check_place_fetch_json(){
         PROVIDER_RESPONSE_STATUS=ok

@@ -457,7 +457,7 @@ source address, so the check works on a directly addressed host or behind NAT.
 ## DNSBL scope
 
 The reporter reverses one IPv4 address and queries every unique zone in the
-vendored `ref/dnsbl.list`. The current self-test validates 422 zones. Concurrency
+vendored `ref/dnsbl.list`. The offline self-test validates 422 zones. Concurrency
 is configurable from 1 through the hard maximum of 50.
 
 Outcomes follow the implemented command result:

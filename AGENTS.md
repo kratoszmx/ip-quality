@@ -217,16 +217,19 @@ live in [PROVIDERS.md](PROVIDERS.md); consult it when changing a source.
 
 ## Source map
 
-- `bin/ip-quality`: CLI policy, live queries, aggregation, and JSON assembly.
+- `bin/ip-quality`: CLI policy, module load order, egress discovery and run
+  orchestration; sourcing it loads definitions without running the CLI.
 - `bin/test-clash-leaf`: direct Ruby entrypoint, CLI policy, and route selection.
 - `common/`: credential-safe HTTP requests, shared provider values, jq value predicates, terminal text/table layout, printable metadata,
   verified-file snapshots, and child-process proxy overrides; see
   [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md).
 - `leaf_runner/`: cached-subscription selection, exact-leaf extraction,
   loopback Mihomo ownership, and cleanup.
-- `providers/`: fixture-testable response parsers, credential loading and
-  reporter-specific source selection/relay policy.
-- `report/`: provider-aware terminal output without a synthetic combined score.
+- `providers/`: one file per source (fixture-testable parser plus its live
+  `db_*` adapter), mail/DNSBL probes, credential loading and source
+  selection/relay policy.
+- `report/`: cn/en labels, terminal sections and JSON assembly, without a
+  synthetic combined score.
 - `mcp/`: IPQS and free provider-account integrations; private `.state/`,
   `node_modules/` and `dist/` stay out of Git.
 - `ref/`: vendored runtime data.

@@ -118,7 +118,7 @@ class PublicFallbacksTest < ReporterTestCase
     probe = <<~'ZSH'
       source "$1"; source "$2"; source "$3"; eval "$4"; source "$9"
       typeset -A ip2location ipdata sinfo stype
-      IP=198.51.100.23 ibar_step=0 sinfo[ldatabase]=0
+      IP=198.51.100.23
       CurlARG='--proxy http://127.0.0.1:12345'; setopt SH_WORD_SPLIT
       show_progress(){ :; }
       calls_file="$5" page_file="$6" data_file="$7" scenario="$8"
@@ -185,7 +185,7 @@ class PublicFallbacksTest < ReporterTestCase
     probe = <<~'ZSH'
       source "$1"; source "$2"; source "$3"; eval "$4"
       typeset -A ip2location ipdata sinfo stype
-      IP=198.51.100.23 ibar_step=0 sinfo[ldatabase]=0
+      IP=198.51.100.23
       show_progress(){ :; }
       curl(){ print -u2 -- unexpected-fallback; return 99; }
       check_place_fetch_json(){
@@ -210,7 +210,7 @@ class PublicFallbacksTest < ReporterTestCase
     probe = <<~'ZSH'
       source "$1"; source "$2"; eval "$3"; source "$7"
       typeset -A abuseipdb sinfo stype provider_credentials
-      IP=198.51.100.23 ibar_step=0 sinfo[ldatabase]=0
+      IP=198.51.100.23
       provider_credentials[ABUSEIPDB_API_KEY]=fixturekey123
       abuseipdb[score]=0
       show_progress(){ :; }

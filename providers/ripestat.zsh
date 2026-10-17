@@ -1,3 +1,5 @@
+# Derived from xykt/IPQuality. See UPSTREAM.md and LICENSE before modifying or
+# redistributing this file.
 # Pure parser for RIPEstat Network Info responses. Network access remains in
 # bin/ip-quality so malformed, stale, and fixture responses can be tested
 # without contacting RIPE NCC.
@@ -33,4 +35,16 @@ ripestat_parsed[prefix]="$prefix"
 ripestat_parsed[origins]="$origins"
 [[ -n "$origins" ]]&&ripestat_parsed[status]="announced"||ripestat_parsed[status]="not_announced"
 return 0
+}
+
+db_ripestat(){
+show_progress "${sinfo[database]}RIPEstat routing"
+ripestat=()
+ripestat[status]="unknown"
+local RESPONSE=$(curl -q $CurlARG -sS -L -$1 -m 10 --max-filesize 65536 --get --data-urlencode "resource=$IP" "https://stat.ripe.net/data/network-info/data.json" 2>/dev/null)
+if ripestat_parse_network_info "$RESPONSE";then
+ripestat[status]="${ripestat_parsed[status]}"
+ripestat[prefix]="${ripestat_parsed[prefix]}"
+ripestat[origins]="${ripestat_parsed[origins]}"
+fi
 }

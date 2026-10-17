@@ -1,3 +1,5 @@
+# Derived from xykt/IPQuality. See UPSTREAM.md and LICENSE before modifying or
+# redistributing this file.
 # IP2Location's public lookup embeds a target-specific JSON example. Read that
 # data without executing page scripts or deriving false flags from missing text.
 ip2location_page_response(){
@@ -30,4 +32,111 @@ print -rn -- "$1"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg target "$2" '
     .proxy.is_scanner, .proxy.is_botnet] | all(boolean_or_null(.))) and
   ([.fraud_score, .is_proxy, .proxy.is_vpn, .proxy.is_tor, .proxy.is_data_center] | any(. != null))
 ' >/dev/null 2>&1
+}
+
+db_ip2location(){
+show_progress "${sinfo[database]}IP2LOCATION"
+ip2location=()
+ip2location[source]=check_place_relay
+check_place_fetch_json "$1" "$IP" "db=ip2location"||true
+ip2location[status]="$PROVIDER_RESPONSE_STATUS"
+local RESPONSE="$PROVIDER_RESPONSE_BODY"
+if [[ "${ip2location[status]}" == ok ]] && ! ip2location_response_is_valid "$RESPONSE" "$IP";then
+ip2location[status]=invalid_response
+fi
+if [[ "${ip2location[status]}" != ok ]];then
+ip2location[relay_status]="${ip2location[status]}"
+ip2location[source]=public_demo
+typeset wire_response
+wire_response=$(curl -q $CurlARG -sS -$1 -m 10 --max-filesize 262144 \
+  --write-out $'\n%{http_code}' "https://www.ip2location.com/$IP" 2>/dev/null)
+provider_decode_http_response "$wire_response" "$?"
+ip2location[status]="${provider_http_response[status]}"
+[[ "${ip2location[status]}" == ok ]]||return 0
+if ! RESPONSE=$(ip2location_page_response "${provider_http_response[body]}" "$IP") ||
+   ! ip2location_response_is_valid "$RESPONSE" "$IP";then
+ip2location[status]=invalid_response
+return 0
+fi
+fi
+ip2location[usetype]=$(echo "$RESPONSE"|jq -r '.usage_type')
+ip2location[comtype]=$(echo "$RESPONSE"|jq -r '.as_info.as_usage_type')
+local first_use="${ip2location[usetype]%%/*}"
+case $first_use in
+"COM")ip2location[susetype]="${stype[business]}"
+;;
+"DCH")ip2location[susetype]="${stype[hosting]}"
+;;
+"EDU")ip2location[susetype]="${stype[education]}"
+;;
+"GOV")ip2location[susetype]="${stype[government]}"
+;;
+"ORG")ip2location[susetype]="${stype[organization]}"
+;;
+"MIL")ip2location[susetype]="${stype[military]}"
+;;
+"LIB")ip2location[susetype]="${stype[library]}"
+;;
+"CDN")ip2location[susetype]="${stype[cdn]}"
+;;
+"ISP")ip2location[susetype]="${stype[lineisp]}"
+;;
+"MOB")ip2location[susetype]="${stype[mobile]}"
+;;
+"SES")ip2location[susetype]="${stype[spider]}"
+;;
+"RSV")ip2location[susetype]="${stype[reserved]}"
+;;
+""|"null")ip2location[susetype]="${stype[unknown]}"
+;;
+*)ip2location[susetype]="${stype[other]}"
+esac
+first_use="${ip2location[comtype]%%/*}"
+case $first_use in
+"COM")ip2location[scomtype]="${stype[business]}"
+;;
+"DCH")ip2location[scomtype]="${stype[hosting]}"
+;;
+"EDU")ip2location[scomtype]="${stype[education]}"
+;;
+"GOV")ip2location[scomtype]="${stype[government]}"
+;;
+"ORG")ip2location[scomtype]="${stype[organization]}"
+;;
+"MIL")ip2location[scomtype]="${stype[military]}"
+;;
+"LIB")ip2location[scomtype]="${stype[library]}"
+;;
+"CDN")ip2location[scomtype]="${stype[cdn]}"
+;;
+"ISP")ip2location[scomtype]="${stype[lineisp]}"
+;;
+"MOB")ip2location[scomtype]="${stype[mobile]}"
+;;
+"SES")ip2location[scomtype]="${stype[spider]}"
+;;
+"RSV")ip2location[scomtype]="${stype[reserved]}"
+;;
+""|"null")ip2location[scomtype]="${stype[unknown]}"
+;;
+*)ip2location[scomtype]="${stype[other]}"
+esac
+ip2location[countrycode]=$(echo "$RESPONSE"|jq -r '.country_code')
+ip2location[proxy0]=$(echo "$RESPONSE"|jq -r '.is_proxy')
+ip2location[proxy1]=$(echo "$RESPONSE"|jq -r '.proxy.is_public_proxy')
+ip2location[proxy2]=$(echo "$RESPONSE"|jq -r '.proxy.is_web_proxy')
+ip2location[proxy]=$(provider_merge_boolean_signals "${ip2location[proxy0]}" "${ip2location[proxy1]}" "${ip2location[proxy2]}")
+ip2location[tor]=$(echo "$RESPONSE"|jq -r '.proxy.is_tor')
+ip2location[vpn]=$(echo "$RESPONSE"|jq -r '.proxy.is_vpn')
+ip2location[server]=$(echo "$RESPONSE"|jq -r '.proxy.is_data_center')
+ip2location[abuser]=$(echo "$RESPONSE"|jq -r '.proxy.is_spammer')
+ip2location[robot1]=$(echo "$RESPONSE"|jq -r '.proxy.is_web_crawler')
+ip2location[robot2]=$(echo "$RESPONSE"|jq -r '.proxy.is_scanner')
+ip2location[robot3]=$(echo "$RESPONSE"|jq -r '.proxy.is_botnet')
+ip2location[robot]=$(provider_merge_boolean_signals "${ip2location[robot1]}" "${ip2location[robot2]}" "${ip2location[robot3]}")
+ip2location[score]=$(echo "$RESPONSE"|jq -r '.fraud_score')
+if ! provider_integer_in_range "${ip2location[score]}" 0 99;then
+ip2location[score]=""
+fi
+ip2location[risk]=""
 }

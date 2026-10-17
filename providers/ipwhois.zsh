@@ -1,3 +1,5 @@
+# Derived from xykt/IPQuality. See UPSTREAM.md and LICENSE before modifying or
+# redistributing this file.
 # IPWHOIS public website demo; missing security flags remain unknown.
 
 typeset -gA ipwhois_parsed=()
@@ -54,4 +56,33 @@ ipwhois_parsed[risk_status]=ok
 fi
 ipwhois_parsed[status]="ok"
 return 0
+}
+
+db_ipwhois(){
+show_progress "${sinfo[database]}IPWHOIS public demo"
+ipwhois=()
+ipwhois[status]="unknown"
+ipwhois[source]="public_demo"
+provider_fetch_public_json "$1" "https://ipwhois.io/demo?ip=$IP" 131072 \
+  -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' \
+  -H 'Accept: */*' -H 'Origin: https://ipwhois.io' -H 'Referer: https://ipwhois.io/' \
+  -H 'Sec-Fetch-Dest: empty' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Site: same-origin'||true
+ipwhois[status]="$PROVIDER_RESPONSE_STATUS"
+local RESPONSE="$PROVIDER_RESPONSE_BODY"
+[[ "${ipwhois[status]}" == "ok" ]]||return 0
+if ipwhois_parse_response "$RESPONSE" "$IP";then
+ipwhois[status]="ok"
+ipwhois[risk_status]="${ipwhois_parsed[risk_status]}"
+ipwhois[countrycode]="${ipwhois_parsed[country_code]}"
+ipwhois[asn]="${ipwhois_parsed[asn]}"
+ipwhois[org]="${ipwhois_parsed[organization]}"
+ipwhois[isp]="${ipwhois_parsed[isp]}"
+ipwhois[timezone]="${ipwhois_parsed[timezone]}"
+ipwhois[proxy]="${ipwhois_parsed[proxy]}"
+ipwhois[vpn]="${ipwhois_parsed[vpn]}"
+ipwhois[tor]="${ipwhois_parsed[tor]}"
+ipwhois[server]="${ipwhois_parsed[hosting]}"
+else
+ipwhois[status]="${ipwhois_parsed[status]:-invalid_response}"
+fi
 }

@@ -1,3 +1,5 @@
+# Derived from xykt/IPQuality. See UPSTREAM.md and LICENSE before modifying or
+# redistributing this file.
 # Strict parser for ipapi.is's keyed and anonymous IP intelligence responses.
 #
 # The no-key free endpoint intentionally returns a flat, minimal response while
@@ -94,5 +96,109 @@ ipapi_parsed[server]=$(print -rn -- "$response"|jq -r 'if .is_datacenter == null
 ipapi_parsed[abuser]=$(print -rn -- "$response"|jq -r 'if .is_abuser == null then empty else .is_abuser end')
 ipapi_parsed[robot]=$(print -rn -- "$response"|jq -r 'if .is_crawler == null then empty else .is_crawler end')
 ipapi_parsed[status]="ok"
+return 0
+}
+
+db_ipapi(){
+show_progress "${sinfo[database]}ipapi"
+ipapi=()
+ipapi[status]="unknown"
+typeset api_key="${provider_credentials[IPAPI_API_KEY]:-}"
+ipapi[credential_mode]=anonymous
+[[ -n "$api_key" ]]&&ipapi[credential_mode]=key
+typeset endpoint="https://api.ipapi.is/?q=$IP"
+[[ -n "$api_key" ]]&&endpoint="$endpoint&key=$api_key"
+typeset wire_response RESPONSE
+if [[ -n "$api_key" ]];then
+wire_response=$(curl_with_secret_url "$endpoint" $CurlARG -sS -L -$1 -m 10 \
+  --max-filesize 262144 --write-out $'\n%{http_code}' 2>/dev/null)
+else
+wire_response=$(curl -q $CurlARG -sS -L -$1 -m 10 -H 'origin: https://ipapi.is' \
+  --max-filesize 262144 --write-out $'\n%{http_code}' "$endpoint" 2>/dev/null)
+fi
+provider_decode_http_response "$wire_response" "$?"
+ipapi[status]="${provider_http_response[status]}"
+[[ "${ipapi[status]}" == ok ]]||return 1
+RESPONSE="${provider_http_response[body]}"
+if ! ipapi_parse_response "$RESPONSE" "$IP";then
+ipapi[status]="invalid_response"
+return 1
+fi
+ipapi[status]="ok"
+ipapi[source]="public_api"
+ipapi[mode]="${ipapi_parsed[mode]}"
+ipapi[ip]="${ipapi_parsed[ip]}"
+ipapi[anonymous_asn]="${ipapi_parsed[anonymous_asn]}"
+ipapi[anonymous_company]="${ipapi_parsed[anonymous_company]}"
+ipapi[anonymous_country]="${ipapi_parsed[anonymous_country]}"
+ipapi[anonymous_city]="${ipapi_parsed[anonymous_city]}"
+ipapi[anonymous_region]="${ipapi_parsed[anonymous_region]}"
+ipapi[anonymous_timezone]="${ipapi_parsed[anonymous_timezone]}"
+ipapi[usetype]="${ipapi_parsed[usage_type]}"
+ipapi[comtype]="${ipapi_parsed[company_type]}"
+case ${ipapi[usetype]} in
+"business")ipapi[susetype]="${stype[business]}"
+;;
+"isp")ipapi[susetype]="${stype[isp]}"
+;;
+"hosting")ipapi[susetype]="${stype[hosting]}"
+;;
+"education")ipapi[susetype]="${stype[education]}"
+;;
+"government")ipapi[susetype]="${stype[government]}"
+;;
+"banking")ipapi[susetype]="${stype[banking]}"
+;;
+""|"null")ipapi[susetype]="${stype[unknown]}"
+;;
+*)ipapi[susetype]="${stype[other]}"
+esac
+case ${ipapi[comtype]} in
+"business")ipapi[scomtype]="${stype[business]}"
+;;
+"isp")ipapi[scomtype]="${stype[isp]}"
+;;
+"hosting")ipapi[scomtype]="${stype[hosting]}"
+;;
+"education")ipapi[scomtype]="${stype[education]}"
+;;
+"government")ipapi[scomtype]="${stype[government]}"
+;;
+"banking")ipapi[scomtype]="${stype[banking]}"
+;;
+""|"null")ipapi[scomtype]="${stype[unknown]}"
+;;
+*)ipapi[scomtype]="${stype[other]}"
+esac
+ipapi[scoretext]="${ipapi_parsed[score_text]}"
+ipapi[scorenum]=$(echo "${ipapi[scoretext]}"|awk '{print $1}')
+ipapi[risktext]=$(echo "${ipapi[scoretext]}"|awk -F'[()]' '{print $2}')
+if is_nonnegative_decimal "${ipapi[scorenum]}";then
+ipapi[score]=$(awk "BEGIN {printf \"%.2f%%\", ${ipapi[scorenum]} * 100}")
+case ${ipapi[risktext]} in
+"Very Low")ipapi[risk]="${sscore[verylow]}"
+;;
+"Low")ipapi[risk]="${sscore[low]}"
+;;
+"Elevated")ipapi[risk]="${sscore[elevated]}"
+;;
+"High")ipapi[risk]="${sscore[high]}"
+;;
+"Very High")ipapi[risk]="${sscore[veryhigh]}"
+esac
+else
+ipapi[scorenum]=""
+ipapi[score]=""
+ipapi[risk]=""
+fi
+ipapi[countrycode]="${ipapi_parsed[country_code]}"
+ipapi[proxy]="${ipapi_parsed[proxy]}"
+ipapi[tor]="${ipapi_parsed[tor]}"
+ipapi[vpn]="${ipapi_parsed[vpn]}"
+ipapi[server]="${ipapi_parsed[server]}"
+ipapi[abuser]="${ipapi_parsed[abuser]}"
+ipapi[robot]="${ipapi_parsed[robot]}"
+ipapi[risk_status]=not_provided
+provider_has_observation "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ipapi[server]}" "${ipapi[abuser]}" "${ipapi[robot]}"&&ipapi[risk_status]=ok
 return 0
 }

@@ -11,6 +11,8 @@ require_relative "utf8_locale"
 class ReporterTestCase < Minitest::Test
   ROOT = File.expand_path("../..", __dir__)
   SCRIPT = File.join(ROOT, "bin", "ip-quality")
+  REPORTER_SOURCES = [SCRIPT, *Dir.glob(File.join(ROOT, "{common,providers,report}", "*.zsh")).sort].freeze
+  SELF_TEST = File.join(ROOT, "test", "support", "self_test.zsh")
   DNSBL = File.join(ROOT, "ref", "dnsbl.list")
   ISO3166 = File.join(ROOT, "ref", "iso3166.json")
   COMMON_PROVIDER_LIBRARY = File.join(ROOT, "common", "provider_values.zsh")
@@ -53,13 +55,15 @@ class ReporterTestCase < Minitest::Test
 
   private
 
-  # Extract only the named top-level functions, without executing CLI startup.
-  # This avoids coupling a probe to the order of neighbouring functions.
+  # Extract named top-level functions from the reporter or its modules, without
+  # executing CLI startup or coupling a probe to the defining file.
   def reporter_functions(*names)
-    source = File.read(SCRIPT, encoding: "UTF-8")
-    source = source.split(/^parse_cli "\$@"\|\|exit \$\?\n/, 2).first
+    sources = REPORTER_SOURCES.map do |path|
+      File.read(path, encoding: "UTF-8").split(/^# Sourcing loads definitions only/, 2).first
+    end
     names.map do |name|
-      source[/^#{Regexp.escape(name)}\(\)\{\n.*?^\}\n(?=\n*(?:[A-Za-z_]\w*\(\)\{|\z))/m] ||
+      pattern = /^#{Regexp.escape(name)}\(\)\{\n.*?^\}\n(?=\n*(?:[A-Za-z_]\w*\(\)\{|\z))/m
+      sources.map { |source| source[pattern] }.compact.first ||
         raise("missing reporter function: #{name}")
     end.join("\n")
   end

@@ -1,3 +1,5 @@
+# Derived from xykt/IPQuality. See UPSTREAM.md and LICENSE before modifying or
+# redistributing this file.
 # Strict parser for Ipregistry's official IP Intelligence API.
 
 typeset -gA ipregistry_parsed=()
@@ -38,4 +40,36 @@ ipregistry_parsed[abuser]=$(provider_merge_boolean_signals \
   "$(print -rn -- "$response"|jq -r 'if .security.is_threat == null then empty else .security.is_threat end')")
 ipregistry_parsed[status]="ok"
 return 0
+}
+
+db_ipregistry(){
+ipregistry=()
+ipregistry[status]="not_configured"
+typeset api_key="${provider_credentials[IPREGISTRY_API_KEY]:-}"
+[[ -n "$api_key" ]]||return 0
+show_progress "${sinfo[database]}Ipregistry official API"
+typeset RESPONSE wire_response
+wire_response=$(curl_with_secret_header "Authorization" "ApiKey $api_key" \
+  "https://api.ipregistry.co/$IP" $CurlARG -sS -$1 -m 10 \
+  --max-filesize 262144 --write-out $'\n%{http_code}' 2>/dev/null)
+provider_decode_http_response "$wire_response" "$?"
+ipregistry[status]="${provider_http_response[status]}"
+[[ "${ipregistry[status]}" == ok ]]||return 0
+RESPONSE="${provider_http_response[body]}"
+if ipregistry_parse_response "$RESPONSE" "$IP";then
+ipregistry[status]="ok"
+ipregistry[source]="official_api"
+ipregistry[usetype]="${ipregistry_parsed[usage_type]}"
+ipregistry[comtype]="${ipregistry_parsed[company_type]}"
+ipregistry[susetype]=$(styled_provider_type "${ipregistry[usetype]}")
+ipregistry[scomtype]=$(styled_provider_type "${ipregistry[comtype]}")
+ipregistry[countrycode]="${ipregistry_parsed[country_code]}"
+ipregistry[proxy]="${ipregistry_parsed[proxy]}"
+ipregistry[vpn]="${ipregistry_parsed[vpn]}"
+ipregistry[tor]="${ipregistry_parsed[tor]}"
+ipregistry[server]="${ipregistry_parsed[server]}"
+ipregistry[abuser]="${ipregistry_parsed[abuser]}"
+else
+ipregistry[status]=invalid_response
+fi
 }

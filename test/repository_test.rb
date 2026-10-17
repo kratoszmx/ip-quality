@@ -23,10 +23,9 @@ class RepositoryTest < ReporterTestCase
   }.freeze
 
   def test_source_is_zsh_native_and_contains_no_removed_runtime_paths
-    source = File.binread(SCRIPT)
-
-    assert source.start_with?("#!/bin/zsh\n")
-    source += File.binread(COMMON_HTTP_LIBRARY)
+    assert File.binread(SCRIPT).start_with?("#!/bin/zsh\n")
+    # Every reporter module is runtime code, so each one obeys the same bans.
+    source = REPORTER_SOURCES.map { |path| File.binread(path) }.join("\n")
     commands = source.lines.reject { |line| line.lstrip.start_with?("#", "local -a required=") }.grep(/\bcurl\s/)
     assert commands.all? { |line| line.match?(/\bcurl -q\s/) }, "curl must ignore user curlrc"
     assert_includes source, 'curl -q "$@" --config -'

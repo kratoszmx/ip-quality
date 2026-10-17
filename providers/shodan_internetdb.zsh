@@ -1,3 +1,5 @@
+# Derived from xykt/IPQuality. See UPSTREAM.md and LICENSE before modifying or
+# redistributing this file.
 # Pure parser for Shodan InternetDB responses. InternetDB is exposure context,
 # not a reputation score; missing data is kept unknown rather than called clean.
 
@@ -52,4 +54,25 @@ internetdb_parsed[vulnerability_count]=$(print -rn -- "$response"|jq -r '.vulns 
 internetdb_parsed[tags]=$(print -rn -- "$response"|jq -r '.tags | join(", ")')
 internetdb_parsed[hostname_count]=$(print -rn -- "$response"|jq -r '.hostnames | length')
 return 0
+}
+
+db_shodan_internetdb(){
+internetdb=()
+internetdb[status]="unknown"
+if [[ "$1" -ne 4 ]];then
+internetdb[status]="not supported for IPv6"
+return 0
+fi
+show_progress "${sinfo[database]}Shodan InternetDB"
+local RESPONSE=$(curl -q $CurlARG -sS -L -4 -m 10 --max-filesize 262144 "https://internetdb.shodan.io/$IP" 2>/dev/null)
+if internetdb_parse_response "$RESPONSE" "$IP";then
+internetdb[status]="${internetdb_parsed[status]}"
+internetdb[ports]="${internetdb_parsed[ports]}"
+internetdb[port_count]="${internetdb_parsed[port_count]}"
+internetdb[vulnerability_count]="${internetdb_parsed[vulnerability_count]}"
+internetdb[tags]="${internetdb_parsed[tags]}"
+internetdb[hostname_count]="${internetdb_parsed[hostname_count]}"
+elif internetdb_parse_unavailability "$RESPONSE";then
+internetdb[status]="${internetdb_unavailable[status]}"
+fi
 }

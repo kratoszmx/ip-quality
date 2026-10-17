@@ -63,7 +63,8 @@ npm --prefix mcp/provider-accounts test
 
 `bin/test-clash-leaf` is the product's route command, not a test suite. Do not
 execute every file whose name contains `test`. The canonical runner includes
-the reporter's `--self-test` once; it need not be run separately for a full pass.
+`test/support/self_test.zsh` once (it sources the reporter in definition-only
+mode); it need not be run separately for a full pass.
 
 For a reporter-only aggregate, run from the root:
 

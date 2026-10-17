@@ -25,11 +25,10 @@ class DbipTest < ReporterTestCase
       source "$6"
       eval "$2"
       typeset -A dbip sinfo sscore
-      IP=198.51.100.23 ibar_step=0
+      IP=198.51.100.23
       CurlARG='--proxy http://127.0.0.1:12345'
       setopt SH_WORD_SPLIT
       calls_file="$5"
-      sinfo[ldatabase]=0
       show_progress(){ :; }
       curl_with_secret_url(){
         print -r -- call >> "$calls_file"

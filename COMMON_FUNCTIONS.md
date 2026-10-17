@@ -350,7 +350,7 @@ exit status and caller options without making a request. The six nullable-boolea
 callers retain their source-specific field lists and missing-observation rules.
 `test/public_demo_test.rb` checks source contracts rather than promoting their
 schema/quotas into the common library. `test/report_test.rb` checks terminal functions and real file/ANSI bytes.
-The CLI self-test retains typed JSON checks.
+`test/support/self_test.zsh` retains typed JSON checks.
 
 Mihomo process lifecycle and cleanup remain in `leaf_runner/`; they carry
 session state, listener ownership, and recovery policy. Shared modules contain

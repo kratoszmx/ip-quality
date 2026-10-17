@@ -48,8 +48,7 @@ class PublicDemoTest < ReporterTestCase
       eval "$2"
       shift 2
       typeset -A ipwhois sinfo
-      IP=198.51.100.23 ibar_step=0
-      sinfo[ldatabase]=0
+      IP=198.51.100.23
       show_progress(){ :; }
       provider_fetch_public_json(){
         [[ "$1" == 4 && "$2" == 'https://ipwhois.io/demo?ip=198.51.100.23' ]] || exit 99

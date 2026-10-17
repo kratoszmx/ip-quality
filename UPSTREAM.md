@@ -27,7 +27,9 @@ The hashes below identify the exact upstream inputs before local modification:
 
 ## Local modifications
 
-The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified:
+The imported `ip.sh` was renamed to `bin/ip-quality` and substantially modified.
+Its provider adapters, labels, report sections and JSON assembly were later
+split into `providers/` and `report/` modules that carry the same notice:
 
 - Added the user-authorized selected-route to direct-IPv4 fallback for official
   IPQS and Cloudflare target lookups after pre-HTTP connectivity errors. The
@@ -169,6 +171,7 @@ in this directory or intended for Git history.
 
 ## License continuity
 
-`bin/ip-quality` is a modified version of the upstream AGPL-3.0 program. The
+`bin/ip-quality` and the reporter modules split from it are a modified version
+of the upstream AGPL-3.0 program. The
 upstream `LICENSE` is preserved verbatim. Redistribution or network service use
 must continue to satisfy the AGPL-3.0 source-availability obligations.
