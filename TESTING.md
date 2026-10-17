@@ -69,7 +69,7 @@ For a reporter-only aggregate, run from the root:
 /usr/bin/ruby -e 'Dir.glob("test/*_test.rb").sort.each { |file| require File.expand_path(file) }'
 ```
 
-MCP dependencies reference `/Users/zmx/Projects/mcps/common/shared` and the HTTP/Chrome
+MCP dependencies reference `/Users/zmx/Projects/myutils` and the HTTP/Chrome
 libraries in `/Users/zmx/Projects/myutils/net_utils/node` through local
 `file:` paths. Both sibling checkouts and cached registry packages must be present
 before restoring dependencies with `npm install --offline --ignore-scripts`

@@ -39,7 +39,7 @@
   "dependencies": {
     "@myutils/totp": "file:../../../../myutils/other_utils/node/totp",
     "@myutils/browser-session": "file:../../../../myutils/net_utils/node/browser-session",
-    "@codex-mcp/shared-mcp-server": "file:../../../../mcps/common/shared/mcp-server",
+    "@myutils/mcp-server": "file:../../../../myutils/other_utils/node/mcp-server",
     "@myutils/one-use-token": "file:../../../../myutils/other_utils/node/one-use-token",
     "@myutils/secret-file": "file:../../../../myutils/file_utils/node/secret-file",
     "@modelcontextprotocol/sdk": "^1.29.0",

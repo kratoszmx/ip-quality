@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { buildToolDescription, textResult } from '@codex-mcp/shared-mcp-server';
+import { buildToolDescription, textResult } from '@myutils/mcp-server';
 import { accountStatus, openAccount, readAccount, createFreeAccount, importIpapiKey, privateAccount } from './accounts.mjs';
 import { readHttpAccount } from './http-account.mjs';
 import { abuseipdbStatus, verifyAbuseipdb, openAbuseipdb } from './abuseipdb.mjs';

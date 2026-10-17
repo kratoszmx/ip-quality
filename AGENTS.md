@@ -163,7 +163,7 @@ API keys are optional; private file formats and precedence are in
   [PROVIDERS.md](PROVIDERS.md).
 
 MCPs are optional for running the reporter. Both use local dependencies from
-the sibling `/Users/zmx/Projects/mcps/common/shared` directory and shared HTTP/Chrome
+the sibling `/Users/zmx/Projects/myutils` directory and shared HTTP/Chrome
 libraries in `/Users/zmx/Projects/myutils/net_utils/node`; this checkout alone
 does not contain those packages. IPQS needs Node 22+, provider accounts
 needs Node 24.5+, and browser tools need Chrome. Build/start/stop commands are in

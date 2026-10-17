@@ -2,14 +2,14 @@
 
 Owns free ipapi.is, Cloudflare and AbuseIPDB account maintenance for the IPQuality reporter.
 ipwho.is and DB-IP need no account or key for their free context APIs. This package
-reuses myutils' browser-session/http-read and mcps/common/shared's secret-file,
+reuses myutils' browser-session/http-read, secret-file,
 totp and mcp-server directly. Provider state, selectors, quotas and API contracts
 stay here.
 
 ## Start here
 
 Use Node 24.5+ for the native HTTPS proxy agent and installed Chrome for browser
-tools. The sibling `mcps/common/shared` dependencies must be present; restoration
+tools. The sibling `myutils` dependencies must be present; restoration
 and test coverage are in [../../TESTING.md](../../TESTING.md). From the project root:
 
 ```text

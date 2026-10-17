@@ -267,7 +267,7 @@ values to this Hash. This helper does not change system VPN/TUN routing.
 ## Account MCP shared APIs
 
 `mcp/ipqs` and `mcp/provider-accounts` reference the sibling repository
-`/Users/zmx/Projects/mcps/common/shared` through direct local package dependencies.
+`/Users/zmx/Projects/myutils` through direct local package dependencies.
 They do not copy those implementations or leave forwarding packages in mcps.
 
 | Shared package | Callers and use |
