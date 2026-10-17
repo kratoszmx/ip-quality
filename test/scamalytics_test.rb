@@ -60,7 +60,7 @@ class ScamalyticsTest < ReporterTestCase
       IP=198.51.100.23 ibar_step=0 sinfo[ldatabase]=0
       CurlARG='--proxy http://127.0.0.1:12345'
       setopt SH_WORD_SPLIT
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       check_place_fetch_json(){
         [[ "$1/$2/$3" == '4/198.51.100.23/db=scamalytics' ]]||exit 98
         PROVIDER_RESPONSE_STATUS="$relay_state" PROVIDER_RESPONSE_BODY="$relay_body"
@@ -106,7 +106,7 @@ class ScamalyticsTest < ReporterTestCase
       eval "$2"
       typeset -A scamalytics sinfo
       IP=198.51.100.23 ibar_step=0 sinfo[ldatabase]=0
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       check_place_fetch_json(){
         PROVIDER_RESPONSE_STATUS=ok
         PROVIDER_RESPONSE_BODY='{"scamalytics":{"scamalytics_score":7,"scamalytics_proxy":{"is_vpn":true}}}'

@@ -14,8 +14,10 @@ cd /Users/zmx/Projects/projects/ipquality
 ```
 
 The command loads every top-level `test/*_test.rb` into one Minitest run, then
-runs the IPQS build/tests/static doctor and provider-account MCP tests. Success
-means exit status 0 with every suite passing. The reporter count and random seed
+runs the IPQS build/tests/static doctor and provider-account MCP tests. It pins
+`LC_ALL=en_US.UTF-8` (direct Ruby suite runs do the same through
+`test/support/utf8_locale.rb`), runs every suite even after a failure and ends
+with `OFFLINE TESTS OK` or the failed suite names. Success means exit status 0. The reporter count and random seed
 appear separately from the Node package counts. A failure names its test and line;
 fix the cause and rerun the affected test, then the complete suite.
 

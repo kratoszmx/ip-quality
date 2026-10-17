@@ -50,7 +50,7 @@ class PublicDemoTest < ReporterTestCase
       typeset -A ipwhois sinfo
       IP=198.51.100.23 ibar_step=0
       sinfo[ldatabase]=0
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       provider_fetch_public_json(){
         [[ "$1" == 4 && "$2" == 'https://ipwhois.io/demo?ip=198.51.100.23' ]] || exit 99
         [[ "$*" == *'Origin: https://ipwhois.io'* && "$*" == *'Referer: https://ipwhois.io/'* && "$*" == *Mozilla/5.0* ]] || exit 98

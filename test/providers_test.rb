@@ -11,7 +11,7 @@ class ProvidersTest < ReporterTestCase
       IP=198.51.100.23 ibar_step=0
       sinfo[ldatabase]=0
       provider_credentials[IPREGISTRY_API_KEY]=fixture-key
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       curl(){ return 35; }
       curl_with_secret_header(){ return 28; }
       ipinfo[countrycode]=US ipregistry[proxy]=false
@@ -279,7 +279,7 @@ class ProvidersTest < ReporterTestCase
       IP='198.51.100.23' CurlARG='' ibar_step=0 fixture="$3"
       sinfo[database]=0 sinfo[ldatabase]=0
       Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       curl(){ cat "$fixture"; print -r -- 200; }
       db_ipapi 4
       exit_code=$?
@@ -310,7 +310,7 @@ class ProvidersTest < ReporterTestCase
       stype[isp]='ISP' stype[unknown]='Unknown'
       sscore[verylow]='Very Low'
       is_nonnegative_decimal(){ [[ "$1" =~ '^[0-9]+([.][0-9]+)?$' ]]; }
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       curl_with_secret_url(){ print -r -- "$(<"$fixture")"; print -r -- 200; }
       db_ipapi 4
       print -r -- "${ipapi[status]}|${ipapi[usetype]}|${ipapi[score]}"
@@ -340,7 +340,7 @@ class ProvidersTest < ReporterTestCase
       Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
       stype[unknown]='Unknown'
       is_nonnegative_decimal(){ [[ "$1" =~ '^[0-9]+([.][0-9]+)?$' ]]; }
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       curl(){ cat "$fixture"; print -r -- 200; }
       db_ipapi 4
       print -r -- "${ipapi[status]}|${ipapi[mode]}|${ipapi[anonymous_asn]}|${ipapi[anonymous_company]}|${ipapi[score]:-missing}|${ipapi[proxy]:-missing}"
@@ -365,7 +365,7 @@ class ProvidersTest < ReporterTestCase
       sinfo[database]=0 sinfo[ldatabase]=0
       Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
       source "$4"
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       curl(){ cat "$fixture"; print -r -- 429; }
       db_ipapi 4
       print -r -- "$?|${ipapi[status]}"
@@ -387,7 +387,7 @@ class ProvidersTest < ReporterTestCase
       provider_credentials[IPAPI_API_KEY]=fixture-key
       IP=198.51.100.23 ibar_step=0
       sinfo[ldatabase]=0
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       curl_with_secret_url(){ return "$failure"; }
       for failure in 28 35 60 7;do
         db_ipapi 4
@@ -490,7 +490,7 @@ class ProvidersTest < ReporterTestCase
       IP='198.51.100.23' CurlARG='' ibar_step=0 fixture="$4"
       sinfo[database]=0 sinfo[ldatabase]=0
       Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       curl_with_secret_header(){
         print -r -- "$(<"$fixture")"
         print -r -- 200
@@ -527,7 +527,7 @@ class ProvidersTest < ReporterTestCase
       sinfo[ldatabase]=0
       quota_fixture="$4" calls_file="$5"
       Font_Cyan='' Font_B='' Font_I='' Font_Suffix=''
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       styled_provider_type(){ print -rn -- "$1"; }
       curl_with_secret_url(){
         case "$1" in
@@ -572,7 +572,7 @@ class ProvidersTest < ReporterTestCase
       provider_credentials[IPQS_API_KEY]=fixture-key
       IP=198.51.100.23 ibar_step=0 sinfo[ldatabase]=0
       failed_stage="$4" curl_exit="$5" response_file="$6" calls_file="$7"
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       styled_provider_type(){ print -rn -- "$1"; }
       curl_with_secret_url(){
         typeset phase=lookup

@@ -5,6 +5,7 @@ require "tmpdir"
 require "open3"
 require "json"
 require_relative "../common/network_environment"
+require_relative "support/utf8_locale"
 require_relative "../common/safe_snapshot"
 require_relative "../common/text"
 

@@ -120,7 +120,7 @@ class PublicFallbacksTest < ReporterTestCase
       typeset -A ip2location ipdata sinfo stype
       IP=198.51.100.23 ibar_step=0 sinfo[ldatabase]=0
       CurlARG='--proxy http://127.0.0.1:12345'; setopt SH_WORD_SPLIT
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       calls_file="$5" page_file="$6" data_file="$7" scenario="$8"
       check_place_fetch_json(){ PROVIDER_RESPONSE_STATUS=skipped_relay_cloudflare_blocked; PROVIDER_RESPONSE_BODY=''; }
       curl(){
@@ -186,7 +186,7 @@ class PublicFallbacksTest < ReporterTestCase
       source "$1"; source "$2"; source "$3"; eval "$4"
       typeset -A ip2location ipdata sinfo stype
       IP=198.51.100.23 ibar_step=0 sinfo[ldatabase]=0
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       curl(){ print -u2 -- unexpected-fallback; return 99; }
       check_place_fetch_json(){
         PROVIDER_RESPONSE_STATUS=ok
@@ -213,7 +213,7 @@ class PublicFallbacksTest < ReporterTestCase
       IP=198.51.100.23 ibar_step=0 sinfo[ldatabase]=0
       provider_credentials[ABUSEIPDB_API_KEY]=fixturekey123
       abuseipdb[score]=0
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       check_place_fetch_json(){ print -u2 -- unexpected-relay; return 99; }
       response="$4" exit_code="$5" calls_file="$6"
       curl(){

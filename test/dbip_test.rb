@@ -30,7 +30,7 @@ class DbipTest < ReporterTestCase
       setopt SH_WORD_SPLIT
       calls_file="$5"
       sinfo[ldatabase]=0
-      show_progress_bar(){ :; }
+      show_progress(){ :; }
       curl_with_secret_url(){
         print -r -- call >> "$calls_file"
         [[ "$*" == *'--proxy http://127.0.0.1:12345'* && "$*" == *'-6'* && "$*" == *'Origin: https://db-ip.com'* && "$*" == *'Referer: https://db-ip.com/'* ]] || exit 99

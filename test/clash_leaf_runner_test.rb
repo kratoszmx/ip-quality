@@ -6,6 +6,7 @@ require "stringio"
 require "tmpdir"
 require "timeout"
 require "yaml"
+require_relative "support/utf8_locale"
 load File.expand_path("../bin/test-clash-leaf", __dir__)
 
 class ClashLeafRunnerTest < Minitest::Test
@@ -637,6 +638,24 @@ class ClashLeafRunnerTest < Minitest::Test
       assert status.success?, stderr
       assert_includes stdout, "--confirm-network-lookup"
       assert_empty stderr
+    end
+  end
+
+  def test_non_ascii_leaf_names_match_under_a_posix_caller_locale
+    Dir.mktmpdir("ip-quality-leaf-locale-") do |directory|
+      document = fixture_document
+      document["proxies"][1]["name"] = "香港 01"
+      document["proxy-groups"][0]["proxies"] = ["香港 01"]
+      profile_path = File.join(directory, "profile.yaml")
+      write_private_yaml(profile_path, document)
+      environment = { "HOME" => directory, "LANG" => nil, "LC_ALL" => "C", "LC_CTYPE" => nil }
+
+      stdout, stderr, status = Open3.capture3(
+        environment, RUNNER, "--profile", profile_path, "--leaf", "香港 01", "-4", chdir: directory
+      )
+
+      assert status.success?, stderr
+      assert_includes stdout, "no network access has occurred"
     end
   end
 

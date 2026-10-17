@@ -1,18 +1,28 @@
 #!/bin/zsh
 
 emulate -LR zsh
-set -eu
+set -u
 unset CDPATH
+# Suites compare UTF-8 text and widths; never inherit a C/POSIX caller locale.
+export LC_ALL=en_US.UTF-8
 
 typeset ROOT="${0:A:h:h}"
+typeset -a failed_suites=()
 
 # Only maintained top-level suites are executable tests; support/ and fixtures/
 # are inputs. One Minitest run gives an aggregate result and seed for all suites.
 /usr/bin/ruby -e '
   root = ARGV.shift
   Dir.glob(File.join(root, "test", "*_test.rb")).sort.each { |path| require path }
-' -- "$ROOT" "$@"
+' -- "$ROOT" "$@" || failed_suites+=(reporter)
 
 # Both owned MCP packages validate without provider requests or account access.
-npm --prefix "$ROOT/mcp/ipqs" run check
-npm --prefix "$ROOT/mcp/provider-accounts" test
+# Every suite runs even after an earlier failure, so one run reports all of them.
+npm --prefix "$ROOT/mcp/ipqs" run check || failed_suites+=(ipqs-mcp)
+npm --prefix "$ROOT/mcp/provider-accounts" test || failed_suites+=(provider-accounts-mcp)
+
+if (( ${#failed_suites} ));then
+  print -ru2 -- "OFFLINE TESTS FAILED: ${(j:, :)failed_suites}"
+  exit 1
+fi
+print -r -- "OFFLINE TESTS OK: reporter, ipqs-mcp, provider-accounts-mcp"

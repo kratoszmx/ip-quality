@@ -484,5 +484,9 @@ end
 
 if __FILE__ == $PROGRAM_NAME
   File.umask(0o077)
-  exit(IpQuality::ClashLeafCommand.new.run(ARGV))
+  # Profile names are UTF-8 YAML keys. A C/POSIX caller locale would tag
+  # arguments as binary, so non-ASCII exact names would never match.
+  Encoding.default_external = Encoding::UTF_8
+  arguments = ARGV.map { |argument| argument.dup.force_encoding(Encoding::UTF_8) }
+  exit(IpQuality::ClashLeafCommand.new.run(arguments))
 end

@@ -6,6 +6,8 @@ emulate -LR zsh
 setopt KSH_ARRAYS SH_WORD_SPLIT NO_NOMATCH NO_CASE_MATCH
 unsetopt RCS GLOBAL_RCS
 umask 077
+# Display widths and byte validation need UTF-8 whatever the caller locale is.
+export LC_ALL=en_US.UTF-8
 
 script_version="v2026-10-11-standalone.31"
 typeset SCRIPT_DIR="${0:A:h:h}"
@@ -120,11 +122,9 @@ typeset mode_output=0
 typeset outputfile=""
 typeset output_fd=-1
 typeset ipjson
-typeset ibar_step=0
 typeset PADDING=""
 typeset useNIC=""
 typeset CurlARG=""
-typeset UA_Browser
 typeset -a shelp_lines=(
 "IP QUALITY CHECK SCRIPT IP质量体检脚本"
 "Safe default: /bin/zsh ./bin/ip-quality [--scope SCOPE]"
@@ -169,9 +169,6 @@ swarn[63]="ERROR: the explicit target IP conflicts with the selected address fam
 sinfo[database]="Checking IP database "
 sinfo[mail]="Connecting Email server "
 sinfo[dnsbl]="Checking Blacklist database "
-sinfo[ldatabase]=21
-sinfo[lmail]=24
-sinfo[ldnsbl]=28
 shead[title]="IP QUALITY CHECK REPORT: "
 shead[title_lite]="IP QUALITY CHECK REPORT(LITE): "
 shead[ver]="Version: $script_version"
@@ -267,9 +264,6 @@ swarn[63]="错误：指定公网IP与选择的IPv4/IPv6类型冲突！"
 sinfo[database]="正在检测IP数据库 "
 sinfo[mail]="正在连接邮件服务商 "
 sinfo[dnsbl]="正在检测黑名单数据库 "
-sinfo[ldatabase]=17
-sinfo[lmail]=19
-sinfo[ldnsbl]=21
 shead[title]="IP质量体检报告："
 shead[title_lite]="IP质量体检报告(Lite)："
 shead[ver]="脚本版本：$script_version"
@@ -359,8 +353,8 @@ shead[time_raw]=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 fi
 shead[time]="${shead[time_label]}${shead[time_raw]}"
 }
-show_progress_bar(){
-print -ru2 -- "[ip-quality] $(clean_ansi "$1")"
+show_progress(){
+print -ru2 -- "[ip-quality] $1"
 }
 
 scope_includes(){
@@ -925,27 +919,6 @@ return 1
 print -r -- "SELF-TEST OK: zsh runtime, validators, provider parsers, and ${#dnsbl_zones[@]} DNSBL entries"
 }
 
-typeset -A browsers=(
-[Chrome]="145.0.0.0 144.0.0.0 143.0.0.0 142.0.0.0 141.0.0.0 140.0.0.0"
-[Firefox]="147.0 146.0 145.0 144.0 143.0 142.0 141.0 140.0")
-generate_random_user_agent(){
-local -a browsers_keys=(Chrome Firefox)
-local random_browser_index=$((RANDOM%${#browsers_keys[@]}))
-local browser=${browsers_keys[random_browser_index]}
-case $browser in
-Chrome)local versions=(${browsers[Chrome]})
-local version=${versions[RANDOM%${#versions[@]}]}
-UA_Browser="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/$version Safari/537.36"
-;;
-Firefox)local versions=(${browsers[Firefox]})
-local version=${versions[RANDOM%${#versions[@]}]}
-UA_Browser="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:$version) Gecko/20100101 Firefox/$version"
-esac
-}
-adapt_locale(){
-local ifunicode=$(printf '\u2800')
-[[ ${#ifunicode} -gt 3 ]]&&export LC_CTYPE=en_US.UTF-8 2>/dev/null
-}
 check_reference_files(){
 local reference_file
 for reference_file in "$DNSBL_FILE" "$REF_DIR/iso3166.json";do
@@ -1190,9 +1163,7 @@ fi
 echo "https://check.place/$lat,$lon,$zoom_level,$YY"
 }
 db_maxmind_relay(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Check.Place / MaxMind relay $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-8-${sinfo[ldatabase]}))
+show_progress "${sinfo[database]}Check.Place / MaxMind relay"
 maxmind=()
 check_place_fetch_json "$1" "$IP" "lang=$YY"||true
 maxmind[status]="$PROVIDER_RESPONSE_STATUS"
@@ -1251,9 +1222,7 @@ maxmind[map]="null"
 fi
 }
 db_ipinfo(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}IPinfo $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-7-${sinfo[ldatabase]}))
+show_progress "${sinfo[database]}IPinfo"
 ipinfo=()
 typeset wire_response RESPONSE
 if [[ $IP == *:* ]];then
@@ -1329,9 +1298,7 @@ ipregistry=()
 ipregistry[status]="not_configured"
 typeset api_key="${provider_credentials[IPREGISTRY_API_KEY]:-}"
 [[ -n "$api_key" ]]||return 0
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Ipregistry official API $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-15-${sinfo[ldatabase]}))
+show_progress "${sinfo[database]}Ipregistry official API"
 typeset RESPONSE wire_response
 wire_response=$(curl_with_secret_header "Authorization" "ApiKey $api_key" \
   "https://api.ipregistry.co/$IP" $CurlARG -sS -$1 -m 10 \
@@ -1358,9 +1325,7 @@ ipregistry[status]=invalid_response
 fi
 }
 db_scamalytics(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Scamalytics $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-12-${sinfo[ldatabase]}))
+show_progress "${sinfo[database]}Scamalytics"
 scamalytics=()
 scamalytics[source]=check_place_relay
 check_place_fetch_json "$1" "$IP" "db=scamalytics"||true
@@ -1412,9 +1377,7 @@ fi
 scamalytics[risk]=""
 }
 db_ipapi(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}ipapi $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-6-${sinfo[ldatabase]}))
+show_progress "${sinfo[database]}ipapi"
 ipapi=()
 ipapi[status]="unknown"
 typeset api_key="${provider_credentials[IPAPI_API_KEY]:-}"
@@ -1517,9 +1480,7 @@ provider_has_observation "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ip
 return 0
 }
 db_ipwhois(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}IPWHOIS public demo $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-9-${sinfo[ldatabase]}))
+show_progress "${sinfo[database]}IPWHOIS public demo"
 ipwhois=()
 ipwhois[status]="unknown"
 ipwhois[source]="public_demo"
@@ -1547,9 +1508,7 @@ ipwhois[status]="${ipwhois_parsed[status]:-invalid_response}"
 fi
 }
 db_dbip(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}DB-IP public demo $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-9-${sinfo[ldatabase]}))
+show_progress "${sinfo[database]}DB-IP public demo"
 dbip=()
 dbip[source]="public_demo"
 dbip[status]=unknown
@@ -1599,9 +1558,7 @@ dbip[status]="${dbip_parsed[status]:-invalid_response}"
 fi
 }
 db_cloudflare(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Cloudflare IP Intelligence $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-12-${sinfo[ldatabase]}))
+show_progress "${sinfo[database]}Cloudflare IP Intelligence"
 cloudflare=()
 cloudflare[status]="not_configured"
 typeset api_token="${provider_credentials[CLOUDFLARE_API_TOKEN]:-}"
@@ -1642,9 +1599,7 @@ cloudflare[threats]="${cloudflare_parsed[threat_categories]}"
 cloudflare[threats_json]="${cloudflare_parsed[threat_categories_json]:-null}"
 }
 db_abuseipdb(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}AbuseIPDB $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-10-${sinfo[ldatabase]}))
+show_progress "${sinfo[database]}AbuseIPDB"
 abuseipdb=()
 local RESPONSE wire_response api_key="${provider_credentials[ABUSEIPDB_API_KEY]:-}"
 abuseipdb[source]=check_place_relay
@@ -1706,9 +1661,7 @@ fi
 abuseipdb[risk]=""
 }
 db_ip2location(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}IP2LOCATION $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-12-${sinfo[ldatabase]}))
+show_progress "${sinfo[database]}IP2LOCATION"
 ip2location=()
 ip2location[source]=check_place_relay
 check_place_fetch_json "$1" "$IP" "db=ip2location"||true
@@ -1814,9 +1767,7 @@ fi
 ip2location[risk]=""
 }
 db_ipdata(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}ipdata $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-7-${sinfo[ldatabase]}))
+show_progress "${sinfo[database]}ipdata"
 ipdata=()
 ipdata[source]=check_place_relay
 check_place_fetch_json "$1" "$IP" "db=ipdata"||true
@@ -1863,9 +1814,7 @@ ipdata[abuser3]=$(echo "$RESPONSE"|jq -r '.threat.is_known_attacker')
 ipdata[abuser]=$(provider_merge_boolean_signals "${ipdata[abuser1]}" "${ipdata[abuser2]}" "${ipdata[abuser3]}")
 }
 db_ipqs(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}IPQS $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-5-${sinfo[ldatabase]}))
+show_progress "${sinfo[database]}IPQS"
 ipqs=()
 ipqs[status]="unknown"
 typeset api_key="${provider_credentials[IPQS_API_KEY]:-}"
@@ -1967,9 +1916,7 @@ fi
 ipqs[risk]=""
 }
 db_ping0(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Ping0 public geo $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-13-${sinfo[ldatabase]}))
+show_progress "${sinfo[database]}Ping0 public geo"
 ping0=()
 ping0[status]="unknown"
 ping0[match]="null"
@@ -1998,9 +1945,7 @@ ping0[match]="null"
 esac
 }
 db_ripestat(){
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}RIPEstat routing $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-13-${sinfo[ldatabase]}))
+show_progress "${sinfo[database]}RIPEstat routing"
 ripestat=()
 ripestat[status]="unknown"
 local RESPONSE=$(curl -q $CurlARG -sS -L -$1 -m 10 --max-filesize 65536 --get --data-urlencode "resource=$IP" "https://stat.ripe.net/data/network-info/data.json" 2>/dev/null)
@@ -2017,9 +1962,7 @@ if [[ "$1" -ne 4 ]];then
 internetdb[status]="not supported for IPv6"
 return 0
 fi
-local temp_info="$Font_Cyan$Font_B${sinfo[database]}${Font_I}Shodan InternetDB $Font_Suffix"
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-17-${sinfo[ldatabase]}))
+show_progress "${sinfo[database]}Shodan InternetDB"
 local RESPONSE=$(curl -q $CurlARG -sS -L -4 -m 10 --max-filesize 262144 "https://internetdb.shodan.io/$IP" 2>/dev/null)
 if internetdb_parse_response "$RESPONSE" "$IP";then
 internetdb[status]="${internetdb_parsed[status]}"
@@ -2099,9 +2042,7 @@ local response=$(smtp_probe "smtp.mailgun.org" 25 9)
 smail[remote]=0
 services=("Gmail" "Outlook" "Yahoo" "Apple" "QQ" "MailRU" "AOL" "GMX" "MailCOM" "163" "Sohu" "Sina")
 for service in "${services[@]}";do
-local temp_info="$Font_Cyan$Font_B${sinfo[mail]}$Font_I$service$Font_Suffix "
-((ibar_step+=3))
-show_progress_bar "$temp_info" $((40-1-${#service}-${sinfo[lmail]}))
+show_progress "${sinfo[mail]}$service"
 check_email_service $service
 done
 }
@@ -2150,9 +2091,7 @@ sort -u "$DNSBL_FILE"|xargs -P "$parallel_jobs" -I {} /bin/zsh -fc '
 ' ip-quality-dnsbl "$reversed_ip" "{}"|LC_ALL=C sort
 }
 check_dnsbl(){
-local temp_info="$Font_Cyan$Font_B${sinfo[dnsbl]} $Font_Suffix"
-((ibar_step=95))
-show_progress_bar "$temp_info" $((40-1-${sinfo[ldnsbl]}))
+show_progress "${sinfo[dnsbl]% }"
 local dnsbl_results=$(check_dnsbl_parallel "$IP" "$2")
 local num_array=($(print -r -- "$dnsbl_results"|summarize_dnsbl_results))
 smail[t]=${num_array[0]:-0}
@@ -2803,7 +2742,6 @@ def dnsresults($value):
 }
 check_IP(){
 IP=$1
-ibar_step=0
 unset 'smail[local]' 'smail[remote]' 'smail[t]' 'smail[c]' 'smail[m]' 'smail[b]' 'smail[u]' 'smail[sdnsbl]' \
   'smail[dnsbl_results]' 'smail[blacklisted_zones]' 'smail[marked_zones]'
 smailstatus=()
@@ -2899,8 +2837,6 @@ provider_load_credentials "" "$SCRIPT_DIR/secrets"||exit $?
 require_dependencies||exit $?
 check_reference_files||exit $?
 set_report_time
-generate_random_user_agent
-adapt_locale
 if [[ -z "$requested_ip" ]];then
 if [[ $IPV4check -ne 0 ]];then
 get_ipv4

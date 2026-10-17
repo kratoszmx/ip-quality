@@ -5,6 +5,7 @@ require "open3"
 require "json"
 require "tmpdir"
 require "fileutils"
+require_relative "utf8_locale"
 
 # Shared paths and offline reporter-process fixtures; no provider-specific state.
 class ReporterTestCase < Minitest::Test
