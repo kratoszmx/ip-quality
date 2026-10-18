@@ -19,8 +19,18 @@ if ! print -rn -- "$RESPONSE"|jq -e 'type == "object" and (.data | type == "obje
 ipinfo[status]=invalid_response
 return 0
 fi
-ipinfo[usetype]=$(print -rn -- "$RESPONSE"|jq -r '.data.asn.type')
-ipinfo[comtype]=$(print -rn -- "$RESPONSE"|jq -r '.data.company.type')
+local field
+provider_json_fields "$RESPONSE" '.data.asn.type, .data.company.type, .data.country,
+  .data.privacy.proxy, .data.privacy.tor, .data.privacy.vpn, .data.privacy.hosting,
+  (.data.asn.asn | if type == "string" then ltrimstr("AS") else . end), .data.asn.name,
+  .data.city, .data.postal, .data.timezone, .data.loc, .data.abuse.country' \
+  usetype comtype countrycode proxy tor vpn server asn org city post timezone loc regcountrycode||{
+ipinfo[status]=invalid_response
+return 0
+}
+for field in usetype comtype countrycode proxy tor vpn server asn org city post timezone regcountrycode;do
+ipinfo[$field]="${provider_fields[$field]}"
+done
 case ${ipinfo[usetype]} in
 "business")ipinfo[susetype]="${stype[business]}"
 ;;
@@ -47,21 +57,10 @@ case ${ipinfo[comtype]} in
 ;;
 *)ipinfo[scomtype]="${stype[other]}"
 esac
-ipinfo[countrycode]=$(print -rn -- "$RESPONSE"|jq -r '.data.country')
-ipinfo[proxy]=$(print -rn -- "$RESPONSE"|jq -r '.data.privacy.proxy')
-ipinfo[tor]=$(print -rn -- "$RESPONSE"|jq -r '.data.privacy.tor')
-ipinfo[vpn]=$(print -rn -- "$RESPONSE"|jq -r '.data.privacy.vpn')
-ipinfo[server]=$(print -rn -- "$RESPONSE"|jq -r '.data.privacy.hosting')
-local ISO3166=$(<"$REF_DIR/iso3166.json")
-ipinfo[asn]=$(print -rn -- "$RESPONSE"|jq -r '.data.asn.asn'|sed 's/^AS//')
-ipinfo[org]=$(print -rn -- "$RESPONSE"|jq -r '.data.asn.name')
-ipinfo[city]=$(print -rn -- "$RESPONSE"|jq -r '.data.city')
-ipinfo[post]=$(print -rn -- "$RESPONSE"|jq -r '.data.postal')
-ipinfo[timezone]=$(print -rn -- "$RESPONSE"|jq -r '.data.timezone')
-local tmp_str=$(print -rn -- "$RESPONSE"|jq -r '.data.loc')
-ipinfo[lat]=$(echo "$tmp_str"|cut -d',' -f1)
-ipinfo[lon]=$(echo "$tmp_str"|cut -d',' -f2)
-ipinfo[countrycode]=$(print -rn -- "$RESPONSE"|jq -r '.data.country')
+local ISO3166=$(<"$REF_DIR/iso3166.json") location="${provider_fields[loc]}"
+# "lat,lon"; without a comma both halves keep the raw value and fail the decimal checks.
+ipinfo[lat]="${location%%,*}"
+ipinfo[lon]="${${location#*,}%%,*}"
 ipinfo[country]=$(print -rn -- "$ISO3166"|jq --arg code "${ipinfo[countrycode]}" -r '.[] | select(.["alpha-2"] == $code) | .name')
 ipinfo[continent]=$(print -rn -- "$ISO3166"|jq --arg code "${ipinfo[countrycode]}" -r '.[] | select(.["alpha-2"] == $code) | .region')
 ipinfo[regcountrycode]=$(print -rn -- "$RESPONSE"|jq -r '.data.abuse.country')

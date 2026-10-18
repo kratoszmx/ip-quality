@@ -806,4 +806,32 @@ class ProvidersTest < ReporterTestCase
     source = File.read(SCRIPT, encoding: "UTF-8")
     assert_includes source, 'provider_load_credentials "" "$SCRIPT_DIR/secrets"'
   end
+
+  def test_ipinfo_widget_fields_map_in_one_pass_with_country_names
+    payload = {data: {asn: {asn: "AS64500", name: "Example Network", type: "hosting"},
+      company: {type: "business"}, country: "US", city: "Example City", postal: "00000",
+      timezone: "America/Chicago", loc: "37.751,-97.822",
+      privacy: {proxy: false, tor: false, vpn: true, hosting: true}, abuse: {country: "DE"}}}
+    probe = <<~'ZSH'
+      source "$1"
+      IP=198.51.100.23
+      show_progress(){ :; }
+      fixture="$2"
+      curl(){ print -r -- "$fixture"; print -rn -- 200; }
+      db_ipinfo 4
+      for key in status asn org usetype comtype countrycode country regcountrycode regcountry city post timezone lat lon proxy tor vpn server dms;do
+        print -r -- "$key=${ipinfo[$key]}"
+      done
+    ZSH
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "ipinfo-fields", SCRIPT, JSON.generate(payload))
+    assert status.success?, stderr
+    fields = stdout.lines(chomp: true).to_h { |line| line.split("=", 2) }
+    countries = JSON.parse(File.read(ISO3166)).to_h { |row| [row.fetch("alpha-2"), row.fetch("name")] }
+    assert_equal({"status" => "ok", "asn" => "64500", "org" => "Example Network", "usetype" => "hosting",
+      "comtype" => "business", "countrycode" => "US", "country" => countries.fetch("US"),
+      "regcountrycode" => "DE", "regcountry" => countries.fetch("DE"), "city" => "Example City",
+      "post" => "00000", "timezone" => "America/Chicago", "lat" => "37.751", "lon" => "-97.822",
+      "proxy" => "false", "tor" => "false", "vpn" => "true", "server" => "true",
+      "dms" => "97°49′19″W, 37°45′4″N"}, fields)
+  end
 end

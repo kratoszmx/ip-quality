@@ -9,7 +9,7 @@ umask 077
 # Display widths and byte validation need UTF-8 whatever the caller locale is.
 export LC_ALL=en_US.UTF-8
 
-script_version="v2026-10-18-standalone.35"
+script_version="v2026-10-18-standalone.36"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
@@ -588,30 +588,21 @@ if ! is_signed_decimal "$lat"||! is_signed_decimal "$lon";then
 echo ""
 return
 fi
-convert_single(){
-local coord=$1
-local direction=$2
-local fixed_coord=$(echo "$coord"|sed 's/\.$/.0/')
-local degrees=$(echo "$fixed_coord"|cut -d'.' -f1)
-local fractional="0.$(echo "$fixed_coord"|cut -d'.' -f2)"
-local minutes=$(echo "$fractional * 60"|bc -l|cut -d'.' -f1)
-local seconds_fractional="0.$(echo "$fractional * 60"|bc -l|cut -d'.' -f2)"
-local seconds=$(echo "$seconds_fractional * 60"|bc -l|awk '{printf "%.0f", $1}')
-echo "$degrees°$minutes′$seconds″$direction"
+print -r -- "$(format_dms_coordinate "$lon" E W), $(format_dms_coordinate "$lat" N S)"
 }
-local lat_dir='N'
-if [[ $(echo "$lat < 0"|bc -l) -eq 1 ]];then
-lat_dir='S'
-lat=$(echo "$lat * -1"|bc -l)
-fi
-local lon_dir='E'
-if [[ $(echo "$lon < 0"|bc -l) -eq 1 ]];then
-lon_dir='W'
-lon=$(echo "$lon * -1"|bc -l)
-fi
-local lat_dms=$(convert_single $lat $lat_dir)
-local lon_dms=$(convert_single $lon $lon_dir)
-echo "$lon_dms, $lat_dms"
+# VALUE (validated signed decimal degrees) as D°M′S″ plus POSITIVE/NEGATIVE
+# hemisphere. Integer arithmetic on 12 fraction digits rounds total seconds, so
+# 59.6″ carries into the next minute instead of printing 60″.
+format_dms_coordinate(){
+emulate -LR zsh
+local value=$1 direction=$2 fraction=""
+[[ $value == -* ]]&&{ direction=$3; value=${value#-}; }
+[[ $value == *.* ]]&&fraction=${value#*.}
+fraction=${(r:12::0:)fraction}
+local -i seconds=$(( (10#$fraction * 3600 + 500000000000) / 1000000000000 ))
+local -i degrees=$(( 10#${value%%.*} + seconds / 3600 ))
+seconds=$(( seconds % 3600 ))
+print -rn -- "$degrees°$(( seconds / 60 ))′$(( seconds % 60 ))″$direction"
 }
 generate_googlemap_url(){
 local lat=$1

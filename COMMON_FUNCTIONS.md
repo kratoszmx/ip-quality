@@ -26,6 +26,7 @@ functions print without a trailing newline.
 | `provider_has_observation VALUE...` | Exit 0 if any value is not empty, `null` or `unknown` (case-insensitive); `false` counts |
 | `provider_http_failure_status CODE BODY` | `cloudflare_blocked` (403 block page), `rate_limited` (429), `http_NNN`, or `network_error`; never echoes the body |
 | `provider_decode_http_response WIRE CURL_EXIT` | Resets `provider_http_response` (`status`, `http_code`, `body`); exit 0 only for curl success plus a 2xx envelope. Curl 28/35/60 keep timeout/TLS/certificate statuses; failure clears the body |
+| `provider_json_fields JSON PROGRAM NAME...` | One `jq` pass over comma-separated scalar expressions; fills `provider_fields[NAME]` with `jq -r` spellings (`null` kept, NULs dropped); 1 with empty fields on a jq error or count mismatch |
 
 ```zsh
 source common/provider_values.zsh

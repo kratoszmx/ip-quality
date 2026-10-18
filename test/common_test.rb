@@ -70,6 +70,23 @@ class CommonTest < Minitest::Test
       'ok|{"misleading":true}', "rate_limited|", "cloudflare_blocked|", "http_403|", "network_error|", "network_error|"], stdout.lines.map(&:strip)
   end
 
+  def test_json_fields_read_several_values_in_one_pass_without_shifting
+    probe = <<~'ZSH'
+      source "$1"
+      setopt KSH_ARRAYS SH_WORD_SPLIT
+      provider_json_fields "$2" '.a, .b, .c, .d, .missing' a b c d e||exit 3
+      print -r -- "${provider_fields[a]}|${provider_fields[b]}|${provider_fields[c]}|${provider_fields[d]}|${provider_fields[e]}"
+      provider_json_fields '{"a":[1,2]}' '.a[]' a&&exit 4
+      provider_json_fields 'not json' '.a' a&&exit 5
+      print -r -- "${#provider_fields}"
+    ZSH
+    json = JSON.generate("a" => 64_500, "b" => nil, "c" => "x\u0000y z", "d" => true)
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "json-fields",
+      File.expand_path("../common/provider_values.zsh", __dir__), json)
+    assert status.success?, stderr
+    assert_equal "64500|null|xy z|true|null\n0\n", stdout
+  end
+
   def test_terminal_tables_share_independent_widths_without_report_state_or_option_changes
     probe = <<~'ZSH'
       setopt KSH_ARRAYS SH_WORD_SPLIT NO_CASE_MATCH

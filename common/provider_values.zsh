@@ -83,3 +83,23 @@ provider_http_response[status]=ok
 provider_http_response[body]="$response_body"
 return 0
 }
+
+# Read several fields in one jq pass. PROGRAM is a comma-separated list of jq
+# expressions, each yielding one scalar for JSON; NAME... label them in order.
+# Fills provider_fields with jq -r spellings (null -> "null", NULs dropped).
+# Returns 1, with provider_fields empty, on a jq error or a value-count mismatch.
+typeset -gA provider_fields=()
+provider_json_fields(){
+emulate -LR zsh
+typeset json="$1" program="$2" joined
+shift 2
+typeset -a values
+typeset -i index
+provider_fields=()
+joined=$(print -rn -- "$json"|jq -j "[$program] | map(if . == null then \"null\" else (tostring | explode | map(select(. != 0)) | implode) end) | join(\"\\u0000\") + \"\\u0000\"" 2>/dev/null)||return 1
+values=("${(@0)${joined%$'\0'}}")
+(( ${#values} == $# ))||return 1
+for (( index = 1; index <= $#; index++ ));do
+provider_fields[${@[index]}]="${values[index]}"
+done
+}

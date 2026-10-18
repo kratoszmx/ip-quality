@@ -104,6 +104,21 @@ class IpQualityTest < ReporterTestCase
     assert_includes stdout, "IPQS direct fallback uses AliDNS"
   end
 
+  def test_dms_coordinates_use_exact_degrees_minutes_and_rounded_seconds
+    cases = {
+      %w[37.751 -97.822] => "97°49′19″W, 37°45′4″N",
+      %w[51.5074 -0.1278] => "0°7′40″W, 51°30′27″N",
+      %w[37 -97] => "97°0′0″W, 37°0′0″N",
+      %w[12.99999 -0.99999] => "1°0′0″W, 13°0′0″N",
+      %w[0.016 0.0001] => "0°0′0″E, 0°0′58″N",
+      %w[-60.4832 -172.2297] => "172°13′47″W, 60°29′0″S"
+    }
+    probe = 'source "$1"; shift; while (( $# ));do print -r -- "$(generate_dms "$1" "$2")"; shift 2;done'
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "dms", SCRIPT, *cases.keys.flatten)
+    assert status.success?, stderr
+    assert_equal cases.values, stdout.lines(chomp: true)
+  end
+
   def test_short_option_clusters_parse_like_getopts_and_removed_flags_fail
     [%w[-4fj], %w[-len -4], %w[-l en -E], %w[-4 -- 8.8.8.8]].each do |arguments|
       stdout, stderr, status = run_script(*arguments)

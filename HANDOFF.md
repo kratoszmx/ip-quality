@@ -1,115 +1,36 @@
 # Current handoff
 
-## Disclosure catalog and CLI cleanup — 2026-10-18
+## Recent maintenance — 2026-10-17 to 2026-10-18
 
-Version `v2026-10-18-standalone.35`; query behavior, sources and fallbacks are
-unchanged. `providers/sources.tsv` is now the one source catalog (IDs, labels,
-independent preset, disclosures). Reporter and runner plans list only selected
-sources; explicit targets (specific IP, prefix samples) show DB-IP and Ping0 as
-not applicable. The old plans listed every source and still promised a DB-IP
-visitor lookup for explicit targets. `ref/non_public_ipv4.txt` is the shared
-public-IPv4 boundary, compared at every range edge by an offline contract.
-The reporter parses long and clustered short options in one pass; the runner's
-`--select` and the reporter's `-p` no-op flags are gone; menu numbering comes
-from one route table. Validation is in the commit message; no live lookup.
+Reporter `v2026-10-18-standalone.36`. Query policy, sources and fallbacks are as
+documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
 
-## Interactive IPv4 prefix sampling — 2026-10-18
+- Structure: `bin/ip-quality` is about 800 lines. Each `providers/*.zsh` holds its
+  parser and `db_*` adapter, `report/` owns labels, sections and JSON, and
+  sourcing the reporter loads definitions only (used by
+  `test/support/self_test.zsh`). One parser handles long options and short
+  clusters such as `-4fj`; the no-op `-p`/`--select` flags are gone.
+- Shared catalogs: `providers/sources.tsv` (IDs, labels, independent preset,
+  plan disclosures) and `ref/non_public_ipv4.txt` (public-IPv4 boundary) are
+  read by both entrypoints. Plans list only selected sources and mark DB-IP and
+  Ping0 as not applicable for explicit targets.
+- Prefix sampling (menu 3, `leaf_runner/prefix_sample.rb`): up to 20 public /24s
+  sampled at `.23`, `.127`, `.231` over the system IPv4 route, saved under a
+  private `reports/prefix-samples-*` directory. These are database samples, not
+  whole-network or node verdicts.
+- Provider repairs: MaxMind validates its single relay observation and falls
+  back to IPinfo on malformed data; responses reach `jq` byte-exact; ipdata
+  recognizes the homepage's `fetch` demo-key form. MaxMind and IPinfo read their
+  fields in one `jq` pass (`provider_json_fields`), and DMS coordinates use
+  exact integer arithmetic (fixing empty minutes, `60″` and integer inputs).
+- Reliability: reporter, runner and suites pin UTF-8 (C-locale shells previously
+  failed 31 tests and non-ASCII leaf names); `scripts/test-offline` runs every
+  suite; supervisor's weekly `test.ipquality.test-offline` runs all of them.
+- MCPs: one npm workspace whose merged lock keeps only previously reviewed
+  versions; both use myutils `generateFreshTotp`.
 
-Version `v2026-10-18-standalone.34` adds menu **3** to the same normal all-source
-command. Paste three-octet prefixes or `.0/24` networks and finish with a blank
-line. The runner validates all input, deduplicates up to 20 public /24s, then
-queries `.23`, `.127`, `.231` sequentially over the system IPv4 route. It saves
-full sample addresses and per-target JSON/text/logs plus comparison summaries in
-a new private `reports/prefix-samples-*` directory. These are database samples,
-not node/whole-network quality verdicts. Failed providers remain unknown;
-malformed/mismatched reports cannot supply scores. Interrupt/TERM stops the owned
-reporter and retains completed/partial evidence. The direct/target menu now also
-works without a usable Clash cache; cached-subscription entries start at 4.
-
-DB-IP now matches Ping0's explicit-target behavior: `not_applicable_target`, no
-visitor-egress requests, and a visible table status. This avoids wasting demo
-quota or assigning the caller's data to a sample. `leaf_runner/prefix_sample.rb`
-owns the sampling policy; it reuses the existing snapshot/proxy helpers and the
-runner's process-group cleanup. No account, live Clash or `human_docs` changes.
-
-Live evidence: the new menu checked three addresses in one /24 with all sources.
-All 12 usable target providers returned data (including RIPEstat/Shodan);
-Check.Place MaxMind was blocked, and DB-IP/Ping0 were inapplicable. Private data:
-`reports/prefix-samples-20261018-010049-20261018-26159-p9t2sj/`. The saved Markdown
-was re-rendered after the percent-format correction without new queries. The
-earlier six-prefix / 18-address comparison, including two successful focused
-timeout retries, is in `reports/us-prefix-samples-20261018/summary.md`.
-
-Validation: **155 Ruby tests / 3,684 assertions**, **26 IPQS tests** and
-**36 provider-account tests**, all passed with no failures/errors/skips.
-Evidence: `reports/offline-20261018-prefix-sampling-complete.txt`. New coverage
-includes no-consent/no-cache selection, bounded public input, zero/unknown/percent
-scores, unchanged explicit targets, private files, partial failures and real TERM
-child cleanup. Provider results above are dated observations, not future access
-guarantees. Start with [AGENTS.md](AGENTS.md) for the unchanged user command.
-
-## Optimization review and provider repairs — 2026-10-18
-
-Reviewed Claude's changes from `979d6dd` through `a428b79` on `main`, including
-the reporter split, locale changes, account-MCP utility imports and npm workspace.
-Reporter is now `v2026-10-18-standalone.33`. The maintained offline behavior and
-real direct/ATT report paths were exercised; this was not a fresh account-login
-or 2FA enrollment audit.
-
-- MaxMind relay: malformed nested fields previously emitted jq errors while
-  retaining `ok` and preventing IPinfo fallback. Validate the single observation
-  object before reads, preserve transport failures, clear stale fields and use
-  IPinfo on malformed data. A failed English supplement leaves valid primary
-  observations intact. Valid partial responses and zero coordinates still work.
-- Literal JSON: legacy `echo` calls interpreted backslashes before jq in
-  MaxMind and six other source adapters. Use `print -rn --` so valid responses
-  retain their bytes; regressions cover a literal text field and unaffected
-  scores/flags despite escaped text in an unrelated field. These parser defects
-  predated Claude's module split.
-- ipdata: the public homepage now uses `fetch` rather than the older `$.get`
-  spelling. The former parser could not find its demo key, causing ATT fallback
-  to report `invalid_response`. Recognize both exact-origin forms, still require
-  one safe key and keep it out of arguments/reports. The actual ATT fallback
-  returned `ok` after the repair.
-
-Final validation: **145 Ruby tests / 3,529 assertions**, **26 IPQS tests** and
-**36 provider-account tests**, no failures/errors/skips. The separate synthetic
-Chrome suite passed all **10 cases**, with zero live requests and no real profile.
-Evidence: `reports/offline-20261018-codex-audit-complete.txt` and
-`reports/browser-text-20261017-codex-audit.txt` (private/ignored). Reports and
-credentials stay out of Git; no `human_docs` or live Clash state was changed.
-After the ATT runs, no isolated Mihomo processes or leaf workspaces remained.
-
-## Structure and reliability maintenance — 2026-10-17
-
-Reviewed 2026-10-17. Worktree: `/Users/zmx/Projects/projects/ipquality`, branch
-`main`. Commit `a428b79` shipped `v2026-10-17-standalone.32`; query policy, sources
-and fallbacks were unchanged. Start with [AGENTS.md](AGENTS.md) and give users its one
-normal interactive command.
-
-- Locale: from a C/POSIX shell (empty `LANG`, as in agent shells and launchd) the
-  offline suite failed with 3 failures and 28 errors, and the runner could not
-  match non-ASCII `--subscription`/`--leaf` names. Reporter, runner and test
-  suites now pin UTF-8; `scripts/test-offline` runs every suite before reporting
-  failures.
-- Reporter split: `bin/ip-quality` went from 2,933 to about 800 lines. Each
-  `providers/*.zsh` holds its parser and live `db_*` adapter; mail/DNSBL probes,
-  labels, report sections and JSON assembly have their own modules. Sourcing the
-  reporter loads definitions only, which `test/support/self_test.zsh` uses
-  (`--self-test` left the CLI). Short options are validated before the plan;
-  the unused random user agent and progress-width state are gone; `mode_lite`
-  became `basic_source`.
-- MCPs: one npm workspace (`mcp/package.json`, `mcp/package-lock.json`). The
-  merged lock contains only versions from the two earlier reviewed locks: IPQS
-  moved to the provider-accounts SDK transitive versions, playwright-core 1.63.0
-  and zod 4.6.2. Both MCPs use myutils `generateFreshTotp`.
-- Supervisor's weekly check is `test.ipquality.test-offline` (complete suite),
-  replacing the IPQS-only check.
-- AGENTS.md (14 KB to 7.6 KB) and COMMON_FUNCTIONS.md (23 KB to 8.4 KB) were
-  condensed; provider-account module APIs moved to their own guide.
-
-The validation result is in the commit message that adds this section. No live
-provider, account or node lookup was performed.
+The latest commit message records its offline validation. The source-catalog,
+CLI, jq and DMS changes were not followed by a new live lookup.
 
 ## Current behavior and ownership
 
@@ -148,6 +69,7 @@ claim. Reports remain private/ignored and active Clash state was not changed.
 
 | Date / scope | Result / private evidence |
 | --- | --- |
+| October 18, prefix sampling (one /24, three addresses) | All 12 usable target providers returned data; Check.Place MaxMind was blocked and DB-IP/Ping0 were inapplicable. `reports/prefix-samples-20261018-010049-20261018-26159-p9t2sj/`; earlier six-prefix comparison `reports/us-prefix-samples-20261018/summary.md` |
 | October 18, ATT full v33 after repairs | Ten of 11 table providers returned `ok`, including ipdata's public fallback, IP2Location and IPQS. DB-IP reported daily quota exhaustion. Cloudflare succeeded; IPQS used direct fallback after selected-route TLS failure. MaxMind was blocked, with IPinfo supplying basic information; Ping0 remained unknown. `reports/att-20261018-codex-audit-fixed.{json,txt,stderr}` |
 | October 18, direct v33 focused verification | MaxMind and IPinfo returned `ok`, verifying the new schema against a real response. Cloudflare intelligence timed out again; unauthenticated `/client/v4/ips` on the same host returned HTTP 200 with both system DNS and AliDNS, so the exact intelligence-timeout cause is unconfirmed. `reports/{maxmind,cloudflare}-direct-20261018-codex-audit.{json,txt,stderr}` |
 | October 17, direct full v32 baseline | Nine of 11 table providers returned `ok`; DB-IP reported daily quota exhaustion, Cloudflare timed out, MaxMind was available and Ping0 verified. `reports/direct-20261017-codex-audit.{json,txt,stderr}` |

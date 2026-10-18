@@ -171,10 +171,17 @@ case ${ipapi[comtype]} in
 *)ipapi[scomtype]="${stype[other]}"
 esac
 ipapi[scoretext]="${ipapi_parsed[score_text]}"
-ipapi[scorenum]=$(echo "${ipapi[scoretext]}"|awk '{print $1}')
-ipapi[risktext]=$(echo "${ipapi[scoretext]}"|awk -F'[()]' '{print $2}')
+# "0.0012 (Low)": the first word is the ratio, the parenthesized word its label.
+local score_word score_rest
+read -r score_word score_rest <<< "${ipapi[scoretext]}"
+ipapi[scorenum]="$score_word"
+ipapi[risktext]=""
+if [[ "${ipapi[scoretext]}" == *[\(\)]* ]];then
+score_rest="${ipapi[scoretext]#*[\(\)]}"
+ipapi[risktext]="${score_rest%%[\(\)]*}"
+fi
 if is_nonnegative_decimal "${ipapi[scorenum]}";then
-ipapi[score]=$(awk "BEGIN {printf \"%.2f%%\", ${ipapi[scorenum]} * 100}")
+ipapi[score]=$(printf '%.2f%%' "$(( ${ipapi[scorenum]} * 100.0 ))")
 case ${ipapi[risktext]} in
 "Very Low")ipapi[risk]="${sscore[verylow]}"
 ;;

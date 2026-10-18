@@ -54,60 +54,42 @@ print -rn -- "$1"|jq -L "${${(%):-%x}:A:h:h}/common" -es '
 ' >/dev/null 2>&1
 }
 
+# Relay fields in display order; one jq pass per response (primary and English).
+typeset -ga maxmind_field_names=(asn org city post lat lon rad continentcode continent
+  citycountrycode citycountry timezone subcode sub countrycode country regcountrycode regcountry)
+typeset -g maxmind_field_program='.ASN.AutonomousSystemNumber, .ASN.AutonomousSystemOrganization,
+  .City.Name, .City.PostalCode, .City.Latitude, .City.Longitude, .City.AccuracyRadius,
+  .City.Continent.Code, .City.Continent.Name, .City.Country.IsoCode, .City.Country.Name,
+  .City.Location.TimeZone,
+  (if (.City.Subdivisions | length) > 0 then .City.Subdivisions[0].IsoCode else "N/A" end),
+  (if (.City.Subdivisions | length) > 0 then .City.Subdivisions[0].Name else "N/A" end),
+  .Country.IsoCode, .Country.Name, .Country.RegisteredCountry.IsoCode, .Country.RegisteredCountry.Name'
+
 db_maxmind_relay(){
 show_progress "${sinfo[database]}Check.Place / MaxMind relay"
 maxmind=()
 basic_source=ipinfo
 check_place_fetch_json "$1" "$IP" "lang=$YY"||true
 maxmind[status]="$PROVIDER_RESPONSE_STATUS"
-local RESPONSE="$PROVIDER_RESPONSE_BODY"
+local RESPONSE="$PROVIDER_RESPONSE_BODY" field
 [[ "${maxmind[status]}" == ok ]]||return 1
-if ! maxmind_response_is_valid "$RESPONSE";then
+if ! maxmind_response_is_valid "$RESPONSE"||! provider_json_fields "$RESPONSE" "$maxmind_field_program" "${maxmind_field_names[@]}";then
 maxmind[status]=invalid_response
 return 1
 fi
 basic_source=maxmind
-maxmind[asn]=$(print -rn -- "$RESPONSE"|jq -r '.ASN.AutonomousSystemNumber')
-maxmind[org]=$(print -rn -- "$RESPONSE"|jq -r '.ASN.AutonomousSystemOrganization')
-maxmind[city]=$(print -rn -- "$RESPONSE"|jq -r '.City.Name')
-maxmind[post]=$(print -rn -- "$RESPONSE"|jq -r '.City.PostalCode')
-maxmind[lat]=$(print -rn -- "$RESPONSE"|jq -r '.City.Latitude')
-maxmind[lon]=$(print -rn -- "$RESPONSE"|jq -r '.City.Longitude')
-maxmind[rad]=$(print -rn -- "$RESPONSE"|jq -r '.City.AccuracyRadius')
-maxmind[continentcode]=$(print -rn -- "$RESPONSE"|jq -r '.City.Continent.Code')
-maxmind[continent]=$(print -rn -- "$RESPONSE"|jq -r '.City.Continent.Name')
-maxmind[citycountrycode]=$(print -rn -- "$RESPONSE"|jq -r '.City.Country.IsoCode')
-maxmind[citycountry]=$(print -rn -- "$RESPONSE"|jq -r '.City.Country.Name')
-maxmind[timezone]=$(print -rn -- "$RESPONSE"|jq -r '.City.Location.TimeZone')
-maxmind[subcode]=$(print -rn -- "$RESPONSE"|jq -r 'if .City.Subdivisions | length > 0 then .City.Subdivisions[0].IsoCode else "N/A" end')
-maxmind[sub]=$(print -rn -- "$RESPONSE"|jq -r 'if .City.Subdivisions | length > 0 then .City.Subdivisions[0].Name else "N/A" end')
-maxmind[countrycode]=$(print -rn -- "$RESPONSE"|jq -r '.Country.IsoCode')
-maxmind[country]=$(print -rn -- "$RESPONSE"|jq -r '.Country.Name')
-maxmind[regcountrycode]=$(print -rn -- "$RESPONSE"|jq -r '.Country.RegisteredCountry.IsoCode')
-maxmind[regcountry]=$(print -rn -- "$RESPONSE"|jq -r '.Country.RegisteredCountry.Name')
-if [[ $YY != "en" && "${maxmind[status]}" == "ok" ]];then
+for field in "${maxmind_field_names[@]}";do
+maxmind[$field]="${provider_fields[$field]}"
+done
+if [[ $YY != "en" ]];then
 check_place_fetch_json "$1" "$IP" "lang=en"||true
 local backup_response="$PROVIDER_RESPONSE_BODY"
 # A failed translation must not erase valid primary fields or emit jq errors.
-if [[ "$PROVIDER_RESPONSE_STATUS" == ok ]]&&maxmind_response_is_valid "$backup_response";then
-[[ ${maxmind[asn]} == "null" ]]&&maxmind[asn]=$(print -rn -- "$backup_response"|jq -r '.ASN.AutonomousSystemNumber')
-[[ ${maxmind[org]} == "null" ]]&&maxmind[org]=$(print -rn -- "$backup_response"|jq -r '.ASN.AutonomousSystemOrganization')
-[[ ${maxmind[city]} == "null" ]]&&maxmind[city]=$(print -rn -- "$backup_response"|jq -r '.City.Name')
-[[ ${maxmind[post]} == "null" ]]&&maxmind[post]=$(print -rn -- "$backup_response"|jq -r '.City.PostalCode')
-[[ ${maxmind[lat]} == "null" ]]&&maxmind[lat]=$(print -rn -- "$backup_response"|jq -r '.City.Latitude')
-[[ ${maxmind[lon]} == "null" ]]&&maxmind[lon]=$(print -rn -- "$backup_response"|jq -r '.City.Longitude')
-[[ ${maxmind[rad]} == "null" ]]&&maxmind[rad]=$(print -rn -- "$backup_response"|jq -r '.City.AccuracyRadius')
-[[ ${maxmind[continentcode]} == "null" ]]&&maxmind[continentcode]=$(print -rn -- "$backup_response"|jq -r '.City.Continent.Code')
-[[ ${maxmind[continent]} == "null" ]]&&maxmind[continent]=$(print -rn -- "$backup_response"|jq -r '.City.Continent.Name')
-[[ ${maxmind[citycountrycode]} == "null" ]]&&maxmind[citycountrycode]=$(print -rn -- "$backup_response"|jq -r '.City.Country.IsoCode')
-[[ ${maxmind[citycountry]} == "null" ]]&&maxmind[citycountry]=$(print -rn -- "$backup_response"|jq -r '.City.Country.Name')
-[[ ${maxmind[timezone]} == "null" ]]&&maxmind[timezone]=$(print -rn -- "$backup_response"|jq -r '.City.Location.TimeZone')
-[[ ${maxmind[subcode]} == "null" ]]&&maxmind[subcode]=$(print -rn -- "$backup_response"|jq -r 'if .City.Subdivisions | length > 0 then .City.Subdivisions[0].IsoCode else "N/A" end')
-[[ ${maxmind[sub]} == "null" ]]&&maxmind[sub]=$(print -rn -- "$backup_response"|jq -r 'if .City.Subdivisions | length > 0 then .City.Subdivisions[0].Name else "N/A" end')
-[[ ${maxmind[countrycode]} == "null" ]]&&maxmind[countrycode]=$(print -rn -- "$backup_response"|jq -r '.Country.IsoCode')
-[[ ${maxmind[country]} == "null" ]]&&maxmind[country]=$(print -rn -- "$backup_response"|jq -r '.Country.Name')
-[[ ${maxmind[regcountrycode]} == "null" ]]&&maxmind[regcountrycode]=$(print -rn -- "$backup_response"|jq -r '.Country.RegisteredCountry.IsoCode')
-[[ ${maxmind[regcountry]} == "null" ]]&&maxmind[regcountry]=$(print -rn -- "$backup_response"|jq -r '.Country.RegisteredCountry.Name')
+if [[ "$PROVIDER_RESPONSE_STATUS" == ok ]]&&maxmind_response_is_valid "$backup_response"&&
+  provider_json_fields "$backup_response" "$maxmind_field_program" "${maxmind_field_names[@]}";then
+for field in "${maxmind_field_names[@]}";do
+[[ "${maxmind[$field]}" == "null" ]]&&maxmind[$field]="${provider_fields[$field]}"
+done
 fi
 fi
 if is_signed_decimal "${maxmind[lat]}"&&is_signed_decimal "${maxmind[lon]}"&&is_nonnegative_decimal "${maxmind[rad]}";then
