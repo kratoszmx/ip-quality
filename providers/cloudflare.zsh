@@ -5,6 +5,8 @@
 # The official endpoint returns ASN infrastructure context and named threat
 # categories. It does not return a universal numeric reputation score, so the
 # categories remain an independent observation.
+# Parsers use provider_json_fields; standalone fixture runs load it here.
+(( ${+functions[provider_json_fields]} ))||source "${${(%):-%x}:A:h:h}/common/provider_values.zsh"
 
 typeset -gA cloudflare_parsed=()
 
@@ -45,12 +47,14 @@ if [[ $(print -rn -- "$response"|jq -r '.result|length') == "0" ]];then
 cloudflare_parsed[status]="not_found"
 return 0
 fi
-cloudflare_parsed[ip]=$(print -rn -- "$response"|jq -r '.result[0].ip // empty')
-cloudflare_parsed[country_code]=$(print -rn -- "$response"|jq -r '.result[0].belongs_to_ref.country // empty')
-cloudflare_parsed[network]=$(print -rn -- "$response"|jq -r '.result[0].belongs_to_ref.value | if type == "number" then "AS\(.)" else . // empty end')
-cloudflare_parsed[organization]=$(print -rn -- "$response"|jq -r '.result[0].belongs_to_ref.description // empty')
-cloudflare_parsed[infrastructure_type]=$(print -rn -- "$response"|jq -r '.result[0].belongs_to_ref.type // empty')
-cloudflare_parsed[threat_categories]=$(print -rn -- "$response"|jq -r '[.result[0].risk_types[]?.name // empty] | map(select(type == "string" and length > 0)) | join(", ")')
+provider_json_fields "$response" '
+  ([.result[0].ip // empty] | if length == 0 then "" else .[0] end),
+  ([.result[0].belongs_to_ref.country // empty] | if length == 0 then "" else .[0] end),
+  ([.result[0].belongs_to_ref.value | if type == "number" then "AS\(.)" else . // empty end] | if length == 0 then "" else .[0] end),
+  ([.result[0].belongs_to_ref.description // empty] | if length == 0 then "" else .[0] end),
+  ([.result[0].belongs_to_ref.type // empty] | if length == 0 then "" else .[0] end),
+  ([[.result[0].risk_types[]?.name // empty] | map(select(type == "string" and length > 0)) | join(", ")] | if length == 0 then "" else .[0] end)' ip country_code network organization infrastructure_type threat_categories||return 1
+cloudflare_parsed+=("${(@kv)provider_fields[@]}")
 cloudflare_parsed[threat_categories_json]=$(print -rn -- "$response"|jq -c 'if (.result[0].risk_types | type) == "array" then [.result[0].risk_types[]?.name // empty] | map(select(type == "string" and length > 0)) else null end')
 return 0
 }

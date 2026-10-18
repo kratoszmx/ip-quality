@@ -8,7 +8,7 @@ functions print without a trailing newline.
 
 | File | Production callers | Responsibility |
 | --- | --- | --- |
-| `common/provider_values.zsh` | Provider parsers/adapters and `bin/ip-quality` | Validate/normalize provider values and HTTP envelopes, no source schemas |
+| `common/provider_values.zsh` | Provider parsers/adapters (each imports it for standalone fixture runs) and `bin/ip-quality` | Validate/normalize provider values and HTTP envelopes, no source schemas |
 | `common/http_request.zsh` | Credential-bearing adapters in `providers/`, `providers/query_route.zsh` | Pass secret URL/header options to curl over stdin, never in process arguments |
 | `common/json_values.jq` | Check.Place/MaxMind, ipapi, Cloudflare, IPWHOIS, DB-IP, IP2Location, ipdata, Ipregistry, IPQS, AbuseIPDB, Shodan parsers | Nullable boolean and bounded text/integer predicates |
 | `common/terminal.zsh` | `report/` sections and tables, `bin/ip-quality` | ANSI cleanup, display width and aligned tables |

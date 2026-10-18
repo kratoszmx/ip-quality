@@ -1,6 +1,8 @@
 # Derived from xykt/IPQuality. See UPSTREAM.md and LICENSE before modifying or
 # redistributing this file.
 # Strict parser for Ipregistry's official IP Intelligence API.
+# Parsers use provider_json_fields; standalone fixture runs load it here.
+(( ${+functions[provider_json_fields]} ))||source "${${(%):-%x}:A:h:h}/common/provider_values.zsh"
 
 typeset -gA ipregistry_parsed=()
 
@@ -25,11 +27,13 @@ print -rn -- "$response"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg expected "$
     | all(boolean_or_null(.)))
 ' >/dev/null 2>&1||return 1
 
-ipregistry_parsed[usage_type]=$(print -rn -- "$response"|jq -r '.connection.type // empty')
-ipregistry_parsed[company_type]=$(print -rn -- "$response"|jq -r '.company.type // empty')
-ipregistry_parsed[country_code]=$(print -rn -- "$response"|jq -r '.location.country.code // empty')
-ipregistry_parsed[proxy]=$(print -rn -- "$response"|jq -r 'if .security.is_proxy == null then empty else .security.is_proxy end')
-ipregistry_parsed[vpn]=$(print -rn -- "$response"|jq -r 'if .security.is_vpn == null then empty else .security.is_vpn end')
+provider_json_fields "$response" '
+  ([.connection.type // empty] | if length == 0 then "" else .[0] end),
+  ([.company.type // empty] | if length == 0 then "" else .[0] end),
+  ([.location.country.code // empty] | if length == 0 then "" else .[0] end),
+  ([if .security.is_proxy == null then empty else .security.is_proxy end] | if length == 0 then "" else .[0] end),
+  ([if .security.is_vpn == null then empty else .security.is_vpn end] | if length == 0 then "" else .[0] end)' usage_type company_type country_code proxy vpn||return 1
+ipregistry_parsed+=("${(@kv)provider_fields[@]}")
 ipregistry_parsed[tor]=$(provider_merge_boolean_signals \
   "$(print -rn -- "$response"|jq -r 'if .security.is_tor == null then empty else .security.is_tor end')" \
   "$(print -rn -- "$response"|jq -r 'if .security.is_tor_exit == null then empty else .security.is_tor_exit end')")

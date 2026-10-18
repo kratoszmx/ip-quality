@@ -2,6 +2,8 @@
 # redistributing this file.
 # IP2Location's public lookup embeds a target-specific JSON example. Read that
 # data without executing page scripts or deriving false flags from missing text.
+# Parsers use provider_json_fields; standalone fixture runs load it here.
+(( ${+functions[provider_json_fields]} ))||source "${${(%):-%x}:A:h:h}/common/provider_values.zsh"
 ip2location_page_response(){
 emulate -LR zsh
 typeset page="$1" target="$2"
@@ -59,8 +61,10 @@ ip2location[status]=invalid_response
 return 0
 fi
 fi
-ip2location[usetype]=$(print -rn -- "$RESPONSE"|jq -r '.usage_type')
-ip2location[comtype]=$(print -rn -- "$RESPONSE"|jq -r '.as_info.as_usage_type')
+provider_json_fields "$RESPONSE" '
+  ([.usage_type] | if length == 0 then "" else .[0] end),
+  ([.as_info.as_usage_type] | if length == 0 then "" else .[0] end)' usetype comtype||true
+ip2location+=("${(@kv)provider_fields[@]}")
 local first_use="${ip2location[usetype]%%/*}"
 case $first_use in
 "COM")ip2location[susetype]="${stype[business]}"
@@ -126,10 +130,12 @@ ip2location[proxy0]=$(print -rn -- "$RESPONSE"|jq -r '.is_proxy')
 ip2location[proxy1]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_public_proxy')
 ip2location[proxy2]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_web_proxy')
 ip2location[proxy]=$(provider_merge_boolean_signals "${ip2location[proxy0]}" "${ip2location[proxy1]}" "${ip2location[proxy2]}")
-ip2location[tor]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_tor')
-ip2location[vpn]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_vpn')
-ip2location[server]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_data_center')
-ip2location[abuser]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_spammer')
+provider_json_fields "$RESPONSE" '
+  ([.proxy.is_tor] | if length == 0 then "" else .[0] end),
+  ([.proxy.is_vpn] | if length == 0 then "" else .[0] end),
+  ([.proxy.is_data_center] | if length == 0 then "" else .[0] end),
+  ([.proxy.is_spammer] | if length == 0 then "" else .[0] end)' tor vpn server abuser||true
+ip2location+=("${(@kv)provider_fields[@]}")
 ip2location[robot1]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_web_crawler')
 ip2location[robot2]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_scanner')
 ip2location[robot3]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_botnet')

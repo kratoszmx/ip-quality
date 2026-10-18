@@ -2,6 +2,8 @@
 # redistributing this file.
 # Pure classification for credential and quota errors returned by the
 # IPQualityScore upstream relay. Arbitrary upstream messages are never printed.
+# Parsers use provider_json_fields; standalone fixture runs load it here.
+(( ${+functions[provider_json_fields]} ))||source "${${(%):-%x}:A:h:h}/common/provider_values.zsh"
 
 typeset -gA ipqualityscore_unavailable=()
 typeset -gA ipqualityscore_parsed=()
@@ -31,9 +33,8 @@ print -rn -- "$response"|jq -e '
     (.proxy_usage | type == "number" and . >= 0 and floor == .))
 ' >/dev/null 2>&1||return 1
 
-ipqualityscore_usage[credits]=$(print -rn -- "$response"|jq -r '.credits')
-ipqualityscore_usage[usage]=$(print -rn -- "$response"|jq -r '.usage')
-ipqualityscore_usage[proxy_usage]=$(print -rn -- "$response"|jq -r '.proxy_usage // empty')
+provider_json_fields "$response" '.credits, .usage, (.proxy_usage // "")' credits usage proxy_usage||return 1
+ipqualityscore_usage=("${(@kv)provider_fields[@]}")
 ipqualityscore_usage[status]="ok"
 return 0
 }
@@ -53,14 +54,11 @@ print -rn -- "$response"|jq -L "${${(%):-%x}:A:h:h}/common" -e '
   (.connection_type == null or (.connection_type | type == "string"))
 ' >/dev/null 2>&1||return 1
 
-ipqualityscore_parsed[score]=$(print -rn -- "$response"|jq -r '.fraud_score')
-ipqualityscore_parsed[country_code]=$(print -rn -- "$response"|jq -r '.country_code // empty')
-ipqualityscore_parsed[proxy]=$(print -rn -- "$response"|jq -r 'if .proxy == null then empty else .proxy end')
-ipqualityscore_parsed[vpn]=$(print -rn -- "$response"|jq -r 'if .vpn == null then empty else .vpn end')
-ipqualityscore_parsed[tor]=$(print -rn -- "$response"|jq -r 'if .tor == null then empty else .tor end')
-ipqualityscore_parsed[abuser]=$(print -rn -- "$response"|jq -r 'if .recent_abuse == null then empty else .recent_abuse end')
-ipqualityscore_parsed[robot]=$(print -rn -- "$response"|jq -r 'if .bot_status == null then empty else .bot_status end')
-ipqualityscore_parsed[connection_type]=$(print -rn -- "$response"|jq -r '.connection_type // empty')
+# Missing observations stay empty (unknown), never false.
+provider_json_fields "$response" '.fraud_score, (.country_code // ""),
+  ([.proxy, .vpn, .tor, .recent_abuse, .bot_status] | map(if . == null then "" else . end) | .[]),
+  (.connection_type // "")' score country_code proxy vpn tor abuser robot connection_type||return 1
+ipqualityscore_parsed=("${(@kv)provider_fields[@]}")
 ipqualityscore_parsed[server]=$(ipqualityscore_connection_type_server_flag "${ipqualityscore_parsed[connection_type]}")
 ipqualityscore_parsed[status]="ok"
 return 0
@@ -172,19 +170,19 @@ RESPONSE="$PROVIDER_RESPONSE_BODY"
 if ipqualityscore_parse_unavailability "$RESPONSE";then
 ipqs[status]="${ipqualityscore_unavailable[status]}"
 fi
-ipqs[score]=$(print -rn -- "$RESPONSE"|jq -r '.fraud_score')
+# A non-object relay body leaves every field empty (unknown).
+local field
+provider_json_fields "$RESPONSE" '.fraud_score, .country_code,
+  (if (.connection_type | type) == "string" and (.connection_type | length) <= 64 then .connection_type else "" end),
+  .proxy, .tor, .vpn, .recent_abuse, .bot_status' score countrycode usetype proxy tor vpn abuser robot||true
+for field in score countrycode usetype proxy tor vpn abuser robot;do
+ipqs[$field]="${provider_fields[$field]:-}"
+done
 if ! provider_integer_in_range "${ipqs[score]}" 0 100;then
 ipqs[score]=""
 fi
-ipqs[countrycode]=$(print -rn -- "$RESPONSE"|jq -r '.country_code')
-ipqs[usetype]=$(print -rn -- "$RESPONSE"|jq -r 'if (.connection_type | type) == "string" and (.connection_type | length) <= 64 then .connection_type else empty end')
 ipqs[susetype]=$(styled_provider_type "${ipqs[usetype]}")
-ipqs[proxy]=$(print -rn -- "$RESPONSE"|jq -r '.proxy')
-ipqs[tor]=$(print -rn -- "$RESPONSE"|jq -r '.tor')
-ipqs[vpn]=$(print -rn -- "$RESPONSE"|jq -r '.vpn')
 ipqs[server]=$(ipqualityscore_connection_type_server_flag "${ipqs[usetype]}")
-ipqs[abuser]=$(print -rn -- "$RESPONSE"|jq -r '.recent_abuse')
-ipqs[robot]=$(print -rn -- "$RESPONSE"|jq -r '.bot_status')
 if provider_has_observation "${ipqs[score]}" "${ipqs[countrycode]}" "${ipqs[proxy]}" "${ipqs[tor]}" "${ipqs[vpn]}" "${ipqs[abuser]}" "${ipqs[robot]}";then
 ipqs[status]="ok"
 fi

@@ -6,6 +6,8 @@
 # a keyed response uses nested ASN/company/location objects.  Validate both
 # contracts before reading child fields so rate-limit/error bodies and schema
 # drift become unavailable evidence without emitting jq diagnostics.
+# Parsers use provider_json_fields; standalone fixture runs load it here.
+(( ${+functions[provider_json_fields]} ))||source "${${(%):-%x}:A:h:h}/common/provider_values.zsh"
 
 typeset -gA ipapi_parsed=()
 
@@ -70,31 +72,30 @@ print -rn -- "$response"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg expected "$
   (valid_full_response or valid_anonymous_response)
 ' >/dev/null 2>&1||return 1
 
-ipapi_parsed[ip]=$(print -rn -- "$response"|jq -r '.ip')
-ipapi_parsed[mode]="full"
-if print -rn -- "$response"|jq -e '(.docs|type) == "string" or (.asn|type) == "string" or (.asn|type) == "number" or (.company|type) == "string"' >/dev/null 2>&1;then
-ipapi_parsed[mode]="anonymous"
-fi
-ipapi_parsed[usage_type]=$(print -rn -- "$response"|jq -r 'if (.asn|type) == "object" then (.asn.type // empty) else empty end')
-ipapi_parsed[company_type]=$(print -rn -- "$response"|jq -r 'if (.company|type) == "object" then (.company.type // empty) else empty end')
-ipapi_parsed[score_text]=$(print -rn -- "$response"|jq -r 'if (.company|type) == "object" then (if .company.abuser_score == null then empty else (.company.abuser_score|tostring) end) else empty end')
-ipapi_parsed[country_code]=$(print -rn -- "$response"|jq -r 'if (.location|type) == "object" then (.location.country_code // empty) elif (.country|type) == "string" and (.country|length) == 2 then .country else empty end')
-ipapi_parsed[anonymous_asn]=$(print -rn -- "$response"|jq -r 'if (.asn|type) == "string" or (.asn|type) == "number" then (.asn|tostring) else empty end')
-ipapi_parsed[anonymous_company]=$(print -rn -- "$response"|jq -r 'if (.company|type) == "string" then .company else empty end')
-ipapi_parsed[anonymous_country]=$(print -rn -- "$response"|jq -r 'if (.country|type) == "string" then .country else empty end')
-ipapi_parsed[anonymous_city]=$(print -rn -- "$response"|jq -r 'if (.city|type) == "string" then .city else empty end')
-ipapi_parsed[anonymous_region]=$(print -rn -- "$response"|jq -r 'if (.region|type) == "string" then .region else empty end')
-ipapi_parsed[anonymous_timezone]=$(print -rn -- "$response"|jq -r 'if (.timezone|type) == "string" then .timezone else empty end')
+# One pass; missing optional values stay empty, booleans keep false.
+provider_json_fields "$response" '.ip,
+  (if (.docs|type) == "string" or (.asn|type) == "string" or (.asn|type) == "number" or (.company|type) == "string" then "anonymous" else "full" end),
+  (if (.asn|type) == "object" then (.asn.type // "") else "" end),
+  (if (.company|type) == "object" then (if .company.abuser_score == null then "" else (.company.abuser_score|tostring) end) else "" end),
+  (if (.company|type) == "object" then (.company.type // "") else "" end),
+  (if (.location|type) == "object" then (.location.country_code // "") elif (.country|type) == "string" and (.country|length) == 2 then .country else "" end),
+  (if (.asn|type) == "string" or (.asn|type) == "number" then (.asn|tostring) else "" end),
+  ([.company, .country, .city, .region, .timezone] | map(if type == "string" then . else "" end) | .[]),
+  ([.is_proxy, .is_tor, .is_vpn, .is_datacenter, .is_abuser, .is_crawler] | map(if . == null then "" else . end) | .[])' \
+  ip mode usage_type score_text company_type country_code anonymous_asn anonymous_company anonymous_country \
+  anonymous_city anonymous_region anonymous_timezone proxy tor vpn server abuser robot||return 1
+typeset field
+for field in ip mode usage_type company_type score_text country_code anonymous_asn anonymous_company \
+  anonymous_country anonymous_city anonymous_region anonymous_timezone;do
+ipapi_parsed[$field]="${provider_fields[$field]}"
+done
 if [[ "${ipapi_parsed[mode]}" == "anonymous" ]];then
 ipapi_parsed[status]="ok"
 return 0
 fi
-ipapi_parsed[proxy]=$(print -rn -- "$response"|jq -r 'if .is_proxy == null then empty else .is_proxy end')
-ipapi_parsed[tor]=$(print -rn -- "$response"|jq -r 'if .is_tor == null then empty else .is_tor end')
-ipapi_parsed[vpn]=$(print -rn -- "$response"|jq -r 'if .is_vpn == null then empty else .is_vpn end')
-ipapi_parsed[server]=$(print -rn -- "$response"|jq -r 'if .is_datacenter == null then empty else .is_datacenter end')
-ipapi_parsed[abuser]=$(print -rn -- "$response"|jq -r 'if .is_abuser == null then empty else .is_abuser end')
-ipapi_parsed[robot]=$(print -rn -- "$response"|jq -r 'if .is_crawler == null then empty else .is_crawler end')
+for field in proxy tor vpn server abuser robot;do
+ipapi_parsed[$field]="${provider_fields[$field]}"
+done
 ipapi_parsed[status]="ok"
 return 0
 }

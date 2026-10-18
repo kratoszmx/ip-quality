@@ -2,6 +2,8 @@
 # redistributing this file.
 # Pure parser for Shodan InternetDB responses. InternetDB is exposure context,
 # not a reputation score; missing data is kept unknown rather than called clean.
+# Parsers use provider_json_fields; standalone fixture runs load it here.
+(( ${+functions[provider_json_fields]} ))||source "${${(%):-%x}:A:h:h}/common/provider_values.zsh"
 
 typeset -gA internetdb_parsed=()
 typeset -gA internetdb_unavailable=()
@@ -48,11 +50,13 @@ print -rn -- "$response"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg expected "$
 ' >/dev/null 2>&1||return 1
 
 internetdb_parsed[status]="available"
-internetdb_parsed[ports]=$(print -rn -- "$response"|jq -r '.ports | map(tostring) | join(", ")')
-internetdb_parsed[port_count]=$(print -rn -- "$response"|jq -r '.ports | length')
-internetdb_parsed[vulnerability_count]=$(print -rn -- "$response"|jq -r '.vulns | length')
-internetdb_parsed[tags]=$(print -rn -- "$response"|jq -r '.tags | join(", ")')
-internetdb_parsed[hostname_count]=$(print -rn -- "$response"|jq -r '.hostnames | length')
+provider_json_fields "$response" '
+  ([.ports | map(tostring) | join(", ")] | if length == 0 then "" else .[0] end),
+  ([.ports | length] | if length == 0 then "" else .[0] end),
+  ([.vulns | length] | if length == 0 then "" else .[0] end),
+  ([.tags | join(", ")] | if length == 0 then "" else .[0] end),
+  ([.hostnames | length] | if length == 0 then "" else .[0] end)' ports port_count vulnerability_count tags hostname_count||return 1
+internetdb_parsed+=("${(@kv)provider_fields[@]}")
 return 0
 }
 

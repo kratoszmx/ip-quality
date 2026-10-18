@@ -2,6 +2,8 @@
 # redistributing this file.
 # Check.Place owns several relay datasets. A confirmed block/rate limit pauses
 # this run's remaining relay requests for the same target and address family.
+# Parsers use provider_json_fields; standalone fixture runs load it here.
+(( ${+functions[provider_json_fields]} ))||source "${${(%):-%x}:A:h:h}/common/provider_values.zsh"
 typeset -gA check_place_pauses
 check_place_pauses=()
 

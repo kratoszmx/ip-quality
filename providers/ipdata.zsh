@@ -2,6 +2,8 @@
 # redistributing this file.
 # The website publishes a demo credential for its own public lookup. Discover it
 # afresh, use it in memory once, and never treat it as an owned account/API key.
+# Parsers use provider_json_fields; standalone fixture runs load it here.
+(( ${+functions[provider_json_fields]} ))||source "${${(%):-%x}:A:h:h}/common/provider_values.zsh"
 ipdata_demo_key_from_page(){
 emulate -LR zsh
 (( ${#1} <= 262144 ))||return 1
@@ -65,11 +67,13 @@ ipdata[status]=invalid_response
 return 0
 fi
 fi
-ipdata[countrycode]=$(print -rn -- "$RESPONSE"|jq -r '.country_code')
-ipdata[proxy]=$(print -rn -- "$RESPONSE"|jq -r '.threat.is_proxy')
-ipdata[vpn]=$(print -rn -- "$RESPONSE"|jq -r '.threat.is_vpn')
-ipdata[tor]=$(print -rn -- "$RESPONSE"|jq -r '.threat.is_tor')
-ipdata[server]=$(print -rn -- "$RESPONSE"|jq -r '.threat.is_datacenter')
+provider_json_fields "$RESPONSE" '
+  ([.country_code] | if length == 0 then "" else .[0] end),
+  ([.threat.is_proxy] | if length == 0 then "" else .[0] end),
+  ([.threat.is_vpn] | if length == 0 then "" else .[0] end),
+  ([.threat.is_tor] | if length == 0 then "" else .[0] end),
+  ([.threat.is_datacenter] | if length == 0 then "" else .[0] end)' countrycode proxy vpn tor server||true
+ipdata+=("${(@kv)provider_fields[@]}")
 ipdata[abuser1]=$(print -rn -- "$RESPONSE"|jq -r '.threat.is_threat')
 ipdata[abuser2]=$(print -rn -- "$RESPONSE"|jq -r '.threat.is_known_abuser')
 ipdata[abuser3]=$(print -rn -- "$RESPONSE"|jq -r '.threat.is_known_attacker')

@@ -1,6 +1,8 @@
 # Derived from xykt/IPQuality. See UPSTREAM.md and LICENSE before modifying or
 # redistributing this file.
 # IPWHOIS public website demo; missing security flags remain unknown.
+# Parsers use provider_json_fields; standalone fixture runs load it here.
+(( ${+functions[provider_json_fields]} ))||source "${${(%):-%x}:A:h:h}/common/provider_values.zsh"
 
 typeset -gA ipwhois_parsed=()
 
@@ -41,11 +43,13 @@ print -rn -- "$response"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg expected "$
         | all(boolean_or_null(.)))))
 ' >/dev/null 2>&1||return 1
 
-ipwhois_parsed[country_code]=$(print -rn -- "$response"|jq -r 'if (.country_code|type) == "string" then .country_code else empty end')
-ipwhois_parsed[asn]=$(print -rn -- "$response"|jq -r 'if (.connection|type) == "object" and .connection.asn != null then (.connection.asn|tostring) else empty end')
-ipwhois_parsed[organization]=$(print -rn -- "$response"|jq -r 'if (.connection|type) == "object" then (.connection.org // empty) else empty end')
-ipwhois_parsed[isp]=$(print -rn -- "$response"|jq -r 'if (.connection|type) == "object" then (.connection.isp // empty) else empty end')
-ipwhois_parsed[timezone]=$(print -rn -- "$response"|jq -r 'if (.timezone|type) == "object" then (.timezone.id // empty) else empty end')
+provider_json_fields "$response" '
+  ([if (.country_code|type) == "string" then .country_code else empty end] | if length == 0 then "" else .[0] end),
+  ([if (.connection|type) == "object" and .connection.asn != null then (.connection.asn|tostring) else empty end] | if length == 0 then "" else .[0] end),
+  ([if (.connection|type) == "object" then (.connection.org // empty) else empty end] | if length == 0 then "" else .[0] end),
+  ([if (.connection|type) == "object" then (.connection.isp // empty) else empty end] | if length == 0 then "" else .[0] end),
+  ([if (.timezone|type) == "object" then (.timezone.id // empty) else empty end] | if length == 0 then "" else .[0] end)' country_code asn organization isp timezone||return 1
+ipwhois_parsed+=("${(@kv)provider_fields[@]}")
 ipwhois_parsed[risk_status]=not_provided
 typeset field
 for field in proxy vpn tor hosting;do

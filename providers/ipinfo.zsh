@@ -1,6 +1,8 @@
 # IPinfo public widget: basic network/location context for the report header.
 # Derived from xykt/IPQuality. See UPSTREAM.md and LICENSE before modifying or
 # redistributing this file.
+# Parsers use provider_json_fields; standalone fixture runs load it here.
+(( ${+functions[provider_json_fields]} ))||source "${${(%):-%x}:A:h:h}/common/provider_values.zsh"
 
 db_ipinfo(){
 show_progress "${sinfo[database]}IPinfo"

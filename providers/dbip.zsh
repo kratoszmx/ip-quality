@@ -1,6 +1,8 @@
 # Derived from xykt/IPQuality. See UPSTREAM.md and LICENSE before modifying or
 # redistributing this file.
 # DB-IP public website demo; original threat labels, never invented scores.
+# Parsers use provider_json_fields; standalone fixture runs load it here.
+(( ${+functions[provider_json_fields]} ))||source "${${(%):-%x}:A:h:h}/common/provider_values.zsh"
 typeset -gA dbip_parsed=()
 
 dbip_demo_key_from_page(){
@@ -39,11 +41,13 @@ print -rn -- "$response"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg expected "$
   (.threatLevel == null or
     (.threatLevel | type == "string" and test("^(low|medium|high)$"; "i")))
 ' >/dev/null 2>&1||return 1
-dbip_parsed[ip]=$(print -rn -- "$response"|jq -r '.ipAddress')
-dbip_parsed[country_code]=$(print -rn -- "$response"|jq -r '.countryCode')
-dbip_parsed[country]=$(print -rn -- "$response"|jq -r '.countryName // empty')
-dbip_parsed[region]=$(print -rn -- "$response"|jq -r '.stateProv // empty')
-dbip_parsed[city]=$(print -rn -- "$response"|jq -r '.city // empty')
+provider_json_fields "$response" '
+  ([.ipAddress] | if length == 0 then "" else .[0] end),
+  ([.countryCode] | if length == 0 then "" else .[0] end),
+  ([.countryName // empty] | if length == 0 then "" else .[0] end),
+  ([.stateProv // empty] | if length == 0 then "" else .[0] end),
+  ([.city // empty] | if length == 0 then "" else .[0] end)' ip country_code country region city||return 1
+dbip_parsed+=("${(@kv)provider_fields[@]}")
 dbip_parsed[risk_status]=not_provided
 dbip_parsed[threat_level]=$(print -rn -- "$response"|jq -r '.threatLevel // empty | ascii_downcase')
 [[ -n "${dbip_parsed[threat_level]}" ]]&&dbip_parsed[risk_status]=ok
