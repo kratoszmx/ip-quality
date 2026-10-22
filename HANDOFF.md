@@ -1,8 +1,8 @@
 # Current handoff
 
-## Recent maintenance — 2026-10-17 to 2026-10-18
+## Recent maintenance — 2026-10-17 to 2026-10-22
 
-Reporter `v2026-10-18-standalone.37`. Query policy, sources and fallbacks are as
+Reporter `v2026-10-22-standalone.38`. Query policy, sources and fallbacks are as
 documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
 
 - Structure: `bin/ip-quality` is about 800 lines. Each `providers/*.zsh` holds its
@@ -21,7 +21,8 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
 - Provider repairs: MaxMind validates its single relay observation and falls
   back to IPinfo on malformed data; responses reach `jq` byte-exact; ipdata
   recognizes the homepage's `fetch` demo-key form. Every provider parser reads its
-  fields in one `jq` pass (`provider_json_fields`), and DMS coordinates use
+  fields in one `jq` pass (`provider_json_fields`); every provider type
+  label comes from `styled_provider_type` in `report/labels.zsh`; and DMS coordinates use
   exact integer arithmetic (fixing empty minutes, `60″` and integer inputs).
 - Reliability: reporter, runner and suites pin UTF-8 (C-locale shells previously
   failed 31 tests and non-ASCII leaf names); `scripts/test-offline` runs every

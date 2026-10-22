@@ -20,7 +20,7 @@ export const ROOT = findPackageRoot(path.dirname(fileURLToPath(import.meta.url))
 export const REPO_ROOT = path.resolve(ROOT, "../..");
 export const IPQS_ORIGIN = "https://www.ipqualityscore.com";
 export const IPQS_API_BASE = `${IPQS_ORIGIN}/api/json`;
-export const DEFAULT_BROWSER_PROFILE_DIR = path.join(ROOT, ".state", "chrome-profile");
+const DEFAULT_BROWSER_PROFILE_DIR = path.join(ROOT, ".state", "chrome-profile");
 export const DEFAULT_API_KEY_FILE = path.join(REPO_ROOT, "secrets", "ipqs");
 
 export const DASHBOARD_PAGES = {

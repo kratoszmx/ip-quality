@@ -8,7 +8,7 @@ import {
   readPrivateTwoLineSecretBundle,
 } from "@myutils/secret-file";
 
-export const IPQS_ACCOUNT_SECRET_DIR = path.resolve(
+const IPQS_ACCOUNT_SECRET_DIR = path.resolve(
   homedir(),
   "codexworkspace",
   "secrets",

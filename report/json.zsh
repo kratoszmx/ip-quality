@@ -5,51 +5,18 @@
 save_json(){
 local query_target_mode=discovered_egress
 [[ -n "${requested_ip:-}" ]]&&query_target_mode=explicit_target
-local info_asn info_org info_lat info_lon info_dms info_map info_timezone
-local info_city info_post info_subcode info_sub info_countrycode info_country
-local info_continentcode info_continent info_regcountrycode info_regcountry info_type=""
-local info_source="Check.Place upstream relay; MaxMind-labeled response"
+local info_type="" info_source="Check.Place upstream relay; MaxMind-labeled response"
+local -A info
 if [[ "$basic_source" == maxmind ]];then
-info_asn="${maxmind[asn]:-}"
-info_org="${maxmind[org]:-}"
-info_lat="${maxmind[lat]:-}"
-info_lon="${maxmind[lon]:-}"
-info_dms="${maxmind[dms]:-}"
-info_map="${maxmind[map]:-}"
-info_timezone="${maxmind[timezone]:-}"
-info_city="${maxmind[city]:-}"
-info_post="${maxmind[post]:-}"
-info_subcode="${maxmind[subcode]:-}"
-info_sub="${maxmind[sub]:-}"
-info_countrycode="${maxmind[countrycode]:-}"
-info_country="${maxmind[country]:-}"
-info_continentcode="${maxmind[continentcode]:-}"
-info_continent="${maxmind[continent]:-}"
-info_regcountrycode="${maxmind[regcountrycode]:-}"
-info_regcountry="${maxmind[regcountry]:-}"
+info=("${(@kv)maxmind[@]}")
 else
 info_source="IPinfo public demo widget"
 [[ "${ipinfo[status]:-}" == disabled ]]&&info_source="none"
-info_asn="${ipinfo[asn]:-}"
-info_org="${ipinfo[org]:-}"
-info_lat="${ipinfo[lat]:-}"
-info_lon="${ipinfo[lon]:-}"
-info_dms="${ipinfo[dms]:-}"
-info_map="${ipinfo[map]:-}"
-info_timezone="${ipinfo[timezone]:-}"
-info_city="${ipinfo[city]:-}"
-info_post="${ipinfo[post]:-}"
-info_subcode=""
-info_sub=""
-info_countrycode="${ipinfo[countrycode]:-}"
-info_country="${ipinfo[country]:-}"
-info_continentcode=""
-info_continent="${ipinfo[continent]:-}"
-info_regcountrycode="${ipinfo[regcountrycode]:-}"
-info_regcountry="${ipinfo[regcountry]:-}"
+# The IPinfo widget has no subdivision or continent code.
+info=("${(@kv)ipinfo[@]}" subcode "" sub "" continentcode "")
 fi
-if [[ -n "$info_countrycode" && "$info_countrycode" != "null" ]];then
-if [[ "$info_countrycode" == "$info_regcountrycode" ]];then
+if [[ -n "${info[countrycode]:-}" && "${info[countrycode]:-}" != "null" ]];then
+if [[ "${info[countrycode]:-}" == "${info[regcountrycode]:-}" ]];then
 info_type=$(clean_ansi "${sbasic[type0]:-}")
 else
 info_type=$(clean_ansi "${sbasic[type1]:-}")
@@ -61,6 +28,7 @@ scope_includes reputation&&reputation_enabled=true
 local mail_port25=null
 local mail_services='{}'
 local service service_value
+local -a mail_service_args=()
 if scope_includes mail;then
 case "${smail[local]:-0}" in
 1)mail_port25=true
@@ -77,8 +45,9 @@ case "${smail[local]:-0}:${smailstatus[$service]:-false}" in
 ;;
 *)service_value=false
 esac
-mail_services=$(print -r -- "$mail_services"|jq -c --arg key "$service" --argjson value "$service_value" '. + {($key): $value}')||return 1
+mail_service_args+=(--argjson "$service" "$service_value")
 done
+mail_services=$(jq -cn "${mail_service_args[@]}" '$ARGS.named')||return 1
 fi
 
 local displayed_ip="${IPhide:-}"
@@ -97,15 +66,15 @@ ipjson=$(jq -n \
 --arg target_mode "$query_target_mode" \
 --arg ipqs_dns "${ipqs[dns]:-}" \
 --arg info_source "$info_source" \
---arg info_asn "$info_asn" --arg info_org "$info_org" \
---arg info_lat "$info_lat" --arg info_lon "$info_lon" \
---arg info_dms "$info_dms" --arg info_map "$info_map" \
---arg info_timezone "$info_timezone" --arg info_city "$info_city" \
---arg info_post "$info_post" --arg info_subcode "$info_subcode" \
---arg info_sub "$info_sub" --arg info_countrycode "$info_countrycode" \
---arg info_country "$info_country" --arg info_continentcode "$info_continentcode" \
---arg info_continent "$info_continent" --arg info_regcountrycode "$info_regcountrycode" \
---arg info_regcountry "$info_regcountry" --arg info_type "$info_type" \
+--arg info_asn "${info[asn]:-}" --arg info_org "${info[org]:-}" \
+--arg info_lat "${info[lat]:-}" --arg info_lon "${info[lon]:-}" \
+--arg info_dms "${info[dms]:-}" --arg info_map "${info[map]:-}" \
+--arg info_timezone "${info[timezone]:-}" --arg info_city "${info[city]:-}" \
+--arg info_post "${info[post]:-}" --arg info_subcode "${info[subcode]:-}" \
+--arg info_sub "${info[sub]:-}" --arg info_countrycode "${info[countrycode]:-}" \
+--arg info_country "${info[country]:-}" --arg info_continentcode "${info[continentcode]:-}" \
+--arg info_continent "${info[continent]:-}" --arg info_regcountrycode "${info[regcountrycode]:-}" \
+--arg info_regcountry "${info[regcountry]:-}" --arg info_type "$info_type" \
 --arg type_ipinfo_usage "$(clean_ansi "${ipinfo[susetype]:-}")" \
 --arg type_ipregistry_usage "$(clean_ansi "${ipregistry[susetype]:-}")" \
 --arg type_ipqs_usage "$(clean_ansi "${ipqs[susetype]:-}")" \

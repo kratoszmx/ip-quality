@@ -373,6 +373,31 @@ print -r -- "$ipjson" | jq -e '.ProviderContext.Cloudflare.ThreatCategories == n
 print -ru2 -- "SELF-TEST FAILED: missing Cloudflare threats became an empty result"
 return 1
 }
+basic_source=ipinfo
+ipinfo=([status]=ok [asn]=64501 [city]="Fallback City" [continent]=Asia [subcode]=stale)
+save_json || return 1
+print -r -- "$ipjson" | jq -e '
+  .Info.Source == "IPinfo public demo widget" and .Info.ASN == "64501" and
+  .Info.City.Name == "Fallback City" and .Info.City.SubCode == null and
+  .Info.Continent.Code == null and .Info.Continent.Name == "Asia"
+' >/dev/null || {
+print -ru2 -- "SELF-TEST FAILED: IPinfo basic information changed"
+return 1
+}
+query_scope=mail
+services=(Gmail 163)
+smailstatus=([Gmail]=true)
+local port25 expected
+for port25 expected in 1 '.Mail.Port25 == true and .Mail.Gmail == true and .Mail["163"] == false' \
+  2 '.Mail.Port25 == null and .Mail.Gmail == null and .Mail["163"] == null' \
+  0 '.Mail.Port25 == false and .Mail.Gmail == false and .Mail["163"] == false';do
+smail[local]=$port25
+save_json || return 1
+print -r -- "$ipjson" | jq -e "$expected" >/dev/null || {
+print -ru2 -- "SELF-TEST FAILED: mail service JSON changed for port-25 state $port25"
+return 1
+}
+done
 print -r -- "SELF-TEST OK: zsh runtime, validators, provider parsers, and ${#dnsbl_zones[@]} DNSBL entries"
 }
 run_self_test

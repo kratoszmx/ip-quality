@@ -197,3 +197,29 @@ stail[thanks]="本次运行未发送遥测，也未上传报告。"
 *)echo -ne "ERROR: Language not supported!"
 esac
 }
+
+# Map any provider's usage/company type vocabulary to one localized stype label.
+styled_provider_type(){
+typeset raw="${1:l}"
+case "$raw" in
+business|corporate)print -rn -- "${stype[business]}"
+;;
+isp|consumer|residential)print -rn -- "${stype[isp]}"
+;;
+mobile)print -rn -- "${stype[mobile]}"
+;;
+hosting|"data center")print -rn -- "${stype[hosting]}"
+;;
+education)print -rn -- "${stype[education]}"
+;;
+government)print -rn -- "${stype[government]}"
+;;
+banking)print -rn -- "${stype[banking]}"
+;;
+inactive|reserved)print -rn -- "${stype[reserved]}"
+;;
+""|null|unknown)print -rn -- "${stype[unknown]}"
+;;
+*)print -rn -- "${stype[other]}"
+esac
+}

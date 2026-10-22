@@ -29,11 +29,11 @@ const BLOCKED_FIELD_PATTERN = /(?:pass(?:word|code)?|e-?mail|mailbox|phone|mobil
 const BLOCKED_SUBMIT_PATTERN = /(?:delete|remove|close|cancel|disable|revoke|billing|payment|purchase|upgrade|downgrade|subscribe|password|e-?mail|mfa|2fa|api.?key|token|secret)/i;
 const SUPPORTED_INPUT_TYPES = new Set(["text", "number", "url", "search", "checkbox"]);
 
-export function normalizeReference(value: string) {
+function normalizeReference(value: string) {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
 }
 
-export function controlReferences(control: DashboardControl) {
+function controlReferences(control: DashboardControl) {
   return [control.name, control.id, control.label].map(normalizeReference).filter(Boolean);
 }
 

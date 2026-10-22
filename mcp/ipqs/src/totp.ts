@@ -22,7 +22,7 @@ export function ipqsSetup(qrSource: string, text: string, email: string) {
   return { uri, recoveryCode: codes[0][0] };
 }
 
-export async function ipqsTotpCode(uri: string) {
+async function ipqsTotpCode(uri: string) {
   return (await generateFreshTotp(uri, options)).code;
 }
 
@@ -57,7 +57,7 @@ export async function enrollIpqsTotp(page: Page) {
   return { ...result, seedSaved: true, recoverySaved: true, changed: result.enabled, state: result.enabled ? "enabled_challenge_verification_pending" : "enrollment_unconfirmed" };
 }
 
-export async function readIpqsTotpUri() {
+async function readIpqsTotpUri() {
   const uri = (await readPrivateSecretFile(path.join(totpDirectory, "totp-uri"), { maxBytes: 4096 })).secret;
   inspectTotpUri(uri, options);
   const parsed = new URL(uri);

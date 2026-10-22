@@ -306,7 +306,7 @@ class ProvidersTest < ReporterTestCase
   end
 
   def test_ipapi_runtime_marks_schema_drift_unavailable_without_writing_jq_errors
-    function_source = reporter_functions("db_ipapi")
+    function_source = reporter_functions("db_ipapi", "styled_provider_type")
     probe = <<~'ZSH'
       setopt KSH_ARRAYS SH_WORD_SPLIT
       source "$1"
@@ -333,7 +333,7 @@ class ProvidersTest < ReporterTestCase
   end
 
   def test_ipapi_free_account_key_uses_secret_url_configuration
-    function_source = reporter_functions("db_ipapi")
+    function_source = reporter_functions("db_ipapi", "styled_provider_type")
     probe = <<~'ZSH'
       setopt KSH_ARRAYS SH_WORD_SPLIT
       source "$1"
@@ -365,7 +365,7 @@ class ProvidersTest < ReporterTestCase
   end
 
   def test_ipapi_anonymous_runtime_keeps_minimal_context_without_fake_risk
-    function_source = reporter_functions("db_ipapi")
+    function_source = reporter_functions("db_ipapi", "styled_provider_type")
     probe = <<~'ZSH'
       setopt KSH_ARRAYS SH_WORD_SPLIT
       source "$1"
@@ -392,7 +392,7 @@ class ProvidersTest < ReporterTestCase
   end
 
   def test_ipapi_runtime_exposes_rate_limit_status_without_parsing_error_json
-    function_source = reporter_functions("db_ipapi")
+    function_source = reporter_functions("db_ipapi", "styled_provider_type")
     probe = <<~'ZSH'
       setopt KSH_ARRAYS SH_WORD_SPLIT
       source "$1"
@@ -805,6 +805,18 @@ class ProvidersTest < ReporterTestCase
 
     source = File.read(SCRIPT, encoding: "UTF-8")
     assert_includes source, 'provider_load_credentials "" "$SCRIPT_DIR/secrets"'
+  end
+
+  def test_one_type_styler_maps_every_provider_vocabulary
+    probe = reporter_functions("styled_provider_type") + <<~'ZSH'
+      typeset -A stype=([business]=B [isp]=I [mobile]=M [hosting]=H [education]=E [government]=G [banking]=K [reserved]=R [unknown]=U [other]=O)
+      for raw in Business corporate ISP residential mobile "data center" hosting education government banking reserved "" null unknown satellite;do
+        print -rn -- "$(styled_provider_type "$raw")"
+      done
+    ZSH
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe)
+    assert status.success?, stderr
+    assert_equal "BBIIMHHEGKRUUUO", stdout
   end
 
   def test_ipinfo_widget_fields_map_in_one_pass_with_country_names

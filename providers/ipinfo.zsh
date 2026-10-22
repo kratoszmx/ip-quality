@@ -33,32 +33,8 @@ return 0
 for field in usetype comtype countrycode proxy tor vpn server asn org city post timezone regcountrycode;do
 ipinfo[$field]="${provider_fields[$field]}"
 done
-case ${ipinfo[usetype]} in
-"business")ipinfo[susetype]="${stype[business]}"
-;;
-"isp")ipinfo[susetype]="${stype[isp]}"
-;;
-"hosting")ipinfo[susetype]="${stype[hosting]}"
-;;
-"education")ipinfo[susetype]="${stype[education]}"
-;;
-""|"null")ipinfo[susetype]="${stype[unknown]}"
-;;
-*)ipinfo[susetype]="${stype[other]}"
-esac
-case ${ipinfo[comtype]} in
-"business")ipinfo[scomtype]="${stype[business]}"
-;;
-"isp")ipinfo[scomtype]="${stype[isp]}"
-;;
-"hosting")ipinfo[scomtype]="${stype[hosting]}"
-;;
-"education")ipinfo[scomtype]="${stype[education]}"
-;;
-""|"null")ipinfo[scomtype]="${stype[unknown]}"
-;;
-*)ipinfo[scomtype]="${stype[other]}"
-esac
+ipinfo[susetype]=$(styled_provider_type "${ipinfo[usetype]}")
+ipinfo[scomtype]=$(styled_provider_type "${ipinfo[comtype]}")
 local ISO3166=$(<"$REF_DIR/iso3166.json") location="${provider_fields[loc]}"
 # "lat,lon"; without a comma both halves keep the raw value and fail the decimal checks.
 ipinfo[lat]="${location%%,*}"

@@ -137,40 +137,8 @@ ipapi[anonymous_region]="${ipapi_parsed[anonymous_region]}"
 ipapi[anonymous_timezone]="${ipapi_parsed[anonymous_timezone]}"
 ipapi[usetype]="${ipapi_parsed[usage_type]}"
 ipapi[comtype]="${ipapi_parsed[company_type]}"
-case ${ipapi[usetype]} in
-"business")ipapi[susetype]="${stype[business]}"
-;;
-"isp")ipapi[susetype]="${stype[isp]}"
-;;
-"hosting")ipapi[susetype]="${stype[hosting]}"
-;;
-"education")ipapi[susetype]="${stype[education]}"
-;;
-"government")ipapi[susetype]="${stype[government]}"
-;;
-"banking")ipapi[susetype]="${stype[banking]}"
-;;
-""|"null")ipapi[susetype]="${stype[unknown]}"
-;;
-*)ipapi[susetype]="${stype[other]}"
-esac
-case ${ipapi[comtype]} in
-"business")ipapi[scomtype]="${stype[business]}"
-;;
-"isp")ipapi[scomtype]="${stype[isp]}"
-;;
-"hosting")ipapi[scomtype]="${stype[hosting]}"
-;;
-"education")ipapi[scomtype]="${stype[education]}"
-;;
-"government")ipapi[scomtype]="${stype[government]}"
-;;
-"banking")ipapi[scomtype]="${stype[banking]}"
-;;
-""|"null")ipapi[scomtype]="${stype[unknown]}"
-;;
-*)ipapi[scomtype]="${stype[other]}"
-esac
+ipapi[susetype]=$(styled_provider_type "${ipapi[usetype]}")
+ipapi[scomtype]=$(styled_provider_type "${ipapi[comtype]}")
 ipapi[scoretext]="${ipapi_parsed[score_text]}"
 # "0.0012 (Low)": the first word is the ratio, the parenthesized word its label.
 local score_word score_rest
