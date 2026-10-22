@@ -459,72 +459,33 @@ report_query_route_note IPQS "${ipqs[query_route]:-}" "${ipqs[primary_status]:-}
 return 0
 }
 
+# Append one provider column to show_factor's arrays (zsh dynamic scope).
+# NAME is the provider's associative array; disabled or empty sources stay hidden.
+report_factor_column(){
+typeset name="$1" label="$2" query_status="$3"
+# An undeclared provider (as in partial fixtures) has nothing to show.
+[[ ${(Pt)name} == association* ]]||return 0
+typeset -A provider=("${(@kvP)${:-${name}[@]}}")
+report_source_visible "${provider[status]:-}" "${provider[countrycode]:-}" "${provider[proxy]:-}" "${provider[vpn]:-}" \
+  "${provider[tor]:-}" "${provider[server]:-}" "${provider[abuser]:-}" "${provider[robot]:-}"||return 0
+headers+=("${Font_B}${Font_Cyan}$label$Font_Suffix")
+statuses+=("$query_status")
+countries+=("${provider[countrycode]:-}") proxies+=("${provider[proxy]:-}") vpns+=("${provider[vpn]:-}")
+tors+=("${provider[tor]:-}") servers+=("${provider[server]:-}") abusers+=("${provider[abuser]:-}") robots+=("${provider[robot]:-}")
+}
+
 show_factor(){
 typeset -a headers countries proxies vpns tors servers abusers robots statuses
-if report_source_visible "${ip2location[status]:-}" "${ip2location[countrycode]}" "${ip2location[proxy]}" "${ip2location[vpn]}" "${ip2location[tor]}" "${ip2location[server]}" "${ip2location[abuser]}" "${ip2location[robot]}";then
-headers+=("${Font_B}${Font_Cyan}IP2Location$Font_Suffix")
-statuses+=("$(report_query_status "${ip2location[status]:-ok}")")
-countries+=("${ip2location[countrycode]}") proxies+=("${ip2location[proxy]}")
-vpns+=("${ip2location[vpn]}") tors+=("${ip2location[tor]}")
-servers+=("${ip2location[server]}") abusers+=("${ip2location[abuser]}")
-robots+=("${ip2location[robot]}")
-fi
-if report_source_visible "${ipapi[status]:-}" "${ipapi[countrycode]}" "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ipapi[server]}" "${ipapi[abuser]}" "${ipapi[robot]}";then
-headers+=("${Font_B}${Font_Cyan}ipapi.is$Font_Suffix")
-statuses+=("$(report_query_status "${ipapi[risk_status]:-${ipapi[status]:-ok}}")")
-countries+=("${ipapi[countrycode]}") proxies+=("${ipapi[proxy]}")
-vpns+=("${ipapi[vpn]}") tors+=("${ipapi[tor]}")
-servers+=("${ipapi[server]}") abusers+=("${ipapi[abuser]}")
-robots+=("${ipapi[robot]}")
-fi
-if report_source_visible "${ipregistry[status]:-}" "${ipregistry[countrycode]}" "${ipregistry[proxy]}" "${ipregistry[vpn]}" "${ipregistry[tor]}" "${ipregistry[server]}" "${ipregistry[abuser]}";then
-headers+=("${Font_B}${Font_Cyan}Ipregistry$Font_Suffix")
-statuses+=("$(report_query_status "${ipregistry[status]:-ok}")")
-countries+=("${ipregistry[countrycode]}") proxies+=("${ipregistry[proxy]}")
-vpns+=("${ipregistry[vpn]}") tors+=("${ipregistry[tor]}")
-servers+=("${ipregistry[server]}") abusers+=("${ipregistry[abuser]}")
-robots+=("")
-fi
-if report_source_visible "${ipqs[status]:-}" "${ipqs[countrycode]}" "${ipqs[proxy]}" "${ipqs[vpn]}" "${ipqs[tor]}" "${ipqs[server]}" "${ipqs[abuser]}" "${ipqs[robot]}";then
-headers+=("${Font_B}${Font_Cyan}IPQS$Font_Suffix")
-statuses+=("$(report_query_status "${ipqs[status]:-ok}" "${ipqs[query_route]:-}")")
-countries+=("${ipqs[countrycode]}") proxies+=("${ipqs[proxy]}")
-vpns+=("${ipqs[vpn]}") tors+=("${ipqs[tor]}")
-servers+=("${ipqs[server]}") abusers+=("${ipqs[abuser]}")
-robots+=("${ipqs[robot]}")
-fi
-if report_source_visible "${scamalytics[status]:-}" "${scamalytics[countrycode]}" "${scamalytics[proxy]}" "${scamalytics[vpn]}" "${scamalytics[tor]}" "${scamalytics[server]}" "${scamalytics[abuser]}" "${scamalytics[robot]}";then
-headers+=("${Font_B}${Font_Cyan}Scamalytics$Font_Suffix")
-statuses+=("$(report_query_status "${scamalytics[status]:-ok}")")
-countries+=("${scamalytics[countrycode]}") proxies+=("${scamalytics[proxy]}")
-vpns+=("${scamalytics[vpn]}") tors+=("${scamalytics[tor]}")
-servers+=("${scamalytics[server]}") abusers+=("${scamalytics[abuser]}")
-robots+=("${scamalytics[robot]}")
-fi
-if report_source_visible "${ipdata[status]:-}" "${ipdata[countrycode]}" "${ipdata[proxy]}" "${ipdata[vpn]}" "${ipdata[tor]}" "${ipdata[server]}" "${ipdata[abuser]}" "${ipdata[robot]}";then
-headers+=("${Font_B}${Font_Cyan}ipdata$Font_Suffix")
 typeset ipdata_source_kind=relay
 [[ "${ipdata[source]:-}" == public_demo ]]&&ipdata_source_kind=demo
-statuses+=("$(report_score_source_status "$ipdata_source_kind" "${ipdata[status]:-ok}")")
-countries+=("${ipdata[countrycode]}") proxies+=("${ipdata[proxy]}")
-vpns+=("${ipdata[vpn]}") tors+=("${ipdata[tor]}")
-servers+=("${ipdata[server]}") abusers+=("${ipdata[abuser]}")
-robots+=("${ipdata[robot]}")
-fi
-if report_source_visible "${ipinfo[status]:-}" "${ipinfo[countrycode]}" "${ipinfo[proxy]}" "${ipinfo[vpn]}" "${ipinfo[tor]}" "${ipinfo[server]}" "${ipinfo[abuser]}" "${ipinfo[robot]}";then
-headers+=("${Font_B}${Font_Cyan}IPinfo$Font_Suffix")
-statuses+=("$(report_query_status "${ipinfo[status]:-ok}")")
-countries+=("${ipinfo[countrycode]}") proxies+=("${ipinfo[proxy]}")
-vpns+=("${ipinfo[vpn]}") tors+=("${ipinfo[tor]}")
-servers+=("${ipinfo[server]}") abusers+=("${ipinfo[abuser]}")
-robots+=("${ipinfo[robot]}")
-fi
-if report_source_visible "${ipwhois[status]:-}";then
-headers+=("${Font_B}${Font_Cyan}IPWHOIS$Font_Suffix")
-statuses+=("$(report_query_status "${ipwhois[risk_status]:-${ipwhois[status]}}")")
-countries+=("${ipwhois[countrycode]}")
-proxies+=("${ipwhois[proxy]}") vpns+=("${ipwhois[vpn]}") tors+=("${ipwhois[tor]}") servers+=("${ipwhois[server]}") abusers+=("") robots+=("")
-fi
+report_factor_column ip2location IP2Location "$(report_query_status "${ip2location[status]:-ok}")"
+report_factor_column ipapi ipapi.is "$(report_query_status "${ipapi[risk_status]:-${ipapi[status]:-ok}}")"
+report_factor_column ipregistry Ipregistry "$(report_query_status "${ipregistry[status]:-ok}")"
+report_factor_column ipqs IPQS "$(report_query_status "${ipqs[status]:-ok}" "${ipqs[query_route]:-}")"
+report_factor_column scamalytics Scamalytics "$(report_query_status "${scamalytics[status]:-ok}")"
+report_factor_column ipdata ipdata "$(report_score_source_status "$ipdata_source_kind" "${ipdata[status]:-ok}")"
+report_factor_column ipinfo IPinfo "$(report_query_status "${ipinfo[status]:-ok}")"
+report_factor_column ipwhois IPWHOIS "$(report_query_status "${ipwhois[risk_status]:-${ipwhois[status]}}")"
 (( ${#headers[@]} ))||return 0
 print -r -- "$Font_B${sfactor[title]}$Font_Suffix"
 typeset field_label status_label widths

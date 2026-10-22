@@ -119,6 +119,20 @@ class IpQualityTest < ReporterTestCase
     assert_equal cases.values, stdout.lines(chomp: true)
   end
 
+  def test_ipv6_masking_shows_three_canonical_groups_without_ambiguous_colons
+    cases = {
+      "2001:db8::1" => "2001:db8:0:*:*:*:*:*",
+      "fe80::1%en0" => "fe80:0:0:*:*:*:*:*",
+      "2001:0DB8:85a3:0000:0000:8a2e:0370:7334" => "2001:db8:85a3:*:*:*:*:*",
+      "2606:4700:4700::1111" => "2606:4700:4700:*:*:*:*:*",
+      "2001:db8:zz::1" => ""
+    }
+    probe = 'source "$1"; shift; setopt KSH_ARRAYS; for ip in "$@";do hide_ipv6 "$ip"; print -r -- "$IPhide";done'
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "ipv6", SCRIPT, *cases.keys)
+    assert status.success?, stderr
+    assert_equal cases.values, stdout.lines(chomp: true)
+  end
+
   def test_short_option_clusters_parse_like_getopts_and_removed_flags_fail
     [%w[-4fj], %w[-len -4], %w[-l en -E], %w[-4 -- 8.8.8.8]].each do |arguments|
       stdout, stderr, status = run_script(*arguments)
