@@ -444,7 +444,8 @@ note="Note: provider scales differ; - means that source did not supply the field
 fi
 typeset value_width
 for value in "$field_label" "$score_label" "$band_label" "$scale_label" "$source_status_label";do
-value_width=$(display_width "$value")
+display_width "$value"
+value_width=$REPLY
 (( value_width > label_width ))&&label_width=$value_width
 done
 typeset widths="$label_width $(terminal_table_widths "$cell_width" "${#headers[@]}" "${headers[@]}" "${rendered_scores[@]}" "${rendered_risks[@]}" "${rendered_scales[@]}" "${source_statuses[@]}")"

@@ -68,8 +68,9 @@ provider functions resolve the path from their own source file.
 
 | Function | Result |
 | --- | --- |
+| `ansi_plain TEXT` | Sets `REPLY` to TEXT with literal `\033` decoded and ANSI `m/G/K/H/F` sequences removed |
 | `clean_ansi TEXT [preserve]` | Decodes literal `\033`, strips ANSI `m/G/K/H/F` sequences and trims each line unless `preserve` |
-| `display_width TEXT` | Cells for one label after ANSI cleanup: ASCII one, other characters two |
+| `display_width TEXT` | Sets `REPLY` to the cells of one label after ANSI cleanup: ASCII one, other characters two (no subprocess) |
 | `terminal_table_widths MIN COLUMNS CELL...` | One width per column from complete rows, each at least `MIN`; 2 for invalid shape |
 | `terminal_table_cell TEXT WIDTH` | Text plus padding; longer text is never truncated |
 | `terminal_table_row "WIDTH..." CELL...` | One ` \| `-separated row; 2 before printing on invalid shape |

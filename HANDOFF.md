@@ -2,7 +2,7 @@
 
 ## Recent maintenance — 2026-10-17 to 2026-10-22
 
-Reporter `v2026-10-22-standalone.39`. Query policy, sources and fallbacks are as
+Reporter `v2026-10-22-standalone.40`. Query policy, sources and fallbacks are as
 documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
 
 - Structure: `bin/ip-quality` is about 800 lines. Each `providers/*.zsh` holds its
@@ -26,7 +26,9 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
   exact integer arithmetic (fixing empty minutes, `60″` and integer inputs).
   IPv6 masking expands `::` properly (no more `fe80:::*` or empty groups), and
   report lines use `print -r`, so saved text reports carry no carriage returns
-  and provider text is never reinterpreted as `echo -e` escapes.
+  and provider text is never reinterpreted as `echo -e` escapes. Terminal width
+  and ANSI cleanup use parameter expansion instead of `sed` per cell (250 cells:
+  4.85 s before, 0.005 s after).
 - Reliability: reporter, runner and suites pin UTF-8 (C-locale shells previously
   failed 31 tests and non-ASCII leaf names); `scripts/test-offline` runs every
   suite; supervisor's weekly `test.ipquality.test-offline` runs all of them.

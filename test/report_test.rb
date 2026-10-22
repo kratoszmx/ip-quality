@@ -321,7 +321,7 @@ class ReportTest < ReporterTestCase
       source "$1"
       source "$2"
       for value in 'abc' '中文' $'\033[31mA中\033[0m' ' A中 ' '\033[31mA中\033[0m'; do
-        print -r -- "$(display_width "$value")"
+        display_width "$value"; print -r -- "$REPLY"
       done
       terminal_table_cell $'\033[31m A中 \033[0m' 8
       print -r -- '|'

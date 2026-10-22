@@ -9,7 +9,7 @@ umask 077
 # Display widths and byte validation need UTF-8 whatever the caller locale is.
 export LC_ALL=en_US.UTF-8
 
-script_version="v2026-10-22-standalone.39"
+script_version="v2026-10-22-standalone.40"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
@@ -555,7 +555,8 @@ IPhide="${(L)${(j.:.)shown}}:*:*:*:*:*"
 calc_padding(){
 local input_text="$1"
 local total_width=$2
-local title_length=$(display_width "$input_text")
+display_width "$input_text"
+local title_length=$REPLY
 local left_padding=$(((total_width-title_length)/2))
 if [[ $left_padding -gt 0 ]];then
 PADDING=$(printf '%*s' $left_padding)
