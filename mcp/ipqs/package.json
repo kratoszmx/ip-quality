@@ -35,12 +35,13 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@myutils/totp": "file:../../../../myutils/other_utils/node/totp",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@myutils/browser-session": "file:../../../../myutils/net_utils/node/browser-session",
     "@myutils/mcp-server": "file:../../../../myutils/other_utils/node/mcp-server",
     "@myutils/one-use-token": "file:../../../../myutils/other_utils/node/one-use-token",
+    "@myutils/redaction": "file:../../../../myutils/other_utils/node/redaction",
     "@myutils/secret-file": "file:../../../../myutils/file_utils/node/secret-file",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@myutils/totp": "file:../../../../myutils/other_utils/node/totp",
     "playwright-core": "^1.61.1",
     "zod": "^4.4.3"
   },

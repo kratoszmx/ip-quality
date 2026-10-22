@@ -45,7 +45,7 @@ test("uses ipqs-key header, parses JSON once, and never retries", async () => {
     const result = await lookupIpqs("email", "user@example.test", { timeout: 5 }, 1000, fetchImpl);
     assert.equal(calls, 1);
     assert.equal(result.ok, true);
-    assert.equal((result.data as any).api_key, "<redacted-secret>");
+    assert.equal((result.data as any).api_key, "[redacted]");
     assert.equal(JSON.stringify(result).includes(syntheticKey), false);
 
     const usage = await getIpqsAccountUsage(1000, fetchImpl);

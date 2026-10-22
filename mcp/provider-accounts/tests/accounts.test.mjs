@@ -1,7 +1,8 @@
+import { redactText } from '@myutils/redaction';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
-import { accountUrl, accountPagePath, accountNetworkOptions, accountRouteMatches, assertAccountOrigin, classifyAccountPage, ipapiDashboardAccepted, redactAccountText, ipapiKeyAccepted } from '../policy.mjs';
+import { accountUrl, accountPagePath, accountNetworkOptions, accountRouteMatches, assertAccountOrigin, classifyAccountPage, ipapiDashboardAccepted, ipapiKeyAccepted } from '../policy.mjs';
 import { submitReviewedSignup } from '../signup.mjs';
 
 test('account origins and surfaces reject credential-bearing and foreign URLs', () => {
@@ -41,7 +42,7 @@ test('provider failures, verification and saved forms never become authenticatio
 });
 
 test('dashboard redaction covers short API keys, account emails, OTPs and explicit passwords', () => {
-  const text = redactAccountText('email a@fixture.invalid API abcdef0123456789 OTP 123456 password canary otpauth://totp/fixture?secret=ABCDEF', ['canary']);
+  const text = redactText('email a@fixture.invalid API abcdef0123456789 OTP 123456 password canary otpauth://totp/fixture?secret=ABCDEF', { secrets: ['canary'] });
   for (const value of ['a@fixture.invalid', 'abcdef0123456789', '123456', 'canary', 'secret=ABCDEF']) assert.ok(!text.includes(value));
 });
 

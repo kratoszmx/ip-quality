@@ -28,7 +28,9 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
   failed 31 tests and non-ASCII leaf names); `scripts/test-offline` runs every
   suite; supervisor's weekly `test.ipquality.test-offline` runs all of them.
 - MCPs: one npm workspace whose merged lock keeps only previously reviewed
-  versions; both use myutils `generateFreshTotp`.
+  versions; both use myutils `generateFreshTotp` and `@myutils/redaction` (the
+  union of the former IPQS, provider-account and web-text redactors, so page
+  text now also loses long words, dates and 6+ digit numbers).
 
 The latest commit message records its offline validation. The source-catalog,
 CLI, jq and DMS changes were not followed by a new live lookup.

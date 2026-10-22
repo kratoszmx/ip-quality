@@ -4,7 +4,8 @@ import { fingerprintSecret } from "@myutils/secret-file";
 
 import { classifyIpqsAccountUsage } from "./account-policy.js";
 import { IPQS_API_BASE, isLikelyIpqsApiKey, resolveApiCredential } from "./config.js";
-import { redactStructured, sanitizedError } from "./redaction.js";
+import { redactStructured } from "@myutils/redaction";
+import { sanitizedError } from "./redaction.js";
 
 export type LookupKind = "ip" | "email" | "phone" | "url";
 export type ApiParameterScalar = string | number | boolean;

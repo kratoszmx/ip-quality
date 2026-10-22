@@ -8,7 +8,8 @@ import { chromium } from 'playwright-core';
 import { connectOrLaunchChromeOverCDP, ensurePrivateDirectoryStrict, verifyChromeProfileBinding, withLoopbackOperationLease, saveStorageStateSafely } from '@myutils/browser-session';
 import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@myutils/secret-file';
 import { requestHttpRead } from '@myutils/http-read';
-import { providerConfig, accountUrl, accountPagePath, accountNetworkOptions, accountRouteMatches, assertAccountOrigin, redactAccountText, classifyAccountPage, ipapiDashboardAccepted, validApiKey, ipapiKeyAccepted } from './policy.mjs';
+import { redactText } from '@myutils/redaction';
+import { providerConfig, accountUrl, accountPagePath, accountNetworkOptions, accountRouteMatches, assertAccountOrigin, classifyAccountPage, ipapiDashboardAccepted, validApiKey, ipapiKeyAccepted } from './policy.mjs';
 import { submitReviewedSignup } from './signup.mjs';
 import { httpStatePath, readHttpAccount } from './http-account.mjs';
 
@@ -80,8 +81,8 @@ async function snapshot(provider, page, submitted = false) {
   return { provider, page: accountPagePath(provider, page.url()),
     state: classifyAccountPage({ ...view, submitted, allowTextAuthentication: provider !== 'ipapi', authenticatedAccount: provider === 'ipapi' && ipapiDashboardAccepted(view.account, account?.email) }),
     text: /two.factor|2FA|recovery codes|authenticator|secret key/i.test(view.text)
-      ? '[security values omitted; inspect value-free controls]' : redactAccountText(view.text, account ? [account.email, account.password] : []),
-    controls: view.controls.map(e => ({ ...e, ...(e.label ? { label: redactAccountText(e.label) } : {}) })),
+      ? '[security values omitted; inspect value-free controls]' : redactText(view.text, { secrets: account ? [account.email, account.password] : [] }).slice(0, 6000),
+    controls: view.controls.map(e => ({ ...e, ...(e.label ? { label: redactText(e.label).slice(0, 6000) } : {}) })),
   };
 }
 

@@ -48,7 +48,7 @@ The dedicated profile is the login container. API requests use the local key fil
 - `src/config.ts`: IPQS URLs, dedicated state paths, proxy settings, and credential discovery.
 - `src/credentials.ts`: fixed central owner-only two-line email/password bundle discovery and validation.
 - `src/frontend-policy.ts`: pure exact-match control, safe-submit, blocked-sensitive-field, and API-key candidate policy.
-- `src/redaction.ts`: dashboard and API output redaction.
+- `src/redaction.ts`: IPQS bounds and error wording on top of `@myutils/redaction`, which owns the redaction rules.
 - `src/tool-policy.ts`: server instructions copied into every tool description through the parent shared helper.
 - `scripts/login.ts`: interactive dedicated-profile login and current-session verification.
 - `scripts/login-saved.ts`: explicitly confirmed bounded login from the fixed private credential bundle.

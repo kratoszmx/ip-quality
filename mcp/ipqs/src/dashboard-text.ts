@@ -1,7 +1,8 @@
 import type { Page } from "playwright-core";
 
 import { dashboardUrl, getTimeoutMs, type DashboardPageName } from "./config.js";
-import { boundedVisibleText, redactText } from "./redaction.js";
+import { redactText } from "@myutils/redaction";
+import { boundedVisibleText } from "./redaction.js";
 
 // Read an already visited dashboard URL inside its authenticated browser origin.
 // The response stays in the page; only a value-free, bounded text projection leaves it.

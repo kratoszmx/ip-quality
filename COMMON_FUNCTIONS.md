@@ -122,6 +122,7 @@ Both MCPs depend directly on sibling `/Users/zmx/Projects/myutils` packages:
 | `one-use-token` | IPQS prepared setting-change reservations |
 | `http-read` | Provider accounts: bounded API reads without redirects or retries |
 | `totp` | Provisioning URI validation and `generateFreshTotp` for Cloudflare and IPQS (IPQS opts into its 80-bit seed) |
+| `redaction` | Both MCPs: one union redactor for account pages, API data and errors (secrets, TOTP/recovery codes, credential syntax, emails, 16+ character tokens, 6+ digit numbers) |
 
 Provider origins, selectors, identities and API-before-2FA checks stay in the
 owning MCP; provider-account module APIs are in

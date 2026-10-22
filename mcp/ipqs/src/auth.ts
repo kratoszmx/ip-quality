@@ -1,7 +1,7 @@
 import type { Locator, Page } from "playwright-core";
 
 import { IPQS_ORIGIN, summarizeIpqsUrl } from "./config.js";
-import { redactText } from "./redaction.js";
+import { redactText } from "@myutils/redaction";
 
 const AUTHENTICATED_MARKERS = ["Dashboard", "API Keys", "Account Settings", "Logout", "Credits", "Usage"];
 const SECONDARY_VERIFICATION_TEXT = /(?:verification code|two[- ]factor|\b2fa\b|multi[- ]factor|captcha|not a robot|passkey|security key)/i;

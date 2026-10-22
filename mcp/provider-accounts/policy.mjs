@@ -40,15 +40,6 @@ export function assertAccountOrigin(provider, value) {
   if (url.origin !== providerConfig(provider).origin || url.username || url.password) throw new Error('Untrusted account origin.');
 }
 
-export function redactAccountText(text, secrets = []) {
-  let value = String(text);
-  for (const secret of secrets.filter(Boolean).sort((a, b) => b.length - a.length)) value = value.split(secret).join('[private]');
-  return value.replace(/otpauth:\/\/\S+/gi, '[private TOTP]')
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[private email]')
-    .replace(/\b[A-Za-z0-9_-]{16,}\b/g, '[private value]')
-    .replace(/\b(?:\d[ -]?){6,}\b/g, '[private number]')
-    .slice(0, 6000);
-}
 
 export function accountPagePath(provider, value) {
   assertAccountOrigin(provider, value);

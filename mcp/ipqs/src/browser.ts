@@ -45,7 +45,8 @@ import {
   type DashboardControl,
   type DashboardSubmit,
 } from "./frontend-policy.js";
-import { boundedVisibleText, redactText } from "./redaction.js";
+import { redactText } from "@myutils/redaction";
+import { boundedVisibleText } from "./redaction.js";
 import { probeIpqsAccount } from "./account-probe.js";
 import { enrollIpqsTotp, completeIpqsTotp } from "./totp.js";
 
