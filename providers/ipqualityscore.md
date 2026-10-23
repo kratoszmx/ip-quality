@@ -3,9 +3,8 @@
 Relay without a key; official API with an account-usage preflight. Adapter and parser: [`ipqualityscore.zsh`](ipqualityscore.zsh).
 Cross-source policy (consent, routes, fallbacks, display): [PROVIDERS.md](../PROVIDERS.md).
 
-Without an IPQS
-key, the reporter uses the named Check.Place relay and records that source. With an
-IPQS key, it first calls the account-usage endpoint. A confirmed zero balance,
+Without an IPQS key, the reporter uses the named Check.Place relay and records
+that source. With an IPQS key, it first calls the account-usage endpoint. A confirmed zero balance,
 insufficient-credit response, transport/HTTP failure or malformed account body
 stops before the reputation request. Both account and lookup stages retain
 timeout, TLS-handshake, certificate, HTTP and response-schema statuses; an error

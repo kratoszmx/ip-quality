@@ -1,18 +1,10 @@
 # frozen_string_literal: true
 
-require "minitest/autorun"
-require "open3"
-require "stringio"
-require "tmpdir"
+require_relative "support/reporter_test_case"
 require "timeout"
 require "yaml"
-require_relative "support/utf8_locale"
-load File.expand_path("../bin/ip-quality-route", __dir__)
 
-class RouteRunnerTest < Minitest::Test
-  ROOT = File.expand_path("..", __dir__)
-  RUNNER = File.join(ROOT, "bin", "ip-quality-route")
-
+class RouteRunnerTest < ReporterTestCase
   def test_cached_remote_subscription_is_resolved_without_using_the_active_profile
     Dir.mktmpdir("ip-quality-subscription-") do |directory|
       write_clash_verge_fixture(directory)
@@ -29,116 +21,40 @@ class RouteRunnerTest < Minitest::Test
   def test_default_flow_selects_subscription_then_leaf_without_repeating_the_leaf_count
     Dir.mktmpdir("ip-quality-subscription-select-") do |directory|
       write_clash_verge_fixture(directory)
-      stdout = StringIO.new
-      stderr = StringIO.new
-      command = IpQuality::RouteCommand.new(
-        stdout: stdout,
-        stderr: stderr,
-        stdin: StringIO.new("4\n2\n"),
-        app_root: directory
-      )
+      code, stdout, stderr = run_route([], stdin: "4\n2\n", app_root: directory)
 
-      exit_code = command.run([])
-
-      assert_equal 0, exit_code
-      assert_includes stdout.string, "Available test routes:"
-      assert_includes stdout.string, "Direct IP reputation report"
-      assert_includes stdout.string, "Specific IP lookup"
-      assert_includes stdout.string, "Cached subscription: Fixture Remote"
-      assert_includes stdout.string, "Available inline leaves"
-      assert_includes stdout.string, "exact leaf: TargetLeaf"
-      assert_includes stdout.string, "one direct IPv4 fallback queries the same leaf IP"
-      assert_includes stdout.string, "both route outcomes remain visible"
-      assert_includes stdout.string, "same provider also sees the system-route egress"
-      refute_match(/\d+ inline leaves/, stdout.string)
-      assert_empty stderr.string
+      assert_equal 0, code
+      ["Available test routes:", "Direct IP reputation report", "Specific IP lookup",
+       "Cached subscription: Fixture Remote", "Available inline leaves", "exact leaf: TargetLeaf",
+       "one direct IPv4 fallback queries the same leaf IP", "both route outcomes remain visible",
+       "same provider also sees the system-route egress"].each { |text| assert_includes stdout, text }
+      refute_match(/\d+ inline leaves/, stdout)
+      assert_empty stderr
     end
   end
 
-  def test_default_route_selector_can_choose_direct_without_loading_a_leaf
+  def test_direct_plans_need_no_clash_cache_and_start_no_mihomo
     Dir.mktmpdir("ip-quality-direct-select-") do |directory|
       write_clash_verge_fixture(directory)
-      stdout = StringIO.new
-      stderr = StringIO.new
-      command = IpQuality::RouteCommand.new(
-        stdout: stdout,
-        stderr: stderr,
-        stdin: StringIO.new("1\n"),
-        app_root: directory
-      )
-
-      exit_code = command.run([])
-
-      assert_equal 0, exit_code
-      assert_includes stdout.string, "Available test routes:"
-      assert_includes stdout.string, "Direct reputation route plan"
-      assert_includes stdout.string, "reputation only"
-      assert_includes stdout.string, "no temporary Mihomo process"
-      refute_includes stdout.string, "Available inline leaves"
-      assert_empty stderr.string
+      code, stdout, stderr = run_route([], stdin: "1\n", app_root: directory)
+      assert_equal 0, code
+      ["Available test routes:", "Direct reputation route plan", "reputation only",
+       "no temporary Mihomo process"].each { |text| assert_includes stdout, text }
+      refute_includes stdout, "Available inline leaves"
+      assert_empty stderr
     end
+
+    code, stdout, stderr = run_route(["--direct", "-4"])
+    assert_equal 0, code
+    ["Direct reputation route plan", "current system route", "system-level VPN or TUN"].each do |text|
+      assert_includes stdout, text
+    end
+    refute_match(/media\/AI|DNSBL/, stdout)
+    assert_empty stderr
   end
 
-  def test_explicit_direct_plan_does_not_require_a_clash_cache
-    Dir.mktmpdir("ip-quality-direct-plan-") do |directory|
-      stdout = StringIO.new
-      stderr = StringIO.new
-      command = IpQuality::RouteCommand.new(
-        stdout: stdout,
-        stderr: stderr,
-        app_root: File.join(directory, "missing-clash-cache")
-      )
-
-      exit_code = command.run(["--direct", "-4"])
-
-      assert_equal 0, exit_code
-      assert_includes stdout.string, "Direct reputation route plan"
-      assert_includes stdout.string, "current system route"
-      refute_includes stdout.string, "media/AI"
-      refute_includes stdout.string, "DNSBL"
-      assert_includes stdout.string, "system-level VPN or TUN"
-      assert_empty stderr.string
-    end
-  end
-
-  def test_direct_live_report_unsets_proxy_environment_and_forwards_report_options
+  def test_live_direct_and_specific_ip_routes_clear_proxies_and_forward_report_options
     Dir.mktmpdir("ip-quality-direct-live-") do |directory|
-      fake_reporter = File.join(directory, "fake-reporter")
-      arguments_file = File.join(directory, "arguments.txt")
-      File.write(fake_reporter, <<~'ZSH')
-        [[ -z "${HTTP_PROXY+x}${https_proxy+x}${No_PrOxY+x}" ]] || exit 71
-        print -r -- "$@" > "$IPQUALITY_TEST_ARGUMENTS_FILE"
-      ZSH
-      File.chmod(0o700, fake_reporter)
-      stdout = StringIO.new
-      stderr = StringIO.new
-      command = IpQuality::RouteCommand.new(
-        stdout: stdout,
-        stderr: stderr,
-        app_root: File.join(directory, "missing-clash-cache"),
-        reporter_path: fake_reporter
-      )
-
-      exit_code = with_environment(
-        "HTTP_PROXY" => "http://127.0.0.1:1",
-        "https_proxy" => "http://127.0.0.1:2",
-        "No_PrOxY" => "fixture.invalid",
-        "IPQUALITY_TEST_ARGUMENTS_FILE" => arguments_file
-      ) do
-        command.run(["--direct", "--confirm-network-lookup", "-4", "-j"])
-      end
-
-      assert_equal 0, exit_code
-      assert_equal "--confirm-network-lookup --scope reputation -4 -j\n", File.read(arguments_file)
-      assert_empty stdout.string
-      assert_includes stderr.string, "no Mihomo process is started"
-      assert_includes stderr.string, "live Clash state was unchanged"
-      assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"))
-    end
-  end
-
-  def test_specific_ip_menu_uses_provider_target_parameters_without_starting_mihomo
-    Dir.mktmpdir("ip-quality-specific-ip-") do |directory|
       write_clash_verge_fixture(directory)
       fake_reporter = File.join(directory, "fake-reporter")
       arguments_file = File.join(directory, "arguments.txt")
@@ -147,124 +63,54 @@ class RouteRunnerTest < Minitest::Test
         print -r -- "$@" > "$IPQUALITY_TEST_ARGUMENTS_FILE"
       ZSH
       File.chmod(0o700, fake_reporter)
-      stdout = StringIO.new
-      stderr = StringIO.new
-      command = IpQuality::RouteCommand.new(
-        stdout: stdout,
-        stderr: stderr,
-        stdin: StringIO.new("2\n12.217.32.68\n"),
-        app_root: directory,
-        reporter_path: fake_reporter
-      )
-
-      exit_code = with_environment(
-        "HTTP_PROXY" => "http://127.0.0.1:1",
-        "https_proxy" => "http://127.0.0.1:2",
-        "No_PrOxY" => "fixture.invalid",
-        "IPQUALITY_TEST_ARGUMENTS_FILE" => arguments_file
-      ) do
-        command.run(["--confirm-network-lookup", "-4", "-f"])
+      # [arguments, menu input, forwarded reporter arguments, stdout and stderr markers]
+      cases = [
+        [%w[--direct --confirm-network-lookup -4 -j], "", "--confirm-network-lookup --scope reputation -4 -j",
+         [], ["no Mihomo process is started", "live Clash state was unchanged"]],
+        [%w[--confirm-network-lookup -f], "1\n", "--confirm-network-lookup --scope reputation -4 -f",
+         ["Direct IP reputation report"], ["current system IPv4 route", "Direct reputation report finished"]],
+        [%w[--confirm-network-lookup -4 -f], "2\n12.217.32.68\n",
+         "--confirm-network-lookup --scope reputation -4 -f 12.217.32.68",
+         ["Specific IP lookup", "Enter one public IP address"],
+         ["Inspecting specific IP 12.217.32.68", "Specific-IP report finished"]]
+      ]
+      proxies = {"HTTP_PROXY" => "http://127.0.0.1:1", "https_proxy" => "http://127.0.0.1:2",
+                 "No_PrOxY" => "fixture.invalid", "IPQUALITY_TEST_ARGUMENTS_FILE" => arguments_file}
+      cases.each do |arguments, stdin, forwarded, menu, progress|
+        code, stdout, stderr = with_environment(proxies) do
+          run_route(arguments, stdin: stdin, app_root: directory, reporter_path: fake_reporter)
+        end
+        assert_equal 0, code, stderr
+        assert_equal "#{forwarded}\n", File.read(arguments_file)
+        menu.each { |text| assert_includes stdout, text }
+        progress.each { |text| assert_includes stderr, text }
+        refute_includes stdout, "Available inline leaves"
+        assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"))
       end
-
-      assert_equal 0, exit_code
-      assert_equal "--confirm-network-lookup --scope reputation -4 -f 12.217.32.68\n", File.read(arguments_file)
-      assert_includes stdout.string, "Specific IP lookup"
-      assert_includes stdout.string, "Enter one public IP address"
-      refute_includes stdout.string, "Available inline leaves"
-      assert_includes stderr.string, "Inspecting specific IP 12.217.32.68"
-      assert_includes stderr.string, "Specific-IP report finished"
-      assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"))
+      assert_includes run_route(["-6"], stdin: "1\n", app_root: directory, reporter_path: fake_reporter)[1], "IPv6 route"
     end
   end
 
-  def test_direct_menu_defaults_to_ipv4_and_allows_explicit_ipv6
-    Dir.mktmpdir("ip-quality-direct-comprehensive-") do |directory|
-      write_clash_verge_fixture(directory)
-      fake_reporter = File.join(directory, "fake-reporter")
-      arguments_file = File.join(directory, "arguments.txt")
-      File.write(fake_reporter, <<~'ZSH')
-        [[ -z "${HTTP_PROXY+x}${https_proxy+x}${No_PrOxY+x}" ]] || exit 71
-        print -r -- "$@" > "$IPQUALITY_TEST_ARGUMENTS_FILE"
-      ZSH
-      File.chmod(0o700, fake_reporter)
-      stdout = StringIO.new
-      stderr = StringIO.new
-      command = IpQuality::RouteCommand.new(
-        stdout: stdout,
-        stderr: stderr,
-        stdin: StringIO.new("1\n"),
-        app_root: directory,
-        reporter_path: fake_reporter
-      )
-
-      exit_code = with_environment(
-        "HTTP_PROXY" => "http://127.0.0.1:1",
-        "https_proxy" => "http://127.0.0.1:2",
-        "No_PrOxY" => "fixture.invalid",
-        "IPQUALITY_TEST_ARGUMENTS_FILE" => arguments_file
-      ) do
-        command.run(["--confirm-network-lookup", "-f"])
-      end
-
-      assert_equal 0, exit_code
-      assert_equal "--confirm-network-lookup --scope reputation -4 -f\n", File.read(arguments_file)
-      assert_includes stdout.string, "Direct IP reputation report"
-      assert_includes stderr.string, "current system IPv4 route"
-      assert_includes stderr.string, "Direct reputation report finished"
-      assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"))
-
-      ipv6_stdout = StringIO.new
-      ipv6_stderr = StringIO.new
-      ipv6_command = IpQuality::RouteCommand.new(
-        stdout: ipv6_stdout,
-        stderr: ipv6_stderr,
-        stdin: StringIO.new("1\n"),
-        app_root: directory,
-        reporter_path: fake_reporter
-      )
-      assert_equal 0, ipv6_command.run(["-6"])
-      assert_includes ipv6_stdout.string, "IPv6 route"
-    end
-  end
-
-  def test_specific_ip_menu_rejects_malformed_or_family_conflicting_input_before_lookup
+  def test_usage_errors_stop_before_any_lookup
     Dir.mktmpdir("ip-quality-specific-ip-reject-") do |directory|
       write_clash_verge_fixture(directory)
-
-      malformed_stdout = StringIO.new
-      malformed_stderr = StringIO.new
-      malformed = IpQuality::RouteCommand.new(
-        stdout: malformed_stdout,
-        stderr: malformed_stderr,
-        stdin: StringIO.new("2\nnot-an-ip\n"),
-        app_root: directory
-      )
-      assert_equal IpQuality::RouteCommand::EX_USAGE, malformed.run([])
-      assert_includes malformed_stderr.string, "specific IP must be one valid public address"
-
-      family_stdout = StringIO.new
-      family_stderr = StringIO.new
-      family = IpQuality::RouteCommand.new(
-        stdout: family_stdout,
-        stderr: family_stderr,
-        stdin: StringIO.new("2\n2001:db8::1\n"),
-        app_root: directory
-      )
-      assert_equal IpQuality::RouteCommand::EX_USAGE, family.run(["-4"])
-      assert_includes family_stderr.string, "conflicts with the selected address family"
+      code, _stdout, stderr = run_route([], stdin: "2\nnot-an-ip\n", app_root: directory)
+      assert_equal IpQuality::RouteCommand::EX_USAGE, code
+      assert_includes stderr, "specific IP must be one valid public address"
+      code, _stdout, stderr = run_route(["-4"], stdin: "2\n2001:db8::1\n", app_root: directory)
+      assert_equal IpQuality::RouteCommand::EX_USAGE, code
+      assert_includes stderr, "conflicts with the selected address family"
     end
-  end
-
-  def test_direct_rejects_leaf_only_options_before_network_access
-    stdout = StringIO.new
-    stderr = StringIO.new
-    command = IpQuality::RouteCommand.new(stdout: stdout, stderr: stderr)
-
-    exit_code = command.run(["--direct", "--leaf", "TargetLeaf"])
-
-    assert_equal IpQuality::RouteCommand::EX_USAGE, exit_code
-    assert_includes stderr.string, "--direct cannot be combined"
-    assert_empty stdout.string
+    {
+      %w[--direct --leaf TargetLeaf] => "--direct cannot be combined",
+      %w[--select --direct] => "--select",
+      %w[-l jp] => "unsupported language"
+    }.each do |arguments, message|
+      code, stdout, stderr = run_route(arguments)
+      assert_equal IpQuality::RouteCommand::EX_USAGE, code, arguments.join(" ")
+      assert_includes stderr, message
+      assert_empty stdout
+    end
   end
 
   def test_renderer_keeps_only_the_exact_leaf_and_recursive_dialer_dependencies
@@ -300,41 +146,18 @@ class RouteRunnerTest < Minitest::Test
     end
   end
 
-  def test_duplicate_leaf_names_are_rejected
-    document = fixture_document
-    document["proxies"] << document["proxies"].last.dup
-
-    error = assert_raises(IpQuality::ClashLeafProfile::Error) do
-      IpQuality::ClashLeafProfile.new(
-        IpQuality::ClashLeafProfile::Source.new("fixture", "fixture.yaml", document)
-      )
-    end
-    assert_includes error.message, "duplicate leaf proxy name"
-  end
-
-  def test_leaf_names_cannot_shadow_mihomo_builtins
-    document = fixture_document
-    document["proxies"].first["name"] = "DIRECT"
-
-    error = assert_raises(IpQuality::ClashLeafProfile::Error) do
-      IpQuality::ClashLeafProfile.new(
-        IpQuality::ClashLeafProfile::Source.new("fixture", "fixture.yaml", document)
-      )
-    end
-    assert_includes error.message, "collides with Mihomo builtin"
-  end
-
-  def test_profile_and_subscription_names_share_printable_byte_limits
+  def test_leaf_names_must_be_unique_printable_and_distinct_from_mihomo_builtins
+    duplicate = fixture_document
+    duplicate["proxies"] << duplicate["proxies"].last.dup
+    builtin = fixture_document
+    builtin["proxies"].first["name"] = "DIRECT"
+    cases = [[duplicate, "duplicate leaf proxy name"], [builtin, "collides with Mihomo builtin"]]
     ["bad\nname", "葉" * 171].each do |name|
       document = fixture_document
       document["proxies"].first["name"] = name
-      error = assert_raises(IpQuality::ClashLeafProfile::Error) do
-        IpQuality::ClashLeafProfile.new(
-          IpQuality::ClashLeafProfile::Source.new("fixture", "fixture.yaml", document)
-        )
-      end
-      assert_includes error.message, "bounded, printable name"
+      cases << [document, "bounded, printable name"]
 
+      # Subscription names share the same printable byte limit.
       Dir.mktmpdir("ip-quality-subscription-name-") do |directory|
         write_clash_verge_fixture(directory)
         registry_path = File.join(directory, "profiles.yaml")
@@ -347,27 +170,11 @@ class RouteRunnerTest < Minitest::Test
         assert_includes error.message, "metadata is malformed"
       end
     end
-  end
-
-  def test_safe_snapshot_rejects_symlinks_and_hard_links
-    Dir.mktmpdir("ip-quality-safe-snapshot-") do |directory|
-      original = File.join(directory, "profile.yaml")
-      File.write(original, "proxies: []\n")
-      File.chmod(0o600, original)
-
-      symlink = File.join(directory, "symlink.yaml")
-      File.symlink(original, symlink)
-      symlink_error = assert_raises(IpQuality::SafeSnapshot::Error) do
-        IpQuality::SafeSnapshot.read(symlink)
+    cases.each do |document, message|
+      error = assert_raises(IpQuality::ClashLeafProfile::Error) do
+        IpQuality::ClashLeafProfile.new(IpQuality::ClashLeafProfile::Source.new("fixture", "fixture.yaml", document))
       end
-      assert_equal :symlink, symlink_error.reason
-
-      hard_link = File.join(directory, "hard-link.yaml")
-      File.link(original, hard_link)
-      hard_link_error = assert_raises(IpQuality::SafeSnapshot::Error) do
-        IpQuality::SafeSnapshot.read(original)
-      end
-      assert_equal :hard_link, hard_link_error.reason
+      assert_includes error.message, message
     end
   end
 
@@ -375,21 +182,13 @@ class RouteRunnerTest < Minitest::Test
     Dir.mktmpdir("ip-quality-leaf-plan-") do |directory|
       profile_path = File.join(directory, "profile.yaml")
       write_private_yaml(profile_path, fixture_document)
-      stdout = StringIO.new
-      stderr = StringIO.new
-      command = IpQuality::RouteCommand.new(
-        stdout: stdout,
-        stderr: stderr,
-        stdin: StringIO.new
-      )
+      code, stdout, stderr = run_route(["--profile", profile_path, "--leaf", "TargetLeaf", "-4"])
 
-      exit_code = command.run(["--profile", profile_path, "--leaf", "TargetLeaf", "-4"])
-
-      assert_equal 0, exit_code
-      assert_includes stdout.string, "no network access has occurred"
-      assert_includes stdout.string, "live Clash profile/selection: read only and unchanged"
-      assert_includes stdout.string, "Ping0"
-      assert_empty stderr.string
+      assert_equal 0, code
+      assert_includes stdout, "no network access has occurred"
+      assert_includes stdout, "live Clash profile/selection: read only and unchanged"
+      assert_includes stdout, "Ping0"
+      assert_empty stderr
     end
   end
 
@@ -413,32 +212,11 @@ class RouteRunnerTest < Minitest::Test
 
   def test_configuration_workspace_is_removed_after_success_and_failure
     Dir.mktmpdir("ip-quality-cleanup-") do |directory|
-      fake_mihomo = File.join(directory, "fake-mihomo")
-      profile = IpQuality::ClashLeafProfile.new(
-        IpQuality::ClashLeafProfile::Source.new("fixture", "fixture.yaml", fixture_document)
-      )
-
-      File.write(fake_mihomo, "#!/bin/zsh\nexit 0\n")
-      File.chmod(0o700, fake_mihomo)
-      session = IpQuality::IsolatedMihomoSession.new(
-        profile,
-        "TargetLeaf",
-        mihomo_path: fake_mihomo,
-        temp_parent: directory
-      )
-      assert session.configuration_test
+      assert leaf_session(directory, exit_code: 0).configuration_test
       assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"))
 
-      File.write(fake_mihomo, "#!/bin/zsh\nexit 9\n")
-      File.chmod(0o700, fake_mihomo)
-      failing_session = IpQuality::IsolatedMihomoSession.new(
-        profile,
-        "TargetLeaf",
-        mihomo_path: fake_mihomo,
-        temp_parent: directory
-      )
       assert_raises(IpQuality::IsolatedMihomoSession::Error) do
-        failing_session.configuration_test
+        leaf_session(directory, exit_code: 9).configuration_test
       end
       assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"))
     end
@@ -456,20 +234,7 @@ class RouteRunnerTest < Minitest::Test
         File.chmod(0o600, File.join(workspace, ".ipquality-owner-pid"))
       end
 
-      fake_mihomo = File.join(directory, "fake-mihomo")
-      File.write(fake_mihomo, "#!/bin/zsh\nexit 0\n")
-      File.chmod(0o700, fake_mihomo)
-      profile = IpQuality::ClashLeafProfile.new(
-        IpQuality::ClashLeafProfile::Source.new("fixture", "fixture.yaml", fixture_document)
-      )
-      session = IpQuality::IsolatedMihomoSession.new(
-        profile,
-        "TargetLeaf",
-        mihomo_path: fake_mihomo,
-        temp_parent: directory
-      )
-
-      assert session.configuration_test
+      assert leaf_session(directory, exit_code: 0).configuration_test
       refute Dir.exist?(stale_workspace)
       assert Dir.exist?(live_workspace)
     end
@@ -609,19 +374,6 @@ class RouteRunnerTest < Minitest::Test
     end
   end
 
-  def test_direct_ruby_entrypoint_and_all_runtime_code_are_source_auditable
-    entrypoint = File.binread(RUNNER)
-    sources = Dir.glob(File.join(ROOT, "{bin,runner,common,providers,report}", "**", "*"))
-      .select { |path| File.file?(path) }
-      .map { |path| File.binread(path) }
-      .join("\n")
-
-    assert entrypoint.start_with?("#!/usr/bin/ruby --disable-gems\n")
-    refute_match(/\/bin\/bash|BASH_REMATCH|\bshopt\b|\bmapfile\b/, sources)
-    refute_includes sources, "external-controller"
-    refute_includes sources, "secret:"
-  end
-
   def test_executable_entrypoint_resolves_libraries_outside_the_worktree
     Dir.mktmpdir("ip-quality-entrypoint-") do |directory|
       stdout, stderr, status = Open3.capture3(
@@ -660,39 +412,17 @@ class RouteRunnerTest < Minitest::Test
   end
 
   def test_runner_plans_disclose_the_reporter_source_catalog
-    stdout = StringIO.new
-    command = IpQuality::RouteCommand.new(stdout: stdout, stderr: StringIO.new,
-      stdin: StringIO.new("2\n8.8.8.8\n"), app_root: File.join(Dir.tmpdir, "ipquality-absent-clash"))
-    assert_equal 0, command.run(["--sources", "dbip,ping0,ripestat"])
-    assert_includes stdout.string, "    DB-IP: not applicable to an explicit target"
-    assert_includes stdout.string, "    Ping0: not applicable to an explicit target"
-    assert_includes stdout.string, "    RIPEstat: routed prefix and origin ASN"
-    refute_includes stdout.string, "IPQS:"
+    code, stdout, = run_route(["--sources", "dbip,ping0,ripestat"], stdin: "2\n8.8.8.8\n")
+    assert_equal 0, code
+    assert_includes stdout, "    DB-IP: not applicable to an explicit target"
+    assert_includes stdout, "    Ping0: not applicable to an explicit target"
+    assert_includes stdout, "    RIPEstat: routed prefix and origin ASN"
+    refute_includes stdout, "IPQS:"
 
-    stdout = StringIO.new
-    command = IpQuality::RouteCommand.new(stdout: stdout, stderr: StringIO.new)
-    assert_equal 0, command.run(["--direct", "--sources", "independent"])
-    assert_includes stdout.string, "    DB-IP: public page + one visitor-egress lookup"
-    refute_includes stdout.string, "Scamalytics"
-  end
-
-  def test_removed_select_compatibility_flag_is_rejected
-    stderr = StringIO.new
-    command = IpQuality::RouteCommand.new(stdout: StringIO.new, stderr: stderr)
-    assert_equal IpQuality::RouteCommand::EX_USAGE, command.run(["--select", "--direct"])
-    assert_includes stderr.string, "--select"
-  end
-
-  def test_leaf_runner_rejects_unimplemented_report_languages_before_network_access
-    stdout = StringIO.new
-    stderr = StringIO.new
-    command = IpQuality::RouteCommand.new(stdout: stdout, stderr: stderr)
-
-    exit_code = command.run(["-l", "jp"])
-
-    assert_equal IpQuality::RouteCommand::EX_USAGE, exit_code
-    assert_includes stderr.string, "unsupported language"
-    assert_empty stdout.string
+    code, stdout, = run_route(["--direct", "--sources", "independent"])
+    assert_equal 0, code
+    assert_includes stdout, "    DB-IP: public page + one visitor-egress lookup"
+    refute_includes stdout, "Scamalytics"
   end
 
   private
@@ -729,6 +459,17 @@ class RouteRunnerTest < Minitest::Test
       ],
       "rules" => ["MATCH,FixtureGroup"]
     }
+  end
+
+  # A real session whose fake Mihomo `-t` check exits with the given code.
+  def leaf_session(directory, exit_code:)
+    fake_mihomo = File.join(directory, "fake-mihomo")
+    File.write(fake_mihomo, "#!/bin/zsh\nexit #{exit_code}\n")
+    File.chmod(0o700, fake_mihomo)
+    profile = IpQuality::ClashLeafProfile.new(
+      IpQuality::ClashLeafProfile::Source.new("fixture", "fixture.yaml", fixture_document)
+    )
+    IpQuality::IsolatedMihomoSession.new(profile, "TargetLeaf", mihomo_path: fake_mihomo, temp_parent: directory)
   end
 
   def write_private_yaml(path, document)
@@ -846,15 +587,5 @@ class RouteRunnerTest < Minitest::Test
     Process.kill("KILL", pid) if process_alive?(pid)
   rescue ArgumentError, Errno::ESRCH, Errno::EPERM
     nil
-  end
-
-  def with_environment(overrides)
-    previous = overrides.each_key.to_h { |key| [key, ENV.key?(key) ? ENV[key] : :missing] }
-    overrides.each { |key, value| ENV[key] = value }
-    yield
-  ensure
-    previous.each do |key, value|
-      value == :missing ? ENV.delete(key) : ENV[key] = value
-    end
   end
 end

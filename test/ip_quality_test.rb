@@ -3,88 +3,102 @@
 require_relative "support/reporter_test_case"
 
 class IpQualityTest < ReporterTestCase
-  def test_default_is_a_no_network_disclosure_plan
+  def test_default_reputation_plan_is_network_free_and_discloses_source_limits
     stdout, stderr, status = run_script
 
     assert status.success?, stderr
-    assert_includes stdout, "no network access has occurred"
-    assert_includes stdout, "scope: reputation"
-    assert_includes stdout, "reputation sources:"
-    refute_includes stdout, "media/AI sources:"
-    refute_includes stdout, "mail sources:"
-    refute_includes stdout, "DNSBL sources:"
-    assert_includes stdout, "telemetry/report upload/remote code: disabled"
-    assert_includes stdout, "one direct IPv4 fallback, querying the same target IP"
-    assert_includes stdout, "same provider also sees the system-route egress"
-    assert_includes stdout, "visitor/self demos never switch routes"
-    assert_includes stdout, "--confirm-network-lookup"
     assert_empty stderr
+    [
+      "no network access has occurred", "scope: reputation", "reputation sources:",
+      "telemetry/report upload/remote code: disabled",
+      "one direct IPv4 fallback, querying the same target IP",
+      "same provider also sees the system-route egress",
+      "visitor/self demos never switch routes", "--confirm-network-lookup",
+      "    DB-IP: public page + one visitor-egress lookup (must match target)",
+      "    IPWHOIS: public website demo, one target lookup",
+      "legacy Threat Score is retired",
+      "    Ipregistry: official API, only with a configured key",
+      "    Ping0: official free /geo endpoint", "not a risk score"
+    ].each { |text| assert_includes stdout, text }
+    ["media/AI sources:", "mail sources:", "DNSBL sources:"].each { |text| refute_includes stdout, text }
   end
 
-  def test_each_scope_has_a_bounded_plan
+  def test_each_scope_has_a_bounded_plan_and_retired_media_is_rejected
     {
-      "reputation" => "reputation sources:",
-      "dnsbl" => "DNSBL sources:",
-      "mail" => "mail sources:"
-    }.each do |scope, marker|
+      "reputation" => ["reputation sources:"],
+      "dnsbl" => ["DNSBL sources:"],
+      "mail" => ["mail sources:"],
+      "mail-dnsbl" => ["mail sources:", "DNSBL sources:"],
+      "full" => ["mail sources:", "DNSBL sources:"]
+    }.each do |scope, markers|
       stdout, stderr, status = run_script("--scope", scope)
-
       assert status.success?, "scope=#{scope}: #{stderr}"
-      assert_includes stdout, "scope: #{scope}"
-      assert_includes stdout, marker
       assert_empty stderr
+      assert_includes stdout, "scope: #{scope}"
+      markers.each { |marker| assert_includes stdout, marker, scope }
+      refute_includes stdout, "media/AI", scope
     end
-
-    stdout, stderr, status = run_script("--scope", "mail-dnsbl")
-    assert status.success?, stderr
-    assert_includes stdout, "scope: mail-dnsbl"
-    assert_includes stdout, "mail sources:"
-    assert_includes stdout, "DNSBL sources:"
-    assert_empty stderr
+    _stdout, stderr, status = run_script("--scope", "media-ai")
+    assert_equal 64, status.exitstatus
+    assert_includes stderr, "unsupported scope"
   end
 
   def test_explicit_plan_still_prevents_network_after_confirmation
-    stdout, stderr, status = run_script(
-      "--confirm-network-lookup",
-      "--plan",
-      "--scope",
-      "full"
-    )
+    stdout, stderr, status = run_script("--confirm-network-lookup", "--plan", "--scope", "full")
 
     assert status.success?, stderr
     assert_includes stdout, "no network access has occurred"
     assert_empty stderr
   end
 
-  def test_offline_self_test_covers_zsh_validators_and_dnsbl_aggregation
-    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", SELF_TEST, File.join(reporter_workspace, "bin", "ip-quality"))
-
-    assert status.success?, stderr
-    assert_match(/SELF-TEST OK: zsh runtime, validators, provider parsers, and \d+ DNSBL entries/, stdout)
-    assert_empty stderr
-  end
-
-  def test_invalid_short_options_fail_before_the_plan
-    [%w[-l jp], %w[--scope dnsbl -6], %w[--scope mail 8.8.8.8]].each do |arguments|
-      stdout, _stderr, status = run_script(*arguments)
-
-      refute status.success?, arguments.join(" ")
-      refute_includes stdout, "query plan", arguments.join(" ")
+  def test_option_parser_accepts_getopts_clusters_and_rejects_invalid_or_removed_flags
+    [%w[-4fj], %w[-len -4], %w[-l en -E], %w[-4 -- 8.8.8.8]].each do |arguments|
+      stdout, stderr, status = run_script(*arguments)
+      assert status.success?, "#{arguments.join(' ')}: #{stderr}"
+      assert_includes stdout, "query plan"
     end
+    # Removed upstream mutation/remote-execution flags fail as disabled (64);
+    # unsupported scope/family/target combinations keep their own gates.
+    {
+      %w[-p] => 1, %w[--bogus] => 1, %w[-o] => 1, %w[-4 8.8.8.8 1.1.1.1] => 1, %w[-l jp] => 1,
+      %w[--scope dnsbl -6] => 61, %w[--scope mail 8.8.8.8] => 62,
+      %w[-xhttp://127.0.0.1:1] => 64, %w[-y] => 64, %w[-M] => 64
+    }.each do |arguments, code|
+      stdout, stderr, status = run_script(*arguments)
+      assert_equal code, status.exitstatus, arguments.join(" ")
+      refute_includes stdout, "query plan", arguments.join(" ")
+      assert_includes stderr, "disabled" if code == 64
+    end
+    help, errors, result = run_script("--help")
+    assert result.success?, errors
+    assert_includes help, "-l cn|en"
+    stdout, stderr, status = run_script("--confirm-network-lookup", "--scope", "reputation", "-l", "jp")
+    assert_equal 1, status.exitstatus
+    assert_includes stdout, "不支持的参数"
+    assert_empty stderr
   end
 
-  def test_reputation_plan_discloses_ping0_public_result_and_risk_limitation
-    stdout, stderr, status = run_script("--scope", "reputation")
-
-    assert status.success?, stderr
-    assert_includes stdout, "reputation sources:"
-    assert_includes stdout, "    DB-IP: public page + one visitor-egress lookup (must match target)"
-    assert_includes stdout, "    IPWHOIS: public website demo, one target lookup"
-    assert_includes stdout, "legacy Threat Score is retired"
-    assert_includes stdout, "    Ipregistry: official API, only with a configured key"
-    assert_includes stdout, "    Ping0: official free /geo endpoint"
-    assert_includes stdout, "not a risk score"
-    assert_empty stderr
+  def test_address_prefix_decimal_and_dnsbl_helpers_validate_their_inputs
+    probe = <<~'ZSH'
+      source "$1"
+      check(){ "$@" && print -rn -- 1 || print -rn -- 0; }
+      check is_valid_ipv4 198.51.100.23; check is_valid_ipv4 999.51.100.23
+      check is_valid_ipv6 2001:4860:4860::8888; check is_valid_ipv6 2001:::1
+      check is_private_ipv4 192.168.1.1; check is_private_ipv4 8.8.8.8
+      check is_private_ipv6 2001:db8::1; check is_private_ipv6 2001:4860:4860::8888
+      check is_nonnegative_decimal 0.25; check is_nonnegative_decimal '0; print unsafe'
+      check is_signed_decimal -33.86; check is_signed_decimal '1; print unsafe'
+      print
+      print -r -- "$(mask_network_prefix 198.51.100.0/24)|$(mask_network_prefix 2001:db8:1234::/48)"
+      printf '%s\n' Clean Clean Blacklisted Other Unknown | summarize_dnsbl_results
+      (
+        query_scope=reputation requested_ip=8.8.8.8
+        IPV4check=1 IPV6check=1 IPV4work=0 IPV6work=0 ERRORcode=0
+        prepare_explicit_target && print -r -- "$IPV4|$IPV4work|$IPV6check"
+      )
+    ZSH
+    assert_equal ["101010101010", "198.51.*.*/24|2001:db8:*::/48", "5 2 1 1 1", "8.8.8.8|1|0"],
+      zsh!(probe, SCRIPT).lines(chomp: true)
   end
 
   def test_plan_discloses_only_selected_sources_and_explicit_target_limits
@@ -114,7 +128,7 @@ class IpQualityTest < ReporterTestCase
       %w[-60.4832 -172.2297] => "172°13′47″W, 60°29′0″S"
     }
     probe = 'source "$1"; shift; while (( $# ));do print -r -- "$(generate_dms "$1" "$2")"; shift 2;done'
-    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "dms", SCRIPT, *cases.keys.flatten)
+    stdout, stderr, status = zsh(probe, SCRIPT, *cases.keys.flatten)
     assert status.success?, stderr
     assert_equal cases.values, stdout.lines(chomp: true)
   end
@@ -130,7 +144,7 @@ class IpQualityTest < ReporterTestCase
       "421 4.7.0 Try again later (2201)",
       ""
     ]
-    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "smtp", *responses)
+    stdout, stderr, status = zsh(probe, *responses)
     assert status.success?, stderr
     assert_equal %w[yes yes no no no], stdout.split
   end
@@ -144,34 +158,10 @@ class IpQualityTest < ReporterTestCase
       "2001:db8:zz::1" => ""
     }
     probe = 'source "$1"; shift; setopt KSH_ARRAYS; for ip in "$@";do hide_ipv6 "$ip"; print -r -- "$IPhide";done'
-    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "ipv6", SCRIPT, *cases.keys)
+    stdout, stderr, status = zsh(probe, SCRIPT, *cases.keys)
     assert status.success?, stderr
     assert_equal cases.values, stdout.lines(chomp: true)
   end
-
-  def test_short_option_clusters_parse_like_getopts_and_removed_flags_fail
-    [%w[-4fj], %w[-len -4], %w[-l en -E], %w[-4 -- 8.8.8.8]].each do |arguments|
-      stdout, stderr, status = run_script(*arguments)
-      assert status.success?, "#{arguments.join(' ')}: #{stderr}"
-      assert_includes stdout, "query plan"
-    end
-    [%w[-p], %w[--bogus], %w[-o], %w[-4 8.8.8.8 1.1.1.1]].each do |arguments|
-      stdout, _stderr, status = run_script(*arguments)
-      assert_equal 1, status.exitstatus, arguments.join(" ")
-      refute_includes stdout, "query plan"
-    end
-  end
-
-def test_full_scope_keeps_optional_mail_and_dnsbl_but_rejects_retired_media
-  stdout, stderr, status = run_script("--scope", "full")
-  assert status.success?, stderr
-  assert_includes stdout, "mail sources:"
-  assert_includes stdout, "DNSBL sources:"
-  refute_includes stdout, "media/AI"
-  _stdout, stderr, status = run_script("--scope", "media-ai")
-  assert_equal 64, status.exitstatus
-  assert_includes stderr, "unsupported scope"
-end
 
   def test_concurrency_is_hard_bounded
     %w[0 51 nope].each do |value|
@@ -231,6 +221,44 @@ end
     assert_includes stderr, "正在检测黑名单数据库"
   end
 
+  def test_mail_live_path_discovers_a_public_egress_and_probes_each_service_mx
+    # Egress discovery skips private and malformed answers before the first public IPv4.
+    write_fake_command("curl", <<~'ZSH')
+      case "${@[-1]}" in
+        https://ipinfo.io/ip) print -rn -- 10.0.0.1 ;;
+        https://ip.sb) print -rn -- not-an-ip ;;
+        https://ping0.cc) print -rn -- 12.217.32.68 ;;
+        *) print -r -- "${@[-1]}" >> "$IPQUALITY_TEST_NETWORK_ATTEMPTS"; exit 7 ;;
+      esac
+    ZSH
+    write_fake_command("dig", <<~'ZSH')
+      case "$*" in
+        '+short MX gmail.com') print -rl -- '20 mx2.gmail.test.' '10 mx1.gmail.test.' ;;
+        '+short MX 163.com') print -r -- '10 mx.163.test.' ;;
+      esac
+    ZSH
+    write_fake_command("nc", <<~'ZSH')
+      print -r -- "$3" >> "$IPQUALITY_TEST_SMTP_HOSTS"
+      case "$3" in
+        smtp.mailgun.org|mx1.gmail.test.) print -r -- '220 fixture ESMTP' ;;
+        *) print -r -- "nc: connectx to $3 port 25 (tcp) failed: Operation timed out" ;;
+      esac
+    ZSH
+    hosts = File.join(reporter_workspace, "smtp-hosts")
+    stdout, stderr, status = run_script("--confirm-network-lookup", "--scope", "mail", "-4", "-j",
+      env: {"IPQUALITY_TEST_SMTP_HOSTS" => hosts})
+
+    assert status.success?, stderr
+    report = JSON.parse(stdout)
+    refute_includes stdout, "12.217.32.68"
+    assert_equal "12.217.*.*", report.dig("Head", "IP")
+    assert_equal true, report.dig("Mail", "Port25")
+    assert_equal true, report.dig("Mail", "Gmail")
+    %w[163 Outlook QQ].each { |service| assert_equal false, report.dig("Mail", service), service }
+    # Only the lowest-preference MX is probed; services without MX make no SMTP call.
+    assert_equal %w[smtp.mailgun.org mx1.gmail.test. mx.163.test.], File.readlines(hosts, chomp: true)
+  end
+
   def test_missing_live_dependency_stops_before_lookup_or_report_creation
     output_path = File.join(reporter_workspace, "must-not-exist.json")
     # Only the command tripwires are on PATH; jq and xargs are absent.
@@ -274,33 +302,6 @@ end
       assert_equal "220 fixture SMTP\n", stdout
       refute_includes File.read(arguments_file), "198.51.100.23"
       assert_empty stderr
-    end
-  end
-
-  def test_only_implemented_report_languages_are_advertised_and_accepted
-    help, errors, result = run_script("--help")
-    assert result.success?, errors
-    assert_includes help, "-l cn|en"
-    assert_empty errors
-
-    stdout, stderr, status = run_script(
-      "--confirm-network-lookup",
-      "--scope",
-      "reputation",
-      "-l",
-      "jp"
-    )
-    assert_equal 1, status.exitstatus
-    assert_includes stdout, "不支持的参数"
-    assert_empty stderr
-  end
-
-  def test_removed_upstream_mutation_and_remote_execution_flags_are_rejected
-    %w[-xhttp://127.0.0.1:1 -y -M].each do |flag|
-      _stdout, stderr, status = run_script(flag)
-
-      assert_equal 64, status.exitstatus, "flag=#{flag}"
-      assert_includes stderr, "disabled"
     end
   end
 

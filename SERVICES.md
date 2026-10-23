@@ -73,9 +73,9 @@ test job, not a project daemon:
 
 Use [TESTING.md](TESTING.md) for complete project validation. The scheduler and
 its service are owned by `/Users/zmx/Projects/supervisor`; this check remains
-useful and does not require a retained project browser. The 2026-10-12
-`inventory` contains neither the former `mcp.ipqs` account probe nor the
-`api.ipqs` expiry check. Manual account probes remain available when needed;
+useful and does not require a retained project browser. The 2026-10-23
+`inventory` again lists only this test for the project: neither the former
+`mcp.ipqs` account probe nor the `api.ipqs` expiry check is registered. Manual account probes remain available when needed;
 their existence does not imply scheduled monitoring. Historical support-mail
 receipts are not background services or instructions to restart a watch.
 

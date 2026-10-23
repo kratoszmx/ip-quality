@@ -1,9 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "support/reporter_test_case"
-require "stringio"
 require "timeout"
-load File.expand_path("../bin/ip-quality-route", __dir__) unless defined?(IpQuality::RouteCommand)
 
 class PrefixSampleTest < ReporterTestCase
   Result = Struct.new(:exitstatus) do
@@ -38,9 +36,7 @@ class PrefixSampleTest < ReporterTestCase
       last = network.to_range.last.to_i
       [first - 1, first, last, last + 1].select { |value| value.between?(0, 2**32 - 1) }
     end.uniq.map { |value| IPAddr.new(value, Socket::AF_INET).to_s }
-    stdout, errors, result = Open3.capture3("/bin/zsh", "-f", "-c",
-      'source "$1"; shift; for ip in "$@";do is_private_ipv4 "$ip"&&print -r -- "$ip private"||print -r -- "$ip public";done',
-      "boundary", SCRIPT, *edges)
+    stdout, errors, result = zsh('source "$1"; shift; for ip in "$@";do is_private_ipv4 "$ip"&&print -r -- "$ip private"||print -r -- "$ip public";done', SCRIPT, *edges)
     assert result.success?, errors
     expected = edges.map do |ip|
       address = IPAddr.new(ip)
@@ -98,13 +94,8 @@ class PrefixSampleTest < ReporterTestCase
           | if ($ip | endswith(".231")) then .Score.ipapi="0.14%" | .ProviderStatus.ipapi="ok"
             | .ProviderStatus.IPQS="tls_error" else . end'
       ZSH
-      env = {"HTTP_PROXY" => "http://127.0.0.1:1", "https_proxy" => "http://127.0.0.1:2", "No_PrOxY" => "invalid"}
-      saved = env.keys.to_h { |key| [key, ENV[key]] }
-      begin
-        env.each { |key, value| ENV[key] = value }
+      with_environment("HTTP_PROXY" => "http://127.0.0.1:1", "https_proxy" => "http://127.0.0.1:2", "No_PrOxY" => "invalid") do
         assert_equal 0, command.run(["--confirm-network-lookup", "-4"]), err.string
-      ensure
-        saved.each { |key, value| value ? ENV[key] = value : ENV.delete(key) }
       end
       batch_dir = Dir.glob(File.join(directory, "reports", "prefix-samples-*")).fetch(0)
       assert_equal 0o700, File.stat(batch_dir).mode & 0o777
@@ -195,7 +186,7 @@ class PrefixSampleTest < ReporterTestCase
         exit command.run(['--confirm-network-lookup', '-4'])
       RUBY
       pid = Process.spawn({"IPQUALITY_TEST_PID" => pid_path}, "/usr/bin/ruby", "--disable-gems", "-e", program,
-        File.join(ROOT, "bin/ip-quality-route"), directory, out: File::NULL, err: File::NULL)
+        RUNNER, directory, out: File::NULL, err: File::NULL)
       begin
         Timeout.timeout(10) { sleep 0.02 until File.file?(pid_path) && !File.read(pid_path).empty? }
         child = Integer(File.read(pid_path))
@@ -217,20 +208,6 @@ class PrefixSampleTest < ReporterTestCase
         Process.kill("KILL", -child) rescue Errno::ESRCH if child
       end
     end
-  end
-
-  def test_dbip_explicit_targets_skip_both_visitor_requests_and_show_inapplicable_status
-    stdout, stderr, status = run_script("--sources", "dbip,ping0", "--confirm-network-lookup", "-4", "-j", "8.8.8.8")
-    assert status.success?, stderr
-    report = JSON.parse(stdout)
-    assert_equal "not_applicable_target", report.dig("ProviderStatus", "DBIP")
-    assert_equal "not_applicable_target", report.dig("ScoreMeta", "DBIP", "Status")
-    assert_nil report.dig("Score", "DBIP")
-    assert_equal "not_applicable_target", report.dig("Ping0", "Status")
-    stdout, errors, result = run_script("--sources", "dbip", "--confirm-network-lookup", "-4", "8.8.8.8")
-    assert result.success?, errors
-    assert_includes stdout, "不支持指定 IP"
-    refute File.exist?(File.join(reporter_workspace, "network-attempts"))
   end
 
   private

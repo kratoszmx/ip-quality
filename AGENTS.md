@@ -143,8 +143,9 @@ never clean. Exact-leaf mode stays reputation-only. DNSBL concurrency is 1–50.
   loopback Mihomo ownership/cleanup, prefix sampling, local batch evidence and
   the Ruby reader of the source catalog.
 - `mcp/`: account MCP workspaces; `.state/`, `node_modules/`, `dist/` are private.
-- `ref/`: vendored runtime data, including the shared non-public IPv4 ranges. `test/`: offline suites, `test/support/`
-  helpers (including the zsh self-test) and sanitized `test/fixtures/`.
+- `ref/`: vendored runtime data, including the shared non-public IPv4 ranges.
+- `test/`: offline suites on one shared base class in `test/support/`, plus
+  sanitized `test/fixtures/`.
 
 ## Development guidance
 

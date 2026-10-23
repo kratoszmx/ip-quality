@@ -27,9 +27,8 @@ not restored as a low-risk result. JSON marks LegacyThreatScore as
 `retired_constant_zero`. Interpretation details remain here and in JSON;
 the terminal omits the repeated Cloudflare, DB-IP, ipapi and IPWHOIS prose.
 
-Cloudflare
-Security Center's IP Intelligence endpoint requires an account ID and an API
-token with Intel Read (or Intel Write) permission. Cloudflare documents 100
+Cloudflare Security Center's IP Intelligence endpoint requires an account ID
+and an API token with Intel Read (or Intel Write) permission. Cloudflare documents 100
 Threat Intelligence API calls per month on Free, Pro, and Business plans; calls
 made by other Security Center features also consume that monthly quota. The
 reporter does not attempt to estimate remaining provider quota.

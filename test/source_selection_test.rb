@@ -1,11 +1,8 @@
 # frozen_string_literal: true
 
 require_relative "support/reporter_test_case"
-load File.expand_path("../bin/ip-quality-route", __dir__) unless defined?(IpQuality::RouteCommand)
 
 class SourceSelectionTest < ReporterTestCase
-  DIRECT_ENV = %w[HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy IPQUALITY_ISOLATED_EGRESS].to_h { |key| [key, nil] }.freeze
-
   def test_presets_and_custom_lists_are_network_free_and_reject_invalid_ids
     stdout, stderr, status = run_script("--sources", "independent")
     assert status.success?, stderr
@@ -21,7 +18,7 @@ class SourceSelectionTest < ReporterTestCase
   end
 
   def test_runner_and_reporter_accept_the_same_source_ids_and_forward_choices
-    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", <<~'ZSH', "catalog", File.join(ROOT, "providers", "selection.zsh"))
+    stdout, stderr, status = zsh(<<~'ZSH', provider_library("selection"))
       source "$1"
       print -r -- "${(j:,:)reputation_source_ids}"
     ZSH
@@ -38,7 +35,7 @@ class SourceSelectionTest < ReporterTestCase
         exit command.run(ARGV)
       RUBY
       _out, err, result = Open3.capture3({"IPQUALITY_TEST_ARGUMENTS" => arguments},
-        "/usr/bin/ruby", "--disable-gems", "-e", code, File.join(ROOT, "bin", "ip-quality-route"), reporter,
+        "/usr/bin/ruby", "--disable-gems", "-e", code, RUNNER, reporter,
         "--direct", "--sources", "ipapi,ipqs", "--ipqs-dns", "alidns", "--confirm-network-lookup")
       assert result.success?, err
       assert_equal %w[--confirm-network-lookup --scope reputation -4 --sources ipapi,ipqs --ipqs-dns alidns], File.readlines(arguments, chomp: true)
@@ -46,12 +43,12 @@ class SourceSelectionTest < ReporterTestCase
   end
 
   def test_explicit_ipqs_doh_requires_direct_selection_and_never_changes_proxy_dns
-    stdout, stderr, status = run_script("--ipqs-dns", "alidns", "--sources", "ipqs", env: DIRECT_ENV)
+    stdout, stderr, status = run_script("--ipqs-dns", "alidns", "--sources", "ipqs", env: NO_PROXY_ENV)
     assert status.success?, stderr
     assert_includes stdout, "https://dns.alidns.com/dns-query"
     assert_includes stdout, "not the API key or target"
     [{"HTTPS_PROXY" => "http://127.0.0.1:1"}, {"IPQUALITY_ISOLATED_EGRESS" => "1"}].each do |proxy_env|
-      _out, err, result = run_script("--ipqs-dns", "alidns", "--confirm-network-lookup", env: DIRECT_ENV.merge(proxy_env))
+      _out, err, result = run_script("--ipqs-dns", "alidns", "--confirm-network-lookup", env: NO_PROXY_ENV.merge(proxy_env))
       assert_equal 64, result.exitstatus
       assert_includes err, "direct route"
     end
@@ -63,9 +60,8 @@ class SourceSelectionTest < ReporterTestCase
     calls = File.join(reporter_workspace, "curl-arguments")
     page = File.join(reporter_workspace, "page.html")
     text_path = File.join(reporter_workspace, "report.txt")
-    File.write(page, File.read(File.join(ROOT, "test", "fixtures", "scamalytics", "public-page.html")).gsub("198.51.100.23", "12.217.32.68"))
-    FileUtils.mkdir_p(File.join(reporter_workspace, "secrets"))
-    File.write(File.join(reporter_workspace, "secrets", "ipqs"), "fixturekey123", perm: 0o600)
+    File.write(page, File.read(fixture_path("scamalytics/public-page.html")).gsub("198.51.100.23", "12.217.32.68"))
+    write_ipqs_key
     write_fake_command("curl", <<~'ZSH')
       print -rl -- "$@" >> "$IPQUALITY_TEST_CALLS"
       request=$(cat)
@@ -85,8 +81,8 @@ class SourceSelectionTest < ReporterTestCase
       fi
     ZSH
     stdout, stderr, status = run_script("--confirm-network-lookup", "-4", "-j", "-o", text_path,
-      "12.217.32.68", env: DIRECT_ENV.merge("IPQUALITY_TEST_CALLS" => calls,
-        "IPQUALITY_TEST_RESPONSE" => IPQUALITYSCORE_OFFICIAL_FIXTURE, "IPQUALITY_TEST_PAGE" => page))
+      "12.217.32.68", env: NO_PROXY_ENV.merge("IPQUALITY_TEST_CALLS" => calls,
+        "IPQUALITY_TEST_RESPONSE" => IPQS_FIXTURE, "IPQUALITY_TEST_PAGE" => page))
     assert status.success?, stderr
     report = JSON.parse(stdout)
     assert_equal "all", report.dig("Query", "SourceSelection")
@@ -112,8 +108,7 @@ class SourceSelectionTest < ReporterTestCase
 
   def test_automatic_dns_keeps_proxy_ipv6_and_explicit_system_routes_unchanged
     calls = File.join(reporter_workspace, "calls")
-    FileUtils.mkdir_p(File.join(reporter_workspace, "secrets"))
-    File.write(File.join(reporter_workspace, "secrets", "ipqs"), "fixturekey123", perm: 0o600)
+    write_ipqs_key
     write_fake_command("curl", <<~'ZSH')
       print -rl -- "$@" >> "$IPQUALITY_TEST_CALLS"
       print -r -- "proxy=${HTTPS_PROXY:-none},isolated=${IPQUALITY_ISOLATED_EGRESS:-none}" >> "$IPQUALITY_TEST_CALLS"
@@ -134,8 +129,8 @@ class SourceSelectionTest < ReporterTestCase
     cases.each do |family, target, environment, options|
       File.write(calls, "")
       stdout, stderr, status = run_script("--confirm-network-lookup", "--sources", "ipqs", family, "-j",
-        *options, target, env: DIRECT_ENV.merge(environment).merge("IPQUALITY_TEST_CALLS" => calls,
-          "IPQUALITY_TEST_RESPONSE" => IPQUALITYSCORE_OFFICIAL_FIXTURE))
+        *options, target, env: NO_PROXY_ENV.merge(environment).merge("IPQUALITY_TEST_CALLS" => calls,
+          "IPQUALITY_TEST_RESPONSE" => IPQS_FIXTURE))
       assert status.success?, stderr
       assert_equal "system", JSON.parse(stdout).dig("Query", "IPQSDNS")
       refute_includes File.read(calls), "--doh-url"
@@ -148,8 +143,7 @@ class SourceSelectionTest < ReporterTestCase
   def test_only_selected_ipqs_is_queried_with_doh_at_both_stages_and_private_auth
     calls = File.join(reporter_workspace, "curl-arguments")
     config = File.join(reporter_workspace, "curl-config")
-    FileUtils.mkdir_p(File.join(reporter_workspace, "secrets"))
-    File.write(File.join(reporter_workspace, "secrets", "ipqs"), "fixturekey123", perm: 0o600)
+    write_ipqs_key
     write_fake_command("curl", <<~'ZSH')
       print -rl -- "$@" >> "$IPQUALITY_TEST_CALLS"
       request=$(cat)
@@ -165,9 +159,9 @@ class SourceSelectionTest < ReporterTestCase
       fi
     ZSH
     stdout, stderr, status = run_script("--sources", "ipqs", "--ipqs-dns", "alidns",
-      "--confirm-network-lookup", "-4", "-j", "12.217.32.68", env: DIRECT_ENV.merge(
+      "--confirm-network-lookup", "-4", "-j", "12.217.32.68", env: NO_PROXY_ENV.merge(
         "IPQUALITY_TEST_CALLS" => calls,
-        "IPQUALITY_TEST_CONFIG" => config, "IPQUALITY_TEST_RESPONSE" => IPQUALITYSCORE_OFFICIAL_FIXTURE))
+        "IPQUALITY_TEST_CONFIG" => config, "IPQUALITY_TEST_RESPONSE" => IPQS_FIXTURE))
     assert status.success?, stderr
     report = JSON.parse(stdout)
     assert_equal "ok", report.dig("ProviderStatus", "IPQS")
@@ -235,13 +229,12 @@ class SourceSelectionTest < ReporterTestCase
       exit 28
     ZSH
     options = ["--sources", "ipqs", "--ipqs-dns", "alidns", "--confirm-network-lookup", "-4", "-j", "12.217.32.68"]
-    stdout, stderr, status = run_script(*options, env: DIRECT_ENV.merge("IPQUALITY_TEST_CALLS" => calls))
+    stdout, stderr, status = run_script(*options, env: NO_PROXY_ENV.merge("IPQUALITY_TEST_CALLS" => calls))
     assert status.success?, stderr
     assert_equal "not_configured", JSON.parse(stdout).dig("ProviderStatus", "IPQS")
     refute File.exist?(calls)
-    FileUtils.mkdir_p(File.join(reporter_workspace, "secrets"))
-    File.write(File.join(reporter_workspace, "secrets", "ipqs"), "fixturekey123", perm: 0o600)
-    stdout, stderr, status = run_script(*options, env: DIRECT_ENV.merge("IPQUALITY_TEST_CALLS" => calls))
+    write_ipqs_key
+    stdout, stderr, status = run_script(*options, env: NO_PROXY_ENV.merge("IPQUALITY_TEST_CALLS" => calls))
     assert status.success?, stderr
     report = JSON.parse(stdout)
     assert_equal "timeout", report.dig("ProviderStatus", "IPQS")

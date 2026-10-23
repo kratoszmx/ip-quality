@@ -31,21 +31,20 @@ the tests and claiming a complete pass.
 
 | File | Responsibility |
 | --- | --- |
-| `test/common_test.rb` | Secret curl stdin/argument boundaries and exit status, HTTP envelopes/transport errors/state reset, printable text, nullable jq predicates, table widths/shape, proxy overrides and snapshots |
-| `test/ip_quality_test.rb` | CLI plans and rejection gates, dependency failure, fixture DNSBL/SMTP execution |
-| `test/providers_test.rb` | Provider parsing, literal JSON escaping across legacy adapters, unknown/failure semantics, credentials, zero-credit preflight |
+| `test/common_test.rb` | Secret curl stdin/argument boundaries and exit status, HTTP envelopes/transport errors/state reset, printable text, nullable jq predicates, table widths/shape, proxy overrides and snapshot link/mode/size boundaries |
+| `test/ip_quality_test.rb` | CLI plans, option parsing and rejection gates, address/prefix/decimal validators, dependency failure, fixture DNSBL and mail (egress discovery, MX, SMTP) execution |
+| `test/providers_test.rb` | Provider parsing, literal JSON escaping across legacy adapters, ipapi runtime outcomes, unknown/failure semantics, credentials, zero-credit preflight |
 | `test/check_place_test.rb` | Relay block/429 pauses and target/family/run isolation; MaxMind schema validation, stale-field clearing, translation failure, literal text/zero coordinates, and actual JSON/terminal IPinfo fallback |
 | `test/source_selection_test.rb` | Source presets/IDs, no-network validation, runner forwarding, failed columns, default full-run DNS/Scamalytics repair, unchanged IPv6/proxy routes and private auth/target binding |
 | `test/query_route_test.rb` | Target-preserving IPQS/Cloudflare direct fallback; sticky IPQS account/lookup route, IPv6 targets, bounded failures, no retry on response/certificate/quota errors, credential privacy and terminal/JSON provenance |
 | `test/scamalytics_test.rb` | Target/heading/badge agreement, bounded schema, nullable/conflicting factors, one same-route page fallback and preserved relay success |
 | `test/public_fallbacks_test.rb` | IP2Location target-bound page JSON, old/current ipdata demo-key syntax and booleans, full-flow fallback recovery, route/failure retention and official AbuseIPDB key privacy |
-| `test/dbip_test.rb` | Demo exact-IP/geography validation, no invented score, two-request visitor flow, route preservation and bounded guest tokens |
-| `test/public_demo_test.rb` | DB-IP labels/IPWHOIS boolean flags, quota errors, partial/malformed data, target binding, state reset and one-request IPWHOIS headers |
-| `test/report_test.rb` | Provider tables, ANSI/layout, JSON/file bytes, exclusive report creation |
-| `test/repository_test.rb` | Source/data safety, vendored references and AGPL provenance |
+| `test/public_demo_test.rb` | DB-IP visitor and IPWHOIS demo parsers: labels/boolean flags, quota errors, partial/malformed data, target binding, state reset, DB-IP two-request flow and bounded guest token, IPWHOIS one-request headers, and DB-IP/Ping0 explicit-target request suppression |
+| `test/report_test.rb` | Provider tables, ANSI/layout, JSON typing/escaping/masking, file bytes, exclusive report creation |
+| `test/repository_test.rb` | Runtime-source bans (zsh and the Ruby runner), vendored references, file safety and AGPL provenance |
 | `test/route_runner_test.rb` | Cached selection, YAML safety, exact leaf/dependencies, proxy isolation, process cleanup |
-| `test/prefix_sample_test.rb` | Multiline /24 sampling and deduplication, bounded/public input parity, no-consent/no-cache menu, proxy isolation, private result files, provider failures/percent scores, malformed/mismatched reports, interruption/TERM cleanup and DB-IP/Ping0 explicit-target request suppression |
-| `test/support/reporter_test_case.rb` | Shared paths, named zsh function probes, isolated reporter copies and fake commands |
+| `test/prefix_sample_test.rb` | Multiline /24 sampling and deduplication, bounded/public input parity, no-consent/no-cache menu, proxy isolation, private result files, provider failures/percent scores, malformed/mismatched reports, interruption/TERM cleanup |
+| `test/support/reporter_test_case.rb` | Shared base class: paths, `zsh`/`zsh!` probe runners, `fixture_path`/`provider_library`, named zsh function extraction, isolated reporter copies with network tripwires, `run_route`, `with_environment` |
 | `test/fixtures/` | Sanitized provider responses; data only |
 | `mcp/ipqs/tests/` | Official account/API, saved login, TOTP issuer/account/form policy, secrets and MCP contracts |
 | `mcp/provider-accounts/tests/` | HTTP identity/state, signup/TOTP/recovery policy, public-provider probes, private output and MCP contracts |
@@ -61,9 +60,6 @@ example seed with the one from a failing run:
 npm --prefix mcp/ipqs run check
 npm --prefix mcp/provider-accounts test
 ```
-
-The canonical runner includes `test/support/self_test.zsh` once (it sources the reporter in definition-only
-mode); it need not be run separately for a full pass.
 
 For a reporter-only aggregate, run from the root:
 
@@ -121,6 +117,11 @@ do not prove a live account session or current provider availability.
   timeout fails the test and its ensure block stops the owned fixture children.
   Preserve success, failure, signal, abandoned-workspace,
   route, link, and malformed-input coverage.
+- Shared myutils behavior (redaction rules, TOTP, secret files) is tested in
+  myutils; project suites cover only how this project applies it.
+- Probes source the reporter in definition-only mode or extract named
+  functions; use the base-class helpers instead of raw `Open3` calls, and
+  table-driven cases instead of near-identical test methods.
 - New suites belong at `test/*_test.rb`; helpers and data belong under
   `test/support/` and `test/fixtures/`. Add a sanitized parser fixture with each
   provider. Prefer observable results over exact implementation strings; keep

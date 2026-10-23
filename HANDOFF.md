@@ -7,9 +7,9 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
 
 - Structure: `bin/ip-quality` is about 800 lines. Each `providers/*.zsh` holds its
   parser and `db_*` adapter, `report/` owns labels, sections and JSON, and
-  sourcing the reporter loads definitions only (used by
-  `test/support/self_test.zsh`). One parser handles long options and short
-  clusters such as `-4fj`; the no-op `-p`/`--select` flags are gone.
+  sourcing the reporter loads definitions only (used by the test probes). One
+  parser handles long options and short clusters such as `-4fj`; the no-op
+  `-p`/`--select` flags are gone.
 - Shared catalogs: `providers/sources.tsv` (IDs, labels, independent preset,
   plan disclosures) and `ref/non_public_ipv4.txt` (public-IPv4 boundary) are
   read by both entrypoints. Plans list only selected sources and mark DB-IP and
@@ -45,6 +45,17 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
 - Reliability: reporter, runner and suites pin UTF-8 (C-locale shells previously
   failed 31 tests and non-ASCII leaf names); `scripts/test-offline` runs every
   suite; supervisor's weekly `test.ipquality.test-offline` runs all of them.
+- Tests (2026-10-23): reporter suites 165 → 139 cases with the same assertion
+  coverage (3,812 → 3,814 assertions). `test/support/self_test.zsh` repeated
+  ~15 parser checks already in Ruby suites and was removed; its unique
+  validator and JSON-typing checks moved to `ip_quality_test.rb` and
+  `report_test.rb`. DB-IP tests merged into `public_demo_test.rb`; overlapping
+  ipapi, Cloudflare, credential, CLI-option, report and route-runner cases became
+  table-driven. All suites share one base class (`zsh!`, `fixture_path`,
+  `run_route`, `with_environment`), and runner tests no longer read the real
+  Clash cache. New coverage: mail-scope live path (egress discovery skipping
+  private/invalid answers, lowest-preference MX, SMTP greeting). Both MCP suites
+  dropped re-tests of `@myutils/redaction`, which myutils covers.
 - MCPs: one npm workspace whose merged lock keeps only previously reviewed
   versions; both use myutils `generateFreshTotp` and `@myutils/redaction` (the
   union of the former IPQS, provider-account and web-text redactors, so page
@@ -121,6 +132,13 @@ public-example fallback remains in place.
   explicit; do not interpret saved account files as live authentication.
 - Direct Ping0 geography was verified on October 17; ATT's October 18 supplemental
   observation remained unknown. Other providers supplied location/ASN context.
+
+## Pending outside this repository
+
+- The supervisor skill's `inventory.md` (owned by the skill-maintenance session)
+  still lists the retired IPQS-only weekly command. The registered job,
+  `test.ipquality.test-offline` in `supervisor/integrations/testing.py`, already
+  runs `/bin/zsh -f scripts/test-offline`; only that table row needs updating.
 
 [TESTING.md](TESTING.md) owns complete/focused validation commands and their
 limits. Earlier change history remains in Git rather than duplicated handoff

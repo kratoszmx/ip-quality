@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ipqsSetup, enrollIpqsTotp, totpDirectory, acceptsIpqsTotpChallenge } from "../src/totp.js";
 import { REPO_ROOT } from "../src/config.js";
-import { redactText } from "@myutils/redaction";
 import type { Page } from "playwright-core";
 import { classifyIpqsAuthSignals } from "../src/auth.js";
 
@@ -29,14 +28,6 @@ test("untrusted or changed MFA pages stop before reading private account files",
   await assert.rejects(enrollIpqsTotp(foreign), /Expected authenticated/);
   const changed = { url: () => "https://www.ipqualityscore.com/user/settings", evaluate: async () => ({ ready: false, text: "Account settings changed" }) } as unknown as Page;
   assert.deepEqual(await enrollIpqsTotp(changed), { enabled: false, changed: false, state: "inspect_existing_factor" });
-});
-
-test("security text never emits the provisioning URI or emergency backup code", () => {
-  const output = redactText(`${uri}\n${recovery}`);
-  assert.ok(!output.includes("JBSWY3DPEHPK3PXP"));
-  assert.ok(!output.includes("12345678"));
-  assert.match(output, /redacted TOTP/);
-  assert.match(output, /redacted recovery code/);
 });
 
 test("MFA challenges cannot become authenticated because dashboard navigation is present", () => {

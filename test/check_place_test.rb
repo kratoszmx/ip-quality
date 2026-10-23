@@ -3,8 +3,6 @@
 require_relative "support/reporter_test_case"
 
 class CheckPlaceTest < ReporterTestCase
-  MAXMIND_FIXTURE = File.join(ROOT, "test", "fixtures", "check_place", "maxmind.json")
-
   def test_maxmind_rejects_malformed_and_empty_observations_without_stale_fields_or_jq_errors
     [
       '{"ASN":"unavailable","City":"unavailable","Country":"unavailable"}',
@@ -33,7 +31,7 @@ class CheckPlaceTest < ReporterTestCase
   end
 
   def test_maxmind_preserves_valid_utf8_backslashes_zero_coordinates_and_partial_fields
-    payload = JSON.parse(File.read(MAXMIND_FIXTURE))
+    payload = JSON.parse(File.read(fixture_path("check_place/maxmind.json")))
     payload["ASN"]["AutonomousSystemOrganization"] = 'Example \\network'
     payload["City"]["Name"] = "示例城市"
     result = run_maxmind_probe(JSON.generate(payload))
@@ -52,7 +50,7 @@ class CheckPlaceTest < ReporterTestCase
   end
 
   def test_maxmind_transport_failure_keeps_original_status_and_clears_stale_data
-    result = run_maxmind_probe(File.read(MAXMIND_FIXTURE), primary_status: "timeout", language: "cn")
+    result = run_maxmind_probe(File.read(fixture_path("check_place/maxmind.json")), primary_status: "timeout", language: "cn")
     assert_equal "timeout", result["Status"]
     assert_equal "ipinfo", result["Source"]
     assert_equal "", result["ASN"]
@@ -61,7 +59,7 @@ class CheckPlaceTest < ReporterTestCase
   end
 
   def test_invalid_or_failed_english_translation_cannot_erase_valid_primary_observations
-    payload = JSON.parse(File.read(MAXMIND_FIXTURE))
+    payload = JSON.parse(File.read(fixture_path("check_place/maxmind.json")))
     payload["City"]["Name"] = nil
     [["ok", '{"City":"unavailable"}'], ["timeout", ""]].each do |state, response|
       result = run_maxmind_probe(JSON.generate(payload), language: "cn", backup: response, backup_status: state)
@@ -77,7 +75,7 @@ class CheckPlaceTest < ReporterTestCase
 
   def test_valid_english_translation_fills_missing_fields_without_overwriting_primary_values
     result = run_maxmind_probe('{"ASN":{"AutonomousSystemNumber":64501}}',
-      language: "cn", backup: File.read(MAXMIND_FIXTURE))
+      language: "cn", backup: File.read(fixture_path("check_place/maxmind.json")))
     assert_equal "ok", result["Status"]
     assert_equal "64501", result["ASN"]
     assert_equal "Example Network", result["Organization"]
@@ -116,7 +114,7 @@ class CheckPlaceTest < ReporterTestCase
 
   def test_confirmed_block_or_rate_limit_stops_later_relay_requests_without_stale_data
     [
-      [File.read(CHECK_PLACE_CLOUDFLARE_FIXTURE) + "\n403", "cloudflare_blocked"],
+      [File.read(fixture_path("check_place/cloudflare-blocked.html")) + "\n403", "cloudflare_blocked"],
       ["slow down\n429", "rate_limited"]
     ].each do |wire, failure|
       stdout, stderr, status, calls = run_relay_probe(wire, <<~'ZSH')
@@ -200,8 +198,7 @@ class CheckPlaceTest < ReporterTestCase
         --arg map "${maxmind[map]}" --argjson calls "$request_count" \
         '{Status:$status,Source:$source,ASN:$asn,Organization:$organization,City:$city,Latitude:$lat,Longitude:$lon,Map:$map,Calls:$calls}'
     ZSH
-    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-      "maxmind-schema", SCRIPT, primary, backup, language, primary_status, backup_status)
+    stdout, stderr, status = zsh(probe, SCRIPT, primary, backup, language, primary_status, backup_status)
     assert status.success?, stderr
     assert_empty stderr
     JSON.parse(stdout)
@@ -225,8 +222,7 @@ class CheckPlaceTest < ReporterTestCase
           return "$curl_exit"
         }
       ZSH
-      result = Open3.capture3("/bin/zsh", "-f", "-c", probe + operations,
-        "relay-policy", COMMON_PROVIDER_LIBRARY, File.join(ROOT, "providers", "check_place.zsh"),
+      result = zsh(probe + operations, COMMON_PROVIDER_LIBRARY, provider_library("check_place"),
         reporter_functions("provider_fetch_public_json"), response, calls, curl_exit.to_s)
       result + [File.readlines(calls, chomp: true)]
     end

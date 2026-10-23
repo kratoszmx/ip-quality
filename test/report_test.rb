@@ -22,12 +22,12 @@ class ReportTest < ReporterTestCase
     relay_states = [["timeout", "network_error"], ["skipped_relay_cloudflare_blocked", "skipped_relay_rate_limited"]]
     %w[cn en].product(relay_states).each do |language, states|
       paused = states.first.start_with?("skipped_")
-      stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-        "failed-matrices", REPUTATION_REPORT, TERMINAL_LIBRARY, language, *states)
+      stdout, stderr, status = zsh(probe, REPUTATION_REPORT, TERMINAL_LIBRARY, language, *states)
       assert status.success?, stderr
       assert_empty stderr
       types, scores, factors = stdout.split(/Scores\n|Factors\n/)
-      assert_includes scores, language == "cn" ? "日额度用完" : "daily quota used"
+      assert_includes scores, language == "cn" ? "公开示例/日额度用完" : "public demo/daily quota used"
+      assert_match(/\|\s+#{language == "cn" ? "限流" : "rate limit"}\s*(?:\||$)/, factors)
       %w[IPinfo Ipregistry IPQS ipapi.is IP2Location AbuseIPDB].each { |name| assert_includes types, name }
       %w[IP2Location Scamalytics ipapi.is AbuseIPDB IPQS DB-IP].each { |name| assert_includes scores, name }
       %w[IP2Location ipapi.is Ipregistry IPQS Scamalytics ipdata IPinfo IPWHOIS].each { |name| assert_includes factors, name }
@@ -50,8 +50,7 @@ class ReportTest < ReporterTestCase
       sscore[title]=Scores ipqs[status]=unknown ipqs[source]=official_api
       show_score
     ZSH
-    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-      "unknown-ipqs", REPUTATION_REPORT, TERMINAL_LIBRARY)
+    stdout, stderr, status = zsh(probe, REPUTATION_REPORT, TERMINAL_LIBRARY)
     assert status.success?, stderr
     assert_empty stderr
     assert_includes stdout, "IPQS"
@@ -92,8 +91,7 @@ class ReportTest < ReporterTestCase
       ["cn", "ok", "full", "key"] => "可用",
       ["en", "ok", "full", "key"] => "available"
     }.each do |args, expected|
-      stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-        "ipapi-factor-status", REPUTATION_REPORT, TERMINAL_LIBRARY, *args)
+      stdout, stderr, status = zsh(probe, REPUTATION_REPORT, TERMINAL_LIBRARY, *args)
       assert status.success?, stderr
       assert_empty stderr
       assert_match(/(?:参数|Field)\s+\|.*ipapi\.is.*IPQS/, stdout)
@@ -123,7 +121,7 @@ class ReportTest < ReporterTestCase
       show_score
       show_factor
     ZSH
-    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "source-sections", REPUTATION_REPORT, TERMINAL_LIBRARY)
+    stdout, stderr, status = zsh(probe, REPUTATION_REPORT, TERMINAL_LIBRARY)
     assert status.success?, stderr
     assert_empty stderr
     score, factors = stdout.split("四、风险因子", 2)
@@ -142,52 +140,30 @@ class ReportTest < ReporterTestCase
     refute_match(/Threat Score|不是“否”|原始风险等级/, stdout)
   end
 
-  def test_cloudflare_missing_and_empty_threats_never_imply_a_clean_ip
+  def test_cloudflare_context_never_implies_a_clean_ip_or_repeats_network_rows
     probe = <<~'ZSH'
       source "$1"
       source "$2"
       YY=en
       typeset -A sscore cloudflare
       sscore[title]='3. Risk Score'
-      cloudflare[status]="$3" cloudflare[threats_json]="$4"
+      cloudflare[status]="$3" cloudflare[threats_json]="$4" cloudflare[network]="$5"
       show_cloudflare_basic
       show_score
     ZSH
-    { ["ok", "null"] => "-", ["ok", "[]"] => "none listed", ["rate_limited", "null"] => "-" }.each do |(state, threats), expected|
-      stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "threat-absence", REPUTATION_REPORT, TERMINAL_LIBRARY, state, threats)
-      assert status.success?, stderr
-      assert_empty stderr
+    {
+      ["ok", "null", ""] => "official/available",
+      ["ok", "[]", ""] => "Threat categories: none listed",
+      ["rate_limited", "null", "AS64500"] => "official/rate limit",
+      ["not_configured", "null", "AS64500"] => "Cloudflare",
+      ["invalid_response", "null", "AS64500"] => "Cloudflare"
+    }.each do |arguments, expected|
+      stdout = zsh!(probe, REPUTATION_REPORT, TERMINAL_LIBRARY, *arguments)
+      assert_includes stdout, expected, arguments.inspect
+      refute_includes stdout, "Threat categories", arguments.inspect unless arguments[1] == "[]"
       refute_includes stdout, "3. Risk Score"
-      if threats == "[]"
-        assert_includes stdout, "Threat categories: #{expected}"
-      else
-        refute_includes stdout, "Threat categories"
-      end
-      assert_includes stdout, state == "ok" ? "official/available" : "official/rate limit"
-      refute_includes stdout, "Threat Score"
-      refute_includes stdout, "Low"
+      refute_match(/Threat Score|ASN|AS64500|Low/, stdout)
     end
-  end
-
-  def test_demo_limitations_are_visible_in_risk_sections_without_clean_claims
-    probe = <<~'ZSH'
-      source "$1"
-      source "$2"
-      YY=cn
-      typeset -A sscore sfactor dbip ipwhois
-      sscore[title]='三、风险评分' sfactor[title]='四、风险因子'
-      dbip[status]=rate_limited ipwhois[status]=rate_limited
-      show_score
-      show_factor
-    ZSH
-    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "demo-limits", REPUTATION_REPORT, TERMINAL_LIBRARY)
-    assert status.success?, stderr
-    assert_empty stderr
-    assert_includes stdout, "DB-IP"
-    assert_match(/参数\s+\|\s+IPWHOIS/, stdout)
-    assert_match(/查询状态\s+\|\s+限流/, stdout)
-    assert_match(/来源\/状态\s+\|\s+公开示例\/限流/, stdout)
-    refute_match(/低风险|\|\s+否/, stdout)
   end
 
   def test_cloudflare_is_in_basic_information_for_both_report_routes_and_languages
@@ -221,8 +197,7 @@ class ReportTest < ReporterTestCase
       check_IP 198.51.100.23 4
     ZSH
     %w[cn en].product(%w[maxmind ipinfo]).each do |language, basic_source|
-      stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-        "cloudflare-basic-context", REPUTATION_REPORT, TERMINAL_LIBRARY, language, basic_source, File.join(ROOT, "providers", "selection.zsh"))
+      stdout, stderr, status = zsh(probe, REPUTATION_REPORT, TERMINAL_LIBRARY, language, basic_source, File.join(ROOT, "providers", "selection.zsh"))
       assert status.success?, stderr
       assert_empty stderr
       basic, remaining = stdout.split("2. IP Type", 2)
@@ -239,28 +214,6 @@ class ReportTest < ReporterTestCase
     end
   end
 
-  def test_cloudflare_unavailable_context_does_not_repeat_network_rows
-    probe = <<~'ZSH'
-      source "$1"
-      source "$2"
-      YY=en
-      typeset -A sscore cloudflare
-      sscore[title]=Scores
-      cloudflare[status]="$3"
-      [[ "$3" != ok ]]&&cloudflare[network]=AS64500
-      show_cloudflare_basic
-      show_score
-    ZSH
-    %w[ok rate_limited not_configured invalid_response].each do |state|
-      stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-        "cloudflare-no-asn-context", REPUTATION_REPORT, TERMINAL_LIBRARY, state)
-      assert status.success?, stderr
-      assert_empty stderr
-      assert_includes stdout, "Cloudflare"
-      refute_match(/ASN|AS64500|Low/, stdout)
-    end
-  end
-
   def test_score_rows_align_with_independent_column_widths
     probe = <<~'ZSH'
       setopt KSH_ARRAYS
@@ -273,7 +226,7 @@ class ReportTest < ReporterTestCase
       show_score
     ZSH
     %w[cn en].each do |language|
-      stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "long-score-cells", REPUTATION_REPORT, TERMINAL_LIBRARY, language)
+      stdout, stderr, status = zsh(probe, REPUTATION_REPORT, TERMINAL_LIBRARY, language)
       assert status.success?, stderr
       assert_empty stderr
       assert_aligned_table(stdout, minimum_rows: 4)
@@ -299,6 +252,84 @@ class ReportTest < ReporterTestCase
     end
   end
 
+  def test_json_report_keeps_types_escapes_masking_and_unknown_states
+    probe = <<~'ZSH'
+      source "$1"
+      set_language
+      special=$'Example "Org" \\ relay\nsecond line'
+      query_scope=reputation fullIP=0 basic_source=maxmind
+      IP=198.51.100.23 IPhide='198.51.*.*' shead[time_raw]=2026-08-23T00:00:00Z
+      maxmind=([status]=ok [org]="$special" [countrycode]=US [regcountrycode]=US)
+      ipinfo=([status]=ok [susetype]="${stype[hosting]}")
+      ipregistry=([status]=ok [susetype]="${stype[hosting]}" [scomtype]="${stype[hosting]}" [proxy]=false)
+      ip2location=([status]=ok [susetype]="${stype[unknown]}" [score]=3)
+      scamalytics[status]=invalid_response abuseipdb[status]=http_403 ipdata[status]=network_error
+      ipqs=([status]=ok [score]=100 [source]=official_api [susetype]="${stype[hosting]}" [proxy]=true)
+      ipapi=([status]=ok [risk]=$'High "quoted"' [mode]=full [ip]=198.51.100.23 [countrycode]=US)
+      ipwhois=([status]=ok [countrycode]=US [asn]=64500 [org]='Example Network' [isp]='Example ISP'
+        [timezone]=America/Los_Angeles [risk_status]=ok [proxy]=false [vpn]=true [tor]=false [server]=true)
+      dbip=([status]=ok [ip]=198.51.100.23 [countrycode]=US [risk_status]=ok [threat_level]=low
+        [country]='United States' [region]=California [city]='Example City')
+      cloudflare=([status]=ok [ip]=198.51.100.23 [countrycode]=US [network]=AS64500 [org]='Example Network'
+        [infrastructure]=hosting_provider [threats]='Phishing, Malware' [threats_json]='["Phishing", "Malware"]')
+      ping0=([status]=verified [match]=true [organization]="$special" [org]="$special")
+      ripestat=([status]=ok [prefix]=198.51.100.0/24 [origins]=AS64500)
+      internetdb=([status]=ok [ports]='22, 443' [port_count]=2 [hostname_count]=1 [vulnerability_count]=1 [tags]='vpn, edge')
+      smail=([t]=2 [c]=1 [m]=0 [b]=1 [u]=0 [dnsbl_results]=$'dnsbl.example\tClean\nlisted.example\tBlacklisted')
+      emit(){ save_json || exit 1; print -r -- "$ipjson" | jq -c .; }
+      emit
+      cloudflare[threats_json]=null
+      emit
+      basic_source=ipinfo
+      ipinfo=([status]=ok [asn]=64501 [city]='Fallback City' [continent]=Asia [subcode]=stale)
+      emit
+      query_scope=mail services=(Gmail 163) smailstatus=([Gmail]=true)
+      for port25 in 1 2 0;do smail[local]=$port25; emit; done
+    ZSH
+    report, no_threats, ipinfo_basic, *mail = zsh!(probe, SCRIPT).lines.map { |line| JSON.parse(line) }
+    special = "Example \"Org\" \\ relay\nsecond line"
+    {
+      %w[Info Organization] => special, %w[Ping0 Organization] => special,
+      %w[Type Source IPinfo] => "public demo widget", %w[Type Source Ipregistry] => "official API",
+      %w[Type Source IPQS] => "official_api", %w[Type Status IP2LOCATION] => "ok",
+      %w[Type Status AbuseIPDB] => "http_403", %w[Type Usage IP2LOCATION] => nil,
+      %w[Score IPQS] => "100", %w[Score Cloudflare] => nil, %w[Score DBIP] => nil,
+      %w[ScoreMeta IP2LOCATION Scale] => "0-99 potential risk", %w[ScoreMeta ipapi Band] => "High \"quoted\"",
+      %w[ScoreMeta IPQS Band] => nil, %w[ScoreMeta IPQS Status] => "ok",
+      %w[ScoreMeta Cloudflare Reason] => "numeric_score_not_provided",
+      %w[ScoreMeta Cloudflare LegacyThreatScore] => "retired_constant_zero",
+      %w[ScoreMeta DBIP Band] => "low", %w[ScoreMeta DBIP Source] => "public_demo",
+      %w[ProviderStatus CheckPlaceMaxMind] => "ok", %w[ProviderStatus ipdata] => "network_error",
+      %w[ProviderStatus IPWhois] => "ok", %w[ProviderStatus Cloudflare] => "ok", %w[ProviderStatus DBIP] => "ok",
+      %w[ProviderContext DBIP City] => "Example City", %w[ProviderContext IPAPI Mode] => "full",
+      %w[ProviderContext IPAPI CountryCode] => "US", %w[ProviderContext IPWhois ASN] => "64500",
+      %w[ProviderContext Cloudflare ThreatCategories] => %w[Phishing Malware],
+      %w[Factor CountryCode IPWhois] => "US", %w[Factor Proxy IPWhois] => false,
+      %w[Factor VPN IPWhois] => true, %w[Factor Abuser IPWhois] => nil, %w[FactorMeta IPWhois Source] => "public_demo",
+      %w[Factor Proxy IPQS] => true, %w[Factor Proxy Ipregistry] => false, %w[Factor VPN IPinfo] => nil,
+      %w[Routing Prefix] => "198.51.*.*/24", %w[Exposure Ports] => [22, 443], %w[Exposure HostnameCount] => 1,
+      %w[Mail DNSBlacklist Results dnsbl.example] => "Clean",
+      %w[Mail DNSBlacklist Results listed.example] => "Blacklisted", %w[Mail Port25] => nil
+    }.each do |path, expected|
+      expected.nil? ? assert_nil(report.dig(*path), path.join(".")) : assert_equal(expected, report.dig(*path), path.join("."))
+    end
+    refute_nil report.dig("Type", "Usage", "IPQS")
+    %w[DBIP IPAPI Cloudflare].each { |name| assert_equal report.dig("Head", "IP"), report.dig("ProviderContext", name, "IP") }
+    refute_includes JSON.generate(report), "198.51.100.23"
+    refute report.key?("Media")
+    # Missing Cloudflare threats stay unknown instead of becoming an empty list.
+    assert_nil no_threats.dig("ProviderContext", "Cloudflare", "ThreatCategories")
+    assert_equal({"Source" => "IPinfo public demo widget", "ASN" => "64501", "City" => "Fallback City",
+      "SubCode" => nil, "ContinentCode" => nil, "Continent" => "Asia"},
+      {"Source" => ipinfo_basic.dig("Info", "Source"), "ASN" => ipinfo_basic.dig("Info", "ASN"),
+       "City" => ipinfo_basic.dig("Info", "City", "Name"), "SubCode" => ipinfo_basic.dig("Info", "City", "SubCode"),
+       "ContinentCode" => ipinfo_basic.dig("Info", "Continent", "Code"),
+       "Continent" => ipinfo_basic.dig("Info", "Continent", "Name")})
+    # Port 25 reachable / unknown / blocked decides whether mail rows are known.
+    assert_equal [[true, true, false], [nil, nil, nil], [false, false, false]],
+      mail.map { |json| [json.dig("Mail", "Port25"), json.dig("Mail", "Gmail"), json.dig("Mail", "163")] }
+  end
+
   def test_shared_terminal_cleanup_preserves_layout_and_normalizes_values
     probe = <<~'ZSH'
       source "$1"
@@ -306,8 +337,7 @@ class ReportTest < ReporterTestCase
       clean_ansi "$value" "$2"
     ZSH
     { "preserve" => " \t中 \n  next \t\n\n", "" => "中\nnext" }.each do |mode, expected|
-      stdout, stderr, status = Open3.capture3(
-        "/bin/zsh", "-f", "-c", probe, "terminal-cleanup-test", TERMINAL_LIBRARY, mode
+      stdout, stderr, status = zsh(probe, TERMINAL_LIBRARY, mode
       )
       assert status.success?, stderr
       assert_equal expected, stdout
@@ -329,8 +359,7 @@ class ReportTest < ReporterTestCase
       print -r -- "${#PADDING}"
       [[ -o KSH_ARRAYS && -o SH_WORD_SPLIT && -o NO_CASE_MATCH ]]
     ZSH
-    stdout, stderr, status = Open3.capture3(
-      "/bin/zsh", "-f", "-c", probe, "terminal-width-test", TERMINAL_LIBRARY, REPUTATION_REPORT
+    stdout, stderr, status = zsh(probe, TERMINAL_LIBRARY, REPUTATION_REPORT
     )
     assert status.success?, stderr
     assert_equal "3\n4\n3\n5\n3\n\e[31m A中 \e[0m   |\n3\n", stdout
@@ -358,13 +387,7 @@ class ReportTest < ReporterTestCase
       show_score
       show_factor
     ZSH
-    stdout, stderr, status = Open3.capture3(
-      "/bin/zsh",
-      "-f",
-      "-c",
-      report_probe,
-      "report-test",
-      REPUTATION_REPORT,
+    stdout, stderr, status = zsh(report_probe, REPUTATION_REPORT,
       TERMINAL_LIBRARY
     )
     assert status.success?, stderr
@@ -426,9 +449,7 @@ class ReportTest < ReporterTestCase
       show_score
       show_factor
     ZSH
-    stdout, stderr, status = Open3.capture3(
-      "/bin/zsh", "-f", "-c", report_probe,
-      "report-alignment-test", REPUTATION_REPORT, TERMINAL_LIBRARY
+    stdout, stderr, status = zsh(report_probe, REPUTATION_REPORT, TERMINAL_LIBRARY
     )
 
     assert status.success?, stderr
@@ -476,9 +497,7 @@ class ReportTest < ReporterTestCase
       source "$1"
       show_network_context
     ZSH
-    stdout, stderr, status = Open3.capture3(
-      "/bin/zsh", "-f", "-c", context_probe,
-      "network-context-report-test", REPUTATION_REPORT, TERMINAL_LIBRARY
+    stdout, stderr, status = zsh(context_probe, REPUTATION_REPORT, TERMINAL_LIBRARY
     )
 
     assert status.success?, stderr
@@ -514,9 +533,7 @@ class ReportTest < ReporterTestCase
       source "$1"
       show_network_context
     ZSH
-    stdout, stderr, status = Open3.capture3(
-      "/bin/zsh", "-f", "-c", context_probe,
-      "additional-provider-context-test", REPUTATION_REPORT, TERMINAL_LIBRARY
+    stdout, stderr, status = zsh(context_probe, REPUTATION_REPORT, TERMINAL_LIBRARY
     )
 
     assert status.success?, stderr
@@ -552,13 +569,7 @@ class ReportTest < ReporterTestCase
       scamalytics[source]=public_demo
       show_unavailable_sources
     ZSH
-    stdout, stderr, status = Open3.capture3(
-      "/bin/zsh",
-      "-f",
-      "-c",
-      report_probe,
-      "report-unavailable-test",
-      REPUTATION_REPORT,
+    stdout, stderr, status = zsh(report_probe, REPUTATION_REPORT,
       TERMINAL_LIBRARY
     )
 
@@ -603,9 +614,7 @@ class ReportTest < ReporterTestCase
       show_score
       show_factor
     ZSH
-    stdout, stderr, status = Open3.capture3(
-      "/bin/zsh", "-f", "-c", report_probe,
-      "ipqs-independent-report-test", REPUTATION_REPORT, TERMINAL_LIBRARY
+    stdout, stderr, status = zsh(report_probe, REPUTATION_REPORT, TERMINAL_LIBRARY
     )
 
     assert status.success?, stderr
@@ -614,35 +623,6 @@ class ReportTest < ReporterTestCase
     assert_match(/参数\s+\|.*IP2Location.*Scamalytics.*ipdata/, stdout)
     assert_includes stdout, "分值"
     assert_includes stdout, "地区"
-    assert_empty stderr
-  end
-
-  def test_reputation_factor_colors_distinguish_safe_risk_and_unknown_values
-    color_probe = <<~'ZSH'
-      Font_B=$'\033[1m' Font_Red=$'\033[31m' Font_Green=$'\033[32m'
-      Font_Purple=$'\033[35m' Font_Cyan=$'\033[36m' Font_Suffix=$'\033[0m'
-      YY=cn
-      clean_ansi(){ print -rn -- "$1" }
-      source "$1"
-      report_factor_value false
-      print -rn -- '|'
-      report_factor_value true
-      print -rn -- '|'
-      report_factor_value ''
-    ZSH
-    stdout, stderr, status = Open3.capture3(
-      "/bin/zsh",
-      "-f",
-      "-c",
-      color_probe,
-      "report-color-test",
-      REPUTATION_REPORT
-    )
-
-    assert status.success?, stderr
-    assert_includes stdout, "\e[32m\e[1m否"
-    assert_includes stdout, "\e[31m\e[1m是"
-    assert_includes stdout, "\e[35m未知"
     assert_empty stderr
   end
 
@@ -670,9 +650,7 @@ class ReportTest < ReporterTestCase
       eval "$1"
       show_dnsbl
     ZSH
-    stdout, stderr, status = Open3.capture3(
-      "/bin/zsh", "-f", "-c", report_probe,
-      "dnsbl-aggregate-context-test", function_source
+    stdout, stderr, status = zsh(report_probe, function_source
     )
 
     assert status.success?, stderr
@@ -727,7 +705,6 @@ class ReportTest < ReporterTestCase
       close_report_output
       [[ $output_fd -eq -1 ]]
     ZSH
-    Open3.capture3("/bin/zsh", "-f", "-c", probe, "report-writer-test",
-                   TERMINAL_LIBRARY, path, json, ansi)
+    zsh(probe, TERMINAL_LIBRARY, path, json, ansi)
   end
 end

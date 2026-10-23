@@ -67,7 +67,7 @@ formatter was replaced by exact integer arithmetic:
   selection, target mode and effective IPQS DNS policy.
 - Ported Bash 4+ constructs and DNSBL workers to system `/bin/zsh`; removed
   background spinners, Bash upgrades, dependency installers, and package-manager
-  mutations. Added offline self-tests, fixtures, safety guidance, and disclosure.
+  mutations. Added offline tests, fixtures, safety guidance, and disclosure.
 - Added default no-network plans, the exact `--confirm-network-lookup` gate,
   explicit scopes, and DNSBL concurrency bounded to 1–50.
 - Removed telemetry, counters, advertisements, sponsor downloads, remote menus,

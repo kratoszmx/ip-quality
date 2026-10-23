@@ -1,15 +1,11 @@
 # frozen_string_literal: true
 
-require "minitest/autorun"
-require "tmpdir"
-require "open3"
-require "json"
+require_relative "support/reporter_test_case"
 require_relative "../common/network_environment"
-require_relative "support/utf8_locale"
 require_relative "../common/safe_snapshot"
 require_relative "../common/text"
 
-class CommonTest < Minitest::Test
+class CommonTest < ReporterTestCase
   def test_secret_curl_options_stay_on_stdin_and_preserve_arguments_and_exit_status
     probe = <<~'ZSH'
       setopt KSH_ARRAYS SH_WORD_SPLIT NO_CASE_MATCH
@@ -31,8 +27,7 @@ class CommonTest < Minitest::Test
       [[ -o KSH_ARRAYS && -o SH_WORD_SPLIT && -o NO_CASE_MATCH ]]
     ZSH
     Dir.mktmpdir("ip-quality-http-request-") do |directory|
-      stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-        "secret-http", File.expand_path("../common/http_request.zsh", __dir__), directory)
+      stdout, stderr, status = zsh(probe, COMMON_HTTP_LIBRARY, directory)
       assert status.success?, stderr
       assert_empty stderr
       assert_equal "fixture-response|35\nfixture-response|35\n", stdout
@@ -62,8 +57,7 @@ class CommonTest < Minitest::Test
       done
       [[ -o KSH_ARRAYS && -o SH_WORD_SPLIT ]]
     ZSH
-    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-      "http-envelope", File.expand_path("../common/provider_values.zsh", __dir__))
+    stdout, stderr, status = zsh(probe, COMMON_PROVIDER_LIBRARY)
     assert status.success?, stderr
     assert_empty stderr
     assert_equal ["timeout|", "tls_error|", "tls_verification_failed|", "network_error|",
@@ -81,8 +75,7 @@ class CommonTest < Minitest::Test
       print -r -- "${#provider_fields}"
     ZSH
     json = JSON.generate("a" => 64_500, "b" => nil, "c" => "x\u0000y z", "d" => true)
-    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "json-fields",
-      File.expand_path("../common/provider_values.zsh", __dir__), json)
+    stdout, stderr, status = zsh(probe, COMMON_PROVIDER_LIBRARY, json)
     assert status.success?, stderr
     assert_equal "64500|null|xy z|true|null\n0\n", stdout
   end
@@ -98,8 +91,7 @@ class CommonTest < Minitest::Test
       terminal_table_row "$widths" A $'\033[31m香港\033[0m' unknown
       [[ -o KSH_ARRAYS && -o SH_WORD_SPLIT && -o NO_CASE_MATCH ]]
     ZSH
-    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-      "common-table", File.expand_path("../common/terminal.zsh", __dir__))
+    stdout, stderr, status = zsh(probe, TERMINAL_LIBRARY)
     assert status.success?, stderr
     assert_empty stderr
     assert_equal "4 4 7\nName | 地区 | Status \n-----+------+--------\nA    | \e[31m香港\e[0m | unknown\n", stdout
@@ -121,8 +113,7 @@ class CommonTest < Minitest::Test
       terminal_table_rule '3 invalid'
       (( $? == 2 ))||exit 1
     ZSH
-    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-      "common-table-invalid", File.expand_path("../common/terminal.zsh", __dir__))
+    stdout, stderr, status = zsh(probe, TERMINAL_LIBRARY)
     assert status.success?, stderr
     assert_empty stdout
     assert_empty stderr
@@ -137,7 +128,7 @@ class CommonTest < Minitest::Test
         integer: [null, 0, 3, -1, 4, 1.5, "1", false, [], {}] | map(integer_or_null(.; 0; 3))
       }
     JQ
-    stdout, stderr, status = Open3.capture3("jq", "-n", "-L", File.expand_path("../common", __dir__), filter)
+    stdout, stderr, status = Open3.capture3("jq", "-n", "-L", File.join(ROOT, "common"), filter)
     assert status.success?, stderr
     assert_empty stderr
     result = JSON.parse(stdout)
@@ -173,7 +164,7 @@ class CommonTest < Minitest::Test
     assert_equal "/fixture/home", environment.fetch("HOME")
   end
 
-  def test_snapshot_read_enforces_size_and_verify_only_keeps_file_policy
+  def test_snapshot_read_enforces_size_links_and_verify_only_keeps_file_policy
     Dir.mktmpdir("ip-quality-common-snapshot-") do |directory|
       path = File.join(directory, "fixture")
       File.write(path, "abcd")
@@ -200,6 +191,11 @@ class CommonTest < Minitest::Test
         IpQuality::SafeSnapshot.read(symlink, allowed_modes: [0o700], max_bytes: nil)
       end
       assert_equal :symlink, error.reason
+      File.link(path, File.join(directory, "hard-link"))
+      error = assert_raises(IpQuality::SafeSnapshot::Error) do
+        IpQuality::SafeSnapshot.read(path, allowed_modes: [0o700], max_bytes: nil)
+      end
+      assert_equal :hard_link, error.reason
 
       File.rename(path, File.join(directory, "previous"))
       File.write(path, "abcd")

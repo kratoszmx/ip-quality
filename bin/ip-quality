@@ -706,7 +706,7 @@ write_report_output "$ip_report"||return $?
 fi
 return 0
 }
-# Sourcing loads definitions only (offline self-test); executing runs the CLI.
+# Sourcing loads definitions only (offline test probes); executing runs the CLI.
 [[ "${(j: :)zsh_eval_context[@]}" == *file ]]&&return 0
 parse_cli "$@"||exit $?
 if [[ $version_requested -eq 1 ]];then

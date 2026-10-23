@@ -88,8 +88,7 @@ class ScamalyticsTest < ReporterTestCase
       calls = File.join(dir, "calls")
       cases.each do |relay, body, http, curl_exit, expected, fields|
         File.write(calls, "")
-        out, err, result = Open3.capture3("/bin/zsh", "-f", "-c", probe,
-          "scamalytics-route", COMMON_PROVIDER_LIBRARY, LIBRARY, reporter_functions("db_scamalytics"),
+        out, err, result = zsh(probe, COMMON_PROVIDER_LIBRARY, LIBRARY, reporter_functions("db_scamalytics"),
           FIXTURE, calls, relay, body, http, curl_exit.to_s)
         assert result.success?, err
         assert_empty err
@@ -115,8 +114,7 @@ class ScamalyticsTest < ReporterTestCase
       db_scamalytics 4
       print -r -- "${scamalytics[source]}|${scamalytics[status]}|${scamalytics[score]}|${scamalytics[vpn]}"
     ZSH
-    out, err, result = Open3.capture3("/bin/zsh", "-f", "-c", probe, "relay-success",
-      COMMON_PROVIDER_LIBRARY, reporter_functions("db_scamalytics"))
+    out, err, result = zsh(probe, COMMON_PROVIDER_LIBRARY, reporter_functions("db_scamalytics"))
     assert result.success?, err
     assert_empty err
     assert_equal "check_place_relay|ok|7|true\n", out
@@ -135,6 +133,6 @@ class ScamalyticsTest < ReporterTestCase
       fi
       print -r -- "${scamalytics_parsed[score]}|${scamalytics_parsed[risk]}|${scamalytics_parsed[countrycode]}|${scamalytics_parsed[proxy]}|${scamalytics_parsed[vpn]}|${scamalytics_parsed[tor]}|${scamalytics_parsed[server]}|${scamalytics_parsed[abuser]}|${scamalytics_parsed[robot]}"
     ZSH
-    Open3.capture3("/bin/zsh", "-f", "-c", probe, "scamalytics-page", LIBRARY, target, stdin_data: page)
+    zsh(probe, LIBRARY, target, stdin_data: page)
   end
 end

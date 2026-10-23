@@ -19,7 +19,7 @@ class PublicFallbacksTest < ReporterTestCase
     ZSH
     page = File.read(IP2_PAGE)
     ["198.51.100.23", "2001:4860:4860::8888"].each do |ip|
-      out, err, status = Open3.capture3("/bin/zsh", "-f", "-c", code, "ip2", IP2_LIBRARY, ip,
+      out, err, status = zsh(code, IP2_LIBRARY, ip,
         stdin_data: page.gsub("198.51.100.23", ip))
       assert status.success?, err
       assert_empty err
@@ -31,7 +31,7 @@ class PublicFallbacksTest < ReporterTestCase
      page.sub('"is_vpn": false', '"is_vpn": "false"'),
      page.sub('"proxy": {', '"proxy": "bad", "unused": {'),
      "<html>Just a moment</html>", page + " " * 262_144].each do |invalid|
-      out, err, status = Open3.capture3("/bin/zsh", "-f", "-c", code, "ip2", IP2_LIBRARY,
+      out, err, status = zsh(code, IP2_LIBRARY,
         "198.51.100.23", stdin_data: invalid)
       refute status.success?
       assert_empty out
@@ -47,8 +47,7 @@ class PublicFallbacksTest < ReporterTestCase
        page.sub("abcdef0123456789abcdef0123456789", 'unsafe"value'), page + " " * 262_144]
     end + [pages.join]
     (pages + invalid).each_with_index do |body, index|
-      out, err, status = Open3.capture3("/bin/zsh", "-f", "-c",
-        'source "$1"; ipdata_demo_key_from_page "$(cat)"', "ipdata-key", IPDATA_LIBRARY, stdin_data: body)
+      out, err, status = zsh('source "$1"; ipdata_demo_key_from_page "$(cat)"', IPDATA_LIBRARY, stdin_data: body)
       assert_empty err
       assert_equal index < pages.length, status.success?
       assert_equal(index < pages.length ? "abcdef0123456789abcdef0123456789\n" : "", out)
@@ -60,8 +59,7 @@ class PublicFallbacksTest < ReporterTestCase
     [valid, {"message" => "quota exceeded"}, valid.merge("ip" => "8.8.8.8"),
       valid.merge("threat" => "bad"), valid.merge("threat" => {"is_proxy" => "false"}),
       valid.merge("threat" => {}), valid.merge("threat" => {"is_proxy" => false})].each_with_index do |body, index|
-      _out, err, status = Open3.capture3("/bin/zsh", "-f", "-c",
-        'source "$1"; ipdata_response_is_valid "$(cat)" 198.51.100.23', "ipdata-schema", IPDATA_LIBRARY,
+      _out, err, status = zsh('source "$1"; ipdata_response_is_valid "$(cat)" 198.51.100.23', IPDATA_LIBRARY,
         stdin_data: JSON.generate(body))
       assert_empty err
       assert_equal [0, 6].include?(index), status.success?
@@ -153,8 +151,7 @@ class PublicFallbacksTest < ReporterTestCase
       [["tls", IP2_PAGE, "tls_error|\n", 1], ["limit", IP2_PAGE, "rate_limited|\n", 1],
         ["ipdata", IPDATA_PAGE, "ok|false|null|\n", 2]].each do |scenario, page, expected, count|
         File.write(calls, "")
-        out, err, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "route",
-          COMMON_PROVIDER_LIBRARY, IP2_LIBRARY, IPDATA_LIBRARY,
+        out, err, status = zsh(probe, COMMON_PROVIDER_LIBRARY, IP2_LIBRARY, IPDATA_LIBRARY,
           reporter_functions("db_ip2location", "db_ipdata"), calls, page, IPDATA_RESPONSE, scenario, COMMON_HTTP_LIBRARY)
         assert status.success?, err
         assert_empty err
@@ -204,8 +201,7 @@ class PublicFallbacksTest < ReporterTestCase
       print -r -- "${ip2location[status]}|${ip2location[source]}|${ip2location[score]}|${ip2location[relay_status]}"
       print -r -- "${ipdata[status]}|${ipdata[source]}|${ipdata[proxy]}|${ipdata[relay_status]}"
     ZSH
-    out, err, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "relay",
-      COMMON_PROVIDER_LIBRARY, IP2_LIBRARY, IPDATA_LIBRARY, reporter_functions("db_ip2location", "db_ipdata"))
+    out, err, status = zsh(probe, COMMON_PROVIDER_LIBRARY, IP2_LIBRARY, IPDATA_LIBRARY, reporter_functions("db_ip2location", "db_ipdata"))
     assert status.success?, err
     assert_empty err
     assert_equal "ok|check_place_relay|0|\nok|check_place_relay|false|\n", out
@@ -234,8 +230,8 @@ class PublicFallbacksTest < ReporterTestCase
       ['{"data":{"ipAddress":"8.8.8.8","abuseConfidenceScore":0}}' + "\n200", 0, "invalid_response"]].each do |response, code, expected|
       calls = File.join(reporter_workspace, "abuse-calls")
       File.write(calls, "")
-      out, err, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "abuse-errors", COMMON_PROVIDER_LIBRARY,
-        File.join(ROOT, "providers", "abuseipdb.zsh"), reporter_functions("db_abuseipdb"), response, code.to_s, calls, COMMON_HTTP_LIBRARY)
+      out, err, status = zsh(probe, COMMON_PROVIDER_LIBRARY,
+        provider_library("abuseipdb"), reporter_functions("db_abuseipdb"), response, code.to_s, calls, COMMON_HTTP_LIBRARY)
       assert status.success?, err
       assert_empty err
       assert_equal "one-request\n", File.read(calls)

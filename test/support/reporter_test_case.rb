@@ -5,48 +5,32 @@ require "open3"
 require "json"
 require "tmpdir"
 require "fileutils"
+require "stringio"
 require_relative "utf8_locale"
+load File.expand_path("../../bin/ip-quality-route", __dir__) unless defined?(IpQuality::RouteCommand)
 
-# Shared paths and offline reporter-process fixtures; no provider-specific state.
+# Shared paths and offline reporter/runner fixtures; no provider-specific state.
 class ReporterTestCase < Minitest::Test
   ROOT = File.expand_path("../..", __dir__)
   SCRIPT = File.join(ROOT, "bin", "ip-quality")
+  RUNNER = File.join(ROOT, "bin", "ip-quality-route")
   REPORTER_SOURCES = [SCRIPT, *Dir.glob(File.join(ROOT, "{common,providers,report}", "*.zsh")).sort].freeze
-  SELF_TEST = File.join(ROOT, "test", "support", "self_test.zsh")
   DNSBL = File.join(ROOT, "ref", "dnsbl.list")
   ISO3166 = File.join(ROOT, "ref", "iso3166.json")
   COMMON_PROVIDER_LIBRARY = File.join(ROOT, "common", "provider_values.zsh")
   COMMON_HTTP_LIBRARY = File.join(ROOT, "common", "http_request.zsh")
   TERMINAL_LIBRARY = File.join(ROOT, "common", "terminal.zsh")
-  CREDENTIALS_LIBRARY = File.join(ROOT, "providers", "credentials.zsh")
-  IPREGISTRY_LIBRARY = File.join(ROOT, "providers", "ipregistry.zsh")
-  IPAPI_LIBRARY = File.join(ROOT, "providers", "ipapi.zsh")
-  IPWHOIS_LIBRARY = File.join(ROOT, "providers", "ipwhois.zsh")
-  CLOUDFLARE_LIBRARY = File.join(ROOT, "providers", "cloudflare.zsh")
-  IPQUALITYSCORE_LIBRARY = File.join(ROOT, "providers", "ipqualityscore.zsh")
-  PING0_LIBRARY = File.join(ROOT, "providers", "ping0.zsh")
-  RIPESTAT_LIBRARY = File.join(ROOT, "providers", "ripestat.zsh")
-  INTERNETDB_LIBRARY = File.join(ROOT, "providers", "shodan_internetdb.zsh")
   REPUTATION_REPORT = File.join(ROOT, "report", "reputation.zsh")
-  PING0_GEO_FIXTURE = File.join(ROOT, "test", "fixtures", "ping0", "public-geo.txt")
-  PING0_CHALLENGE_FIXTURE = File.join(ROOT, "test", "fixtures", "ping0", "challenge.html")
-  RIPESTAT_FIXTURE = File.join(ROOT, "test", "fixtures", "ripestat", "network-info.json")
-  INTERNETDB_FIXTURE = File.join(ROOT, "test", "fixtures", "shodan", "internetdb.json")
-  INTERNETDB_NO_INFORMATION_FIXTURE = File.join(ROOT, "test", "fixtures", "shodan", "no-information.json")
-  IPQUALITYSCORE_CREDITS_FIXTURE = File.join(ROOT, "test", "fixtures", "ipqualityscore", "insufficient-credits.json")
-  IPQUALITYSCORE_USAGE_FIXTURE = File.join(ROOT, "test", "fixtures", "ipqualityscore", "usage.json")
-  IPREGISTRY_FIXTURE = File.join(ROOT, "test", "fixtures", "ipregistry", "ip-intelligence.json")
-  IPAPI_FIXTURE = File.join(ROOT, "test", "fixtures", "ipapi", "valid.json")
-  IPAPI_ANONYMOUS_FIXTURE = File.join(ROOT, "test", "fixtures", "ipapi", "anonymous.json")
-  IPAPI_MALFORMED_FIXTURE = File.join(ROOT, "test", "fixtures", "ipapi", "malformed.json")
-  IPAPI_RATE_LIMIT_FIXTURE = File.join(ROOT, "test", "fixtures", "ipapi", "rate-limited.json")
-  IPWHOIS_FIXTURE = File.join(ROOT, "test", "fixtures", "ipwhois", "valid.json")
-  IPWHOIS_MISMATCH_FIXTURE = File.join(ROOT, "test", "fixtures", "ipwhois", "mismatch.json")
-  CLOUDFLARE_FIXTURE = File.join(ROOT, "test", "fixtures", "cloudflare", "valid.json")
-  CLOUDFLARE_EMPTY_FIXTURE = File.join(ROOT, "test", "fixtures", "cloudflare", "empty.json")
-  CLOUDFLARE_INVALID_RISK_FIXTURE = File.join(ROOT, "test", "fixtures", "cloudflare", "invalid-risk-type.json")
-  IPQUALITYSCORE_OFFICIAL_FIXTURE = File.join(ROOT, "test", "fixtures", "ipqualityscore", "official.json")
-  CHECK_PLACE_CLOUDFLARE_FIXTURE = File.join(ROOT, "test", "fixtures", "check_place", "cloudflare-blocked.html")
+  QUERY_ROUTE_LIBRARY = File.join(ROOT, "providers", "query_route.zsh")
+  IPQS_FIXTURE = File.join(ROOT, "test", "fixtures", "ipqualityscore", "official.json")
+  # Unset every proxy variable the reporter honours, for direct-route cases.
+  NO_PROXY_ENV = %w[HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
+                    IPQUALITY_ISOLATED_EGRESS].to_h { |name| [name, nil] }.freeze
+
+  def setup
+    super
+    @reporter_workspace = nil
+  end
 
   def teardown
     FileUtils.remove_entry(@reporter_workspace) if @reporter_workspace
@@ -54,6 +38,31 @@ class ReporterTestCase < Minitest::Test
   end
 
   private
+
+  def provider_library(name)
+    File.join(ROOT, "providers", "#{name}.zsh")
+  end
+
+  def fixture_path(name)
+    File.join(ROOT, "test", "fixtures", name)
+  end
+
+  def fixture_json(name)
+    JSON.parse(File.read(fixture_path(name)))
+  end
+
+  # Run a zsh probe with positional arguments; returns [stdout, stderr, status].
+  def zsh(probe, *arguments, **options)
+    Open3.capture3("/bin/zsh", "-f", "-c", probe, "probe", *arguments, **options)
+  end
+
+  # Run a probe that must succeed silently and return its stdout.
+  def zsh!(probe, *arguments, **options)
+    stdout, stderr, status = zsh(probe, *arguments, **options)
+    assert status.success?, stderr
+    assert_empty stderr
+    stdout
+  end
 
   # Extract named top-level functions from the reporter or its modules, without
   # executing CLI startup or coupling a probe to the defining file.
@@ -99,6 +108,12 @@ class ReporterTestCase < Minitest::Test
     path
   end
 
+  # A workspace-private IPQS key, so official IPQS paths run without real secrets.
+  def write_ipqs_key
+    FileUtils.mkdir_p(File.join(reporter_workspace, "secrets"))
+    File.write(File.join(reporter_workspace, "secrets", "ipqs"), "fixturekey123", perm: 0o600)
+  end
+
   def run_script(*arguments, env: {})
     workspace = reporter_workspace
     attempts = File.join(workspace, "network-attempts")
@@ -111,5 +126,25 @@ class ReporterTestCase < Minitest::Test
                             File.join(workspace, "bin", "ip-quality"), *arguments)
     refute File.exist?(attempts), "reporter attempted an unstubbed network command"
     result
+  end
+
+  # Run the route command in-process; returns [exit code, stdout, stderr]. The
+  # default app root is absent, so no case reads the real Clash Verge cache.
+  def run_route(arguments, stdin: "", app_root: File.join(Dir.tmpdir, "ipquality-absent-clash"), **options)
+    stdout = StringIO.new
+    stderr = StringIO.new
+    command = IpQuality::RouteCommand.new(stdout: stdout, stderr: stderr, stdin: StringIO.new(stdin),
+                                          app_root: app_root, **options)
+    [command.run(arguments), stdout.string, stderr.string]
+  end
+
+  def with_environment(overrides)
+    previous = overrides.each_key.to_h { |key| [key, ENV.key?(key) ? ENV[key] : :missing] }
+    overrides.each { |key, value| ENV[key] = value }
+    yield
+  ensure
+    previous.each do |key, value|
+      value == :missing ? ENV.delete(key) : ENV[key] = value
+    end
   end
 end

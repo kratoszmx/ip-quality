@@ -3,7 +3,6 @@
 require_relative "support/reporter_test_case"
 
 class QueryRouteTest < ReporterTestCase
-  CLEAN_ENV = %w[HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy IPQUALITY_ISOLATED_EGRESS].to_h { |name| [name, nil] }.freeze
   TARGET = "8.8.8.8"
 
   def test_ipqs_account_failure_reuses_direct_route_for_the_same_target_lookup
@@ -117,11 +116,10 @@ class QueryRouteTest < ReporterTestCase
     failure_path = File.join(root, "failure.txt")
     File.write(failure_path, wire)
     cloudflare_path = File.join(root, "cloudflare.json")
-    response = JSON.parse(File.read(CLOUDFLARE_FIXTURE))
+    response = JSON.parse(File.read(fixture_path("cloudflare/valid.json")))
     response["result"][0]["ip"] = wrong_target ? "1.1.1.1" : target
     File.write(cloudflare_path, JSON.generate(response))
-    FileUtils.mkdir_p(File.join(root, "secrets"))
-    File.write(File.join(root, "secrets", "ipqs"), "fixturekey123", perm: 0o600)
+    write_ipqs_key
     FileUtils.mkdir_p(File.join(root, "config", "ipquality"))
     credentials = File.join(root, "config", "ipquality", "credentials")
     File.write(credentials, "CLOUDFLARE_API_TOKEN=fixturetoken123\nCLOUDFLARE_ACCOUNT_ID=fixtureaccount123\n", perm: 0o600)
@@ -157,12 +155,12 @@ class QueryRouteTest < ReporterTestCase
         cloudflare)print -r -- "$(<"$IPQUALITY_TEST_CLOUDFLARE")";print -rn -- 200 ;;
       esac
     ZSH
-    env = CLEAN_ENV.merge(
+    env = NO_PROXY_ENV.merge(
       "IPQUALITY_TEST_ARGUMENTS" => @arguments, "IPQUALITY_TEST_CONFIG" => @config,
       "IPQUALITY_TEST_CALLS" => calls_path, "IPQUALITY_TEST_FAIL_STAGE" => stage,
       "IPQUALITY_TEST_FAILURE" => failure_path, "IPQUALITY_TEST_EXIT" => exit_code.to_s,
       "IPQUALITY_TEST_DIRECT_FAILURE" => direct_failure ? "1" : "0",
-      "IPQUALITY_TEST_RESPONSE" => IPQUALITYSCORE_OFFICIAL_FIXTURE,
+      "IPQUALITY_TEST_RESPONSE" => IPQS_FIXTURE,
       "IPQUALITY_TEST_CLOUDFLARE" => cloudflare_path)
     env.merge!("HTTPS_PROXY" => "http://127.0.0.1:1", "IPQUALITY_ISOLATED_EGRESS" => "1") if proxy
     stdout, stderr, status = run_script("--confirm-network-lookup", "--sources", provider,

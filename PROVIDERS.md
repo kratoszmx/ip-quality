@@ -60,11 +60,11 @@ when a single JSON document is needed.
 scope before any network access. Mail and DNSBL remain opt-in because their
 many DNS/TCP probes add latency and cannot describe an HTTP-proxied leaf.
 
-## Source selection
+## Prefix sampling
 
-The normal route menu also accepts incomplete IPv4 prefixes. Menu 3 treats
-three octets as an assumed /24, accepts explicit `.0/24` notation, deduplicates
-up to 20 networks and queries `.23`, `.127`, `.231` from each. All input must
+Route menu 3 accepts incomplete IPv4 prefixes. It treats three octets as an
+assumed /24, accepts explicit `.0/24` notation, deduplicates up to 20 networks
+and queries `.23`, `.127`, `.231` from each. All input must
 pass the public-IPv4 boundary in `ref/non_public_ipv4.txt` (IANA special-purpose
 ranges, shared with the reporter) before any lookup starts. A blank line
 finishes a multiline paste. Queries run sequentially over the current system
@@ -85,6 +85,8 @@ The summary updates after every sample; Ctrl-C/TERM stops the owned reporter
 process group, preserves completed results and marks pending samples. A failed
 reporter or malformed/mismatched report is retained as such, while later samples
 still run. An empty field is never substituted with another provider's score.
+
+## Source selection
 
 The normal interactive command defaults to all sources. Users need no source
 or DNS switches. The optional choices below are maintenance controls:
@@ -165,17 +167,6 @@ On October 10, a strict direct run with AliDNS completed the official IPQS
 lookup; the same-key ATT route still failed TLS. IPinfo, Ipregistry, ipapi,
 IPWHOIS and Cloudflare Intel worked on both routes. DB-IP was rate limited.
 These are dated observations, not permanent availability guarantees.
-
-The same day's NodeQuality check retrieved its website and launch script. Its
-[current launcher](https://github.com/LloydAsp/NodeQuality/blob/main/NodeQuality.sh)
-still loads `https://IP.Check.Place`, whose response matched the
-[current xykt script](https://github.com/xykt/IPQuality/blob/main/ip.sh), version
-`v2026-09-16`. That script still uses `ipinfo.check.place` for IPQS and several
-other datasets. A bounded ATT request to that same IPQS relay returned HTTP 403
-and the known Cloudflare block page. The user's linked report is dated March
-24, 2025. Neither that saved report nor today's accessible website establishes
-current end-to-end health on other nodes. The Linux/chroot benchmark installer
-was inspected as text, not executed on this Mac.
 
 ## Reputation providers
 
@@ -348,8 +339,9 @@ source address, so the check works on a directly addressed host or behind NAT.
 ## DNSBL scope
 
 The reporter reverses one IPv4 address and queries every unique zone in the
-vendored `ref/dnsbl.list`. The offline self-test validates 420 zones. Concurrency
-is configurable from 1 through the hard maximum of 50.
+vendored `ref/dnsbl.list` (420 zones; `test/repository_test.rb` checks their
+format and uniqueness). Concurrency is configurable from 1 through the hard
+maximum of 50.
 
 Outcomes follow the implemented command result:
 
@@ -381,24 +373,21 @@ report evidence; the old DB-IP scraper/paid-adapter removal and other exclusions
 [UPSTREAM.md](UPSTREAM.md). A new source needs a named access contract,
 sanitized fixture, conservative parser, route boundary, and disclosure.
 
-### Comparing the supplied NodeQuality report
+### NodeQuality comparison (dated)
 
 The user's [NodeQuality report](https://nodequality.com/r/IHfGBj2jD8OT7BqBNUbCWTWV3XRIbpMB)
-states 2025-03-24 and v2025-03-13. That upstream version queried DB-IP's old
-target demo, IPWHOIS /widget and third-party ip.nodeget.com/json .ip.riskScore
-under the Cloudflare label. On 2026-09-24 that third-party endpoint returned
-HTTP 200 without riskScore in a direct check. This does not invalidate the
-historical report, but it cannot establish today's field availability.
-Cloudflare's own current documentation independently says its old Threat Score
-is no longer populated and is always zero. The current official Intel API
-provides categories, not that historical numeric field.
-
-[Current NodeQuality source](https://github.com/LloydAsp/NodeQuality/blob/main/NodeQuality.sh)
-still launches IP.Check.Place. Its current IPQuality source identifies itself as
-v2026-09-16, has no Cloudflare/IPWHOIS query functions, and uses DB-IP's visitor
-demo. The current request contract was useful: it led to a working DB-IP
-integration here. Historical and current code, and a successful API response
-versus a populated risk field, should be compared separately.
+is dated 2025-03-24 (v2025-03-13). That upstream version queried DB-IP's old
+target demo, IPWHOIS `/widget` and third-party `ip.nodeget.com/json`
+`.ip.riskScore` under the Cloudflare label; on 2026-09-24 that endpoint returned
+HTTP 200 without `riskScore`, and Cloudflare documents its old Threat Score as
+always zero. On 2026-10-10 the [current launcher](https://github.com/LloydAsp/NodeQuality/blob/main/NodeQuality.sh)
+still loaded IP.Check.Place, matching the [current xykt script](https://github.com/xykt/IPQuality/blob/main/ip.sh)
+v2026-09-16, which still uses `ipinfo.check.place` for IPQS and other datasets
+(HTTP 403 Cloudflare block from ATT that day) and DB-IP's visitor demo, the
+contract this reporter adopted. The installer was read as text, never executed.
+Neither the saved report nor these checks establish current end-to-end health;
+compare historical and current code, and an API response versus a populated
+risk field, separately.
 
 ## Official references
 

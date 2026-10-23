@@ -22,7 +22,7 @@ class RepositoryTest < ReporterTestCase
     dynamic_api_key_scrape: /apiKey=/
   }.freeze
 
-  def test_source_is_zsh_native_and_contains_no_removed_runtime_paths
+  def test_runtime_sources_are_native_and_contain_no_removed_paths
     assert File.binread(SCRIPT).start_with?("#!/bin/zsh\n")
     # Every reporter module is runtime code, so each one obeys the same bans.
     source = REPORTER_SOURCES.map { |path| File.binread(path) }.join("\n")
@@ -32,6 +32,12 @@ class RepositoryTest < ReporterTestCase
     BANNED_SOURCE_PATTERNS.each do |name, pattern|
       refute_match pattern, source, "#{name} unexpectedly remains"
     end
+
+    # The route runner is stdlib Ruby and never drives a Mihomo controller API.
+    assert File.binread(RUNNER).start_with?("#!/usr/bin/ruby --disable-gems\n")
+    runtime = Dir.glob(File.join(ROOT, "{bin,runner,common,providers,report}", "**", "*"))
+      .select { |path| File.file?(path) }.map { |path| File.binread(path) }.join("\n")
+    refute_match(/\/bin\/bash|BASH_REMATCH|\bshopt\b|\bmapfile\b|external-controller|secret:/, runtime)
   end
 
   def test_vendored_references_are_regular_local_data_without_cookie_state
