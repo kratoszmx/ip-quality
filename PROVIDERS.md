@@ -254,7 +254,9 @@ MaxMind basic data](providers/check_place.md), [ipapi.is](providers/ipapi.md),
   supplies it. It does not invent a band from local thresholds. Current numeric
   scales remain distinct: IP2Location 0-99 potential risk, Scamalytics 0-100
   fraud, ipapi.is 0-100% abuse, AbuseIPDB 0-100 confidence, and IPQS 0-100 fraud.
-- Ping0 accepts exactly four bounded lines and requires the returned IP to match.
+- Ping0 accepts exactly four bounded lines after a successful HTTP response and
+  requires the returned IP to match. TLS, timeout, HTTP and malformed-response
+  failures stay identifiable in JSON and the terminal unavailable-source summary.
   RIPEstat validates prefix/ASN structure. Shodan validates the target IP and
   bounded arrays. Ports must be integers from 1 through 65535, and text array
   elements must be bounded strings without control characters; malformed values
@@ -343,14 +345,18 @@ vendored `ref/dnsbl.list` (420 zones; `test/repository_test.rb` checks their
 format and uniqueness). Concurrency is configurable from 1 through the hard
 maximum of 50.
 
-Outcomes follow the implemented command result:
+The reader keeps `dig`'s DNS header as well as its answer records: an exit
+status of zero alone does not distinguish NXDOMAIN from SERVFAIL or REFUSED.
+Outcomes follow the DNS status and complete answer, not just empty stdout:
 
-- `Clean`: `dig` succeeds and returns no address;
-- `Blacklisted`: one of the returned records is `127.0.0.2`;
-- `Marked`: every record is another `127.0.0.0/8` listing code;
-- `Unknown`: `dig` fails or times out, any record is a `127.255.255.*`
-  resolver-policy error, or any record lies outside `127.0.0.0/8` (an NXDOMAIN-
-  hijacking resolver, not evidence of a listing).
+- `Clean`: a complete NXDOMAIN or NOERROR response with zero answers;
+- `Blacklisted`: a complete NOERROR response has only valid listing A records,
+  including `127.0.0.2`;
+- `Marked`: a complete NOERROR response has only other `127.0.0.0/8` listing codes;
+- `Unknown`: `dig` fails or times out, DNS returns an error such as SERVFAIL or
+  REFUSED, the header/record count is missing or inconsistent, a response is
+  truncated, or an answer is malformed, an alias, a `127.255.255.*` policy error,
+  or an address outside `127.0.0.0/8` (possible NXDOMAIN hijacking).
 
 Terminal output names every `Blacklisted` and `Marked` zone. JSON retains a
 per-zone `Results` object as well as totals. Spamhaus codes such as

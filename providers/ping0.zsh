@@ -1,7 +1,8 @@
 # Derived from xykt/IPQuality. See UPSTREAM.md and LICENSE before modifying or
 # redistributing this file.
-# Ping0's documented public /geo response parser. Network access stays
-# in bin/ip-quality so this library is fixture-testable and reusable.
+# Ping0's public /geo parser and adapter. The visitor request stays on the tested
+# route; switching transport would observe another egress instead of this node.
+(( ${+functions[provider_decode_http_response]} ))||source "${${(%):-%x}:A:h:h}/common/provider_values.zsh"
 
 typeset -ga ping0_parsed=()
 
@@ -40,8 +41,14 @@ return 0
 fi
 local endpoint="https://ipv4.ping0.cc/geo"
 [[ "$1" -eq 6 ]]&&endpoint="https://ipv6.ping0.cc/geo"
-local RESPONSE=$(curl -q $CurlARG -sS -L -$1 -m 10 --max-filesize 4096 "$endpoint" 2>/dev/null)
-ping0_parse_geo "$RESPONSE" "$IP"
+local wire_response request_exit_code
+wire_response=$(curl -q $CurlARG -sS -L -$1 -m 10 --max-filesize 4096 --write-out $'\n%{http_code}' "$endpoint" 2>/dev/null)
+request_exit_code=$?
+if ! provider_decode_http_response "$wire_response" "$request_exit_code";then
+ping0[status]="${provider_http_response[status]}"
+return 0
+fi
+ping0_parse_geo "${provider_http_response[body]}" "$IP"
 local parse_status=$?
 case "$parse_status" in
 0)ping0[status]="verified"
@@ -53,7 +60,7 @@ ping0[org]="${ping0_parsed[3]}"
 2)ping0[status]="ip_mismatch"
 ping0[match]="false"
 ;;
-*)ping0[status]="unknown"
+*)ping0[status]="invalid_response"
 ping0[match]="null"
 esac
 }

@@ -41,7 +41,6 @@ ipinfo[lat]="${location%%,*}"
 ipinfo[lon]="${${location#*,}%%,*}"
 ipinfo[country]=$(print -rn -- "$ISO3166"|jq --arg code "${ipinfo[countrycode]}" -r '.[] | select(.["alpha-2"] == $code) | .name')
 ipinfo[continent]=$(print -rn -- "$ISO3166"|jq --arg code "${ipinfo[countrycode]}" -r '.[] | select(.["alpha-2"] == $code) | .region')
-ipinfo[regcountrycode]=$(print -rn -- "$RESPONSE"|jq -r '.data.abuse.country')
 ipinfo[regcountry]=$(print -rn -- "$ISO3166"|jq --arg code "${ipinfo[regcountrycode]}" -r '.[] | select(.["alpha-2"] == $code) | .name')
 if is_signed_decimal "${ipinfo[lat]}"&&is_signed_decimal "${ipinfo[lon]}";then
 ipinfo[dms]=$(generate_dms "${ipinfo[lat]}" "${ipinfo[lon]}")

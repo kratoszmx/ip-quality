@@ -650,7 +650,7 @@ cn:not_applicable_target)missing+=("Ping0（/geo 仅核对当前出口，指定�
 en:not_applicable_target)missing+=("Ping0 (/geo verifies the current egress only; skipped for explicit targets)")
 ;;
 *:verified|*:ip_mismatch|*:disabled) ;;
-*)missing+=("Ping0")
+*)missing+=("Ping0 ($(report_query_status "${ping0[status]:-unknown}"))")
 esac
 report_any_known "${ripestat[status]}" "${ripestat[prefix]}" "${ripestat[origins]}"||missing+=("RIPEstat")
 if [[ "${internetdb[status]}" != "not_found" && "${internetdb[status]}" != disabled ]] &&

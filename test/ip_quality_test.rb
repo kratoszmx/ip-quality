@@ -181,17 +181,27 @@ class IpQualityTest < ReporterTestCase
 
   def test_dnsbl_live_path_keeps_every_zone_result_with_a_fixture_dig
     write_fake_command("dig", <<~'ZSH')
+      [[ " $* " == *' +noall +comments +answer '* ]]||exit 2
+      local rcode=NOERROR
+      local -a addresses
       case "$*" in
-        *dnsbl-3.uceprotect.net*) print -r -- 127.0.0.2 ;;
-        *bl.spamcop.net*) print -r -- 127.0.0.3 ;;
+        *dnsbl-3.uceprotect.net*) addresses=(127.0.0.2) ;;
+        *bl.spamcop.net*) addresses=(127.0.0.3) ;;
         *.b.barracudacentral.org*) exit 9 ;;
-        *.vouch.dwl.spamhaus.org*) print -r -- 127.255.255.254 ;;
-        *.psbl.surriel.com*) print -rl -- 127.0.0.4 127.0.0.2 ;;
-        *.dnsbl.dronebl.org*) print -rl -- 127.0.0.10 127.255.255.252 ;;
-        *.bl.mailspike.net*) print -r -- 198.105.244.11 ;;
-        *.rbl.interserver.net*) print -rl -- 127.0.0.5 127.0.0.6 ;;
-        *) exit 0 ;;
+        *.vouch.dwl.spamhaus.org*) addresses=(127.255.255.254) ;;
+        *.psbl.surriel.com*) addresses=(127.0.0.4 127.0.0.2) ;;
+        *.dnsbl.dronebl.org*) addresses=(127.0.0.10 127.255.255.252) ;;
+        *.bl.mailspike.net*) addresses=(198.105.244.11) ;;
+        *.rbl.interserver.net*) addresses=(127.0.0.5 127.0.0.6) ;;
+        *.all.spamrats.com*) rcode=SERVFAIL ;;
+        *.auth.spamrats.com*) rcode=REFUSED ;;
+        *) rcode=NXDOMAIN ;;
       esac
+      print -r -- ";; ->>HEADER<<- opcode: QUERY, status: $rcode, id: 1"
+      print -r -- ";; flags: qr rd ra; QUERY: 1, ANSWER: ${#addresses}, AUTHORITY: 0, ADDITIONAL: 0"
+      for address in "${addresses[@]}";do
+        print -r -- "fixture.example. 60 IN A $address"
+      done
     ZSH
     output_path = File.join(reporter_workspace, "report.json")
     stdout, stderr, status = run_script(
@@ -208,10 +218,10 @@ class IpQualityTest < ReporterTestCase
     zones = File.readlines(DNSBL, chomp: true)
     assert_equal zones.sort, dnsbl.fetch("Results").keys.sort
     assert_equal zones.size, dnsbl.fetch("Total")
-    assert_equal zones.size - 8, dnsbl.fetch("Clean")
+    assert_equal zones.size - 10, dnsbl.fetch("Clean"), dnsbl.fetch("Results").reject { |_zone, state| state == "Clean" }.inspect
     assert_equal 2, dnsbl.fetch("Marked")
     assert_equal 2, dnsbl.fetch("Blacklisted")
-    assert_equal 4, dnsbl.fetch("Unknown")
+    assert_equal 6, dnsbl.fetch("Unknown")
     assert_equal "Blacklisted", dnsbl.dig("Results", "dnsbl-3.uceprotect.net")
     assert_equal "Marked", dnsbl.dig("Results", "bl.spamcop.net")
     assert_equal "Unknown", dnsbl.dig("Results", "b.barracudacentral.org")
@@ -221,7 +231,43 @@ class IpQualityTest < ReporterTestCase
     assert_equal "Unknown", dnsbl.dig("Results", "dnsbl.dronebl.org")
     assert_equal "Unknown", dnsbl.dig("Results", "bl.mailspike.net")
     assert_equal "Marked", dnsbl.dig("Results", "rbl.interserver.net")
+    assert_equal "Unknown", dnsbl.dig("Results", "all.spamrats.com")
+    assert_equal "Unknown", dnsbl.dig("Results", "auth.spamrats.com")
     assert_includes stderr, "正在检测黑名单数据库"
+  end
+
+  def test_dnsbl_requires_a_successful_complete_dns_response_before_reporting_clean
+    response = lambda do |rcode, records = [], flags: "qr rd ra", count: records.length|
+      [";; ->>HEADER<<- opcode: QUERY, status: #{rcode}, id: 1",
+        ";; flags: #{flags}; QUERY: 1, ANSWER: #{count}, AUTHORITY: 0, ADDITIONAL: 0",
+        *records.map { |record| "fixture.example. 60 IN #{record}" }].join("\n")
+    end
+    cases = [
+      [response.call("NXDOMAIN"), 0, "Clean"],
+      [response.call("NOERROR"), 0, "Clean"],
+      [response.call("SERVFAIL"), 0, "Unknown"],
+      [response.call("REFUSED"), 0, "Unknown"],
+      [response.call("NOTIMP"), 0, "Unknown"],
+      [response.call("NOERROR"), 9, "Unknown"],
+      ["", 0, "Unknown"],
+      [";; no valid DNS header", 0, "Unknown"],
+      [response.call("NOERROR", [], flags: "qr tc rd ra"), 0, "Unknown"],
+      [response.call("NOERROR", [], flags: "rd ra"), 0, "Unknown"],
+      [response.call("NOERROR", [], count: 1), 0, "Unknown"],
+      [response.call("NOERROR", ["CNAME alias.example."]), 0, "Unknown"],
+      [response.call("NOERROR", ["A 127.999.0.2"]), 0, "Unknown"],
+      [response.call("NOERROR", ["A 127.0.0.2", "A 198.105.244.11"]), 0, "Unknown"],
+      [response.call("NXDOMAIN", ["A 127.0.0.2"]), 0, "Unknown"],
+      [response.call("NOERROR", ["A 127.0.0.4", "A 127.0.0.2"]), 0, "Blacklisted"],
+      [response.call("NOERROR", ["A 127.0.0.2", "A 127.255.255.252"]), 0, "Unknown"],
+      [response.call("NOERROR", ["A 127.0.0.4", "A 127.0.0.6"]), 0, "Marked"]
+    ]
+    probe = <<~'ZSH'
+      source "$1"; shift
+      while (( $# ));do dnsbl_response_state "$1" "$2"; shift 2;done
+    ZSH
+    actual = zsh!(probe, provider_library("dnsbl"), *cases.flat_map { |body, status, _state| [body, status.to_s] }).lines(chomp: true)
+    assert_equal cases.map(&:last), actual
   end
 
   def test_mail_live_path_discovers_a_public_egress_and_probes_each_service_mx

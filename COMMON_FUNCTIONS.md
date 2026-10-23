@@ -35,6 +35,10 @@ provider_decode_http_response $'{"example":true}\n200' 0
 print -r -- "${provider_http_response[status]}"
 ```
 
+The HTTP decoder also serves Ping0's plain-text adapter; it is independent of
+JSON syntax. The provider's own parser validates the body only after transport
+and HTTP success, so an HTTP error with plausible data cannot become evidence.
+
 ## zsh credential-bearing requests (`http_request.zsh`)
 
 | Function | Result |

@@ -73,6 +73,43 @@ class ProvidersTest < ReporterTestCase
     refute zsh(probe, library, fixture_path("ping0/public-geo.txt"), "198.51.100.24")[2].success?
   end
 
+  def test_ping0_runtime_keeps_transport_http_and_schema_failures_without_old_observations
+    geo = File.read(fixture_path("ping0/public-geo.txt")).strip
+    cases = [
+      ["#{geo}\n200", 0, "verified", true, "AS64500"],
+      ["#{geo}\n000", 35, "tls_error", nil, nil],
+      ["\n000", 28, "timeout", nil, nil],
+      ["\n000", 60, "tls_verification_failed", nil, nil],
+      ["#{geo}\n429", 0, "rate_limited", nil, nil],
+      ["#{geo}\n503", 0, "http_503", nil, nil],
+      ["<html>challenge</html>\n200", 0, "invalid_response", nil, nil],
+      ["#{geo.sub('198.51.100.23', '198.51.100.24')}\n200", 0, "ip_mismatch", false, nil]
+    ]
+    probe = <<~'ZSH'
+      source "$1"
+      wire="$2" curl_code="$3" IP=198.51.100.23
+      ping0=([status]=verified [match]=true [asn]=AS999 [org]=stale)
+      show_progress(){ :; }
+      curl(){ print -rn -- "$wire"; return "$curl_code"; }
+      db_ping0 4
+      save_json
+      print -r -- "$ipjson"
+    ZSH
+    cases.each do |wire, curl_code, state, match, asn|
+      observation = JSON.parse(zsh!(probe, SCRIPT, wire, curl_code.to_s)).fetch("Ping0")
+      assert_equal state, observation.fetch("Status")
+      assert_equal [match, asn], [observation.fetch("IPMatch"), observation.fetch("ASN")], state
+      assert_nil observation.fetch("Organization") unless state == "verified"
+    end
+    report_probe = <<~'ZSH'
+      source "$1"
+      set_language
+      ping0[status]=tls_error
+      clean_ansi "$(show_unavailable_sources)"
+    ZSH
+    assert_includes zsh!(report_probe, SCRIPT), "Ping0 (TLS 握手失败)"
+  end
+
   def test_official_context_provider_parsers_reject_mismatches_and_keep_dimensions
     probe = <<~'ZSH'
       setopt KSH_ARRAYS

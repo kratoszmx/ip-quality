@@ -93,7 +93,8 @@ runtime dependency:
   as a MaxMind-shaped relay response rather than a local official database.
 - Added strict Ping0 `/geo`, RIPEstat Network Info, and Shodan InternetDB parsers
   for location, routing, and exposure context. Ping0 requires an exact returned
-  IP match and exposes no public risk score; Shodan retains hostname counts.
+  IP match and a successful HTTP response, preserves transport/HTTP failure
+  reasons and exposes no public risk score; Shodan retains hostname counts.
 - Removed DB-IP's invented 0/50/100 scores and the paid Extended adapter.
   On 2026-09-24, compared historical upstream commit
   `b3ad433931db9882673e070f59edaf17d56e05ac` (v2025-03-13) with today's provider
@@ -127,6 +128,8 @@ runtime dependency:
   `hostkarma.junkemailfilter.com[brl]` to `hostkarma.junkemailfilter.com` and
   removed duplicate DNSBL entries. Split four entries where upstream had glued
   two zones together (for example `dul.dnsbl.sorbs.netdul.ru`).
+  Validate DNS response status and complete answer records, keeping SERVFAIL,
+  REFUSED, malformed and truncated replies unknown even when `dig` exits 0.
 - Added a system-Ruby runner that reads one cached remote subscription
   independently of the active Clash profile, extracts an exact inline leaf and
   concrete dependencies, and owns temporary loopback-only Mihomo startup,

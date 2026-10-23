@@ -32,8 +32,8 @@ the tests and claiming a complete pass.
 | File | Responsibility |
 | --- | --- |
 | `test/common_test.rb` | Secret curl stdin/argument boundaries and exit status, HTTP envelopes/transport errors/state reset, printable text, nullable jq predicates, table widths/shape, proxy overrides and snapshot link/mode/size boundaries |
-| `test/ip_quality_test.rb` | CLI plans, option parsing and rejection gates, `--help`/`--version`, address/prefix/decimal validators, per-scope required commands and dependency failure, fixture DNSBL and mail (egress discovery, MX, SMTP) execution |
-| `test/providers_test.rb` | Provider parsing, literal JSON escaping across legacy adapters, ipapi runtime outcomes, unknown/failure semantics, credentials, zero-credit preflight |
+| `test/ip_quality_test.rb` | CLI plans, option parsing and rejection gates, `--help`/`--version`, address/prefix/decimal validators, per-scope required commands and dependency failure, fixture DNSBL (DNS status, complete answers and unknown errors) and mail (egress discovery, MX, SMTP) execution |
+| `test/providers_test.rb` | Provider parsing, literal JSON escaping across legacy adapters, ipapi runtime outcomes, Ping0 transport/HTTP/schema failures and visible status, unknown/failure semantics, credentials, zero-credit preflight |
 | `test/check_place_test.rb` | Relay block/429 pauses and target/family/run isolation; MaxMind schema validation, stale-field clearing, translation failure, literal text/zero coordinates, and actual JSON/terminal IPinfo fallback |
 | `test/source_selection_test.rb` | Source presets/IDs, no-network validation, runner forwarding, failed columns, default full-run DNS/Scamalytics repair, unchanged IPv6/proxy routes and private auth/target binding |
 | `test/query_route_test.rb` | Target-preserving IPQS/Cloudflare direct fallback; sticky IPQS account/lookup route, IPv6 targets, bounded failures, no retry on response/certificate/quota errors, credential privacy and terminal/JSON provenance |

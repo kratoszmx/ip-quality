@@ -1,8 +1,34 @@
 # Current handoff
 
+## Independent regression review — 2026-10-23
+
+Reporter `v2026-10-23-standalone.44`. Reviewed the 14 commits after `214f0f4`;
+the worktree was clean at the start. The baseline complete suite passed, and the
+review found two additional failure-handling gaps:
+
+- DNSBL: system `dig` returns exit 0 and empty `+short` output even for SERVFAIL
+  and REFUSED. Preserve the DNS header and answer count; these errors, truncated
+  or inconsistent replies and malformed records now remain `Unknown`, never
+  `Clean`. A loopback DNS responder verified all four NOERROR/NXDOMAIN/SERVFAIL/
+  REFUSED outcomes against the real system `dig`; fixtures cover mixed records.
+- Ping0: its adapter discarded curl/HTTP failures and exposed only `unknown`.
+  Reuse the common HTTP decoder and show the specific failure in JSON and the
+  terminal unavailable-source summary. An HTTP error cannot validate a plausible
+  four-line body. Keep the visitor request on its original route.
+- Removed IPinfo's duplicate registration-country read; the batched parser had
+  already populated that field.
+
+Validation: 143 reporter cases / 3,932 assertions, 21 IPQS MCP tests and 34
+provider-account MCP tests, all passing. The separate synthetic browser-text
+suite passed its 10 cases with zero live requests and no real profile. Direct
+and ATT live evidence is recorded below; provider availability is separate from
+offline correctness. Private receipts are `reports/offline-20261023-codex-audit-fixed-final.txt`,
+`reports/browser-text-20261023-codex-audit.txt` and
+`reports/dnsbl-local-20261023-codex-audit-fixed.json`.
+
 ## Recent maintenance — 2026-10-17 to 2026-10-23
 
-Reporter `v2026-10-23-standalone.43`. Query policy, sources and fallbacks are as
+Changes through `v2026-10-23-standalone.43`. Query policy, sources and fallbacks are as
 documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
 
 - Structure: `bin/ip-quality` is about 800 lines. Each `providers/*.zsh` holds its
@@ -20,8 +46,8 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
   whole-network or node verdicts.
 - Provider repairs: MaxMind validates its single relay observation and falls
   back to IPinfo on malformed data; responses reach `jq` byte-exact; ipdata
-  recognizes the homepage's `fetch` demo-key form. Every provider parser reads its
-  fields in one `jq` pass (`provider_json_fields`); every provider type
+  recognizes the homepage's `fetch` demo-key form. Related provider fields use
+  batched `jq` reads (`provider_json_fields`); shared textual provider type
   label comes from `styled_provider_type` in `report/labels.zsh`; and DMS coordinates use
   exact integer arithmetic (fixing empty minutes, `60″` and integer inputs).
   IPv6 masking expands `::` properly (no more `fe80:::*` or empty groups), and
@@ -70,8 +96,8 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
   union of the former IPQS, provider-account and web-text redactors, so page
   text now also loses long words, dates and 6+ digit numbers).
 
-The latest commit message records its offline validation. The source-catalog,
-CLI, jq and DMS changes were not followed by a new live lookup.
+The October 23 regression review above also exercised the source-catalog,
+CLI, jq and DMS changes through fresh direct and ATT reports.
 
 ## Current behavior and ownership
 
@@ -110,6 +136,9 @@ claim. Reports remain private/ignored and active Clash state was not changed.
 
 | Date / scope | Result / private evidence |
 | --- | --- |
+| October 23, direct all-source v43 | 14 of 15 sources returned usable observations, including IPQS, Cloudflare and Ping0. DB-IP returned `daily_quota_exhausted`. `reports/direct-20261023-codex-audit.{json,txt,stderr}` |
+| October 23, ATT all-source v43 and focused recheck | Cloudflare, IP2Location and the other table providers succeeded except DB-IP's daily quota and IPQS's initial timeout after direct fallback. A focused IPQS recheck succeeded through direct fallback after selected-route TLS failure, with the same discovered target preserved. Ping0 was unavailable. `reports/att-20261023-codex-audit.{json,txt,stderr}` and `reports/att-ipqs-20261023-codex-audit-recheck.{json,txt,stderr}` |
+| October 23, Ping0 v44 | Focused direct check returned `verified`; isolated ATT returned `tls_error`. A separate bounded ATT HTTP probe confirmed curl exit 35, HTTP 000 and no response body. This endpoint observes the caller, so a direct fallback would not measure ATT. `reports/ping0-{direct,att}-20261023-codex-audit-fixed.{json,stderr}` |
 | October 18, prefix sampling (one /24, three addresses) | All 12 usable target providers returned data; Check.Place MaxMind was blocked and DB-IP/Ping0 were inapplicable. `reports/prefix-samples-20261018-010049-20261018-26159-p9t2sj/`; earlier six-prefix comparison `reports/us-prefix-samples-20261018/summary.md` |
 | October 18, ATT full v33 after repairs | Ten of 11 table providers returned `ok`, including ipdata's public fallback, IP2Location and IPQS. DB-IP reported daily quota exhaustion. Cloudflare succeeded; IPQS used direct fallback after selected-route TLS failure. MaxMind was blocked, with IPinfo supplying basic information; Ping0 remained unknown. `reports/att-20261018-codex-audit-fixed.{json,txt,stderr}` |
 | October 18, direct v33 focused verification | MaxMind and IPinfo returned `ok`, verifying the new schema against a real response. Cloudflare intelligence timed out again; unauthenticated `/client/v4/ips` on the same host returned HTTP 200 with both system DNS and AliDNS, so the exact intelligence-timeout cause is unconfirmed. `reports/{maxmind,cloudflare}-direct-20261018-codex-audit.{json,txt,stderr}` |
@@ -126,21 +155,23 @@ public-example fallback remains in place.
 
 ## Unresolved external observations
 
-- ATT-to-IPQS TLS access still needed direct fallback on October 18. Check.Place
-  denied ATT while the direct MaxMind query succeeded. Cloudflare intelligence
-  succeeded on ATT but timed out on direct; its public API endpoint was reachable
-  directly. Reporter fallbacks recover other usable data; attribution to a
-  specific remote edge is unconfirmed. The last support-mail check was October 11, with
+- ATT-to-IPQS TLS access still needed direct fallback on October 23; the first
+  full run timed out on that fallback, while a focused recheck succeeded.
+  Cloudflare and Check.Place MaxMind both succeeded on direct and ATT this time,
+  superseding their older blocked/timeout observations. Attribution of ATT's
+  remaining TLS failures to a specific remote edge is unconfirmed.
+  The last support-mail check was October 11, with
   no reply then. Current inquiry/evidence: [IPQS TLS support](mcp/ipqs/SUPPORT-TLS-20261010.md)
   (sent October 10, confirmed in Gmail Sent; exact messages stay private). The
   September zero-credit case was superseded by successful account/API checks
   from September 22; its private receipts are in `mcp/ipqs/.state/support/20260916/`.
 - DB-IP returned `ok` on October 12, then daily quota exhaustion on both direct
-  and ATT during this audit. There is no
+  and ATT on October 23. There is no
   guaranteed demo reset/recovery time. Failed or expired source sessions remain
   explicit; do not interpret saved account files as live authentication.
-- Direct Ping0 geography was verified on October 17; ATT's October 18 supplemental
-  observation remained unknown. Other providers supplied location/ASN context.
+- Direct Ping0 geography was verified again on October 23; ATT failed before
+  HTTP with curl exit 35 (`tls_error`). Its visitor-only semantics preclude a
+  direct fallback. Other providers supplied location/ASN context for ATT.
 
 ## Pending outside this repository
 

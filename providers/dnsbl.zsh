@@ -2,6 +2,55 @@
 # Derived from xykt/IPQuality. See UPSTREAM.md and LICENSE before modifying or
 # redistributing this file.
 
+# dig exits successfully even for SERVFAIL/REFUSED. Keep the DNS header so an
+# empty error response cannot become a clean observation. Only complete,
+# unambiguous A answers are listing evidence; malformed/alias replies stay unknown.
+dnsbl_response_state(){
+emulate -LR zsh
+local response="$1" lookup_status="$2" line rcode="" answer_count=""
+local owner ttl rrclass rrtype value extra
+local header_pattern='^;; ->>HEADER<<- opcode: QUERY, status: ([A-Z0-9]+),'
+local count_pattern='^;; flags: (.*); QUERY: [0-9]+, ANSWER: ([0-9]+),'
+local address_pattern='^127\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$'
+local -a answers
+local invalid=0
+if (( lookup_status != 0 ));then
+print -r -- Unknown
+return 0
+fi
+for line in "${(@f)response}";do
+if [[ "$line" =~ $header_pattern ]];then
+[[ -n "$rcode" ]]&&invalid=1
+rcode="$match[1]"
+elif [[ "$line" =~ $count_pattern ]];then
+[[ -n "$answer_count" || " $match[1] " != *' qr '* || " $match[1] " == *' tc '* ]]&&invalid=1
+answer_count="$match[2]"
+elif [[ -n "$line" && "$line" != ';'* ]];then
+read -r owner ttl rrclass rrtype value extra <<< "$line"
+if [[ "$rrclass" != IN || "$rrtype" != A || -n "$extra" || ! "$value" =~ $address_pattern ]];then
+invalid=1
+elif (( match[1] > 255 || match[2] > 255 || match[3] > 255 ));then
+invalid=1
+else
+answers+=("$value")
+fi
+fi
+done
+if (( invalid ))||[[ -z "$answer_count" || ( "$rcode" != NOERROR && "$rcode" != NXDOMAIN ) ]];then
+print -r -- Unknown
+elif (( answer_count != ${#answers} ));then
+print -r -- Unknown
+elif (( ${#answers} == 0 ));then
+print -r -- Clean
+elif [[ "$rcode" != NOERROR ]]||(( ${answers[(I)127.255.255.*]} ));then
+print -r -- Unknown
+elif (( ${answers[(Ie)127.0.0.2]} ));then
+print -r -- Blacklisted
+else
+print -r -- Marked
+fi
+}
+
 summarize_dnsbl_results(){
 local total=0
 local clean=0
@@ -26,32 +75,17 @@ local ip_to_check="$1"
 local parallel_jobs="$2"
 local -a ip_octets=("${(@s:.:)ip_to_check}")
 local reversed_ip="${ip_octets[3]}.${ip_octets[2]}.${ip_octets[1]}.${ip_octets[0]}"
+local library="${${(%):-%x}:A}"
 sort -u "$DNSBL_FILE"|xargs -P "$parallel_jobs" -I {} /bin/zsh -fc '
   emulate -LR zsh
-  setopt EXTENDED_GLOB
-  local reversed_ip="$1"
-  local zone="$2"
+  source "$1"
+  local reversed_ip="$2"
+  local zone="$3"
   local result
-  result=$(dig +time=3 +tries=1 +short "$reversed_ip.$zone" A 2>/dev/null)
+  result=$(dig +time=3 +tries=1 +noall +comments +answer "$reversed_ip.$zone" A 2>/dev/null)
   local lookup_status=$?
-  # dig +short may print several records. DNSBLs answer only in 127/8, and
-  # 127.255.255.x is a zone error, so any other address is resolver
-  # interference (NXDOMAIN hijacking), never evidence of a listing.
-  local -a answers=("${(@f)result}")
-  local state
-  if (( lookup_status != 0 )) || (( ${answers[(I)127.255.255.*]} )); then
-    state=Unknown
-  elif [[ -z "$result" ]]; then
-    state=Clean
-  elif (( ${answers[(I)^127.*]} )); then
-    state=Unknown
-  elif (( ${answers[(Ie)127.0.0.2]} )); then
-    state=Blacklisted
-  else
-    state=Marked
-  fi
-  printf "%s\t%s\n" "$zone" "$state"
-' ip-quality-dnsbl "$reversed_ip" "{}"|LC_ALL=C sort
+  printf "%s\t%s\n" "$zone" "$(dnsbl_response_state "$result" "$lookup_status")"
+' ip-quality-dnsbl "$library" "$reversed_ip" "{}"|LC_ALL=C sort
 }
 check_dnsbl(){
 show_progress "${sinfo[dnsbl]% }"
