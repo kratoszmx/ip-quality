@@ -26,8 +26,10 @@ class RepositoryTest < ReporterTestCase
     assert File.binread(SCRIPT).start_with?("#!/bin/zsh\n")
     # Every reporter module is runtime code, so each one obeys the same bans.
     source = REPORTER_SOURCES.map { |path| File.binread(path) }.join("\n")
-    commands = source.lines.reject { |line| line.lstrip.start_with?("#", "local -a required=") }.grep(/\bcurl\s/)
-    assert commands.all? { |line| line.match?(/\bcurl -q\s/) }, "curl must ignore user curlrc"
+    # Comments and the dependency list name curl without running it.
+    commands = source.lines.reject { |line| line.lstrip.start_with?("#") || line.match?(/\brequired=\(/) }.grep(/\bcurl\s/)
+    offenders = commands.reject { |line| line.match?(/\bcurl -q\s/) }
+    assert_empty offenders, "curl must ignore user curlrc"
     assert_includes source, 'curl -q "$@" --config -'
     BANNED_SOURCE_PATTERNS.each do |name, pattern|
       refute_match pattern, source, "#{name} unexpectedly remains"

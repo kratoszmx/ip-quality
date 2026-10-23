@@ -72,6 +72,9 @@ class IpQualityTest < ReporterTestCase
     help, errors, result = run_script("--help")
     assert result.success?, errors
     assert_includes help, "-l cn|en"
+    version, errors, result = run_script("--version")
+    assert result.success?, errors
+    assert_match(/\Av\d{4}-\d{2}-\d{2}-standalone\.\d+\n\z/, version)
     stdout, stderr, status = run_script("--confirm-network-lookup", "--scope", "reputation", "-l", "jp")
     assert_equal 1, status.exitstatus
     assert_includes stdout, "不支持的参数"
@@ -257,6 +260,27 @@ class IpQualityTest < ReporterTestCase
     %w[163 Outlook QQ].each { |service| assert_equal false, report.dig("Mail", service), service }
     # Only the lowest-preference MX is probed; services without MX make no SMTP call.
     assert_equal %w[smtp.mailgun.org mx1.gmail.test. mx.163.test.], File.readlines(hosts, chomp: true)
+  end
+
+  def test_each_scope_requires_only_the_commands_it_runs
+    Dir.mktmpdir("ipquality-commands-") do |directory|
+      %w[curl jq].each { |name| File.write(File.join(directory, name), "", perm: 0o700) }
+      probe = <<~'ZSH'
+        source "$1"
+        PATH="$2"
+        for query_scope in reputation mail dnsbl mail-dnsbl full;do
+          output=$(require_dependencies 2>&1)
+          code=$?
+          [[ -n "$output" ]] && print -r -- "${output%%$'\n'*}"
+          print -r -- "$query_scope=$code"
+        done
+      ZSH
+      assert_equal ["reputation=0",
+        "ERROR: missing required commands: dig nc", "mail=69",
+        "ERROR: missing required commands: dig xargs", "dnsbl=69",
+        "ERROR: missing required commands: dig nc xargs", "mail-dnsbl=69",
+        "ERROR: missing required commands: dig nc xargs", "full=69"], zsh!(probe, SCRIPT, directory).lines(chomp: true)
+    end
   end
 
   def test_missing_live_dependency_stops_before_lookup_or_report_creation

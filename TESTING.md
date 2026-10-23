@@ -32,7 +32,7 @@ the tests and claiming a complete pass.
 | File | Responsibility |
 | --- | --- |
 | `test/common_test.rb` | Secret curl stdin/argument boundaries and exit status, HTTP envelopes/transport errors/state reset, printable text, nullable jq predicates, table widths/shape, proxy overrides and snapshot link/mode/size boundaries |
-| `test/ip_quality_test.rb` | CLI plans, option parsing and rejection gates, address/prefix/decimal validators, dependency failure, fixture DNSBL and mail (egress discovery, MX, SMTP) execution |
+| `test/ip_quality_test.rb` | CLI plans, option parsing and rejection gates, `--help`/`--version`, address/prefix/decimal validators, per-scope required commands and dependency failure, fixture DNSBL and mail (egress discovery, MX, SMTP) execution |
 | `test/providers_test.rb` | Provider parsing, literal JSON escaping across legacy adapters, ipapi runtime outcomes, unknown/failure semantics, credentials, zero-credit preflight |
 | `test/check_place_test.rb` | Relay block/429 pauses and target/family/run isolation; MaxMind schema validation, stale-field clearing, translation failure, literal text/zero coordinates, and actual JSON/terminal IPinfo fallback |
 | `test/source_selection_test.rb` | Source presets/IDs, no-network validation, runner forwarding, failed columns, default full-run DNS/Scamalytics repair, unchanged IPv6/proxy routes and private auth/target binding |
@@ -42,7 +42,7 @@ the tests and claiming a complete pass.
 | `test/public_demo_test.rb` | DB-IP visitor and IPWHOIS demo parsers: labels/boolean flags, quota errors, partial/malformed data, target binding, state reset, DB-IP two-request flow and bounded guest token, IPWHOIS one-request headers, and DB-IP/Ping0 explicit-target request suppression |
 | `test/report_test.rb` | Provider tables, ANSI/layout, JSON typing/escaping/masking, file bytes, exclusive report creation |
 | `test/repository_test.rb` | Runtime-source bans (zsh and the Ruby runner), vendored references, file safety and AGPL provenance |
-| `test/route_runner_test.rb` | Cached selection, YAML safety, exact leaf/dependencies, proxy isolation, process cleanup |
+| `test/route_runner_test.rb` | Menu and non-interactive listing/plan paths, option-combination rules, cached selection, YAML safety, exact leaf/dependencies, `--config-test-only`, proxy isolation, process cleanup |
 | `test/prefix_sample_test.rb` | Multiline /24 sampling and deduplication, bounded/public input parity, no-consent/no-cache menu, proxy isolation, private result files, provider failures/percent scores, malformed/mismatched reports, interruption/TERM cleanup |
 | `test/support/reporter_test_case.rb` | Shared base class: paths, `zsh`/`zsh!` probe runners, `fixture_path`/`provider_library`, named zsh function extraction, isolated reporter copies with network tripwires, `run_route`, `with_environment` |
 | `test/fixtures/` | Sanitized provider responses; data only |

@@ -2,7 +2,7 @@
 
 ## Recent maintenance — 2026-10-17 to 2026-10-23
 
-Reporter `v2026-10-23-standalone.42`. Query policy, sources and fallbacks are as
+Reporter `v2026-10-23-standalone.43`. Query policy, sources and fallbacks are as
 documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
 
 - Structure: `bin/ip-quality` is about 800 lines. Each `providers/*.zsh` holds its
@@ -45,9 +45,12 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
 - Reliability: reporter, runner and suites pin UTF-8 (C-locale shells previously
   failed 31 tests and non-ASCII leaf names); `scripts/test-offline` runs every
   suite; supervisor's weekly `test.ipquality.test-offline` runs all of them.
-- Tests (2026-10-23, two passes): reporter suites 165 → 138 cases with the same
-  coverage (3,812 → 3,810 assertions); IPQS MCP 26 → 21; provider accounts
-  36 → 34. `test/support/self_test.zsh` repeated
+- Dependencies (v43): `reputation` no longer requires `bc`, which nothing had
+  used since the DMS rewrite, and a scope's missing-command list names each
+  command once (`full` previously reported `dig` twice).
+- Tests (2026-10-23, three passes): reporter suites 165 → 141 cases (3,812 →
+  3,874 assertions) after removing duplicates and adding the gaps below; IPQS
+  MCP 26 → 21; provider accounts 36 → 34. `test/support/self_test.zsh` repeated
   ~15 parser checks already in Ruby suites and was removed; its unique
   validator and JSON-typing checks moved to `ip_quality_test.rb` and
   `report_test.rb`. DB-IP tests merged into `public_demo_test.rb`; overlapping
@@ -55,7 +58,10 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
   table-driven. All suites share one base class (`zsh!`, `fixture_path`,
   `run_route`, `with_environment`), and runner tests no longer read the real
   Clash cache. New coverage: mail-scope live path (egress discovery skipping
-  private/invalid answers, lowest-preference MX, SMTP greeting). Both MCP suites
+  private/invalid answers, lowest-preference MX, SMTP greeting); per-scope
+  required commands; the runner's `--list-subscriptions`, `--list-leaves`,
+  `--subscription … --leaf` plan and `--config-test-only` paths and its
+  option-combination rules; reporter `--version`. Both MCP suites
   dropped re-tests of `@myutils/redaction`, which myutils covers; IPQS
   auth/account/credential classifiers are table-driven and its stdio contract
   test runs in an OS temporary directory instead of the package's `.state/`.

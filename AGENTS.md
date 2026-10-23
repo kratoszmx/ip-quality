@@ -83,8 +83,8 @@ prefix sampling deliberately saves full sample IPs for per-address comparison.
 
 ## Runtime requirements
 
-The reporter needs `curl` and `jq`; `reputation` adds `bc`, `mail` adds `dig`
-and `nc`, `dnsbl` adds `dig` and `xargs`. Exact-leaf runs also need
+The reporter needs `curl` and `jq`; `mail` adds `dig` and `nc`, `dnsbl` adds
+`dig` and `xargs`. Exact-leaf runs also need
 `/usr/sbin/lsof` and Mihomo (default
 `/Applications/Clash Verge.app/Contents/MacOS/verge-mihomo`, or `--mihomo PATH`)
 and read the Clash Verge `profiles.yaml`/`profiles/` cache read-only. Missing

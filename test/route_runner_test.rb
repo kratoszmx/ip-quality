@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "support/reporter_test_case"
+require "minitest/mock"
 require "timeout"
 require "yaml"
 
@@ -103,6 +104,11 @@ class RouteRunnerTest < ReporterTestCase
     end
     {
       %w[--direct --leaf TargetLeaf] => "--direct cannot be combined",
+      %w[--profile p.yaml --subscription s] => "--profile and --subscription are mutually exclusive",
+      %w[--list-subscriptions -4] => "--list-subscriptions cannot be combined",
+      %w[--subscription s --list-leaves --leaf TargetLeaf] => "--list-leaves cannot be combined",
+      %w[--profile p.yaml --leaf TargetLeaf --config-test-only --confirm-network-lookup] => "mutually exclusive",
+      %w[-4 -6] => "-4 and -6 are mutually exclusive",
       %w[--select --direct] => "--select",
       %w[-l jp] => "unsupported language"
     }.each do |arguments, message|
@@ -110,6 +116,51 @@ class RouteRunnerTest < ReporterTestCase
       assert_equal IpQuality::RouteCommand::EX_USAGE, code, arguments.join(" ")
       assert_includes stderr, message
       assert_empty stdout
+    end
+  end
+
+  def test_non_interactive_listing_and_leaf_plans_use_exact_cached_names
+    Dir.mktmpdir("ip-quality-cli-") do |directory|
+      write_clash_verge_fixture(directory)
+      code, stdout, stderr = run_route(["--list-subscriptions"], app_root: directory)
+      assert_equal [0, "Cached remote subscriptions:\n  1  Fixture Remote\n", ""], [code, stdout.rstrip + "\n", stderr]
+      code, stdout, = run_route(["--subscription", "Fixture Remote", "--list-leaves"], app_root: directory)
+      assert_equal 0, code
+      assert_match(/1  TransportLeaf\n  2  TargetLeaf/, stdout)
+      code, stdout, = run_route(["--subscription", "Fixture Remote", "--leaf", "TargetLeaf", "-4"], app_root: directory)
+      assert_equal 0, code
+      ["no network access has occurred", 'source: cached remote subscription "Fixture Remote"',
+       "exact leaf: TargetLeaf", "start gate: add --confirm-network-lookup"].each { |text| assert_includes stdout, text }
+      {
+        ["--subscription", "Missing", "--list-leaves"] => "no cached remote subscription has that exact name",
+        ["--subscription", "Fixture Remote", "--leaf", "Target", "-4"] => "not one exact inline leaf"
+      }.each do |arguments, message|
+        code, stdout, stderr = run_route(arguments, app_root: directory)
+        assert_equal IpQuality::RouteCommand::EX_NOINPUT, code, arguments.join(" ")
+        assert_includes stderr, message
+        assert_empty stdout
+      end
+    end
+  end
+
+  def test_config_test_only_runs_mihomo_check_without_listener_or_reporter
+    Dir.mktmpdir("ip-quality-config-test-") do |directory|
+      profile_path = File.join(directory, "profile.yaml")
+      write_private_yaml(profile_path, fixture_document)
+      arguments_file = File.join(directory, "mihomo-arguments")
+      fake_mihomo = File.join(directory, "fake-mihomo")
+      File.write(fake_mihomo, "#!/bin/zsh\nprint -r -- \"$@\" > #{arguments_file}\n", perm: 0o700)
+      reporter = File.join(directory, "reporter-must-not-run")
+      constructor = IpQuality::IsolatedMihomoSession.method(:new)
+      factory = ->(*arguments, **options) { constructor.call(*arguments, **options.merge(temp_parent: directory)) }
+      code, stdout, stderr = IpQuality::IsolatedMihomoSession.stub(:new, factory) do
+        run_route(["--profile", profile_path, "--leaf", "TargetLeaf", "--mihomo", fake_mihomo, "--config-test-only"],
+          reporter_path: reporter)
+      end
+      assert_equal 0, code, stderr
+      assert_includes stdout, 'CONFIG TEST OK: exact leaf "TargetLeaf"'
+      assert_match(/(?:\A|\s)-t(?:\s|\z)/, File.read(arguments_file))
+      assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"), File::FNM_DOTMATCH)
     end
   end
 
