@@ -26,7 +26,7 @@ class SourceSelectionTest < ReporterTestCase
       print -r -- "${(j:,:)reputation_source_ids}"
     ZSH
     assert status.success?, stderr
-    assert_equal IpQuality::ClashLeafCommand::SOURCE_IDS, stdout.strip.split(",")
+    assert_equal IpQuality::SourceCatalog::IDS, stdout.strip.split(",")
 
     Dir.mktmpdir("source-runner-") do |directory|
       arguments = File.join(directory, "arguments")
@@ -90,7 +90,7 @@ class SourceSelectionTest < ReporterTestCase
     assert status.success?, stderr
     report = JSON.parse(stdout)
     assert_equal "all", report.dig("Query", "SourceSelection")
-    assert_equal IpQuality::ClashLeafCommand::SOURCE_IDS, report.dig("Query", "SelectedSources")
+    assert_equal IpQuality::SourceCatalog::IDS, report.dig("Query", "SelectedSources")
     refute_includes report.fetch("ProviderStatus").values, "disabled"
     assert_equal "alidns", report.dig("Query", "IPQSDNS")
     assert_equal "ok", report.dig("ProviderStatus", "IPQS")

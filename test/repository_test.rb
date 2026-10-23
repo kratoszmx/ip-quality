@@ -61,7 +61,7 @@ class RepositoryTest < ReporterTestCase
 
     # User reports, private credentials, and caches are not repository sources.
     # Limit traversal before reading any contents, including ignored files.
-    paths = Dir.glob(File.join(ROOT, "{bin,common,leaf_runner,providers,report,ref,scripts,test}", "**", "*"), File::FNM_DOTMATCH)
+    paths = Dir.glob(File.join(ROOT, "{bin,common,runner,providers,report,ref,scripts,test}", "**", "*"), File::FNM_DOTMATCH)
     paths.concat(Dir.glob(File.join(ROOT, "*.md")))
     paths << File.join(ROOT, "LICENSE")
     paths.each do |path|

@@ -6,7 +6,7 @@ import { withLoopbackOperationLease, requestBinaryWithBrowserContext, saveStorag
 import { SECRETS, withSession, privateAccount } from './accounts.mjs';
 import { accountNetworkOptions, assertAccountOrigin, validApiKey } from './policy.mjs';
 import { cloudflareIdentity, cloudflareApiUsable, intelReadPolicy } from './cloudflare-policy.mjs';
-import { httpStatePath, readHttpAccount } from './http-account.mjs';
+import { httpStatePath } from './http-account.mjs';
 
 const ORIGIN = 'https://dash.cloudflare.com';
 export const keyPath = path.join(SECRETS, 'cloudflare_token');
@@ -29,9 +29,6 @@ export async function identityOnPage(page) {
   return identity;
 }
 
-export async function checkCloudflareAccount() {
-  return readHttpAccount('cloudflare', (await privateAccount('cloudflare')).email);
-}
 
 async function reviewedPolicy(page, accountId) {
   assertAccountOrigin('cloudflare', page.url());

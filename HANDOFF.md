@@ -14,7 +14,7 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
   plan disclosures) and `ref/non_public_ipv4.txt` (public-IPv4 boundary) are
   read by both entrypoints. Plans list only selected sources and mark DB-IP and
   Ping0 as not applicable for explicit targets.
-- Prefix sampling (menu 3, `leaf_runner/prefix_sample.rb`): up to 20 public /24s
+- Prefix sampling (menu 3, `runner/prefix_sample.rb`): up to 20 public /24s
   sampled at `.23`, `.127`, `.231` over the system IPv4 route, saved under a
   private `reports/prefix-samples-*` directory. These are database samples, not
   whole-network or node verdicts.
@@ -33,6 +33,11 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
   (NXDOMAIN hijacking) are `Unknown`, four glued zones in `ref/dnsbl.list` were
   split (420 zones), and SMTP success needs a `220` greeting line.
 - Docs: per-source contracts moved from `PROVIDERS.md` to `providers/<source>.md`.
+- Structure: the runner library directory is `runner/` (it holds direct-route,
+  prefix-sampling and catalog code, not only leaf handling); `mcp/ipqs/HANDOFF.md`
+  was folded into this file; MCP wrappers `ipqsTotpCode`/`checkCloudflareAccount`
+  and the `SOURCE_IDS` alias are gone. Runtime helpers stay in `common/`: myutils
+  has no zsh/Ruby, and the reporter must not depend on a private sibling checkout.
 - Reliability: reporter, runner and suites pin UTF-8 (C-locale shells previously
   failed 31 tests and non-ASCII leaf names); `scripts/test-offline` runs every
   suite; supervisor's weekly `test.ipquality.test-offline` runs all of them.
@@ -102,7 +107,10 @@ public-example fallback remains in place.
   succeeded on ATT but timed out on direct; its public API endpoint was reachable
   directly. Reporter fallbacks recover other usable data; attribution to a
   specific remote edge is unconfirmed. The last support-mail check was October 11, with
-  no reply then. Current inquiry/evidence: [IPQS TLS support](mcp/ipqs/SUPPORT-TLS-20261010.md).
+  no reply then. Current inquiry/evidence: [IPQS TLS support](mcp/ipqs/SUPPORT-TLS-20261010.md)
+  (sent October 10, confirmed in Gmail Sent; exact messages stay private). The
+  September zero-credit case was superseded by successful account/API checks
+  from September 22; its private receipts are in `mcp/ipqs/.state/support/20260916/`.
 - DB-IP returned `ok` on October 12, then daily quota exhaustion on both direct
   and ATT during this audit. There is no
   guaranteed demo reset/recovery time. Failed or expired source sessions remain

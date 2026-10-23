@@ -139,7 +139,7 @@ never clean. Exact-leaf mode stays reputation-only. DNSBL concurrency is 1–50.
   `sources.tsv` is the source catalog both entrypoints read for IDs and plans;
   `<source>.md` beside an adapter is that source's contract.
 - `report/`: cn/en labels, terminal sections and JSON assembly.
-- `leaf_runner/`: cached-subscription selection, exact-leaf extraction,
+- `runner/`: cached-subscription selection, exact-leaf extraction,
   loopback Mihomo ownership/cleanup, prefix sampling, local batch evidence and
   the Ruby reader of the source catalog.
 - `mcp/`: account MCP workspaces; `.state/`, `node_modules/`, `dist/` are private.

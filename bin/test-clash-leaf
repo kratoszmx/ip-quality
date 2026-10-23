@@ -4,11 +4,11 @@
 require "optparse"
 require "ipaddr"
 require_relative "../common/network_environment"
-require_relative "../leaf_runner/profile"
-require_relative "../leaf_runner/subscription_catalog"
-require_relative "../leaf_runner/isolated_mihomo_session"
-require_relative "../leaf_runner/prefix_sample"
-require_relative "../leaf_runner/source_catalog"
+require_relative "../runner/profile"
+require_relative "../runner/subscription_catalog"
+require_relative "../runner/isolated_mihomo_session"
+require_relative "../runner/prefix_sample"
+require_relative "../runner/source_catalog"
 
 module IpQuality
   class ClashLeafCommand
@@ -25,7 +25,6 @@ module IpQuality
       [:specific_ip, "Specific IP lookup (enter one public target; current system route)"],
       [:prefix_samples, "IPv4 /24 samples / 網段抽樣（貼上多個三段 IP，每段抽查 3 個地址）"]
     ].freeze
-    SOURCE_IDS = SourceCatalog::IDS
 
     def initialize(
       stdout: $stdout,
@@ -179,8 +178,8 @@ module IpQuality
         options.on("--confirm-network-lookup", "Authorize the selected route's live network queries") { @confirmed = true }
         options.on("--sources SOURCES", "all, independent (no Check.Place), or comma-separated source IDs") do |value|
           ids = value.split(",", -1)
-          unless %w[all independent].include?(value) || (!ids.empty? && ids.all? { |id| SOURCE_IDS.include?(id) })
-            raise OptionParser::InvalidArgument, "sources must be all, independent, or: #{SOURCE_IDS.join(',')}"
+          unless %w[all independent].include?(value) || (!ids.empty? && ids.all? { |id| SourceCatalog::IDS.include?(id) })
+            raise OptionParser::InvalidArgument, "sources must be all, independent, or: #{SourceCatalog::IDS.join(',')}"
           end
           @sources = value
           @report_arguments.concat(["--sources", value])

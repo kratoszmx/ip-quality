@@ -22,10 +22,6 @@ export function ipqsSetup(qrSource: string, text: string, email: string) {
   return { uri, recoveryCode: codes[0][0] };
 }
 
-async function ipqsTotpCode(uri: string) {
-  return (await generateFreshTotp(uri, options)).code;
-}
-
 export async function enrollIpqsTotp(page: Page) {
   if (new URL(page.url()).origin !== IPQS_ORIGIN || new URL(page.url()).pathname !== "/user/settings") throw new Error("Expected authenticated IPQS settings.");
   const current = await page.evaluate(() => {
@@ -43,7 +39,7 @@ export async function enrollIpqsTotp(page: Page) {
   if (saved.conflict || recovery.conflict) throw new Error("Preserving different saved IPQS authenticator data.");
   const receipt = await writePrivateSecretFile(path.join(totpDirectory, "enrollment-attempt.json"), JSON.stringify({ attemptedAt: new Date().toISOString() }));
   if (!receipt.changed || receipt.conflict) throw new Error("IPQS enrollment is already reserved.");
-  const code = await ipqsTotpCode(setup.uri);
+  const code = (await generateFreshTotp(setup.uri, options)).code;
   // The observed Settings.js submits exactly this form field to this endpoint.
   const result = await page.evaluate(async code => {
     const response = await fetch("/user/2fa/enable", { method: "POST", credentials: "same-origin", redirect: "error",
@@ -82,7 +78,7 @@ export async function completeIpqsTotp(page: Page) {
   const metadata = await form.evaluate(form => ({ url: location.href, action: form.getAttribute("action") || "", method: form.getAttribute("method") || "get",
     fields: Array.from(form.querySelectorAll("input")).map(e => e.name), button: form.querySelector("button[type='submit']")?.textContent || "" }));
   if (!acceptsIpqsTotpChallenge(metadata)) throw new Error("Unrecognized IPQS authenticator challenge.");
-  const code = await ipqsTotpCode(await readIpqsTotpUri());
+  const code = (await generateFreshTotp(await readIpqsTotpUri(), options)).code;
   const field = form.locator('input[name="2fa"]');
   try {
     await field.fill(code, { timeout: 5000 });

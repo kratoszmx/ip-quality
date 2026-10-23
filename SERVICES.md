@@ -20,7 +20,7 @@ and owned Mihomo children. Success, ordinary failure, and handled interruption
 remove the private workspace. A later run can scavenge a dead-owner workspace
 left by an unhandled process/host failure; live-owner workspaces and `-o` reports
 are retained. Lifecycle code is in `bin/test-clash-leaf` and
-`leaf_runner/isolated_mihomo_session.rb`.
+`runner/isolated_mihomo_session.rb`.
 
 The installed Clash Verge service, active profile, and subscription cache are
 external dependencies. This project does not start, stop, restart, or rewrite

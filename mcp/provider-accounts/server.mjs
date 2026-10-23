@@ -2,10 +2,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { buildToolDescription, textResult } from '@myutils/mcp-server';
-import { accountStatus, openAccount, readAccount, createFreeAccount, importIpapiKey, privateAccount } from './accounts.mjs';
-import { readHttpAccount } from './http-account.mjs';
+import { accountStatus, openAccount, readAccount, createFreeAccount, importIpapiKey } from './accounts.mjs';
 import { abuseipdbStatus, verifyAbuseipdb, openAbuseipdb } from './abuseipdb.mjs';
-import { checkCloudflareAccount, prepareCloudflareToken, createCloudflareToken, verifyCloudflareApi } from './cloudflare.mjs';
+import { prepareCloudflareToken, createCloudflareToken, verifyCloudflareApi } from './cloudflare.mjs';
 import { enableCloudflareTotp, saveCloudflareRecoveryCodes } from './cloudflare-totp.mjs';
 import { verifyPublicProvider } from './public-api.mjs';
 
@@ -39,7 +38,7 @@ server.registerTool('public_provider_verify_free_api', {
 
 server.registerTool('cloudflare_account_check', {
   description: buildToolDescription('Verify the saved Cloudflare identity, email and 2FA state with one HTTP account read and private saved state. No Chrome and no Intel lookup; expired state requires explicit browser recovery.', instructions), inputSchema: {},
-}, () => result(checkCloudflareAccount));
+}, () => result(() => readAccount('cloudflare')));
 server.registerTool('cloudflare_prepare_intel_token', {
   description: buildToolDescription('Prepare and validate an account-scoped Intel Read token on the official dashboard without submitting it.', instructions), inputSchema: {},
 }, () => result(prepareCloudflareToken));
@@ -61,7 +60,7 @@ server.registerTool('abuseipdb_account_status', {
 }, () => result(abuseipdbStatus));
 server.registerTool('abuseipdb_account_check', {
   description: buildToolDescription('Read the exact saved AbuseIPDB account over HTTP, without Chrome. Returns authentication, email-verification and public-profile setting booleans only. Does not change settings or submit abuse reports.', instructions), inputSchema: {},
-}, () => result(async () => readHttpAccount('abuseipdb', (await privateAccount('abuseipdb')).email)));
+}, () => result(() => readAccount('abuseipdb')));
 server.registerTool('abuseipdb_verify_free_api', {
   description: buildToolDescription('Read the official AbuseIPDB APIv2 CHECK endpoint for 1.1.1.1 once. Uses the private owned key and native HTTP. Returns only validated public observations; no abuse report, key, account identity or browser state.', instructions), inputSchema: { confirmation: z.literal('VERIFY_FREE_API') },
 }, ({ confirmation }) => result(() => verifyAbuseipdb(confirmation)));

@@ -611,7 +611,7 @@ class ClashLeafRunnerTest < Minitest::Test
 
   def test_direct_ruby_entrypoint_and_all_runtime_code_are_source_auditable
     entrypoint = File.binread(RUNNER)
-    sources = Dir.glob(File.join(ROOT, "{bin,leaf_runner,common,providers,report}", "**", "*"))
+    sources = Dir.glob(File.join(ROOT, "{bin,runner,common,providers,report}", "**", "*"))
       .select { |path| File.file?(path) }
       .map { |path| File.binread(path) }
       .join("\n")
@@ -674,7 +674,6 @@ class ClashLeafRunnerTest < Minitest::Test
     assert_equal 0, command.run(["--direct", "--sources", "independent"])
     assert_includes stdout.string, "    DB-IP: public page + one visitor-egress lookup"
     refute_includes stdout.string, "Scamalytics"
-    assert_equal IpQuality::SourceCatalog::IDS, IpQuality::ClashLeafCommand::SOURCE_IDS
   end
 
   def test_removed_select_compatibility_flag_is_rejected

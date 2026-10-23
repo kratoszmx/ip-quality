@@ -1,5 +1,5 @@
 # IPv4 ranges that are never accepted as public lookup targets or egress.
-# Read by bin/ip-quality (is_private_ipv4) and leaf_runner/prefix_sample.rb so
+# Read by bin/ip-quality (is_private_ipv4) and runner/prefix_sample.rb so
 # both entrypoints enforce one boundary.
 # Source: IANA IPv4 Special-Purpose Address Registry (RFC 6890 and updates:
 # RFC 6598 shared space, RFC 7526 deprecated 6to4 relay, RFC 5737 documentation,

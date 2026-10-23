@@ -18,7 +18,7 @@ stdio server for an MCP client, not an interactive CLI. For build-only setup use
 See [../../MCP_AUTH.md](../../MCP_AUTH.md) for current authentication/backend evidence,
 [../../TESTING.md](../../TESTING.md) for dependency restoration and all test
 commands, [../../SERVICES.md](../../SERVICES.md) for retained-browser lifetime,
-and [HANDOFF.md](HANDOFF.md) for dated account evidence. The commands below use
+and [../../HANDOFF.md](../../HANDOFF.md) for dated account and support evidence. The commands below use
 this package as the working directory.
 
 ## Authentication check

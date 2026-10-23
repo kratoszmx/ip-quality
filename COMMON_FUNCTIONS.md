@@ -12,7 +12,7 @@ functions print without a trailing newline.
 | `common/http_request.zsh` | Credential-bearing adapters in `providers/`, `providers/query_route.zsh` | Pass secret URL/header options to curl over stdin, never in process arguments |
 | `common/json_values.jq` | Check.Place/MaxMind, ipapi, Cloudflare, IPWHOIS, DB-IP, IP2Location, ipdata, Ipregistry, IPQS, AbuseIPDB, Shodan parsers | Nullable boolean and bounded text/integer predicates |
 | `common/terminal.zsh` | `report/` sections and tables, `bin/ip-quality` | ANSI cleanup, display width and aligned tables |
-| `common/text.rb` | `leaf_runner/profile.rb`, `leaf_runner/subscription_catalog.rb` | Bounded printable metadata |
+| `common/text.rb` | `runner/profile.rb`, `runner/subscription_catalog.rb` | Bounded printable metadata |
 | `common/safe_snapshot.rb` | Profile, catalog, isolated Mihomo session, prefix batch evidence | Verified owner-controlled file reads and snapshot comparison |
 | `common/network_environment.rb` | Direct route command, isolated Mihomo session | Child-process overrides removing inherited proxies |
 
@@ -102,12 +102,12 @@ These are reporter or provider policy and stay with their owners:
 | Owner | Policy |
 | --- | --- |
 | `providers/query_route.zsh` | IPQS/Cloudflare selected-route request with one pre-HTTP direct-IPv4 retry; see [PROVIDERS.md](PROVIDERS.md#automatic-query-route-fallback) |
-| `providers/selection.zsh`, `providers/sources.tsv` | Source catalog (IDs, labels, independent preset, plan disclosures; also read by `leaf_runner/source_catalog.rb`), `reputation_choose_sources`, `reputation_source_selected`, `reputation_source_disclosure_lines` |
+| `providers/selection.zsh`, `providers/sources.tsv` | Source catalog (IDs, labels, independent preset, plan disclosures; also read by `runner/source_catalog.rb`), `reputation_choose_sources`, `reputation_source_selected`, `reputation_source_disclosure_lines` |
 | `providers/check_place.zsh` | `check_place_fetch_json` relay URL and in-memory block/429 pauses; `maxmind_response_is_valid` guards primary/English basic responses before IPinfo fallback |
 | `providers/<source>.zsh` | Each source's schema, endpoint, fallback and `db_*` adapter (for example Scamalytics page parsing, IPQS connection types) |
 | `report/` | Localized labels, `report_query_status`, `report_source_visible`, missing-value display |
-| `leaf_runner/` | Mihomo lifecycle, listener ownership and cleanup |
-| `leaf_runner/prefix_sample.rb` | /24 input policy, fixed sample expansion, target-bound batch results and private summaries; single product caller, not a general network utility |
+| `runner/` | Mihomo lifecycle, listener ownership and cleanup |
+| `runner/prefix_sample.rb` | /24 input policy, fixed sample expansion, target-bound batch results and private summaries; single product caller, not a general network utility |
 
 A similar `jq` expression alone is not a shared schema contract.
 
