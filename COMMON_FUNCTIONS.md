@@ -41,6 +41,7 @@ print -r -- "${provider_http_response[status]}"
 | --- | --- |
 | `curl_with_secret_url URL [CURL_ARG...]` | Sends the URL through curl's stdin configuration; forwards other arguments intact; keeps curl's output and exit status |
 | `curl_with_secret_header NAME VALUE URL [CURL_ARG...]` | Same, also sending one header through stdin |
+| `http_route_is_proxied` | Exit 0 when an inherited proxy variable or the runner's `IPQUALITY_ISOLATED_EGRESS` is set (not the plain system route); used by the CLI, IPQS DNS choice and query-route fallback |
 
 Both put `-q` first to ignore user curl configuration. Callers validate the
 endpoint and credential format (no quotes, backslashes or line breaks), choose

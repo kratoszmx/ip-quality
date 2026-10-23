@@ -516,7 +516,7 @@ class ProvidersTest < ReporterTestCase
   end
 
   def test_cloudflare_runtime_requires_both_credentials_and_uses_official_response
-    function_source = File.read(File.join(ROOT, "providers/query_route.zsh")) + reporter_functions("db_cloudflare")
+    function_source = File.read(File.join(ROOT, "providers/query_route.zsh")) + reporter_functions("db_cloudflare", "http_route_is_proxied")
     probe = <<~'ZSH'
       setopt KSH_ARRAYS SH_WORD_SPLIT
       source "$1"
@@ -550,7 +550,7 @@ class ProvidersTest < ReporterTestCase
   end
 
   def test_ipqs_account_quota_preflight_skips_a_lookup_that_would_spend_credit
-    function_source = File.read(File.join(ROOT, "providers/query_route.zsh")) + reporter_functions("db_ipqs")
+    function_source = File.read(File.join(ROOT, "providers/query_route.zsh")) + reporter_functions("db_ipqs", "http_route_is_proxied")
 
     quota_probe = <<~'ZSH'
       setopt KSH_ARRAYS SH_WORD_SPLIT
@@ -643,7 +643,7 @@ class ProvidersTest < ReporterTestCase
           File.write(calls, "")
           stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe,
             "ipqs-stage-failures", COMMON_PROVIDER_LIBRARY, IPQUALITYSCORE_LIBRARY,
-            File.read(File.join(ROOT, "providers/query_route.zsh")) + reporter_functions("db_ipqs"), stage, curl_exit.to_s, response, calls)
+            File.read(File.join(ROOT, "providers/query_route.zsh")) + reporter_functions("db_ipqs", "http_route_is_proxied"), stage, curl_exit.to_s, response, calls)
           assert status.success?, stderr
           assert_empty stderr
           assert_equal "#{expected}|#{score}|#{proxy}\n", stdout

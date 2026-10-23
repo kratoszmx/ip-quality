@@ -98,7 +98,7 @@ ipqs[source]="official_api"
 ipqs[dns]="${ipqs_dns:-auto}"
 if [[ "${ipqs[dns]}" == auto ]];then
 ipqs[dns]=system
-if [[ "$1" == 4 && -z "${IPQUALITY_ISOLATED_EGRESS:-}${http_proxy:-}${https_proxy:-}${all_proxy:-}${HTTP_PROXY:-}${HTTPS_PROXY:-}${ALL_PROXY:-}" ]];then
+if [[ "$1" == 4 ]]&&! http_route_is_proxied;then
 ipqs[dns]=alidns
 fi
 fi

@@ -125,10 +125,12 @@ case $first_use in
 ;;
 *)ip2location[scomtype]="${stype[other]}"
 esac
-ip2location[countrycode]=$(print -rn -- "$RESPONSE"|jq -r '.country_code')
-ip2location[proxy0]=$(print -rn -- "$RESPONSE"|jq -r '.is_proxy')
-ip2location[proxy1]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_public_proxy')
-ip2location[proxy2]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_web_proxy')
+provider_json_fields "$RESPONSE" '
+  ([.country_code] | if length == 0 then "" else .[0] end),
+  ([.is_proxy] | if length == 0 then "" else .[0] end),
+  ([.proxy.is_public_proxy] | if length == 0 then "" else .[0] end),
+  ([.proxy.is_web_proxy] | if length == 0 then "" else .[0] end)' countrycode proxy0 proxy1 proxy2||true
+ip2location+=("${(@kv)provider_fields[@]}")
 ip2location[proxy]=$(provider_merge_boolean_signals "${ip2location[proxy0]}" "${ip2location[proxy1]}" "${ip2location[proxy2]}")
 provider_json_fields "$RESPONSE" '
   ([.proxy.is_tor] | if length == 0 then "" else .[0] end),
@@ -136,9 +138,11 @@ provider_json_fields "$RESPONSE" '
   ([.proxy.is_data_center] | if length == 0 then "" else .[0] end),
   ([.proxy.is_spammer] | if length == 0 then "" else .[0] end)' tor vpn server abuser||true
 ip2location+=("${(@kv)provider_fields[@]}")
-ip2location[robot1]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_web_crawler')
-ip2location[robot2]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_scanner')
-ip2location[robot3]=$(print -rn -- "$RESPONSE"|jq -r '.proxy.is_botnet')
+provider_json_fields "$RESPONSE" '
+  ([.proxy.is_web_crawler] | if length == 0 then "" else .[0] end),
+  ([.proxy.is_scanner] | if length == 0 then "" else .[0] end),
+  ([.proxy.is_botnet] | if length == 0 then "" else .[0] end)' robot1 robot2 robot3||true
+ip2location+=("${(@kv)provider_fields[@]}")
 ip2location[robot]=$(provider_merge_boolean_signals "${ip2location[robot1]}" "${ip2location[robot2]}" "${ip2location[robot3]}")
 ip2location[score]=$(print -rn -- "$RESPONSE"|jq -r '.fraud_score')
 if ! provider_integer_in_range "${ip2location[score]}" 0 99;then

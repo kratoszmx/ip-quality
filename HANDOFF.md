@@ -2,7 +2,7 @@
 
 ## Recent maintenance — 2026-10-17 to 2026-10-23
 
-Reporter `v2026-10-23-standalone.41`. Query policy, sources and fallbacks are as
+Reporter `v2026-10-23-standalone.42`. Query policy, sources and fallbacks are as
 documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
 
 - Structure: `bin/ip-quality` is about 800 lines. Each `providers/*.zsh` holds its
@@ -38,7 +38,9 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
   the runner library directory is `runner/` (it holds direct-route,
   prefix-sampling and catalog code, not only leaf handling); `mcp/ipqs/HANDOFF.md`
   was folded into this file; MCP wrappers `ipqsTotpCode`/`checkCloudflareAccount`
-  and the `SOURCE_IDS` alias are gone. Runtime helpers stay in `common/`: myutils
+  and the `SOURCE_IDS` alias are gone. The proxy-route test that three callers
+  repeated is `http_route_is_proxied` in `common/http_request.zsh`, and the
+  Scamalytics/IP2Location relay adapters also read fields in one `jq` pass. Runtime helpers stay in `common/`: myutils
   has no zsh/Ruby, and the reporter must not depend on a private sibling checkout.
 - Reliability: reporter, runner and suites pin UTF-8 (C-locale shells previously
   failed 31 tests and non-ASCII leaf names); `scripts/test-offline` runs every

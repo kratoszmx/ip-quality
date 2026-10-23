@@ -9,7 +9,7 @@ umask 077
 # Display widths and byte validation need UTF-8 whatever the caller locale is.
 export LC_ALL=en_US.UTF-8
 
-script_version="v2026-10-23-standalone.41"
+script_version="v2026-10-23-standalone.42"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
@@ -297,7 +297,7 @@ reputation_choose_sources "$source_selection"||return $?
 case "$ipqs_dns" in
 auto|system) ;;
 alidns)
-if [[ -n "${IPQUALITY_ISOLATED_EGRESS:-}${http_proxy:-}${https_proxy:-}${all_proxy:-}${HTTP_PROXY:-}${HTTPS_PROXY:-}${ALL_PROXY:-}" ]];then
+if http_route_is_proxied;then
 print -ru2 -- "ERROR: --ipqs-dns alidns requires a direct route without proxy variables."
 return 64
 fi

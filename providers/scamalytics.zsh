@@ -3,6 +3,8 @@
 # Scamalytics public target page. This is not its subscription JSON API.
 # Match both page identity and its embedded example, then project only known
 # labels. Missing/conflicting table cells remain unknown rather than false.
+# Parsers use provider_json_fields; standalone fixture runs load it here.
+(( ${+functions[provider_json_fields]} ))||source "${${(%):-%x}:A:h:h}/common/provider_values.zsh"
 typeset -gA scamalytics_parsed=()
 
 scamalytics_parse_page(){
@@ -82,15 +84,17 @@ scamalytics[$field]="${scamalytics_parsed[$field]}"
 done
 return 0
 fi
-scamalytics[countrycode]=$(print -rn -- "$RESPONSE"|jq -r '.external_datasources.maxmind_geolite2.ip_country_code')
-scamalytics[proxy]=$(print -rn -- "$RESPONSE"|jq -r '.external_datasources.firehol.is_proxy')
-scamalytics[tor]=$(print -rn -- "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_tor')
-scamalytics[vpn]=$(print -rn -- "$RESPONSE"|jq -r '.scamalytics.scamalytics_proxy.is_vpn')
-scamalytics[server]=$(print -rn -- "$RESPONSE"|jq -r '.scamalytics.scamalytics_proxy.is_datacenter')
-scamalytics[abuser]=$(print -rn -- "$RESPONSE"|jq -r '.scamalytics.is_blacklisted_external')
-scamalytics[robot1]=$(print -rn -- "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_blacklisted_spambot')
-scamalytics[robot2]=$(print -rn -- "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_bot_operamini')
-scamalytics[robot3]=$(print -rn -- "$RESPONSE"|jq -r '.external_datasources.x4bnet.is_bot_semrush')
+provider_json_fields "$RESPONSE" '
+  ([.external_datasources.maxmind_geolite2.ip_country_code] | if length == 0 then "" else .[0] end),
+  ([.external_datasources.firehol.is_proxy] | if length == 0 then "" else .[0] end),
+  ([.external_datasources.x4bnet.is_tor] | if length == 0 then "" else .[0] end),
+  ([.scamalytics.scamalytics_proxy.is_vpn] | if length == 0 then "" else .[0] end),
+  ([.scamalytics.scamalytics_proxy.is_datacenter] | if length == 0 then "" else .[0] end),
+  ([.scamalytics.is_blacklisted_external] | if length == 0 then "" else .[0] end),
+  ([.external_datasources.x4bnet.is_blacklisted_spambot] | if length == 0 then "" else .[0] end),
+  ([.external_datasources.x4bnet.is_bot_operamini] | if length == 0 then "" else .[0] end),
+  ([.external_datasources.x4bnet.is_bot_semrush] | if length == 0 then "" else .[0] end)' countrycode proxy tor vpn server abuser robot1 robot2 robot3||true
+scamalytics+=("${(@kv)provider_fields[@]}")
 scamalytics[robot]=$(provider_merge_boolean_signals "${scamalytics[robot1]}" "${scamalytics[robot2]}" "${scamalytics[robot3]}")
 scamalytics[score]=$(print -rn -- "$RESPONSE"|jq -r '.scamalytics.scamalytics_score')
 if ! provider_integer_in_range "${scamalytics[score]}" 0 100;then

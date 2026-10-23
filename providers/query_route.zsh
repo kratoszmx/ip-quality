@@ -5,7 +5,7 @@ emulate -LR zsh
 typeset -gA query_route
 query_route=([family]="$1" [dns]="$2" [direct_dns]="$3" [route]=selected_route [primary_status]="")
 query_route[can_fallback]=0
-[[ -n "${IPQUALITY_ISOLATED_EGRESS:-}${http_proxy:-}${https_proxy:-}${all_proxy:-}${HTTP_PROXY:-}${HTTPS_PROXY:-}${ALL_PROXY:-}" ]]&&query_route[can_fallback]=1
+http_route_is_proxied&&query_route[can_fallback]=1
 return 0
 }
 

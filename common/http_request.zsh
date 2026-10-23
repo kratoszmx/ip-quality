@@ -1,3 +1,9 @@
+# True when curl would leave through an inherited proxy or the runner's isolated
+# leaf (IPQUALITY_ISOLATED_EGRESS), i.e. not over the plain system route.
+http_route_is_proxied(){
+[[ -n "${IPQUALITY_ISOLATED_EGRESS:-}${http_proxy:-}${https_proxy:-}${all_proxy:-}${HTTP_PROXY:-}${HTTPS_PROXY:-}${ALL_PROXY:-}" ]]
+}
+
 # Keep credential-bearing curl options on stdin, out of process arguments.
 # Callers own endpoint/key validation, route selection and request budgets.
 curl_with_secret_url(){
