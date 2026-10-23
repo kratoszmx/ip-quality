@@ -12,14 +12,13 @@ local port="$2"
 local wait_seconds="$3"
 printf 'QUIT\r\n'|nc -w "$wait_seconds" "$host" "$port" 2>&1
 }
+# A greeting is a line starting "220 " or "220-". nc errors are captured too,
+# and an address or port inside them may contain "220", so a substring is not enough.
+smtp_greeting_received(){
+[[ $'\n'"$1" == *$'\n'220[\ -]* ]]
+}
 check_email_service(){
-local service=$1
-local port=25
-local expected_response="220"
-local domain=""
-local host=""
-local response=""
-local success="false"
+local service=$1 domain="" host
 case $service in
 "Gmail")domain="gmail.com";;
 "Outlook")domain="outlook.com";;
@@ -33,39 +32,23 @@ case $service in
 "Sohu")domain="sohu.com";;
 "Sina")domain="sina.com";;
 "QQ")domain="qq.com";;
-*)return
+*)return 0
 esac
-if [[ -z $host ]];then
 local mx_hosts=($(get_sorted_mx_records $domain))
 for host in "${mx_hosts[@]}";do
-response=$(smtp_probe "$host" "$port" 4)
-smail_response[$service]=$response
-if [[ $response == *"$expected_response"* ]];then
-success="true"
+if smtp_greeting_received "$(smtp_probe "$host" 25 4)";then
 smail[$service]="$Font_Black+$Font_Suffix$Back_Green$Font_White$Font_B$service$Font_Suffix"
 smailstatus[$service]="true"
 smail[remote]=1
-break
+return 0
 fi
 done
-else
-response=$(smtp_probe "$host" "$port" 4)
-if [[ $response == *"$expected_response"* ]];then
-success="true"
-smail[$service]="$Font_Black+$Font_Suffix$Back_Green$Font_White$Font_B$service$Font_Suffix"
-smailstatus[$service]="true"
-smail[remote]=1
-fi
-fi
-if [[ $success == "false" ]];then
 smail[$service]="$Font_Black-$Font_Suffix$Back_Red$Font_White$Font_B$service$Font_Suffix"
 smailstatus[$service]="false"
-fi
 }
 check_mail(){
 smail[local]=0
-local response=$(smtp_probe "smtp.mailgun.org" 25 9)
-[[ $response == *"220"* ]]&&smail[local]=1
+smtp_greeting_received "$(smtp_probe "smtp.mailgun.org" 25 9)"&&smail[local]=1
 smail[remote]=0
 services=("Gmail" "Outlook" "Yahoo" "Apple" "QQ" "MailRU" "AOL" "GMX" "MailCOM" "163" "Sohu" "Sina")
 for service in "${services[@]}";do

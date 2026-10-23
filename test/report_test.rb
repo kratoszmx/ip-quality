@@ -198,7 +198,7 @@ class ReportTest < ReporterTestCase
       source "$5"
       YY="$3"
       fixture_basic_source="$4" mode_json=0 mode_output=0
-      typeset -A sbasic stype sscore sfactor smail smailstatus smail_response maxmind ipinfo ip2location cloudflare dbip ipregistry scamalytics ipapi ipwhois abuseipdb ipdata ipqs ping0 ripestat internetdb
+      typeset -A sbasic stype sscore sfactor smail smailstatus maxmind ipinfo ip2location cloudflare dbip ipregistry scamalytics ipapi ipwhois abuseipdb ipdata ipqs ping0 ripestat internetdb
       sbasic[title]='1. Basic Information (relay)' sbasic[title_lite]='1. Basic Information (fallback)'
       stype[title]='2. IP Type' sscore[title]='3. Risk Score' sfactor[title]='4. Risk Factors'
       scope_includes(){ [[ "$1" == reputation ]]; }

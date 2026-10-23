@@ -220,25 +220,8 @@ existing provider statuses.
 ### Independent recovery for relay-backed sources
 
 The default all-source run automatically recovers three relay-backed sources:
-
-- IP2Location: after an unavailable or malformed relay response, read
-  `https://www.ip2location.com/{IP}` once. The heading and embedded `code2` JSON
-  must both match the target; scores remain within the provider's 0–99 range.
-  Missing flags stay unknown. This is a public website example, not a promise
-  that its paid Security API has a free risk tier.
-- ipdata: after the same relay failures, read `https://ipdata.co/` and extract
-  its one published demo key from the legacy `$.get` or current `fetch` call
-  to the exact official API origin; ambiguous keys are rejected. Make one
-  `https://api.ipdata.co/{IP}` lookup with
-  the website Origin/Referer. The key stays in memory and curl's stdin config;
-  it is never hard-coded, cached, put in process arguments or reported. This is
-  shared website-demo access with an unspecified allowance, not an owned key.
-- AbuseIPDB: a configured private key selects its official
-  [APIv2 CHECK endpoint](https://docs.abuseipdb.com/#check-endpoint) directly,
-  with `maxAgeInDays=90`, a private `Key` header and target-bound response
-  validation. The [free individual account](https://www.abuseipdb.com/register)
-  advertises 1,000 checks/day. No abuse report is submitted. Without a key the
-  existing named relay remains; an official failure does not switch to it.
+[IP2Location](providers/ip2location.md), [ipdata](providers/ipdata.md) and
+[AbuseIPDB](providers/abuseipdb.md) (owned key).
 
 Each additional request uses the selected route/address family, a ten-second
 deadline and a response-size bound. There is no redirect, retry or direct-route
@@ -256,93 +239,18 @@ parsers. We do not copy inferred false flags or manufacture scores from booleans
 
 ## Interpretation rules
 
-Check.Place relays share one upstream host. After that host returns the known
-Cloudflare block page or HTTP 429, the remaining relay calls for the same target
-and address family pause for this reporter process. Their columns remain visible
-with `skipped_relay_cloudflare_blocked` or `skipped_relay_rate_limited`; those are
-unqueried/unknown results, not additional observed failures or clean results.
-The first actual failure retains its original status. Other official APIs,
-targets and address families proceed normally; no persistent cache, retry,
-browser fallback or route change is created. Ordinary HTTP 403, transport and
-schema failures do not trigger this source-specific pause.
+Source-specific contracts live next to each adapter: [Check.Place relays and
+MaxMind basic data](providers/check_place.md), [ipapi.is](providers/ipapi.md),
+[IPWHOIS](providers/ipwhois.md), [DB-IP](providers/dbip.md),
+[Cloudflare](providers/cloudflare.md), [Scamalytics](providers/scamalytics.md),
+[IP2Location](providers/ip2location.md), [ipdata](providers/ipdata.md),
+[AbuseIPDB](providers/abuseipdb.md) and [IPQS](providers/ipqualityscore.md).
 
 - Results remain per source. Conflicting answers stay visible and score scales
   are never averaged into a synthetic rating.
 - A provider failure, rate limit, quota response, malformed body, target mismatch,
   or schema change is `Unknown`/unavailable, not clean. A missing required command
   stops the run with an explicit dependency error before a report is produced.
-- The ipapi.is adapter validates the returned IP and accepts both documented
-  response tiers: the flat anonymous response and the keyed nested response.
-  Anonymous data is shown as context only; it supplies no proxy, VPN, Tor,
-  hosting, abuse, type, or score evidence. Error bodies, quota responses, and
-  malformed nested sections become an explicit unavailable status, with the
-  upstream body and jq diagnostics kept out of the terminal report.
-  Section 4 keeps the ipapi.is column on failures or anonymous responses. Its
-  query-status row distinguishes missing risk from request failure. Credential
-  mode and response tier remain in `FactorMeta.ipapi`; no routine prose footer
-  repeats them below the matrix. The same status row covers the other sources.
-  Curl timeout, TLS-handshake and certificate-verification failures have separate
-  statuses; none implies an exhausted API allowance. A 2026-09-24 comparison
-  returned a full keyed response over direct access and curl 35 before HTTP
-  over isolated ATT, including a TLS 1.2 and official diagnostic-host check.
-  This establishes a route-specific transport failure, not its remote cause.
-  Runtime keeps certificate checks and the chosen route; it does not secretly
-  fetch the observation through direct access or pin a diagnostic hostname.
-- IPWHOIS uses its current homepage demo, `https://ipwhois.io/demo?ip={IP}`.
-  The old upstream used `/widget`; its current JavaScript uses `/demo`.
-  Requests include its website Origin/Referer and browser request headers. On
-  2026-09-24 a paired direct-route check returned a rate-limit body without
-  those headers and valid security fields with them. A limit message alone
-  therefore does not prove the user's own daily allowance was exhausted.
-  Section 4 accepts only actual boolean proxy/VPN/Tor/hosting fields in
-  `security`, bound to the exact returned target. Missing fields stay null,
-  including abuse/bot fields that the demo does not supply. HTTP 200 with
-  `success:false` and a rate-limit message means `rate_limited`, not usable.
-  `FactorMeta.IPWhois` records `public_demo` and the risk-query status.
-- DB-IP reads `https://db-ip.com/api/core/`, extracts its bounded public visitor
-  token into memory, then reads `https://api.db-ip.com/v2/{token}/self?convertCurrencies`
-  with the website headers. This visitor endpoint returned a risk label when
-  the old `/demo/home.php` target lookup reported its query limit. Both requests
-  preserve the selected route and IP family. The token URL is sent through curl
-  stdin, never saved or printed. No remote script is executed. The returned
-  `ipAddress` must equal the tested IP; an explicit unrelated target or changed
-  egress becomes `ip_mismatch`, never another IP's risk. It validates bounded
-  geography and a `threatLevel` of low/medium/high. A missing label remains unknown. The original
-  label is in section 3 and `ScoreMeta.DBIP.Band`; `Score.DBIP` remains null.
-  HTTP 200 with `OVER_QUERY_LIMIT` or an explicit daily quota message means
-  `daily_quota_exhausted`; other query-limit messages remain `rate_limited`. No label is
-  converted to a 0/50/100 score. The public visitor token is used only in memory;
-  no account key is obtained or saved.
-  The [official FAQ](https://db-ip.com/faq.php) documents daily API-key allowance
-  resets at midnight CET. That is 07:00 in Asia/Shanghai when interpreted as
-  CET (UTC+1); the public visitor demo supplies no reset timestamp or guaranteed
-  recovery schedule. On October 11, both direct and ATT returned the daily-limit
-  body without `Retry-After`, so changing routes was not a recovery for this demo.
-  The no-key free geography contract is retained only for the MCP's optional
-  `free_api` probe; unexpected premium fields there still cannot supply risk.
-- Cloudflare IP Intelligence validates the target IP, ASN reference, and bounded
-  threat-category objects. Its categories remain source-specific observations;
-  they are not converted into the project's other boolean factors or a score.
-  A live response on 2026-09-22 supplied a numeric ASN despite the documentation's
-  string example; valid 32-bit numeric ASNs are normalized to `AS<number>`.
-  Missing `risk_types` stays `null` in JSON, while an explicitly empty array stays
-  `[]`. A null `threat_summary` supplies no clean-IP evidence.
-  Section 1 includes the named Cloudflare query status, ASN, ASN country,
-  ASN type and organization after either the relay or fallback basic data.
-  Actual threat categories appear there when supplied; missing categories
-  create no extra line, while an explicit empty array says "none listed".
-  Section 3 has no Cloudflare column or context rows. JSON fields remain
-  compatible: Score.Cloudflare is null, and ProviderContext.Cloudflare retains
-  all observations. These are `belongs_to_ref` attributes: the country belongs to
-  the ASN context and the type classifies the ASN, not whether the tested IP
-  itself is residential, a VPN or clean. Failed queries show their status without
-  displaying stale context; absent fields are omitted.
-  Cloudflare's current WAF documentation says legacy Threat Score is always 0
-  and no longer populated. The old upstream fetched `.ip.riskScore` from the
-  third-party `ip.nodeget.com` and assigned local risk bands. That old zero is
-  not restored as a low-risk result. JSON marks LegacyThreatScore as
-  `retired_constant_zero`. Interpretation details remain here and in JSON;
-  the terminal omits the repeated Cloudflare, DB-IP, ipapi and IPWHOIS prose.
 - The additional providers retain visible source status in their assigned sections.
   Missing Cloudflare credentials are shown as unconfigured. Context IP fields use the
   same masking as `Head.IP`. Cloudflare category names remain intact JSON strings,
@@ -355,35 +263,6 @@ schema failures do not trigger this source-specific pause.
   supplies it. It does not invent a band from local thresholds. Current numeric
   scales remain distinct: IP2Location 0-99 potential risk, Scamalytics 0-100
   fraud, ipapi.is 0-100% abuse, AbuseIPDB 0-100 confidence, and IPQS 0-100 fraud.
-- Check.Place rows are explicitly labeled `Upstream relay`; they are not treated
-  as owner-controlled official accounts. Its MaxMind-shaped payload does not
-  prove that this machine owns a `.mmdb`, a MaxMind subscription, or a known
-  edition/build.
-- If the Scamalytics relay is unavailable or malformed, one same-route request
-  to `https://scamalytics.com/ip/TARGET` can restore that provider's observations.
-  The page heading and embedded example must identify the exact target; its
-  score badge must agree with the example's 0–100 score. The sample's original
-  risk/blacklist values and unambiguous labeled Yes/No cells are retained.
-  Missing or conflicting cells remain unknown. Public/Web/Residential Proxy
-  flags use any-true/all-false semantics; robot combines the displayed search
-  engine and X4Bnet spambot flags. This public page is distinct from the paid
-  JSON API and from the relay's dataset: JSON `ScoreMeta.SCAMALYTICS` records
-  `Source`, final `Status`, and the failed `RelayStatus`; `FactorMeta` records
-  the same source. No other provider's score is substituted. The page has no
-  guaranteed automation quota; one failure stops without a browser, route
-  change, account or retry. See the [official example](https://scamalytics.com/ip/8.8.8.8).
-- Each Check.Place-backed request keeps an independent HTTP status. The parser
-  distinguishes its known Cloudflare block page from an ordinary HTTP 403, and
-  one relay failure cannot erase a successful sibling. JSON exposes these states
-  in `ProviderStatus`.
-- The MaxMind-labeled basic response must contain one valid observation object.
-  Wrong nested types, error-only bodies and empty observations become
-  `invalid_response`; basic information then uses the existing IPinfo fallback.
-  Missing optional fields and zero coordinates remain valid. An English
-  supplement fills only missing fields after the same validation, so a failed
-  translation cannot erase valid primary data. JSON text is passed unchanged
-  to jq, including literal backslashes. The other provider adapters use the same
-  literal-input rule so unrelated escaped text cannot corrupt their JSON reads.
 - Ping0 accepts exactly four bounded lines and requires the returned IP to match.
   RIPEstat validates prefix/ASN structure. Shodan validates the target IP and
   bounded arrays. Ports must be integers from 1 through 65535, and text array
@@ -430,26 +309,8 @@ fed to curl through standard-input configuration, so they do not appear in
 process arguments, Git configuration, or reports.
 
 Without an Ipregistry key, no Ipregistry request is made; its type and factor
-columns remain visible with `not_configured` and unknown values. Without an IPQS
-key, the reporter uses the named Check.Place relay and records that source. With an
-IPQS key, it first calls the account-usage endpoint. A confirmed zero balance,
-insufficient-credit response, transport/HTTP failure or malformed account body
-stops before the reputation request. Both account and lookup stages retain
-timeout, TLS-handshake, certificate, HTTP and response-schema statuses; an error
-body cannot override a failing HTTP status. Failures remain attributed to the
-official path rather than being described as a clean IP.
-When the account preflight and the official lookup both succeed, the report marks
-IPQS as `官方/可用`; the current terminal and JSON reports do not expose the
-account's remaining credit balance. The preflight value is used only to gate the
-paid lookup.
-The anonymous `ipapi.is` path requires no key and returns a minimal response.
-On 2026-09-24 its official pages disagree on the anonymous daily limit (30 on
-the free-tier page; 100 on the developer page). Treat HTTP 429/Retry-After as
-authoritative for an actual request, without retrying into a firewall ban. A free
-ipapi.is account key raises the documented allowance to 1,000 lookups per day
-and unlocks the complete response used by the type, score, and factor tables.
-The reporter reads that optional key from the file assignment `IPAPI_API_KEY`
-or the raw-key file `secrets/ipapi`.
+columns remain visible with `not_configured` and unknown values.
+Per-source key behavior and quotas are in the linked source contracts.
 DB-IP's permanent free endpoint is `https://api.db-ip.com/v2/free/{IP}` and
 documents 500 requests per day. It requires no account, key, billing or 2FA.
 Its country/state/city response is distinct from the paid Extended API's threat
@@ -473,22 +334,13 @@ API quotas are separate and cannot promise security fields. If the corrected
 request is throttled, stop, respect a supplied Retry-After/reset time, and keep
 the remaining sources; repeated requests or rotating accounts is not a fix.
 
-Cloudflare
-Security Center's IP Intelligence endpoint requires an account ID and an API
-token with Intel Read (or Intel Write) permission. Cloudflare documents 100
-Threat Intelligence API calls per month on Free, Pro, and Business plans; calls
-made by other Security Center features also consume that monthly quota. The
-reporter does not attempt to estimate remaining provider quota.
-The similarly named `ipapi.co` is a different product with a contact-gated free
-trial. This project uses `ipapi.is`, with a free key when configured; the two
-providers must not be silently combined.
-
 ## Mail scope
 
 The reporter resolves public MX records for Gmail, Outlook, Yahoo, Apple, QQ,
 Mail.ru, AOL, GMX, Mail.com, 163, Sohu, and Sina. For each service it selects one
 MX host with the lowest numeric preference, makes a bounded TCP/25 connection,
-looks for an SMTP `220` greeting, sends `QUIT`, and submits no message. It does
+requires a line starting `220 ` or `220-` (a `220` inside an `nc` error or
+address is not a greeting), sends `QUIT`, and submits no message. It does
 not retry alternate MX hosts. A separate Mailgun greeting probe describes local
 outbound TCP/25 reachability. The operating system chooses the actual local
 source address, so the check works on a directly addressed host or behind NAT.
@@ -496,16 +348,17 @@ source address, so the check works on a directly addressed host or behind NAT.
 ## DNSBL scope
 
 The reporter reverses one IPv4 address and queries every unique zone in the
-vendored `ref/dnsbl.list`. The offline self-test validates 422 zones. Concurrency
+vendored `ref/dnsbl.list`. The offline self-test validates 420 zones. Concurrency
 is configurable from 1 through the hard maximum of 50.
 
 Outcomes follow the implemented command result:
 
 - `Clean`: `dig` succeeds and returns no address;
-- `Blacklisted`: the answer is exactly `127.0.0.2`;
-- `Marked`: a different non-empty ordinary answer is returned;
-- `Unknown`: `dig` fails, times out, or returns a `127.255.255.*` resolver-policy
-  error.
+- `Blacklisted`: one of the returned records is `127.0.0.2`;
+- `Marked`: every record is another `127.0.0.0/8` listing code;
+- `Unknown`: `dig` fails or times out, any record is a `127.255.255.*`
+  resolver-policy error, or any record lies outside `127.0.0.0/8` (an NXDOMAIN-
+  hijacking resolver, not evidence of a listing).
 
 Terminal output names every `Blacklisted` and `Marked` zone. JSON retains a
 per-zone `Results` object as well as totals. Spamhaus codes such as

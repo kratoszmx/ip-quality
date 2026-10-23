@@ -9,7 +9,7 @@ umask 077
 # Display widths and byte validation need UTF-8 whatever the caller locale is.
 export LC_ALL=en_US.UTF-8
 
-script_version="v2026-10-22-standalone.40"
+script_version="v2026-10-23-standalone.41"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
@@ -91,7 +91,6 @@ typeset -A sfactor
 typeset -A sping0
 typeset -A smail
 typeset -A smailstatus
-typeset -A smail_response
 typeset -A stail
 typeset basic_source=ipinfo
 typeset mode_json=0
@@ -648,7 +647,6 @@ IP=$1
 unset 'smail[local]' 'smail[remote]' 'smail[t]' 'smail[c]' 'smail[m]' 'smail[b]' 'smail[u]' 'smail[sdnsbl]' \
   'smail[dnsbl_results]' 'smail[blacklisted_zones]' 'smail[marked_zones]'
 smailstatus=()
-smail_response=()
 ipjson='{
       "Head": {},
       "Info": {},

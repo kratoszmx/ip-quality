@@ -119,6 +119,22 @@ class IpQualityTest < ReporterTestCase
     assert_equal cases.values, stdout.lines(chomp: true)
   end
 
+  def test_smtp_success_requires_a_greeting_line_not_a_220_substring
+    probe = reporter_functions("smtp_greeting_received") + <<~'ZSH'
+      for response in "$@";do smtp_greeting_received "$response"&&print -r -- yes||print -r -- no;done
+    ZSH
+    responses = [
+      "220 mx.example.test ESMTP ready",
+      "220-mx.example.test greeting\n220 ready",
+      "nc: connectx to 2a00:1450:4220::1b port 25 (tcp) failed: Operation timed out",
+      "421 4.7.0 Try again later (2201)",
+      ""
+    ]
+    stdout, stderr, status = Open3.capture3("/bin/zsh", "-f", "-c", probe, "smtp", *responses)
+    assert status.success?, stderr
+    assert_equal %w[yes yes no no no], stdout.split
+  end
+
   def test_ipv6_masking_shows_three_canonical_groups_without_ambiguous_colons
     cases = {
       "2001:db8::1" => "2001:db8:0:*:*:*:*:*",
@@ -177,6 +193,10 @@ end
         *bl.spamcop.net*) print -r -- 127.0.0.3 ;;
         *.b.barracudacentral.org*) exit 9 ;;
         *.vouch.dwl.spamhaus.org*) print -r -- 127.255.255.254 ;;
+        *.psbl.surriel.com*) print -rl -- 127.0.0.4 127.0.0.2 ;;
+        *.dnsbl.dronebl.org*) print -rl -- 127.0.0.10 127.255.255.252 ;;
+        *.bl.mailspike.net*) print -r -- 198.105.244.11 ;;
+        *.rbl.interserver.net*) print -rl -- 127.0.0.5 127.0.0.6 ;;
         *) exit 0 ;;
       esac
     ZSH
@@ -195,14 +215,19 @@ end
     zones = File.readlines(DNSBL, chomp: true)
     assert_equal zones.sort, dnsbl.fetch("Results").keys.sort
     assert_equal zones.size, dnsbl.fetch("Total")
-    assert_equal zones.size - 4, dnsbl.fetch("Clean")
-    assert_equal 1, dnsbl.fetch("Marked")
-    assert_equal 1, dnsbl.fetch("Blacklisted")
-    assert_equal 2, dnsbl.fetch("Unknown")
+    assert_equal zones.size - 8, dnsbl.fetch("Clean")
+    assert_equal 2, dnsbl.fetch("Marked")
+    assert_equal 2, dnsbl.fetch("Blacklisted")
+    assert_equal 4, dnsbl.fetch("Unknown")
     assert_equal "Blacklisted", dnsbl.dig("Results", "dnsbl-3.uceprotect.net")
     assert_equal "Marked", dnsbl.dig("Results", "bl.spamcop.net")
     assert_equal "Unknown", dnsbl.dig("Results", "b.barracudacentral.org")
     assert_equal "Unknown", dnsbl.dig("Results", "vouch.dwl.spamhaus.org")
+    # Multi-record answers, a zone error among codes and a hijacked NXDOMAIN.
+    assert_equal "Blacklisted", dnsbl.dig("Results", "psbl.surriel.com")
+    assert_equal "Unknown", dnsbl.dig("Results", "dnsbl.dronebl.org")
+    assert_equal "Unknown", dnsbl.dig("Results", "bl.mailspike.net")
+    assert_equal "Marked", dnsbl.dig("Results", "rbl.interserver.net")
     assert_includes stderr, "正在检测黑名单数据库"
   end
 

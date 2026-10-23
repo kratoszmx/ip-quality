@@ -1,8 +1,8 @@
 # Current handoff
 
-## Recent maintenance — 2026-10-17 to 2026-10-22
+## Recent maintenance — 2026-10-17 to 2026-10-23
 
-Reporter `v2026-10-22-standalone.40`. Query policy, sources and fallbacks are as
+Reporter `v2026-10-23-standalone.41`. Query policy, sources and fallbacks are as
 documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
 
 - Structure: `bin/ip-quality` is about 800 lines. Each `providers/*.zsh` holds its
@@ -29,6 +29,10 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
   and provider text is never reinterpreted as `echo -e` escapes. Terminal width
   and ANSI cleanup use parameter expansion instead of `sed` per cell (250 cells:
   4.85 s before, 0.005 s after).
+- DNSBL/mail: multi-record answers are classified per record, non-127/8 answers
+  (NXDOMAIN hijacking) are `Unknown`, four glued zones in `ref/dnsbl.list` were
+  split (420 zones), and SMTP success needs a `220` greeting line.
+- Docs: per-source contracts moved from `PROVIDERS.md` to `providers/<source>.md`.
 - Reliability: reporter, runner and suites pin UTF-8 (C-locale shells previously
   failed 31 tests and non-ASCII leaf names); `scripts/test-offline` runs every
   suite; supervisor's weekly `test.ipquality.test-offline` runs all of them.

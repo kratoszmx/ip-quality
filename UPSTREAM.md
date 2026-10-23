@@ -124,7 +124,8 @@ formatter was replaced by exact integer arithmetic:
 - Bounded DNS attempts, added `Unknown` outcomes, retained every zone in JSON,
   and named marked/blacklisted zones in terminal output. Normalized
   `hostkarma.junkemailfilter.com[brl]` to `hostkarma.junkemailfilter.com` and
-  removed duplicate DNSBL entries.
+  removed duplicate DNSBL entries. Split four entries where upstream had glued
+  two zones together (for example `dul.dnsbl.sorbs.netdul.ru`).
 - Added a system-Ruby runner that reads one cached remote subscription
   independently of the active Clash profile, extracts an exact inline leaf and
   concrete dependencies, and owns temporary loopback-only Mihomo startup,

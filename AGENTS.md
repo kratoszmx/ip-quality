@@ -32,7 +32,7 @@ a separate action after the user accepts the disclosure.
 | Document | Read it for |
 | --- | --- |
 | [HANDOFF.md](HANDOFF.md) | Current version, validation evidence and pending work |
-| [PROVIDERS.md](PROVIDERS.md) | Scopes, source selection, route fallback, per-source contracts and disclosure |
+| [PROVIDERS.md](PROVIDERS.md) | Scopes, source selection, route fallback, display mapping and disclosure; links each `providers/<source>.md` contract |
 | [TESTING.md](TESTING.md) | Offline prerequisites, complete/focused commands and suite ownership |
 | [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md) | Shared helpers, their callers and boundaries |
 | [SERVICES.md](SERVICES.md) | No resident service; temporary processes and the external weekly test |
@@ -136,7 +136,8 @@ never clean. Exact-leaf mode stays reputation-only. DNSBL concurrency is 1–50.
   layout, printable metadata, verified snapshots, proxy overrides.
 - `providers/`: one file per source (fixture-testable parser plus its live
   `db_*` adapter), mail/DNSBL probes, credentials and source/relay policy;
-  `sources.tsv` is the source catalog both entrypoints read for IDs and plans.
+  `sources.tsv` is the source catalog both entrypoints read for IDs and plans;
+  `<source>.md` beside an adapter is that source's contract.
 - `report/`: cn/en labels, terminal sections and JSON assembly.
 - `leaf_runner/`: cached-subscription selection, exact-leaf extraction,
   loopback Mihomo ownership/cleanup, prefix sampling, local batch evidence and
