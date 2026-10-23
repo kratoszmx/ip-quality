@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "support/reporter_test_case"
-load File.expand_path("../bin/test-clash-leaf", __dir__) unless defined?(IpQuality::ClashLeafCommand)
+load File.expand_path("../bin/ip-quality-route", __dir__) unless defined?(IpQuality::RouteCommand)
 
 class SourceSelectionTest < ReporterTestCase
   DIRECT_ENV = %w[HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy IPQUALITY_ISOLATED_EGRESS].to_h { |key| [key, nil] }.freeze
@@ -34,11 +34,11 @@ class SourceSelectionTest < ReporterTestCase
       File.write(reporter, 'print -rl -- "$@" > "$IPQUALITY_TEST_ARGUMENTS"' + "\n")
       code = <<~'RUBY'
         load ARGV.shift
-        command = IpQuality::ClashLeafCommand.new(reporter_path: ARGV.shift)
+        command = IpQuality::RouteCommand.new(reporter_path: ARGV.shift)
         exit command.run(ARGV)
       RUBY
       _out, err, result = Open3.capture3({"IPQUALITY_TEST_ARGUMENTS" => arguments},
-        "/usr/bin/ruby", "--disable-gems", "-e", code, File.join(ROOT, "bin", "test-clash-leaf"), reporter,
+        "/usr/bin/ruby", "--disable-gems", "-e", code, File.join(ROOT, "bin", "ip-quality-route"), reporter,
         "--direct", "--sources", "ipapi,ipqs", "--ipqs-dns", "alidns", "--confirm-network-lookup")
       assert result.success?, err
       assert_equal %w[--confirm-network-lookup --scope reputation -4 --sources ipapi,ipqs --ipqs-dns alidns], File.readlines(arguments, chomp: true)

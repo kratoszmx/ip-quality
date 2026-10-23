@@ -43,7 +43,7 @@ the tests and claiming a complete pass.
 | `test/public_demo_test.rb` | DB-IP labels/IPWHOIS boolean flags, quota errors, partial/malformed data, target binding, state reset and one-request IPWHOIS headers |
 | `test/report_test.rb` | Provider tables, ANSI/layout, JSON/file bytes, exclusive report creation |
 | `test/repository_test.rb` | Source/data safety, vendored references and AGPL provenance |
-| `test/clash_leaf_runner_test.rb` | Cached selection, YAML safety, exact leaf/dependencies, proxy isolation, process cleanup |
+| `test/route_runner_test.rb` | Cached selection, YAML safety, exact leaf/dependencies, proxy isolation, process cleanup |
 | `test/prefix_sample_test.rb` | Multiline /24 sampling and deduplication, bounded/public input parity, no-consent/no-cache menu, proxy isolation, private result files, provider failures/percent scores, malformed/mismatched reports, interruption/TERM cleanup and DB-IP/Ping0 explicit-target request suppression |
 | `test/support/reporter_test_case.rb` | Shared paths, named zsh function probes, isolated reporter copies and fake commands |
 | `test/fixtures/` | Sanitized provider responses; data only |
@@ -62,9 +62,7 @@ npm --prefix mcp/ipqs run check
 npm --prefix mcp/provider-accounts test
 ```
 
-`bin/test-clash-leaf` is the product's route command, not a test suite. Do not
-execute every file whose name contains `test`. The canonical runner includes
-`test/support/self_test.zsh` once (it sources the reporter in definition-only
+The canonical runner includes `test/support/self_test.zsh` once (it sources the reporter in definition-only
 mode); it need not be run separately for a full pass.
 
 For a reporter-only aggregate, run from the root:

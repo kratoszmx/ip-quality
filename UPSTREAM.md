@@ -140,7 +140,7 @@ formatter was replaced by exact integer arithmetic:
   an unsuccessful or malformed account preflight now stops before any lookup.
   Check.Place-specific in-memory request policy stops repeated relay requests
   after a known block/429, with unqueried sources explicitly marked as skipped.
-  The route command now lives directly in `bin/test-clash-leaf`; removed the
+  The route command now lives directly in `bin/ip-quality-route`; removed the
   shell forwarding entrypoint and report-output forwarding helper. Header and
   table width calculations share one character-based implementation. Generic
   table measurement, cell padding, rows and rules now live in common/terminal.zsh;

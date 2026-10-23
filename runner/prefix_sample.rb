@@ -9,7 +9,7 @@ require_relative "source_catalog"
 
 module IpQuality
   # Target sampling policy and local batch evidence, not a network scanner.
-  # Process ownership/termination stays with ClashLeafCommand.
+  # Process ownership/termination stays with RouteCommand.
   class PrefixSample
     class Error < StandardError; end
 

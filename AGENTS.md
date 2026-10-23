@@ -10,7 +10,7 @@ direct executable using the system Ruby standard library.
 Give the user only the normal interactive, all-source command:
 
 ```text
-cd /Users/zmx/Projects/projects/ipquality && /usr/bin/ruby --disable-gems bin/test-clash-leaf --confirm-network-lookup -4
+cd /Users/zmx/Projects/projects/ipquality && /usr/bin/ruby --disable-gems bin/ip-quality-route --confirm-network-lookup -4
 ```
 
 It asks for direct, a public IP, IPv4 prefix samples, or a subscription leaf. DNS repair and source fallback are
@@ -20,8 +20,8 @@ below is for agents. These commands are network-free:
 ```text
 cd /Users/zmx/Projects/projects/ipquality
 /bin/zsh -f bin/ip-quality --help
-/usr/bin/ruby --disable-gems bin/test-clash-leaf --direct
-/usr/bin/ruby --disable-gems bin/test-clash-leaf --help
+/usr/bin/ruby --disable-gems bin/ip-quality-route --direct
+/usr/bin/ruby --disable-gems bin/ip-quality-route --help
 /bin/zsh -f scripts/test-offline
 ```
 
@@ -46,8 +46,8 @@ a separate action after the user accepts the disclosure.
 
 | Need | Entrypoint |
 | --- | --- |
-| Current system route | `bin/test-clash-leaf --direct` (IPv4 default, `-6` for IPv6); clears proxy variables, needs no Clash cache or Mihomo |
-| One subscription node | `bin/test-clash-leaf --subscription NAME --leaf NAME -4`; isolated private Mihomo, exact names |
+| Current system route | `bin/ip-quality-route --direct` (IPv4 default, `-6` for IPv6); clears proxy variables, needs no Clash cache or Mihomo |
+| One subscription node | `bin/ip-quality-route --subscription NAME --leaf NAME -4`; isolated private Mihomo, exact names |
 | A chosen scope or public target IP | `bin/ip-quality --scope SCOPE [IP]`; see [route boundary](PROVIDERS.md#consent-and-route-boundary) |
 
 Discover cached node names with `--list-subscriptions` and
@@ -131,7 +131,7 @@ never clean. Exact-leaf mode stays reputation-only. DNSBL concurrency is 1–50.
 
 - `bin/ip-quality`: CLI policy, module load order, egress discovery and run
   orchestration; sourcing it loads definitions without running the CLI.
-- `bin/test-clash-leaf`: Ruby route runner, CLI policy and route selection.
+- `bin/ip-quality-route`: Ruby route runner, CLI policy and route selection.
 - `common/`: credential-safe HTTP, provider values, jq predicates, terminal
   layout, printable metadata, verified snapshots, proxy overrides.
 - `providers/`: one file per source (fixture-testable parser plus its live

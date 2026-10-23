@@ -3,7 +3,7 @@
 require_relative "support/reporter_test_case"
 require "stringio"
 require "timeout"
-load File.expand_path("../bin/test-clash-leaf", __dir__) unless defined?(IpQuality::ClashLeafCommand)
+load File.expand_path("../bin/ip-quality-route", __dir__) unless defined?(IpQuality::RouteCommand)
 
 class PrefixSampleTest < ReporterTestCase
   Result = Struct.new(:exitstatus) do
@@ -189,13 +189,13 @@ class PrefixSampleTest < ReporterTestCase
         require 'stringio'
         load ARGV.shift
         root = ARGV.shift
-        command = IpQuality::ClashLeafCommand.new(stdin: StringIO.new("3\n128.241.47\n\n"),
+        command = IpQuality::RouteCommand.new(stdin: StringIO.new("3\n128.241.47\n\n"),
           app_root: File.join(root, 'absent-clash'), reporter_path: File.join(root, 'reporter'),
           reports_root: File.join(root, 'reports'))
         exit command.run(['--confirm-network-lookup', '-4'])
       RUBY
       pid = Process.spawn({"IPQUALITY_TEST_PID" => pid_path}, "/usr/bin/ruby", "--disable-gems", "-e", program,
-        File.join(ROOT, "bin/test-clash-leaf"), directory, out: File::NULL, err: File::NULL)
+        File.join(ROOT, "bin/ip-quality-route"), directory, out: File::NULL, err: File::NULL)
       begin
         Timeout.timeout(10) { sleep 0.02 until File.file?(pid_path) && !File.read(pid_path).empty? }
         child = Integer(File.read(pid_path))
@@ -239,7 +239,7 @@ class PrefixSampleTest < ReporterTestCase
     Dir.mktmpdir("prefix-command-") do |directory|
       out = StringIO.new
       err = StringIO.new
-      command = IpQuality::ClashLeafCommand.new(stdin: StringIO.new(input), stdout: out, stderr: err,
+      command = IpQuality::RouteCommand.new(stdin: StringIO.new(input), stdout: out, stderr: err,
         app_root: File.join(directory, "absent-clash"), reporter_path: File.join(directory, "reporter"),
         reports_root: File.join(directory, "reports"))
       yield command, directory, out, err

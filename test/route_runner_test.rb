@@ -7,11 +7,11 @@ require "tmpdir"
 require "timeout"
 require "yaml"
 require_relative "support/utf8_locale"
-load File.expand_path("../bin/test-clash-leaf", __dir__)
+load File.expand_path("../bin/ip-quality-route", __dir__)
 
-class ClashLeafRunnerTest < Minitest::Test
+class RouteRunnerTest < Minitest::Test
   ROOT = File.expand_path("..", __dir__)
-  RUNNER = File.join(ROOT, "bin", "test-clash-leaf")
+  RUNNER = File.join(ROOT, "bin", "ip-quality-route")
 
   def test_cached_remote_subscription_is_resolved_without_using_the_active_profile
     Dir.mktmpdir("ip-quality-subscription-") do |directory|
@@ -31,7 +31,7 @@ class ClashLeafRunnerTest < Minitest::Test
       write_clash_verge_fixture(directory)
       stdout = StringIO.new
       stderr = StringIO.new
-      command = IpQuality::ClashLeafCommand.new(
+      command = IpQuality::RouteCommand.new(
         stdout: stdout,
         stderr: stderr,
         stdin: StringIO.new("4\n2\n"),
@@ -60,7 +60,7 @@ class ClashLeafRunnerTest < Minitest::Test
       write_clash_verge_fixture(directory)
       stdout = StringIO.new
       stderr = StringIO.new
-      command = IpQuality::ClashLeafCommand.new(
+      command = IpQuality::RouteCommand.new(
         stdout: stdout,
         stderr: stderr,
         stdin: StringIO.new("1\n"),
@@ -83,7 +83,7 @@ class ClashLeafRunnerTest < Minitest::Test
     Dir.mktmpdir("ip-quality-direct-plan-") do |directory|
       stdout = StringIO.new
       stderr = StringIO.new
-      command = IpQuality::ClashLeafCommand.new(
+      command = IpQuality::RouteCommand.new(
         stdout: stdout,
         stderr: stderr,
         app_root: File.join(directory, "missing-clash-cache")
@@ -112,7 +112,7 @@ class ClashLeafRunnerTest < Minitest::Test
       File.chmod(0o700, fake_reporter)
       stdout = StringIO.new
       stderr = StringIO.new
-      command = IpQuality::ClashLeafCommand.new(
+      command = IpQuality::RouteCommand.new(
         stdout: stdout,
         stderr: stderr,
         app_root: File.join(directory, "missing-clash-cache"),
@@ -149,7 +149,7 @@ class ClashLeafRunnerTest < Minitest::Test
       File.chmod(0o700, fake_reporter)
       stdout = StringIO.new
       stderr = StringIO.new
-      command = IpQuality::ClashLeafCommand.new(
+      command = IpQuality::RouteCommand.new(
         stdout: stdout,
         stderr: stderr,
         stdin: StringIO.new("2\n12.217.32.68\n"),
@@ -189,7 +189,7 @@ class ClashLeafRunnerTest < Minitest::Test
       File.chmod(0o700, fake_reporter)
       stdout = StringIO.new
       stderr = StringIO.new
-      command = IpQuality::ClashLeafCommand.new(
+      command = IpQuality::RouteCommand.new(
         stdout: stdout,
         stderr: stderr,
         stdin: StringIO.new("1\n"),
@@ -215,7 +215,7 @@ class ClashLeafRunnerTest < Minitest::Test
 
       ipv6_stdout = StringIO.new
       ipv6_stderr = StringIO.new
-      ipv6_command = IpQuality::ClashLeafCommand.new(
+      ipv6_command = IpQuality::RouteCommand.new(
         stdout: ipv6_stdout,
         stderr: ipv6_stderr,
         stdin: StringIO.new("1\n"),
@@ -233,24 +233,24 @@ class ClashLeafRunnerTest < Minitest::Test
 
       malformed_stdout = StringIO.new
       malformed_stderr = StringIO.new
-      malformed = IpQuality::ClashLeafCommand.new(
+      malformed = IpQuality::RouteCommand.new(
         stdout: malformed_stdout,
         stderr: malformed_stderr,
         stdin: StringIO.new("2\nnot-an-ip\n"),
         app_root: directory
       )
-      assert_equal IpQuality::ClashLeafCommand::EX_USAGE, malformed.run([])
+      assert_equal IpQuality::RouteCommand::EX_USAGE, malformed.run([])
       assert_includes malformed_stderr.string, "specific IP must be one valid public address"
 
       family_stdout = StringIO.new
       family_stderr = StringIO.new
-      family = IpQuality::ClashLeafCommand.new(
+      family = IpQuality::RouteCommand.new(
         stdout: family_stdout,
         stderr: family_stderr,
         stdin: StringIO.new("2\n2001:db8::1\n"),
         app_root: directory
       )
-      assert_equal IpQuality::ClashLeafCommand::EX_USAGE, family.run(["-4"])
+      assert_equal IpQuality::RouteCommand::EX_USAGE, family.run(["-4"])
       assert_includes family_stderr.string, "conflicts with the selected address family"
     end
   end
@@ -258,11 +258,11 @@ class ClashLeafRunnerTest < Minitest::Test
   def test_direct_rejects_leaf_only_options_before_network_access
     stdout = StringIO.new
     stderr = StringIO.new
-    command = IpQuality::ClashLeafCommand.new(stdout: stdout, stderr: stderr)
+    command = IpQuality::RouteCommand.new(stdout: stdout, stderr: stderr)
 
     exit_code = command.run(["--direct", "--leaf", "TargetLeaf"])
 
-    assert_equal IpQuality::ClashLeafCommand::EX_USAGE, exit_code
+    assert_equal IpQuality::RouteCommand::EX_USAGE, exit_code
     assert_includes stderr.string, "--direct cannot be combined"
     assert_empty stdout.string
   end
@@ -377,7 +377,7 @@ class ClashLeafRunnerTest < Minitest::Test
       write_private_yaml(profile_path, fixture_document)
       stdout = StringIO.new
       stderr = StringIO.new
-      command = IpQuality::ClashLeafCommand.new(
+      command = IpQuality::RouteCommand.new(
         stdout: stdout,
         stderr: stderr,
         stdin: StringIO.new
@@ -661,7 +661,7 @@ class ClashLeafRunnerTest < Minitest::Test
 
   def test_runner_plans_disclose_the_reporter_source_catalog
     stdout = StringIO.new
-    command = IpQuality::ClashLeafCommand.new(stdout: stdout, stderr: StringIO.new,
+    command = IpQuality::RouteCommand.new(stdout: stdout, stderr: StringIO.new,
       stdin: StringIO.new("2\n8.8.8.8\n"), app_root: File.join(Dir.tmpdir, "ipquality-absent-clash"))
     assert_equal 0, command.run(["--sources", "dbip,ping0,ripestat"])
     assert_includes stdout.string, "    DB-IP: not applicable to an explicit target"
@@ -670,7 +670,7 @@ class ClashLeafRunnerTest < Minitest::Test
     refute_includes stdout.string, "IPQS:"
 
     stdout = StringIO.new
-    command = IpQuality::ClashLeafCommand.new(stdout: stdout, stderr: StringIO.new)
+    command = IpQuality::RouteCommand.new(stdout: stdout, stderr: StringIO.new)
     assert_equal 0, command.run(["--direct", "--sources", "independent"])
     assert_includes stdout.string, "    DB-IP: public page + one visitor-egress lookup"
     refute_includes stdout.string, "Scamalytics"
@@ -678,19 +678,19 @@ class ClashLeafRunnerTest < Minitest::Test
 
   def test_removed_select_compatibility_flag_is_rejected
     stderr = StringIO.new
-    command = IpQuality::ClashLeafCommand.new(stdout: StringIO.new, stderr: stderr)
-    assert_equal IpQuality::ClashLeafCommand::EX_USAGE, command.run(["--select", "--direct"])
+    command = IpQuality::RouteCommand.new(stdout: StringIO.new, stderr: stderr)
+    assert_equal IpQuality::RouteCommand::EX_USAGE, command.run(["--select", "--direct"])
     assert_includes stderr.string, "--select"
   end
 
   def test_leaf_runner_rejects_unimplemented_report_languages_before_network_access
     stdout = StringIO.new
     stderr = StringIO.new
-    command = IpQuality::ClashLeafCommand.new(stdout: stdout, stderr: stderr)
+    command = IpQuality::RouteCommand.new(stdout: stdout, stderr: stderr)
 
     exit_code = command.run(["-l", "jp"])
 
-    assert_equal IpQuality::ClashLeafCommand::EX_USAGE, exit_code
+    assert_equal IpQuality::RouteCommand::EX_USAGE, exit_code
     assert_includes stderr.string, "unsupported language"
     assert_empty stdout.string
   end
@@ -747,7 +747,7 @@ class ClashLeafRunnerTest < Minitest::Test
         constructor.call(*arguments, **options.merge(temp_parent: ENV.fetch("IPQUALITY_TEST_TEMP_PARENT")))
       end
       IpQuality::IsolatedMihomoSession.stub(:new, factory) do
-        command = IpQuality::ClashLeafCommand.new(
+        command = IpQuality::RouteCommand.new(
           reporter_path: ENV.fetch("IPQUALITY_TEST_REPORTER")
         )
         exit(command.run([

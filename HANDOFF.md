@@ -33,7 +33,9 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
   (NXDOMAIN hijacking) are `Unknown`, four glued zones in `ref/dnsbl.list` were
   split (420 zones), and SMTP success needs a `220` greeting line.
 - Docs: per-source contracts moved from `PROVIDERS.md` to `providers/<source>.md`.
-- Structure: the runner library directory is `runner/` (it holds direct-route,
+- Structure: the route command is `bin/ip-quality-route` (formerly
+  `bin/test-clash-leaf`; class `RouteCommand`, suite `test/route_runner_test.rb`);
+  the runner library directory is `runner/` (it holds direct-route,
   prefix-sampling and catalog code, not only leaf handling); `mcp/ipqs/HANDOFF.md`
   was folded into this file; MCP wrappers `ipqsTotpCode`/`checkCloudflareAccount`
   and the `SOURCE_IDS` alias are gone. Runtime helpers stay in `common/`: myutils

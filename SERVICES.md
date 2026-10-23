@@ -19,7 +19,7 @@ run, Ctrl-C stops the runner; handled HUP/TERM signals also stop its reporter
 and owned Mihomo children. Success, ordinary failure, and handled interruption
 remove the private workspace. A later run can scavenge a dead-owner workspace
 left by an unhandled process/host failure; live-owner workspaces and `-o` reports
-are retained. Lifecycle code is in `bin/test-clash-leaf` and
+are retained. Lifecycle code is in `bin/ip-quality-route` and
 `runner/isolated_mihomo_session.rb`.
 
 The installed Clash Verge service, active profile, and subscription cache are
@@ -82,6 +82,6 @@ receipts are not background services or instructions to restart a watch.
 ## Network-free checks
 
 There is no resident health endpoint or restart command. For a network-free
-check, run `/usr/bin/ruby --disable-gems bin/test-clash-leaf --direct` and
+check, run `/usr/bin/ruby --disable-gems bin/ip-quality-route --direct` and
 `/bin/zsh -f scripts/test-offline` from the worktree root. These validate plans
 and fixture behavior, not current provider availability or real-node health.

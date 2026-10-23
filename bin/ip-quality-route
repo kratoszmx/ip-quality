@@ -11,7 +11,7 @@ require_relative "../runner/prefix_sample"
 require_relative "../runner/source_catalog"
 
 module IpQuality
-  class ClashLeafCommand
+  class RouteCommand
     EX_USAGE = 64
     EX_NOINPUT = 66
     EX_UNAVAILABLE = 69
@@ -148,11 +148,11 @@ module IpQuality
       OptionParser.new do |options|
         options.banner = <<~BANNER
           Usage:
-            test-clash-leaf --confirm-network-lookup [-4|-6] [-f] [-j]
-            test-clash-leaf --direct --confirm-network-lookup [-4] [-f] [-j]
-            test-clash-leaf --list-subscriptions
-            test-clash-leaf --subscription NAME --list-leaves
-            test-clash-leaf --profile PATH --leaf NAME --config-test-only
+            ip-quality-route --confirm-network-lookup [-4|-6] [-f] [-j]
+            ip-quality-route --direct --confirm-network-lookup [-4] [-f] [-j]
+            ip-quality-route --list-subscriptions
+            ip-quality-route --subscription NAME --list-leaves
+            ip-quality-route --profile PATH --leaf NAME --config-test-only
 
           By default, choose one direct reputation report or one cached remote
           Clash Verge subscription. The menu also accepts one specific public
@@ -518,5 +518,5 @@ if __FILE__ == $PROGRAM_NAME
   # arguments as binary, so non-ASCII exact names would never match.
   Encoding.default_external = Encoding::UTF_8
   arguments = ARGV.map { |argument| argument.dup.force_encoding(Encoding::UTF_8) }
-  exit(IpQuality::ClashLeafCommand.new.run(arguments))
+  exit(IpQuality::RouteCommand.new.run(arguments))
 end

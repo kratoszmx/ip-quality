@@ -218,7 +218,7 @@ esac
 ;;
 -x|-x*|-y|-y*|-M|-M*)
 print -ru2 -- "ERROR: proxy arguments, automatic installers, and remote menus are disabled."
-print -ru2 -- "Use bin/test-clash-leaf for a supervised isolated proxy path."
+print -ru2 -- "Use bin/ip-quality-route for a supervised isolated proxy path."
 return 64
 ;;
 --)positional+=("$@")
