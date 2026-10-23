@@ -49,7 +49,7 @@ The dedicated profile is the login container. API requests use the local key fil
 - `src/credentials.ts`: fixed central owner-only two-line email/password bundle discovery and validation.
 - `src/frontend-policy.ts`: pure exact-match control, safe-submit, blocked-sensitive-field, and API-key candidate policy.
 - `src/redaction.ts`: IPQS bounds and error wording on top of `@myutils/redaction`, which owns the redaction rules.
-- `src/tool-policy.ts`: server instructions copied into every tool description through the parent shared helper.
+- `src/tool-policy.ts`: server instructions copied into every tool description through `@myutils/mcp-server`.
 - `scripts/login.ts`: interactive dedicated-profile login and current-session verification.
 - `scripts/login-saved.ts`: explicitly confirmed bounded login from the fixed private credential bundle.
 - `scripts/doctor.ts`: offline readiness and secret metadata summary.
@@ -107,7 +107,7 @@ The dedicated profile is the login container. API requests use the local key fil
 
 ## Safety Evidence
 
-- The package reuses `@myutils/browser-session` from myutils and `@myutils/mcp-server`, `@myutils/secret-file`, and `@myutils/one-use-token` from myutils. IPQS URLs, quota messages, account state and selectors stay in this package.
+- The package reuses myutils' `@myutils/browser-session`, `mcp-server`, `secret-file`, `one-use-token`, `redaction` and `totp` directly. IPQS URLs, quota messages, account state and selectors stay in this package.
 - `@myutils/totp` supplies RFC 6238 validation/generation. The website's QR URL is read as text; no image processing occurs. Seed and recovery code are saved before activation, and a changed/foreign form stops before secret use.
 - The saved account directory must be an owned ordinary `0700` directory containing exactly one owned, singly linked, `0600` ordinary file with email and password as two positional lines.
 - Authentication checks recognize the reviewed visible `/login/submit` form rather than treating password-change fields on `/user/settings` as a login page.
@@ -116,7 +116,7 @@ The dedicated profile is the login container. API requests use the local key fil
 - Secret-file inspection returns only usability and a short SHA-256 fingerprint. API-key content is never returned by MCP tools.
 - Form submission requires a prepared change id, field-policy revalidation, a safe exact submit button, ten-minute expiry, and literal confirmation.
 - API calls reject redirects, unsupported charsets, non-JSON or oversized bodies, and unbounded parameter keys or values.
-- The scheduled-account probe never returns API bodies, status messages, account fields, credential metadata, paths, fingerprints, or error text, and never spends a reputation-lookup credit.
+- The sanitized account probe (`probe:sanitized`, not scheduled) never returns API bodies, status messages, account fields, credential metadata, paths, fingerprints, or error text, and never spends a reputation-lookup credit.
 - Live Codex config remains unchanged unless a separate task explicitly requests registration or enablement.
 
 ## Validation
@@ -127,7 +127,7 @@ Run from this package:
 npm run check
 ```
 
-This builds TypeScript, runs offline tests, starts an isolated stdio MCP contract test, and runs a static doctor. It does not open Chrome, log in, or spend IPQS credits. Use `npm run login` for interactive login or `npm run login:saved -- --confirm` only after the current task explicitly authorizes use of the fixed saved bundle.
+This builds TypeScript, runs offline tests (including a stdio MCP contract test whose server runs in a temporary directory), and runs a static doctor. It does not open Chrome, log in, or spend IPQS credits. Use `npm run login` for interactive login or `npm run login:saved -- --confirm` only after the current task explicitly authorizes use of the fixed saved bundle.
 
 Browser entrypoints build and run compiled JavaScript: direct `tsx` execution can inject `__name` helpers into serialized Playwright callbacks and fail inside the page. Use the compiled `dist/src/browser.js` for task-scoped browser scripts too.
 

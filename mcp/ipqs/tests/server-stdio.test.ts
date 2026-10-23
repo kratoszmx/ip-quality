@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -11,7 +13,7 @@ const PACKAGE_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)))
 const SERVER_ENTRY = path.join(PACKAGE_ROOT, "dist", "src", "server.js");
 
 test("compiled stdio MCP lists the complete tool surface and returns a secret-free static status", async () => {
-  const temporary = path.join(PACKAGE_ROOT, ".state", "stdio-test");
+  const temporary = await mkdtemp(path.join(tmpdir(), "ipqs-stdio-"));
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [SERVER_ENTRY],
@@ -60,5 +62,6 @@ test("compiled stdio MCP lists the complete tool surface and returns a secret-fr
     assert.equal(status.result.apiCredential.usable, false);
   } finally {
     await client.close();
+    await rm(temporary, { recursive: true, force: true });
   }
 });

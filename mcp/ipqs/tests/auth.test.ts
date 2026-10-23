@@ -3,59 +3,25 @@ import test from "node:test";
 
 import { classifyIpqsAuthSignals } from "../src/auth.js";
 
-test("HTTP 200 dashboard URL containing the exact login form is expired authentication", () => {
-  const signals = { trustedOrigin: true, path: "/user/dashboard", authenticatedMarkerCount: 0,
-    loginFormPresent: true, secondaryVerification: false, credentialError: false };
-  assert.equal(classifyIpqsAuthSignals(signals), "login");
-  assert.equal(classifyIpqsAuthSignals({ ...signals, authenticatedMarkerCount: 3 }), "login");
-  assert.equal(classifyIpqsAuthSignals({ ...signals, trustedOrigin: false }), "unknown");
-  assert.equal(classifyIpqsAuthSignals({ ...signals, secondaryVerification: true }), "secondary-verification");
-});
+const base = { trustedOrigin: true, path: "/login", authenticatedMarkerCount: 0, loginFormPresent: false,
+  secondaryVerification: false, credentialError: false, totpChallengePresent: false };
 
-test("IPQS authentication classification distinguishes login forms from password settings", () => {
-  assert.equal(classifyIpqsAuthSignals({
-    trustedOrigin: true,
-    path: "/login",
-    authenticatedMarkerCount: 0,
-    loginFormPresent: true,
-    secondaryVerification: false,
-    credentialError: false,
-  }), "login");
-
-  assert.equal(classifyIpqsAuthSignals({
-    trustedOrigin: true,
-    path: "/user/settings",
-    authenticatedMarkerCount: 6,
-    loginFormPresent: false,
-    secondaryVerification: false,
-    credentialError: false,
-  }), "authenticated");
-
-  assert.equal(classifyIpqsAuthSignals({
-    trustedOrigin: false,
-    path: "/user/settings",
-    authenticatedMarkerCount: 6,
-    loginFormPresent: false,
-    secondaryVerification: false,
-    credentialError: false,
-  }), "unknown");
-});
-
-test("IPQS authentication classification surfaces human verification and credential errors", () => {
-  assert.equal(classifyIpqsAuthSignals({
-    trustedOrigin: true,
-    path: "/login",
-    authenticatedMarkerCount: 0,
-    loginFormPresent: false,
-    secondaryVerification: true,
-    credentialError: false,
-  }), "secondary-verification");
-  assert.equal(classifyIpqsAuthSignals({
-    trustedOrigin: true,
-    path: "/login",
-    authenticatedMarkerCount: 0,
-    loginFormPresent: true,
-    secondaryVerification: false,
-    credentialError: true,
-  }), "credential-error");
+test("IPQS authentication needs trusted dashboard markers and never ignores login, MFA or errors", () => {
+  const cases: [Partial<typeof base>, string][] = [
+    [{ loginFormPresent: true }, "login"],
+    [{ path: "/user/settings", authenticatedMarkerCount: 6 }, "authenticated"],
+    [{ path: "/user/settings", authenticatedMarkerCount: 6, trustedOrigin: false }, "unknown"],
+    // An HTTP 200 dashboard URL that renders the exact login form is expired authentication.
+    [{ path: "/user/dashboard", loginFormPresent: true }, "login"],
+    [{ path: "/user/dashboard", loginFormPresent: true, authenticatedMarkerCount: 3 }, "login"],
+    [{ path: "/user/dashboard", loginFormPresent: true, trustedOrigin: false }, "unknown"],
+    [{ path: "/user/dashboard", loginFormPresent: true, secondaryVerification: true }, "secondary-verification"],
+    [{ secondaryVerification: true }, "secondary-verification"],
+    [{ loginFormPresent: true, credentialError: true }, "credential-error"],
+    // MFA challenges cannot become authenticated because dashboard navigation is present.
+    [{ path: "/user/settings", authenticatedMarkerCount: 5, totpChallengePresent: true }, "secondary-verification"],
+  ];
+  for (const [change, expected] of cases) {
+    assert.equal(classifyIpqsAuthSignals({ ...base, ...change }), expected, JSON.stringify(change));
+  }
 });

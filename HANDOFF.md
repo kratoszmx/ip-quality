@@ -45,8 +45,9 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
 - Reliability: reporter, runner and suites pin UTF-8 (C-locale shells previously
   failed 31 tests and non-ASCII leaf names); `scripts/test-offline` runs every
   suite; supervisor's weekly `test.ipquality.test-offline` runs all of them.
-- Tests (2026-10-23): reporter suites 165 → 139 cases with the same assertion
-  coverage (3,812 → 3,814 assertions). `test/support/self_test.zsh` repeated
+- Tests (2026-10-23, two passes): reporter suites 165 → 138 cases with the same
+  coverage (3,812 → 3,810 assertions); IPQS MCP 26 → 21; provider accounts
+  36 → 34. `test/support/self_test.zsh` repeated
   ~15 parser checks already in Ruby suites and was removed; its unique
   validator and JSON-typing checks moved to `ip_quality_test.rb` and
   `report_test.rb`. DB-IP tests merged into `public_demo_test.rb`; overlapping
@@ -55,7 +56,9 @@ documented in [PROVIDERS.md](PROVIDERS.md); per-change detail is in `git log`.
   `run_route`, `with_environment`), and runner tests no longer read the real
   Clash cache. New coverage: mail-scope live path (egress discovery skipping
   private/invalid answers, lowest-preference MX, SMTP greeting). Both MCP suites
-  dropped re-tests of `@myutils/redaction`, which myutils covers.
+  dropped re-tests of `@myutils/redaction`, which myutils covers; IPQS
+  auth/account/credential classifiers are table-driven and its stdio contract
+  test runs in an OS temporary directory instead of the package's `.state/`.
 - MCPs: one npm workspace whose merged lock keeps only previously reviewed
   versions; both use myutils `generateFreshTotp` and `@myutils/redaction` (the
   union of the former IPQS, provider-account and web-text redactors, so page

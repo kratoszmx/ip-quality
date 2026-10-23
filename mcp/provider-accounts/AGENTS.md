@@ -2,9 +2,8 @@
 
 Owns free ipapi.is, Cloudflare and AbuseIPDB account maintenance for the IPQuality reporter.
 ipwho.is and DB-IP need no account or key for their free context APIs. This package
-reuses myutils' browser-session/http-read, secret-file,
-totp and mcp-server directly. Provider state, selectors, quotas and API contracts
-stay here.
+reuses myutils' browser-session/http-read, secret-file, totp, redaction and
+mcp-server directly. Provider state, selectors, quotas and API contracts stay here.
 
 ## Start here
 
@@ -60,12 +59,10 @@ supplied. Missing demo security is distinct from a useful geography observation.
 HTTP 200 quota-error bodies return `usable:false`, with `status:rate_limited`
 or `daily_quota_exhausted` for DB-IP's explicit daily-limit response.
 Demo quotas are unspecified and separate from free geography allowances in
-[../../PROVIDERS.md](../../PROVIDERS.md). Both use the websites' request headers.
-DB-IP reads /api/core/
-and keeps its bounded public guest token in memory for one /self?convertCurrencies
-request; URLs/tokens are never returned or saved. Its target is request_egress,
-not the fixed address used by free geography. Page failure stops before lookup;
-there are no retries or route switches. No demo account/2FA or paid Extended
+[../../PROVIDERS.md](../../PROVIDERS.md). Both demos use the websites' request
+headers; requests per surface are in [Module APIs](#module-apis). DB-IP's guest
+token and URLs are never returned or saved, and a page failure stops before
+lookup without retries or route switches. No demo account/2FA or paid Extended
 integration/profile is created.
 
 ipapi's observed dashboard is /app/home. Its logout is an icon, so the account
@@ -78,8 +75,7 @@ email verification even when a password form is present.
 Routine account reads use `http-account.mjs` and the shared bounded HTTP context
 reader with private saved state, without launching Chrome. Cloudflare uses one
 fixed GET to /api/v4/user; ipapi uses /app/home; AbuseIPDB uses /account.
-All bind the saved identity and
-reject login/error bodies, redirects and retries. A failed HTTP check returns a
+All bind the saved identity and reject login/error bodies, redirects and retries. A failed HTTP check returns a
 failure rather than automatically opening a browser. HTTP-state recovery is
 described below; opening a browser alone does not refresh every provider's state.
 Intel lookups use native bounded HTTP with the saved token and no Chrome.
@@ -92,8 +88,8 @@ test target and project only score/country; personal account fields stay private
 The September 24 trial passed both HTTP identity checks with the owned Chrome
 containers closed. ipapi's isolated headless dashboard also passed, so its setup
 default now selects shared `headless:true`; the shared launcher suppresses GUI
-launch/window flags without consumer-built headless arguments. Cloudflare headless returned 403; its explicit
-setup/recovery browser stays headed. Switching an existing container's mode
+launch/window flags without consumer-built headless arguments. Cloudflare
+headless returned 403; its explicit setup/recovery browser stays headed. Switching an existing container's mode
 requires closing that verified owned container first.
 
 ## HTTP state recovery
@@ -133,12 +129,11 @@ flat secrets/ipapi, secrets/cloudflare_token and secrets/abuseipdb paths.
 
 Profiles are .state/ipapi, .state/cloudflare and .state/abuseipdb, bound to CDP
 19503/19504/19505 with exclusive operation leases at 19603/19604/19605.
-PROVIDER_ACCOUNTS_PROXY chooses a
-credential-free HTTP proxy only for this package. Set it to DIRECT for explicit
-direct access: Chrome receives --no-proxy-server and bypasses macOS system proxy
-preferences. The bound process's actual routing flags are verified before reuse;
-changing the requested route requires closing that owned browser first.
-Local CDP traffic stays direct;
+PROVIDER_ACCOUNTS_PROXY chooses a credential-free HTTP proxy only for this
+package. Set it to DIRECT for explicit direct access: Chrome receives
+--no-proxy-server and bypasses macOS system proxy preferences. The bound
+process's actual routing flags are verified before reuse; changing the requested
+route requires closing that owned browser first. Local CDP traffic stays direct;
 when launching a child through an isolated ATT session, pass its proxy with that
 variable and retain localhost in NO_PROXY. No live Clash setting changes.
 Browser shutdown verifies profile binding before Browser.close. The temporary
@@ -224,11 +219,9 @@ Cloudflare's `identityOnPage(page)` verifies the active browser's server identit
 before refreshing saved HTTP state. Ordinary HTTP checks only consume that state;
 see [recovery guidance](#http-state-recovery).
 
-AbuseIPDB's account identity scopes the saved email to the account-basics form,
-requires the logout action and projects public-profile/domain settings as
-booleans. Its API observation validation stays in `abuseipdb.mjs`; it is not a
-generic reputation schema. Both request paths reuse the existing shared HTTP
-and private-file implementations directly.
+AbuseIPDB's identity parsing (see [Tools and workflow](#tools-and-workflow))
+also requires the logout action. Its API observation validation stays in
+`abuseipdb.mjs`; it is not a generic reputation schema.
 
 The same MCP owns `public-api.mjs::verifyPublicProvider(provider, confirmation,
 request, surface)` for DB-IP/IPWHOIS. The MCP selects `free_api` (default) or

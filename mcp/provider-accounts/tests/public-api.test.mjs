@@ -47,19 +47,19 @@ test('HTTP failures, redirects, invalid JSON and wrong targets cannot become fre
     { status: 200, contentType: 'application/json', body: Buffer.from('{') },
     { status: 200, contentType: 'application/json', body: Buffer.from(JSON.stringify(dbip)) },
   ]) {
-    let calls=0;
-    const result=await verifyPublicProvider('dbip','VERIFY_FREE_API',async()=>{calls++;return response;});
-    assert.equal(calls,1);
-    assert.equal(result.usable,false);
-    assert.equal(result.observation,undefined);
+    let calls = 0;
+    const result = await verifyPublicProvider('dbip', 'VERIFY_FREE_API', async () => { calls++; return response; });
+    assert.equal(calls, 1);
+    assert.equal(result.usable, false);
+    assert.equal(result.observation, undefined);
   }
-  let calls=0;
-  const request=async()=>{calls++;throw new Error('raw response canary');};
-  assert.equal((await verifyPublicProvider('dbip','VERIFY_FREE_API',request)).status,'network_error');
-  assert.equal(calls,1);
-  await assert.rejects(verifyPublicProvider('unknown','VERIFY_FREE_API',request));
-  await assert.rejects(verifyPublicProvider('dbip','',request));
-  assert.equal(calls,1);
+  let calls = 0;
+  const request = async () => { calls++; throw new Error('raw response canary'); };
+  assert.equal((await verifyPublicProvider('dbip', 'VERIFY_FREE_API', request)).status, 'network_error');
+  assert.equal(calls, 1);
+  await assert.rejects(verifyPublicProvider('unknown', 'VERIFY_FREE_API', request));
+  await assert.rejects(verifyPublicProvider('dbip', '', request));
+  assert.equal(calls, 1);
 });
 
 test('demo contracts expose real labels and booleans only for the exact target', () => {

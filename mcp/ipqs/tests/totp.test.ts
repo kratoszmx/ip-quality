@@ -3,7 +3,6 @@ import test from "node:test";
 import { ipqsSetup, enrollIpqsTotp, totpDirectory, acceptsIpqsTotpChallenge } from "../src/totp.js";
 import { REPO_ROOT } from "../src/config.js";
 import type { Page } from "playwright-core";
-import { classifyIpqsAuthSignals } from "../src/auth.js";
 
 const email = "fixture@example.test";
 const uri = `otpauth://totp/IPQualityScore:${email}?secret=JBSWY3DPEHPK3PXP&issuer=IPQualityScore`;
@@ -30,9 +29,7 @@ test("untrusted or changed MFA pages stop before reading private account files",
   assert.deepEqual(await enrollIpqsTotp(changed), { enabled: false, changed: false, state: "inspect_existing_factor" });
 });
 
-test("MFA challenges cannot become authenticated because dashboard navigation is present", () => {
-  assert.equal(classifyIpqsAuthSignals({ trustedOrigin: true, path: "/user/settings", authenticatedMarkerCount: 5,
-    loginFormPresent: false, credentialError: false, secondaryVerification: true, totpChallengePresent: true }), "secondary-verification");
+test("the TOTP challenge form must be the exact trusted IPQS finish-login form", () => {
   const value = { url: "https://www.ipqualityscore.com/user/dashboard", action: "", method: "post", fields: ["2fa", "rememberme", "rememberme"], button: "Finish Login »" };
   assert.equal(acceptsIpqsTotpChallenge(value), true);
   for (const changed of [{ action: "https://foreign.invalid" }, { method: "get" }, { fields: ["password", "2fa"] },

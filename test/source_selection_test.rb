@@ -140,46 +140,6 @@ class SourceSelectionTest < ReporterTestCase
     end
   end
 
-  def test_only_selected_ipqs_is_queried_with_doh_at_both_stages_and_private_auth
-    calls = File.join(reporter_workspace, "curl-arguments")
-    config = File.join(reporter_workspace, "curl-config")
-    write_ipqs_key
-    write_fake_command("curl", <<~'ZSH')
-      print -rl -- "$@" >> "$IPQUALITY_TEST_CALLS"
-      request=$(cat)
-      print -r -- "$request" >> "$IPQUALITY_TEST_CONFIG"
-      if [[ "$request" == *"/api/json/account/"* ]];then
-        print -rn -- $'{"success":true,"credits":100,"usage":1}\n200'
-      elif [[ "$request" == *"/api/json/ip/fixturekey123/12.217.32.68?"* ]];then
-        print -r -- "$(<"$IPQUALITY_TEST_RESPONSE")"
-        print -rn -- 200
-      else
-        print -r -- unexpected >> "$IPQUALITY_TEST_NETWORK_ATTEMPTS"
-        exit 97
-      fi
-    ZSH
-    stdout, stderr, status = run_script("--sources", "ipqs", "--ipqs-dns", "alidns",
-      "--confirm-network-lookup", "-4", "-j", "12.217.32.68", env: NO_PROXY_ENV.merge(
-        "IPQUALITY_TEST_CALLS" => calls,
-        "IPQUALITY_TEST_CONFIG" => config, "IPQUALITY_TEST_RESPONSE" => IPQS_FIXTURE))
-    assert status.success?, stderr
-    report = JSON.parse(stdout)
-    assert_equal "ok", report.dig("ProviderStatus", "IPQS")
-    assert_equal "disabled", report.dig("ProviderStatus", "CheckPlaceMaxMind")
-    assert_equal ["ipqs"], report.dig("Query", "SelectedSources")
-    assert_equal "explicit_target", report.dig("Query", "TargetMode")
-    assert_equal "alidns", report.dig("Query", "IPQSDNS")
-    assert_equal "none", report.dig("Info", "Source")
-    arguments = File.readlines(calls, chomp: true)
-    assert_equal 2, arguments.count("https://dns.alidns.com/dns-query")
-    assert_equal 2, arguments.count("--doh-url")
-    assert_equal 2, arguments.count("-4")
-    refute_includes File.read(calls), "fixturekey123"
-    refute_includes File.read(calls), "--resolve"
-    refute_includes File.read(calls), "--insecure"
-    assert_includes File.read(config), "/12.217.32.68?"
-  end
-
   def test_selected_failure_keeps_its_column_while_deselected_sources_are_absent
     calls = File.join(reporter_workspace, "calls")
     report_path = File.join(reporter_workspace, "report.txt")
@@ -221,24 +181,60 @@ class SourceSelectionTest < ReporterTestCase
     assert_equal "timeout", report.dig("ProviderStatus", "ipapi")
   end
 
-  def test_doh_failure_and_missing_key_do_not_fall_back_to_a_relay_or_another_resolver
-    calls = File.join(reporter_workspace, "calls")
+  def test_forced_alidns_ipqs_needs_a_key_uses_doh_at_both_stages_and_never_falls_back
+    calls = File.join(reporter_workspace, "curl-arguments")
+    config = File.join(reporter_workspace, "curl-config")
     write_fake_command("curl", <<~'ZSH')
-      print -r -- called >> "$IPQUALITY_TEST_CALLS"
-      print -rn -- $'\n000'
-      exit 28
+      print -rl -- "$@" >> "$IPQUALITY_TEST_CALLS"
+      request=$(cat)
+      print -r -- "$request" >> "$IPQUALITY_TEST_CONFIG"
+      if [[ -n "${IPQUALITY_TEST_FAIL:-}" ]];then
+        print -rn -- $'\n000'
+        exit 28
+      elif [[ "$request" == *"/api/json/account/"* ]];then
+        print -rn -- $'{"success":true,"credits":100,"usage":1}\n200'
+      elif [[ "$request" == *"/api/json/ip/fixturekey123/12.217.32.68?"* ]];then
+        print -r -- "$(<"$IPQUALITY_TEST_RESPONSE")"
+        print -rn -- 200
+      else
+        print -r -- unexpected >> "$IPQUALITY_TEST_NETWORK_ATTEMPTS"
+        exit 97
+      fi
     ZSH
     options = ["--sources", "ipqs", "--ipqs-dns", "alidns", "--confirm-network-lookup", "-4", "-j", "12.217.32.68"]
-    stdout, stderr, status = run_script(*options, env: NO_PROXY_ENV.merge("IPQUALITY_TEST_CALLS" => calls))
+    env = NO_PROXY_ENV.merge("IPQUALITY_TEST_CALLS" => calls, "IPQUALITY_TEST_CONFIG" => config,
+                             "IPQUALITY_TEST_RESPONSE" => IPQS_FIXTURE)
+
+    # Without a key there is no request at all, not a relay or resolver fallback.
+    stdout, stderr, status = run_script(*options, env: env)
     assert status.success?, stderr
     assert_equal "not_configured", JSON.parse(stdout).dig("ProviderStatus", "IPQS")
     refute File.exist?(calls)
+
     write_ipqs_key
-    stdout, stderr, status = run_script(*options, env: NO_PROXY_ENV.merge("IPQUALITY_TEST_CALLS" => calls))
+    stdout, stderr, status = run_script(*options, env: env)
+    assert status.success?, stderr
+    report = JSON.parse(stdout)
+    assert_equal "ok", report.dig("ProviderStatus", "IPQS")
+    assert_equal "disabled", report.dig("ProviderStatus", "CheckPlaceMaxMind")
+    assert_equal ["ipqs"], report.dig("Query", "SelectedSources")
+    assert_equal "explicit_target", report.dig("Query", "TargetMode")
+    assert_equal "alidns", report.dig("Query", "IPQSDNS")
+    assert_equal "none", report.dig("Info", "Source")
+    arguments = File.readlines(calls, chomp: true)
+    assert_equal 2, arguments.count("https://dns.alidns.com/dns-query")
+    assert_equal 2, arguments.count("--doh-url")
+    assert_equal 2, arguments.count("-4")
+    refute_match(/fixturekey123|--resolve|--insecure/, File.read(calls))
+    assert_includes File.read(config), "/12.217.32.68?"
+
+    File.write(calls, "")
+    stdout, stderr, status = run_script(*options, env: env.merge("IPQUALITY_TEST_FAIL" => "1"))
     assert status.success?, stderr
     report = JSON.parse(stdout)
     assert_equal "timeout", report.dig("ProviderStatus", "IPQS")
     assert_nil report.dig("Score", "IPQS")
-    assert_equal ["called"], File.readlines(calls, chomp: true)
+    # One AliDNS request (account preflight), then no relay or system-resolver retry.
+    assert_equal [1, 1], ["-q", "--doh-url"].map { |flag| File.readlines(calls, chomp: true).count(flag) }
   end
 end

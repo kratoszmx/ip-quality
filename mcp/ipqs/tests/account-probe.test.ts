@@ -4,49 +4,28 @@ import test from "node:test";
 import { classifyIpqsAccountUsage } from "../src/account-policy.js";
 import { probeIpqsAccount } from "../src/account-probe.js";
 
-test("classifies fixed IPQS account authentication outcomes", () => {
-  assert.equal(classifyIpqsAccountUsage({
-    httpStatus: 200,
-    data: { success: true, requests: 10 },
-  }), "authenticated");
-  assert.equal(classifyIpqsAccountUsage({
-    httpStatus: 200,
-    data: { success: false, message: "You have insufficient credits to make this query." },
-  }), "authenticated_without_credits");
-  assert.equal(classifyIpqsAccountUsage({
-    httpStatus: 401,
-    data: { success: false, message: "Invalid or unauthorized key." },
-  }), "login_required");
-  assert.equal(classifyIpqsAccountUsage({
-    httpStatus: 429,
-    data: { success: false, message: "Too many requests." },
-  }), "rate_limited");
-  assert.equal(classifyIpqsAccountUsage({
-    httpStatus: 403,
-    data: { success: false, message: "Account verification required." },
-  }), "verification_required");
-  assert.equal(classifyIpqsAccountUsage({ httpStatus: 503, data: {} }), "unavailable");
-  assert.equal(classifyIpqsAccountUsage({ httpStatus: 200, data: {} }), "inconclusive");
-});
-
-test("HTTP failures and malformed bodies never prove authentication or usable credits", () => {
-  for (const data of [
-    { success: true, credits: 1000 },
-    { success: false, message: "You have insufficient credits to make this query." },
-  ]) {
-    for (const [httpStatus, expected] of [
-      [401, "login_required"], [403, "login_required"], [429, "rate_limited"],
-      [503, "unavailable"], [302, "inconclusive"], [0, "inconclusive"],
-    ] as const) {
-      assert.equal(classifyIpqsAccountUsage({ httpStatus, data }), expected);
+test("account classification needs HTTP 200 evidence; failures never prove authentication or credits", () => {
+  const cases: [number, Record<string, unknown>, string][] = [
+    [200, { success: true, requests: 10 }, "authenticated"],
+    [200, { success: false, message: "You have insufficient credits to make this query." }, "authenticated_without_credits"],
+    [200, { success: true, credits: 0, usage: 0 }, "authenticated_without_credits"],
+    [200, { message: "insufficient credits" }, "inconclusive"],
+    [200, {}, "inconclusive"],
+    [401, { success: false, message: "Invalid or unauthorized key." }, "login_required"],
+    [403, { success: false, message: "Account verification required." }, "verification_required"],
+    [429, { success: false, message: "Too many requests." }, "rate_limited"],
+    [503, {}, "unavailable"],
+  ];
+  // Error statuses win over misleading success or credit bodies.
+  for (const data of [{ success: true, credits: 1000 }, { success: false, message: "You have insufficient credits to make this query." }]) {
+    for (const [httpStatus, expected] of [[401, "login_required"], [403, "login_required"], [429, "rate_limited"],
+      [503, "unavailable"], [302, "inconclusive"], [0, "inconclusive"]] as const) {
+      cases.push([httpStatus, data, expected]);
     }
   }
-  assert.equal(classifyIpqsAccountUsage({
-    httpStatus: 200, data: { success: true, credits: 0, usage: 0 },
-  }), "authenticated_without_credits");
-  assert.equal(classifyIpqsAccountUsage({
-    httpStatus: 200, data: { message: "insufficient credits" },
-  }), "inconclusive");
+  for (const [httpStatus, data, expected] of cases) {
+    assert.equal(classifyIpqsAccountUsage({ httpStatus, data }), expected, `${httpStatus} ${JSON.stringify(data)}`);
+  }
 });
 
 test("returns fixed secret-free readiness outcomes and performs at most one account read", async () => {

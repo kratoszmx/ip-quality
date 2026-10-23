@@ -80,14 +80,17 @@ function signupPage({ action = '/app/signup', method = 'post', enabled = true, c
   return { events, page: { url: () => 'https://ipapi.is/app/signup', locator: () => form, waitForFunction: async () => events.push('settled-outcome') } };
 }
 
-test('signup waits for the asynchronous outcome after exactly one submission', async () => {
+const submit = (page, reserve = async () => {}) =>
+  submitReviewedSignup(page, 'ipapi', { email: 'a@fixture.invalid', password: 'synthetic' }, 'Hong Kong', reserve);
+
+test('signup submits exactly once and then waits for the asynchronous outcome', async () => {
   const { events, page } = signupPage();
-  await submitReviewedSignup(page, 'ipapi', { email: 'a@fixture.invalid', password: 'synthetic' }, 'Hong Kong', async () => events.push('reserve'));
+  await submit(page, async () => events.push('reserve'));
   assert.deepEqual(events, ['fill', 'fill', 'country', 'reserve', 'submit', 'settled-outcome']);
-  page.waitForFunction = async () => { throw new Error('Outcome timeout'); };
-  const other = signupPage(); other.page.waitForFunction = page.waitForFunction;
-  await submitReviewedSignup(other.page, 'ipapi', { email: 'a@fixture.invalid', password: 'synthetic' }, 'Hong Kong', async () => {});
-  assert.equal(other.events.filter(event => event === 'submit').length, 1);
+  const timedOut = signupPage();
+  timedOut.page.waitForFunction = async () => { throw new Error('Outcome timeout'); };
+  await submit(timedOut.page);
+  assert.equal(timedOut.events.filter(event => event === 'submit').length, 1);
 });
 
 test('an ipapi activation notice completes the signup wait without another submission', async () => {
@@ -97,26 +100,23 @@ test('an ipapi activation notice completes the signup wait without another submi
     assert.equal(evaluate('Create Free Account'), false);
     assert.equal(evaluate('We have just sent a new activation link. Please activate your account.'), true);
   };
-  await submitReviewedSignup(page, 'ipapi', { email: 'a@fixture.invalid', password: 'synthetic' }, 'Hong Kong', async () => {});
+  await submit(page);
   assert.equal(events.filter(event => event === 'submit').length, 1);
 });
 
 test('foreign, changed, GET and disabled signup forms stop before credentials are filled', async () => {
   for (const options of [{ action: 'https://evil.test/' }, { action: '/app/upgrade' }, { method: 'get' }, { enabled: false }]) {
     const { events, page } = signupPage(options);
-    await assert.rejects(submitReviewedSignup(page, 'ipapi', { email: 'a@fixture.invalid', password: 'synthetic' }, 'Hong Kong', async () => events.push('reserve')));
+    await assert.rejects(submit(page, async () => events.push('reserve')));
     assert.deepEqual(events, []);
   }
 });
 
-test('an ambiguous submission consumes its one-use reservation and is never retried', async () => {
-  const { events, page } = signupPage({ clickFails: true });
-  await assert.rejects(submitReviewedSignup(page, 'ipapi', { email: 'a@fixture.invalid', password: 'synthetic' }, 'Hong Kong', async () => events.push('reserve')));
-  assert.deepEqual(events, ['fill', 'fill', 'country', 'reserve', 'submit']);
-});
-
-test('concurrent or previously reserved registration never submits', async () => {
-  const { events, page } = signupPage();
-  await assert.rejects(submitReviewedSignup(page, 'ipapi', { email: 'a@fixture.invalid', password: 'synthetic' }, 'Hong Kong', async () => { throw new Error('reserved'); }));
-  assert.ok(!events.includes('submit'));
+test('a held or ambiguous one-use reservation never leads to a second submission', async () => {
+  const ambiguous = signupPage({ clickFails: true });
+  await assert.rejects(submit(ambiguous.page, async () => ambiguous.events.push('reserve')));
+  assert.deepEqual(ambiguous.events, ['fill', 'fill', 'country', 'reserve', 'submit']);
+  const reserved = signupPage();
+  await assert.rejects(submit(reserved.page, async () => { throw new Error('reserved'); }));
+  assert.ok(!reserved.events.includes('submit'));
 });
