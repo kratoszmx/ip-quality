@@ -42,10 +42,10 @@
   2026-10-23; no published reset time.
 - **Ping0 on ATT:** `tls_error` (curl 35) on 2026-10-23 while direct verified.
   Ping0 observes the caller, so a direct fallback would not measure ATT.
-- **Outside this repository:** the Supervisor skill's `inventory.md` (owned by
-  the skill-maintenance session) still lists the retired IPQS-only weekly
-  command. The registered job in `supervisor/integrations/testing.py` already
-  runs `/bin/zsh -f scripts/test-offline`; only that table row needs updating.
+- **Outside this repository:** the Supervisor skill's `inventory.md` row for
+  IPQuality now shows `/bin/zsh -f scripts/test-offline`, matching the
+  registered job. It is codexworkspace commit `5c8cdb7` (2026-10-24), local
+  until that repo's maintenance session pushes it.
 
 ## Recent changes worth knowing
 
