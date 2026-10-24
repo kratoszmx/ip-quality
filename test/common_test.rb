@@ -4,6 +4,8 @@ require_relative "support/reporter_test_case"
 require_relative "../common/network_environment"
 
 class CommonTest < ReporterTestCase
+  parallelize_me!
+
   def test_secret_curl_options_stay_on_stdin_and_preserve_arguments_and_exit_status
     probe = <<~'ZSH'
       setopt KSH_ARRAYS SH_WORD_SPLIT NO_CASE_MATCH
@@ -112,4 +114,52 @@ class CommonTest < ReporterTestCase
     assert_equal "/fixture/home", environment.fetch("HOME")
   end
 
+  def test_shared_terminal_cleanup_preserves_layout_and_normalizes_values
+    probe = <<~'ZSH'
+      source "$1"
+      value=$' \t\\033[31m中\\033[0m \033[2K\033[3G\033[1;2H\033[F\n  next \t\n\n'
+      clean_ansi "$value" "$2"
+    ZSH
+    { "preserve" => " \t中 \n  next \t\n\n", "" => "中\nnext" }.each do |mode, expected|
+      stdout, stderr, status = zsh(probe, TERMINAL_LIBRARY, mode
+      )
+      assert status.success?, stderr
+      assert_equal expected, stdout
+      assert_empty stderr
+    end
+  end
+
+  def test_coordinate_helpers_use_exact_dms_and_radius_based_map_zoom
+    cases = {
+      %w[37.751 -97.822] => "97°49′19″W, 37°45′4″N",
+      %w[51.5074 -0.1278] => "0°7′40″W, 51°30′27″N",
+      %w[37 -97] => "97°0′0″W, 37°0′0″N",
+      %w[12.99999 -0.99999] => "1°0′0″W, 13°0′0″N",
+      %w[0.016 0.0001] => "0°0′0″E, 0°0′58″N",
+      %w[-60.4832 -172.2297] => "172°13′47″W, 60°29′0″S"
+    }
+    probe = 'source "$1"; source "$2"; shift 2; while (( $# ));do print -r -- "$(generate_dms "$1" "$2")"; shift 2;done'
+    assert_equal cases.values, zsh!(probe, COMMON_PROVIDER_LIBRARY, LOCATION_LIBRARY, *cases.keys.flatten).lines(chomp: true)
+
+    # Zoom 15 up to 250 m, then 14 / 13 / 12 above 250 / 500 / 1000 m; invalid input gives no link.
+    radii = {"250" => 15, "250.5" => 14, "500" => 14, "501" => 13, "1000" => 13, "1001" => 12}
+    probe = 'source "$1"; source "$2"; YY=en; shift 2; for radius in "$@";do print -r -- "$(location_map_url 37.751 -97.822 "$radius")";done'
+    links = radii.values.map { |zoom| "https://check.place/37.751,-97.822,#{zoom},en" }
+    assert_equal links + ["", ""], zsh!(probe, COMMON_PROVIDER_LIBRARY, LOCATION_LIBRARY, *radii.keys, "-5", "abc").lines(chomp: true)
+  end
+
+  def test_common_provider_helpers_validate_objects_and_merge_boolean_signals_conservatively
+    probe = <<~'ZSH'
+      source "$1"
+      provider_json_is_object '{"provider":"fixture"}' || exit 1
+      provider_json_is_object '[]' && exit 2
+      provider_integer_in_range 99 0 99 || exit 3
+      provider_integer_in_range 100 0 99 && exit 4
+      provider_integer_in_range null 0 99 && exit 5
+      provider_has_observation null unknown '' && exit 6
+      provider_has_observation null false || exit 7
+      print -r -- "$(provider_merge_boolean_signals false true null)|$(provider_merge_boolean_signals false false)|$(provider_merge_boolean_signals false null)"
+    ZSH
+    assert_equal "true|false|\n", zsh!(probe, COMMON_PROVIDER_LIBRARY)
+  end
 end

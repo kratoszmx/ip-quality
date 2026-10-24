@@ -128,8 +128,10 @@ owning MCP; provider-account module APIs are in
 
 ## Validation
 
-Run `/bin/zsh -f scripts/test-offline`. `test/common_test.rb` covers the zsh/jq
-helpers, the curl stdin stub and proxy overrides; table layout tests are in
-`test/report_test.rb` and the runner's snapshot/text tests in
-`test/route_runner_test.rb`; [TESTING.md](TESTING.md)
-maps the other suites.
+`test/common_test.rb` tests the helpers directly. The decimal predicates are
+checked with the reporter's validators in `test/ip_quality_test.rb`;
+`provider_fetch_public_json`, `http_route_is_proxied` and `show_progress` are
+exercised through the Check.Place, query-route and source-selection suites.
+Report-only table layout is tested in `test/report_test.rb`, and the runner's
+snapshot/text helpers in `test/route_runner_test.rb`. Run `/bin/zsh -f scripts/test-offline`;
+[TESTING.md](TESTING.md) maps the other suites.

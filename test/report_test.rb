@@ -3,6 +3,8 @@
 require_relative "support/reporter_test_case"
 
 class ReportTest < ReporterTestCase
+  parallelize_me!
+
   def test_failed_sources_remain_in_all_applicable_matrices_in_both_languages
     probe = <<~'ZSH'
       source "$1"
@@ -328,21 +330,6 @@ class ReportTest < ReporterTestCase
     # Port 25 reachable / unknown / blocked decides whether mail rows are known.
     assert_equal [[true, true, false], [nil, nil, nil], [false, false, false]],
       mail.map { |json| [json.dig("Mail", "Port25"), json.dig("Mail", "Gmail"), json.dig("Mail", "163")] }
-  end
-
-  def test_shared_terminal_cleanup_preserves_layout_and_normalizes_values
-    probe = <<~'ZSH'
-      source "$1"
-      value=$' \t\\033[31m中\\033[0m \033[2K\033[3G\033[1;2H\033[F\n  next \t\n\n'
-      clean_ansi "$value" "$2"
-    ZSH
-    { "preserve" => " \t中 \n  next \t\n\n", "" => "中\nnext" }.each do |mode, expected|
-      stdout, stderr, status = zsh(probe, TERMINAL_LIBRARY, mode
-      )
-      assert status.success?, stderr
-      assert_equal expected, stdout
-      assert_empty stderr
-    end
   end
 
   def test_shared_display_width_aligns_ascii_unicode_ansi_and_whitespace

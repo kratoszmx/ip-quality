@@ -1,9 +1,11 @@
 # AGENTS.md
 
-This repository contains a source-auditable IP reputation and quality reporter
-derived from `xykt/IPQuality`. It reports each source separately, without a
-combined quality score. Shell code runs with `/bin/zsh`; the route runner is a
-direct executable using the system Ruby standard library.
+A source-auditable IP reputation and quality reporter derived from
+`xykt/IPQuality`. It asks up to 15 named sources about one IP address (the
+current egress, a given public IP, /24 prefix samples or one proxy-subscription
+node) and reports each source separately — no combined quality score, and a
+failed or missing answer is `unknown`, never clean. Shell code runs with
+`/bin/zsh`; the route runner uses only the system Ruby standard library.
 
 ## Start here
 
@@ -13,9 +15,10 @@ Give the user only the normal interactive, all-source command:
 cd /Users/zmx/Projects/projects/ipquality && /usr/bin/ruby --disable-gems bin/ip-quality-route --confirm-network-lookup -4
 ```
 
-It asks for direct, a public IP, IPv4 prefix samples, or a subscription leaf. DNS repair and source fallback are
-automatic; do not ask the user to choose presets or diagnostic flags. Everything
-below is for agents. These commands are network-free:
+It asks for direct, a public IP, IPv4 prefix samples, or a subscription leaf.
+DNS repair and source fallback are automatic; do not ask the user to choose
+presets or diagnostic flags. Everything below is for agents. These commands are
+network-free:
 
 ```text
 cd /Users/zmx/Projects/projects/ipquality
@@ -25,22 +28,48 @@ cd /Users/zmx/Projects/projects/ipquality
 /bin/zsh -f scripts/test-offline
 ```
 
-Without `--confirm-network-lookup`, the reporter and runner only validate
-options and print a disclosure plan; a plan is not a measurement. A live run is
-a separate action after the user accepts the disclosure.
+Without `--confirm-network-lookup`, both entrypoints only validate options and
+print a disclosure plan; a plan is not a measurement. A live run is a separate
+action after the user accepts the disclosure.
 
 | Document | Read it for |
 | --- | --- |
-| [HANDOFF.md](HANDOFF.md) | Current version, validation evidence and pending work |
-| [PROVIDERS.md](PROVIDERS.md) | Scopes, source selection, route fallback, display mapping and disclosure; links each `providers/<source>.md` contract |
-| [TESTING.md](TESTING.md) | Offline prerequisites, complete/focused commands and suite ownership |
-| [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md) | Shared helpers, their callers and boundaries |
-| [SERVICES.md](SERVICES.md) | No resident service; temporary processes and the external weekly test |
-| [CREDENTIALS.md](CREDENTIALS.md) | Private account/API/TOTP paths and formats |
-| [MCP_AUTH.md](MCP_AUTH.md) | Account MCP purposes, first calls, login/2FA evidence and recovery |
+| [HANDOFF.md](HANDOFF.md) | Current status, open issues, recent changes and live evidence |
+| [PROVIDERS.md](PROVIDERS.md) | Consent and routes, scopes, prefix sampling, source selection, fallbacks, display mapping; links each `providers/<source>.md` contract |
+| [TESTING.md](TESTING.md) | Running the offline suites, which suite covers what, test helpers |
+| [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md) | Shared helpers in `common/`, their callers and boundaries |
+| [SERVICES.md](SERVICES.md) | Processes a run starts (no daemon) and the external weekly test |
+| [MCP.md](MCP.md) | The two account MCP servers: first calls, access methods, lessons, evidence |
+| [CREDENTIALS.md](CREDENTIALS.md) | API-key names and precedence, private account/TOTP file locations |
 | [UPSTREAM.md](UPSTREAM.md) | AGPL provenance and material modifications |
 
 `README.md` is intentionally absent, and there is no project-specific skill.
+
+## Architecture
+
+A live run flows through four layers:
+
+1. **Route runner** — `bin/ip-quality-route` (Ruby) shows the menu or parses
+   flags, then prepares the route: it clears proxy variables for direct and
+   specific-IP runs, or starts a private loopback Mihomo for one exact
+   subscription leaf (`runner/`). Prefix sampling runs the reporter once per
+   sample and saves a comparison (`runner/prefix_sample.rb`).
+2. **Reporter** — `bin/ip-quality` (zsh) enforces the consent gate and required
+   commands, discovers the public egress unless a target was given, and calls
+   each selected source's `db_<source>` adapter. `providers/sources.tsv` is the
+   source catalog both entrypoints read.
+3. **Providers** — `providers/<source>.zsh` fetches through the credential-safe
+   helpers in `common/`, validates the response with `jq` and fills one
+   associative array per source; `providers/<source>.md` is its contract.
+   Relay pauses, query-route fallback and credentials also live here.
+4. **Report** — `report/` renders cn/en terminal sections and tables and
+   assembles JSON. The tested IP and routed prefix are masked unless `-f`.
+
+Directory map: `common/` (helpers used by two or more modules; see
+COMMON_FUNCTIONS.md), `ref/` (vendored DNSBL zones, ISO countries, non-public
+IPv4 ranges), `mcp/` (optional account MCPs; `.state/`, `node_modules/`, `dist/`
+are private), `test/` (offline suites on one base class in `test/support/`,
+sanitized `test/fixtures/`), `secrets/` and `reports/` (private, ignored).
 
 ## Choose a route
 
@@ -54,53 +83,40 @@ Discover cached node names with `--list-subscriptions` and
 `--subscription 'NAME' --list-leaves`. Only inline leaf proxies and their
 `dialer-proxy` dependencies are supported, not groups or remote providers.
 `--profile PATH` uses a local profile; `--config-test-only` runs Mihomo's local
-check only. When the Clash Verge cache is unavailable, the menu still offers
-direct, specific IP and prefix sampling; only subscriptions need that cache. A system VPN/TUN can still
-affect direct traffic.
+check only. Without the Clash Verge cache the menu still offers direct, specific
+IP and prefix sampling. A system VPN/TUN can still affect direct traffic.
 
-Menu **3** accepts pasted three-octet prefixes (`128.241.47`) or explicit
-`128.241.47.0/24` networks, separated by newlines, whitespace or commas; a blank
-line finishes input. Up to 20 distinct public /24s are checked sequentially at
-`.23`, `.127`, `.231`. These are database samples, not whole-network verdicts,
-assigned-IP validation, scans or tests through those IPs. The runner saves full
-sample addresses, individual JSON/text/logs and a comparison under a new private
-`reports/prefix-samples-*` directory. Failure and interruption keep partial
-evidence. DB-IP/Ping0 are visibly inapplicable to explicit targets and make no
-visitor requests. This mode saves its own files, so `-o`/`-j` are single-report
-options only. Source/DNS policy and provider fallback remain unchanged.
+Menu **3** samples up to 20 pasted public /24 prefixes at `.23`, `.127` and
+`.231` and saves full sample IPs under a private `reports/prefix-samples-*`
+directory; these are database samples, not whole-network verdicts. Contract:
+[PROVIDERS.md](PROVIDERS.md#prefix-sampling).
 
 Both entrypoints default to `--sources all` and accept `--sources independent`
 or an explicit ID list; unselected providers make no request and report
-`disabled`. IPQS DNS, direct-IPv4 recovery and public-page fallbacks are
-automatic and disclosed in the plan; their contracts are in
-[PROVIDERS.md](PROVIDERS.md#automatic-query-route-fallback).
-
-Reports mask the tested IP and routed prefix (`-f` reveals them). `-j` prints
-JSON, `-E`/`-l en` selects English (default `cn`), and `-o FILE` creates a new
-`.json`, `.ansi` or plain-text report; existing files and symlinks are rejected.
-The specific-IP menu's plan and progress messages include the entered target;
-prefix sampling deliberately saves full sample IPs for per-address comparison.
+`disabled`. IPQS DNS repair, direct-IPv4 recovery and public-page fallbacks are
+automatic and disclosed in the plan
+([PROVIDERS.md](PROVIDERS.md#automatic-query-route-fallback)). Report flags:
+`-j` JSON, `-E`/`-l en` English (default `cn`), `-f` unmasked IP, and `-o FILE`
+a new `.json`, `.ansi` or plain-text file (existing paths and links are rejected).
 
 ## Runtime requirements
 
 The reporter needs `curl` and `jq`; `mail` adds `dig` and `nc`, `dnsbl` adds
-`dig` and `xargs`. Exact-leaf runs also need
-`/usr/sbin/lsof` and Mihomo (default
-`/Applications/Clash Verge.app/Contents/MacOS/verge-mihomo`, or `--mihomo PATH`)
-and read the Clash Verge `profiles.yaml`/`profiles/` cache read-only. Missing
-dependencies stop explicitly; the project installs nothing. Both entrypoints pin
-a UTF-8 locale themselves.
+`dig` and `xargs`. Exact-leaf runs also need `/usr/sbin/lsof` and Mihomo
+(default `/Applications/Clash Verge.app/Contents/MacOS/verge-mihomo`, or
+`--mihomo PATH`) and read the Clash Verge `profiles.yaml`/`profiles/` cache
+read-only. Missing dependencies stop explicitly; the project installs nothing.
+Both entrypoints pin a UTF-8 locale themselves. Optional API keys are listed in
+[CREDENTIALS.md](CREDENTIALS.md#reporter-api-keys).
 
 ## Provider account MCPs
 
 [mcp/ipqs/AGENTS.md](mcp/ipqs/AGENTS.md) owns the IPQS dashboard, account probe
-and API key shared with the reporter.
-[mcp/provider-accounts/AGENTS.md](mcp/provider-accounts/AGENTS.md) owns
+and the API key shared with the reporter.
+[mcp/provider-accounts/AGENTS.md](mcp/provider-accounts/AGENTS.md) owns the
 ipapi/Cloudflare/AbuseIPDB accounts and account-free DB-IP/IPWHOIS probes.
-Both are workspaces of `mcp/package.json` and use sibling
-`/Users/zmx/Projects/myutils` packages; they are optional for the reporter.
-Start with [MCP_AUTH.md](MCP_AUTH.md). Account mutations require explicit task
-intent.
+Both are optional for the reporter; start with [MCP.md](MCP.md). Account
+mutations require explicit task intent.
 
 ## Safety invariants
 
@@ -125,36 +141,20 @@ intent.
 
 Provider results and scales stay separately identifiable, including conflicts.
 Failure, rate limiting, schema drift and missing dependencies are `unknown`,
-never clean. Exact-leaf mode stays reputation-only. DNSBL concurrency is 1–50.
+never clean. Exact-leaf mode stays reputation-only; DNSBL and SMTP always use the
+system route. DNSBL concurrency is 1–50.
 
-## Source map
-
-- `bin/ip-quality`: CLI policy, module load order, egress discovery and run
-  orchestration; sourcing it loads definitions without running the CLI.
-- `bin/ip-quality-route`: Ruby route runner, CLI policy and route selection.
-- `common/`: helpers used by two or more modules: credential-safe and public
-  HTTP, provider values, jq predicates, ANSI cleanup/progress, coordinate
-  formatting, proxy overrides.
-- `providers/`: one file per source (fixture-testable parser plus its live
-  `db_*` adapter), mail/DNSBL probes, credentials and source/relay policy;
-  `sources.tsv` is the source catalog both entrypoints read for IDs and plans;
-  `<source>.md` beside an adapter is that source's contract.
-- `report/`: cn/en labels, table layout, terminal sections and JSON assembly.
-- `runner/`: cached-subscription selection, exact-leaf extraction,
-  loopback Mihomo ownership/cleanup, prefix sampling, local batch evidence, the
-  Ruby reader of the source catalog, verified file snapshots and printable text.
-- `mcp/`: account MCP workspaces; `.state/`, `node_modules/`, `dist/` are private.
-- `ref/`: vendored runtime data, including the shared non-public IPv4 ranges.
-- `test/`: offline suites on one shared base class in `test/support/`, plus
-  sanitized `test/fixtures/`.
-
-## Development guidance
+## Development workflow
 
 - Tests stay offline: no external DNS, HTTP, mail, SSH, browser, proxy or paid
-  route. Every new provider gets a sanitized fixture and parser contract.
+  route. Every new provider gets a sanitized fixture and parser contract. See
+  [TESTING.md](TESTING.md#writing-tests-that-last).
 - Validate with `/bin/zsh -f scripts/test-offline`; a fixture pass does not
   establish provider availability or real-node connectivity.
 - Reuse shared helpers only where caller semantics match; source schemas,
-  labels and lifecycle state stay with their owners.
+  labels and lifecycle state stay with their owners. A runtime change bumps
+  `script_version` in `bin/ip-quality`.
+- After validating, update the HANDOFF status, commit on `main`, push to both
+  GitHub remotes and read them back.
 - Preserve the AGPL-3.0 license and provenance in `UPSTREAM.md`. This directory
   is the worktree root; no nested Git metadata.

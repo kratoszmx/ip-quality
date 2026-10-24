@@ -3,6 +3,8 @@ require_relative "support/reporter_test_case"
 
 # DB-IP visitor demo and IPWHOIS public demo: parsers, runtime and target rules.
 class PublicDemoTest < ReporterTestCase
+  parallelize_me!
+
   def test_demo_parsers_preserve_labels_false_flags_and_unknown_fields
     dbip = fixture_json("dbip/demo.json")
     whois = fixture_json("ipwhois/demo.json")

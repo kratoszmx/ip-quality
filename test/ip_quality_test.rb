@@ -3,6 +3,8 @@
 require_relative "support/reporter_test_case"
 
 class IpQualityTest < ReporterTestCase
+  parallelize_me!
+
   def test_default_reputation_plan_is_network_free_and_discloses_source_limits
     stdout, stderr, status = run_script
 
@@ -119,21 +121,6 @@ class IpQualityTest < ReporterTestCase
     assert_includes stdout, "    Ping0: not applicable to an explicit target"
     refute_includes stdout, "visitor-egress lookup"
     assert_includes stdout, "IPQS direct fallback uses AliDNS"
-  end
-
-  def test_dms_coordinates_use_exact_degrees_minutes_and_rounded_seconds
-    cases = {
-      %w[37.751 -97.822] => "97°49′19″W, 37°45′4″N",
-      %w[51.5074 -0.1278] => "0°7′40″W, 51°30′27″N",
-      %w[37 -97] => "97°0′0″W, 37°0′0″N",
-      %w[12.99999 -0.99999] => "1°0′0″W, 13°0′0″N",
-      %w[0.016 0.0001] => "0°0′0″E, 0°0′58″N",
-      %w[-60.4832 -172.2297] => "172°13′47″W, 60°29′0″S"
-    }
-    probe = 'source "$1"; shift; while (( $# ));do print -r -- "$(generate_dms "$1" "$2")"; shift 2;done'
-    stdout, stderr, status = zsh(probe, SCRIPT, *cases.keys.flatten)
-    assert status.success?, stderr
-    assert_equal cases.values, stdout.lines(chomp: true)
   end
 
   def test_smtp_success_requires_a_greeting_line_not_a_220_substring
@@ -294,7 +281,8 @@ class IpQualityTest < ReporterTestCase
       esac
     ZSH
     hosts = File.join(reporter_workspace, "smtp-hosts")
-    stdout, stderr, status = run_script("--confirm-network-lookup", "--scope", "mail", "-4", "-j",
+    text_path = File.join(reporter_workspace, "mail.txt")
+    stdout, stderr, status = run_script("--confirm-network-lookup", "--scope", "mail", "-4", "-j", "-o", text_path,
       env: {"IPQUALITY_TEST_SMTP_HOSTS" => hosts})
 
     assert status.success?, stderr
@@ -306,6 +294,9 @@ class IpQualityTest < ReporterTestCase
     %w[163 Outlook QQ].each { |service| assert_equal false, report.dig("Mail", service), service }
     # Only the lowest-preference MX is probed; services without MX make no SMTP call.
     assert_equal %w[smtp.mailgun.org mx1.gmail.test. mx.163.test.], File.readlines(hosts, chomp: true)
+    text = File.read(text_path)
+    assert_includes text, "本地25端口出站：可用"
+    assert_match(/通信：.*\+Gmail.*-Outlook.*-163/, text)
   end
 
   def test_each_scope_requires_only_the_commands_it_runs

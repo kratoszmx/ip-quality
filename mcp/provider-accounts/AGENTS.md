@@ -21,7 +21,7 @@ interactive CLI. Start with the network-free `provider_account_status` tool;
 opening pages or verifying APIs makes live requests. Browser retention and
 shutdown are described in [../../SERVICES.md](../../SERVICES.md).
 The formal inventory and current account/2FA evidence are in
-[../../MCP_AUTH.md](../../MCP_AUTH.md).
+[../../MCP.md](../../MCP.md).
 
 ## Tools and workflow
 
@@ -149,49 +149,10 @@ seeds, cookies, account IDs or verification URL tokens.
 
 ## Dated account evidence
 
-On 2026-10-11 AbuseIPDB free individual signup, email verification and one owned
-API key succeeded. Its fixed-target MCP probe and both full direct/ATT reports
-returned validated official observations. Native HTTP matched the account with
-Chrome closed and confirmed email verification plus both public-visibility
-options off. The account settings exposed no 2FA enrollment entry, so no factor
-was created. No payment method or paid service was used. Fresh ATT headless
-signup was blocked; the explicit setup needed the dedicated headed profile.
-The final routine account/API paths use HTTP. These results do not promise future
-session or route availability.
-
-On 2026-09-22 the user selected the existing IPQS email and Hong Kong. ipapi
-signup and email activation succeeded on verified explicit DIRECT. Earlier proxy/system-route and
-isolated vps+yyssr18 / ATT attempts were rejected. Clearing proxy environment
-variables alone had left Chrome using macOS system proxy preferences; the new
-direct flag and retained-process route check fix that bug. The dashboard confirms
-a 1,000/day free plan. The private key passed a full-response 1.1.1.1 API lookup
-and the reporter returned ipapi=ok / Mode=full. No 2FA entry was present on the
-account page, so no ipapi factor was created. ipwho.is worked without registration.
-
-Cloudflare free signup and email verification succeeded. The saved account token
-has only Intel Read for the configured account, with no expiration. The official
-API returned useful ASN/organization/infrastructure data. Its current numeric ASN
-and absent risk_types are covered by fixtures; absence is not a clean result.
-The reporter also returned Cloudflare=ok with the saved token.
-
-Only after that API proof, a generated TOTP code and saved password were accepted.
-The server confirmed both two_factor_authentication_enabled and totp_configured.
-The private seed and eight recovery codes were saved, and no paid plan was chosen.
-An independent fresh Chrome profile then passed one saved-password login and the
-new TOTP challenge; the authenticated account endpoint confirmed the exact saved
-identity and enabled factor. The login widget automatically submits a complete
-six-digit code. Inspect navigation/identity before clicking a Verify button that
-may already have disappeared. Both owned setup browsers and the temporary proof
-profile were closed/removed after validation; the normal account profile remains.
-
-On 2026-09-24 both permanent free API probes returned context for 1.1.1.1.
-The old DB-IP target demo and bare IPWHOIS requests returned limit errors; later
-corrected native-HTTP requests returned a DB-IP visitor `low` label and IPWHOIS
-security booleans. This supersedes the blanket conclusion that the demos were
-unavailable, without establishing their unpublished quota policy. No new account
-or 2FA enrollment was needed. These are dated observations, not current account
-or service-health guarantees. Latest aggregate test results, reporter recovery
-and route-specific observations are in [../../HANDOFF.md](../../HANDOFF.md).
+Signup, key, 2FA and HTTP-identity proofs for these accounts, plus the lessons
+learned from them, are summarized in [../../MCP.md](../../MCP.md#latest-live-account-evidence).
+They are dated observations, not current session or route guarantees; private
+receipts stay under `../../secrets/accounts/`.
 
 ## Module APIs
 

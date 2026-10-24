@@ -3,6 +3,8 @@
 require_relative "support/reporter_test_case"
 
 class RepositoryTest < ReporterTestCase
+  parallelize_me!
+
   BANNED_SOURCE_PATTERNS = {
     bash_runtime: /(^|[^A-Za-z0-9_])bash([^A-Za-z0-9_]|$)/i,
     bash_match_array: /BASH_REMATCH/,

@@ -267,107 +267,19 @@ MaxMind basic data](providers/check_place.md), [ipapi.is](providers/ipapi.md),
 
 ## Optional official credentials
 
-The global data-only assignment file is
-`${XDG_CONFIG_HOME:-$HOME/.config}/ipquality/credentials` and accepts only:
+Accepted key names, file locations, precedence and validation are in
+[CREDENTIALS.md](CREDENTIALS.md#reporter-api-keys). Without an Ipregistry key,
+no Ipregistry request is made; its type and factor columns remain visible with
+`not_configured` and unknown values. Per-source key behavior and quotas are in
+the linked source contracts; DB-IP/IPWHOIS free APIs versus their website demos
+are compared in [providers/dbip.md](providers/dbip.md) and
+[providers/ipwhois.md](providers/ipwhois.md).
 
-```text
-IPREGISTRY_API_KEY=...
-IPAPI_API_KEY=...
-IPQS_API_KEY=...
-ABUSEIPDB_API_KEY=...
-CLOUDFLARE_API_TOKEN=...
-CLOUDFLARE_ACCOUNT_ID=...
-```
+## Mail and DNSBL scopes
 
-This checkout can instead or additionally use ignored raw-key files:
-
-```text
-secrets/ipregistry
-secrets/ipapi
-secrets/ipqs
-secrets/abuseipdb
-secrets/cloudflare_token
-secrets/cloudflare_account_id
-```
-
-The uppercase names above are fields in the global assignment file, not reporter
-environment overrides. The separate IPQS MCP also supports an `IPQS_API_KEY`
-environment override; see [its guide](mcp/ipqs/AGENTS.md#api-experience).
-
-Project-local values override the corresponding global value. Credential files
-must be regular, readable, owned by the current user, and mode `600` or stricter;
-links and group/other permission bits are rejected. Names, duplicates, file
-syntax, and key characters are validated without executing the file. Keys are
-fed to curl through standard-input configuration, so they do not appear in
-process arguments, Git configuration, or reports.
-
-Without an Ipregistry key, no Ipregistry request is made; its type and factor
-columns remain visible with `not_configured` and unknown values.
-Per-source key behavior and quotas are in the linked source contracts.
-DB-IP's permanent free endpoint is `https://api.db-ip.com/v2/free/{IP}` and
-documents 500 requests per day. It requires no account, key, billing or 2FA.
-Its country/state/city response is distinct from the paid Extended API's threat
-level, crawler and proxy fields. No paid trial or Extended credential is used.
-The free `ipwho.is` endpoint requires no key and documents a limit of 1,000
-requests per client IP per day; its free response has no security data. These
-permanent free quotas do **not** describe the separate website demos used by the
-reporter. Demo quotas are unspecified and their availability is not guaranteed.
-IPWHOIS gets one bounded target request; DB-IP gets one page and one bounded
-visitor lookup per report. There is no automatic retry,
-route rotation, paid signup, account or 2FA. No geography-only fallback hides a
-failed risk lookup behind an "available" risk status. The account MCP can probe
-either `free_api` or `public_demo` separately without account creation.
-
-The earlier 2026-09-24 failures came from the old DB-IP target demo and bare
-IPWHOIS requests. Later direct comparisons returned a DB-IP `low` visitor label
-and real IPWHOIS security booleans using the requests above. The precise server
-throttling policy is unpublished. Do not attribute these failures to an exhausted
-personal quota or dismiss all website demos as unavailable. Permanent geography
-API quotas are separate and cannot promise security fields. If the corrected
-request is throttled, stop, respect a supplied Retry-After/reset time, and keep
-the remaining sources; repeated requests or rotating accounts is not a fix.
-
-## Mail scope
-
-The reporter resolves public MX records for Gmail, Outlook, Yahoo, Apple, QQ,
-Mail.ru, AOL, GMX, Mail.com, 163, Sohu, and Sina. For each service it selects one
-MX host with the lowest numeric preference, makes a bounded TCP/25 connection,
-requires a line starting `220 ` or `220-` (a `220` inside an `nc` error or
-address is not a greeting), sends `QUIT`, and submits no message. It does
-not retry alternate MX hosts. A separate Mailgun greeting probe describes local
-outbound TCP/25 reachability. The operating system chooses the actual local
-source address, so the check works on a directly addressed host or behind NAT.
-
-## DNSBL scope
-
-The reporter reverses one IPv4 address and queries every unique zone in the
-vendored `ref/dnsbl.list` (420 zones; `test/repository_test.rb` checks their
-format and uniqueness). Concurrency is configurable from 1 through the hard
-maximum of 50.
-
-The reader keeps `dig`'s DNS header as well as its answer records: an exit
-status of zero alone does not distinguish NXDOMAIN from SERVFAIL or REFUSED.
-Outcomes follow the DNS status and complete answer, not just empty stdout:
-
-- `Clean`: a complete NXDOMAIN or NOERROR response with zero answers;
-- `Blacklisted`: a complete NOERROR response has only valid listing A records,
-  including `127.0.0.2`;
-- `Marked`: a complete NOERROR response has only other `127.0.0.0/8` listing codes;
-- `Unknown`: `dig` fails or times out, DNS returns an error such as SERVFAIL or
-  REFUSED, the header/record count is missing or inconsistent, a response is
-  truncated, or an answer is malformed, an alias, a `127.255.255.*` policy error,
-  or an address outside `127.0.0.0/8` (possible NXDOMAIN hijacking).
-
-Terminal output names every `Blacklisted` and `Marked` zone. JSON retains a
-per-zone `Results` object as well as totals. Spamhaus codes such as
-`127.255.255.252`, `.254`, and `.255` are therefore errors, not listing or clean
-evidence. Resolver policy and each zone operator's terms still determine whether
-a DNSBL answer is authoritative.
-
-UCEPROTECT Level 2 and Level 3 are netblock/allocation and ASN/provider-level
-signals; they are not proof that the individual address sent spam. DNSBL, MX,
-and SMTP checks always remain system-route observations and are never attributed
-to an isolated HTTP proxy leaf.
+Their probe and outcome contracts are in [providers/mail.md](providers/mail.md)
+and [providers/dnsbl.md](providers/dnsbl.md). Both always remain system-route
+observations and are never attributed to an isolated HTTP proxy leaf.
 
 ## Deliberate non-sources
 

@@ -3,6 +3,8 @@
 require_relative "support/reporter_test_case"
 
 class ScamalyticsTest < ReporterTestCase
+  parallelize_me!
+
   LIBRARY = File.join(ROOT, "providers", "scamalytics.zsh")
   FIXTURE = File.join(ROOT, "test", "fixtures", "scamalytics", "public-page.html")
 

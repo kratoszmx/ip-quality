@@ -3,6 +3,8 @@
 require_relative "support/reporter_test_case"
 
 class CheckPlaceTest < ReporterTestCase
+  parallelize_me!
+
   def test_maxmind_rejects_malformed_and_empty_observations_without_stale_fields_or_jq_errors
     [
       '{"ASN":"unavailable","City":"unavailable","Country":"unavailable"}',

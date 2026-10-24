@@ -14,3 +14,10 @@ Section 4 accepts only actual boolean proxy/VPN/Tor/hosting fields in
 including abuse/bot fields that the demo does not supply. HTTP 200 with
 `success:false` and a rate-limit message means `rate_limited`, not usable.
 `FactorMeta.IPWhois` records `public_demo` and the risk-query status.
+
+The permanent free `ipwho.is` endpoint needs no key and documents 1,000
+requests per client IP per day, but its response has no security data. The
+reporter's one bounded demo request is a different surface with an unspecified
+quota, and no geography-only fallback hides a failed risk lookup behind an
+"available" status. The account MCP probes `free_api` and `public_demo`
+separately.

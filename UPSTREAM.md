@@ -173,7 +173,7 @@ runtime dependency:
   and headless login trials did not establish authentication. Added provider-bound
   IPQS TOTP enrollment/challenge handling through shared TOTP primitives, private
   seed/recovery storage, one-attempt reservation and fixture/synthetic regressions.
-  The formal server inventory and dated login proofs live in MCP_AUTH.md.
+  The formal server inventory and dated login proofs live in MCP.md.
 
 ## Deliberate exclusions
 

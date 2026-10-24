@@ -3,6 +3,8 @@
 require_relative "support/reporter_test_case"
 
 class SourceSelectionTest < ReporterTestCase
+  parallelize_me!
+
   def test_presets_and_custom_lists_are_network_free_and_reject_invalid_ids
     stdout, stderr, status = run_script("--sources", "independent")
     assert status.success?, stderr

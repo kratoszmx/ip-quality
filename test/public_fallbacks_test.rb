@@ -3,6 +3,8 @@
 require_relative "support/reporter_test_case"
 
 class PublicFallbacksTest < ReporterTestCase
+  parallelize_me!
+
   IP2_LIBRARY = File.join(ROOT, "providers", "ip2location.zsh")
   IPDATA_LIBRARY = File.join(ROOT, "providers", "ipdata.zsh")
   IP2_PAGE = File.join(ROOT, "test", "fixtures", "ip2location", "public-page.html")

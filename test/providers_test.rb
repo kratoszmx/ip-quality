@@ -3,6 +3,8 @@
 require_relative "support/reporter_test_case"
 
 class ProvidersTest < ReporterTestCase
+  parallelize_me!
+
   def test_provider_adapters_read_literal_json_without_interpreting_backslash_escapes
     cases = [
       ["ipinfo", {data: {asn: {asn: "AS64500", name: "Example Network"}, country: "US", loc: "0,0"}}, "64500"],
@@ -146,21 +148,6 @@ class ProvidersTest < ReporterTestCase
       assert_empty zsh!(probe, provider_library("shodan_internetdb"), fixture_path("shodan/internetdb.json"),
         JSON.generate(body)), "accepted malformed or retained previous fields: #{body.inspect}"
     end
-  end
-
-  def test_common_provider_helpers_validate_objects_and_merge_boolean_signals_conservatively
-    probe = <<~'ZSH'
-      source "$1"
-      provider_json_is_object '{"provider":"fixture"}' || exit 1
-      provider_json_is_object '[]' && exit 2
-      provider_integer_in_range 99 0 99 || exit 3
-      provider_integer_in_range 100 0 99 && exit 4
-      provider_integer_in_range null 0 99 && exit 5
-      provider_has_observation null unknown '' && exit 6
-      provider_has_observation null false || exit 7
-      print -r -- "$(provider_merge_boolean_signals false true null)|$(provider_merge_boolean_signals false false)|$(provider_merge_boolean_signals false null)"
-    ZSH
-    assert_equal "true|false|\n", zsh!(probe, COMMON_PROVIDER_LIBRARY)
   end
 
   def test_credentialed_provider_parsers_keep_official_dimensions_without_invented_scores

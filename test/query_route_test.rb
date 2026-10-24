@@ -3,6 +3,8 @@
 require_relative "support/reporter_test_case"
 
 class QueryRouteTest < ReporterTestCase
+  parallelize_me!
+
   TARGET = "8.8.8.8"
 
   def test_ipqs_account_failure_reuses_direct_route_for_the_same_target_lookup

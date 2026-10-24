@@ -24,3 +24,17 @@ recovery schedule. On October 11, both direct and ATT returned the daily-limit
 body without `Retry-After`, so changing routes was not a recovery for this demo.
 The no-key free geography contract is retained only for the MCP's optional
 `free_api` probe; unexpected premium fields there still cannot supply risk.
+
+## Free API versus website demo
+
+The permanent free endpoint `https://api.db-ip.com/v2/free/{IP}` documents 500
+requests per day and needs no account, key, billing or 2FA, but returns only
+country/state/city; threat, crawler and proxy fields are paid Extended data,
+which this project does not use. That quota says nothing about the website demo
+the reporter uses (one page plus one visitor lookup per report), whose allowance
+is unspecified. The account MCP probes `free_api` and `public_demo` separately.
+
+Lesson from 2026-09-24: the limit errors came from the old target demo, while
+the current visitor flow returned a `low` label. When a demo is throttled, stop
+and respect any Retry-After/reset time; repeating requests or rotating accounts
+is not a fix.

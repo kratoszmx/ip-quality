@@ -15,7 +15,7 @@ npm --prefix mcp/ipqs start
 `check` builds before offline tests and the static doctor; `start` runs the built
 stdio server for an MCP client, not an interactive CLI. For build-only setup use
 `npm --prefix mcp/ipqs run build`. Stop the server through its client or Ctrl-C.
-See [../../MCP_AUTH.md](../../MCP_AUTH.md) for current authentication/backend evidence,
+See [../../MCP.md](../../MCP.md) for current authentication/backend evidence,
 [../../TESTING.md](../../TESTING.md) for dependency restoration and all test
 commands, [../../SERVICES.md](../../SERVICES.md) for retained-browser lifetime,
 and [../../HANDOFF.md](../../HANDOFF.md) for dated account and support evidence. The commands below use
