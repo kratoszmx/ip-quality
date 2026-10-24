@@ -1,6 +1,7 @@
 # Project common functions
 
-`common/` holds implementations with several production callers. Load the file
+`common/` holds generic implementations used by two or more modules; code with
+one consumer lives in that module. Load the file
 directly; there are no forwarding copies. Loading performs no network access,
 credential read or environment mutation. zsh functions preserve caller options
 (including `KSH_ARRAYS`); predicates answer through exit status and value
@@ -9,11 +10,10 @@ functions print without a trailing newline.
 | File | Production callers | Responsibility |
 | --- | --- | --- |
 | `common/provider_values.zsh` | Provider parsers/adapters (each imports it for standalone fixture runs) and `bin/ip-quality` | Validate/normalize provider values and HTTP envelopes, no source schemas |
-| `common/http_request.zsh` | Credential-bearing adapters in `providers/`, `providers/query_route.zsh` | Pass secret URL/header options to curl over stdin, never in process arguments |
+| `common/http_request.zsh` | Credential-bearing adapters, Check.Place/IPWHOIS public reads, `providers/query_route.zsh`, `bin/ip-quality` | Secret URL/header options over curl stdin, bounded public JSON GETs and proxy-route detection |
 | `common/json_values.jq` | Check.Place/MaxMind, ipapi, Cloudflare, IPWHOIS, DB-IP, IP2Location, ipdata, Ipregistry, IPQS, AbuseIPDB, Shodan parsers | Nullable boolean and bounded text/integer predicates |
-| `common/terminal.zsh` | `report/` sections and tables, `bin/ip-quality` | ANSI cleanup, display width and aligned tables |
-| `common/text.rb` | `runner/profile.rb`, `runner/subscription_catalog.rb` | Bounded printable metadata |
-| `common/safe_snapshot.rb` | Profile, catalog, isolated Mihomo session, prefix batch evidence | Verified owner-controlled file reads and snapshot comparison |
+| `common/terminal.zsh` | All provider adapters (progress), `report/`, `bin/ip-quality` | ANSI cleanup and stderr progress lines |
+| `common/location.zsh` | Check.Place/MaxMind and IPinfo adapters | Coordinate DMS text and Check.Place map links |
 | `common/network_environment.rb` | Direct route command, isolated Mihomo session | Child-process overrides removing inherited proxies |
 
 ## zsh provider values (`provider_values.zsh`)
@@ -26,6 +26,7 @@ functions print without a trailing newline.
 | `provider_has_observation VALUE...` | Exit 0 if any value is not empty, `null` or `unknown` (case-insensitive); `false` counts |
 | `provider_http_failure_status CODE BODY` | `cloudflare_blocked` (403 block page), `rate_limited` (429), `http_NNN`, or `network_error`; never echoes the body |
 | `provider_decode_http_response WIRE CURL_EXIT` | Resets `provider_http_response` (`status`, `http_code`, `body`); exit 0 only for curl success plus a 2xx envelope. Curl 28/35/60 keep timeout/TLS/certificate statuses; failure clears the body |
+| `is_nonnegative_decimal VALUE`, `is_signed_decimal VALUE` | Exit 0 for a plain (signed) decimal string such as `0.25` or `-97.8`; no arithmetic |
 | `provider_json_fields JSON PROGRAM NAME...` | One `jq` pass over comma-separated scalar expressions; fills `provider_fields[NAME]` with `jq -r` spellings (`null` kept, NULs dropped); 1 with empty fields on a jq error or count mismatch |
 
 ```zsh
@@ -39,12 +40,13 @@ The HTTP decoder also serves Ping0's plain-text adapter; it is independent of
 JSON syntax. The provider's own parser validates the body only after transport
 and HTTP success, so an HTTP error with plausible data cannot become evidence.
 
-## zsh credential-bearing requests (`http_request.zsh`)
+## zsh HTTP requests (`http_request.zsh`)
 
 | Function | Result |
 | --- | --- |
 | `curl_with_secret_url URL [CURL_ARG...]` | Sends the URL through curl's stdin configuration; forwards other arguments intact; keeps curl's output and exit status |
 | `curl_with_secret_header NAME VALUE URL [CURL_ARG...]` | Same, also sending one header through stdin |
+| `provider_fetch_public_json FAMILY URL [MAX_BYTES] [CURL_ARG...]` | One bounded GET over the reporter's `$CurlARG` interface; sets `PROVIDER_RESPONSE_STATUS`/`BODY`, exit 0 only for a 2xx JSON object |
 | `http_route_is_proxied` | Exit 0 when an inherited proxy variable or the runner's `IPQUALITY_ISOLATED_EGRESS` is set (not the plain system route); used by the CLI, IPQS DNS choice and query-route fallback |
 
 Both put `-q` first to ignore user curl configuration. Callers validate the
@@ -69,36 +71,26 @@ provider functions resolve the path from their own source file.
 | `text_or_null($value; $max)` | null or a string of at most `$max` codepoints without C0/DEL controls |
 | `integer_or_null($value; $min; $max)` | null or an in-range integer JSON number; numeric strings and booleans rejected |
 
-## zsh terminal text (`terminal.zsh`)
+## zsh terminal text (`terminal.zsh`) and coordinates (`location.zsh`)
 
 | Function | Result |
 | --- | --- |
 | `ansi_plain TEXT` | Sets `REPLY` to TEXT with literal `\033` decoded and ANSI `m/G/K/H/F` sequences removed |
 | `clean_ansi TEXT [preserve]` | Decodes literal `\033`, strips ANSI `m/G/K/H/F` sequences and trims each line unless `preserve` |
-| `display_width TEXT` | Sets `REPLY` to the cells of one label after ANSI cleanup: ASCII one, other characters two (no subprocess) |
-| `terminal_table_widths MIN COLUMNS CELL...` | One width per column from complete rows, each at least `MIN`; 2 for invalid shape |
-| `terminal_table_cell TEXT WIDTH` | Text plus padding; longer text is never truncated |
-| `terminal_table_row "WIDTH..." CELL...` | One ` \| `-separated row; 2 before printing on invalid shape |
-| `terminal_table_rule "WIDTH..."` | Matching `-+-` rule |
+| `show_progress MESSAGE` | Prints `[ip-quality] MESSAGE` to stderr so stdout stays the report |
+| `generate_dms LAT LON` | `D°M′S″E, D°M′S″N` text from validated decimals, by exact integer arithmetic; empty for invalid input |
+| `location_map_url LAT LON RADIUS` | Check.Place map link whose zoom follows the accuracy radius; empty for invalid input |
 
-Render values before measuring them; one long label widens only its own column.
-The width rule is an approximation, not full `wcwidth` (combining marks, emoji
-and ambiguous-width characters can differ). It needs a UTF-8 locale, which both
-entrypoints and the test suites pin.
+Table layout (`display_width`, `terminal_table_*`, `calc_padding`) is report-only
+and lives in `report/table.zsh`; it needs a UTF-8 locale, which both entrypoints
+and the test suites pin.
 
-## Ruby helpers
+## Ruby helper (`network_environment.rb`)
 
-| API | Contract |
-| --- | --- |
-| `Text.printable?(value, max_bytes: 512)` | Nonempty, validly encoded String within the byte limit and without control characters |
-| `SafeSnapshot.read(path, allowed_modes: [0o600, 0o644], max_bytes: 16 MiB)` | `Snapshot(path, bytes, stat)` after owner, regular-file, single-link, mode and descriptor/path identity checks before and after reading; `max_bytes: nil` checks metadata only |
-| `SafeSnapshot.verify_directory(path)` | Expanded path of a real directory owned by the effective user, not group/other-writable |
-| `SafeSnapshot.same?(left, right)` | Compares captured bytes, device, inode and owner without a new read |
-| `SafeSnapshot::Error#reason` | `symlink`, `not_regular`, `wrong_owner`, `hard_link`, `unsafe_mode`, `changed_while_reading`, `too_large`, `missing_or_replaced`, `unreadable`, `not_directory`, `writable_by_other_users` |
-| `NetworkEnvironment.without_proxy_variables(env = ENV)` | New Hash mapping each present `all/http/https/no_proxy` key (any case) to `nil` for `Process.spawn`; does not affect VPN/TUN routing |
-
-A snapshot is point-in-time evidence; callers enforce trusted parents and
-revalidate at their own state transitions.
+`NetworkEnvironment.without_proxy_variables(env = ENV)` returns a new Hash mapping
+each present `all/http/https/no_proxy` key (any case) to `nil` for
+`Process.spawn`; it does not affect VPN/TUN routing. Callers: the direct route in
+`bin/ip-quality-route` and the isolated Mihomo session.
 
 ## Deliberately not common
 
@@ -110,8 +102,8 @@ These are reporter or provider policy and stay with their owners:
 | `providers/selection.zsh`, `providers/sources.tsv` | Source catalog (IDs, labels, independent preset, plan disclosures; also read by `runner/source_catalog.rb`), `reputation_choose_sources`, `reputation_source_selected`, `reputation_source_disclosure_lines` |
 | `providers/check_place.zsh` | `check_place_fetch_json` relay URL and in-memory block/429 pauses; `maxmind_response_is_valid` guards primary/English basic responses before IPinfo fallback |
 | `providers/<source>.zsh` | Each source's schema, endpoint, fallback and `db_*` adapter (for example Scamalytics page parsing, IPQS connection types) |
-| `report/` | Localized labels, `report_query_status`, `report_source_visible`, missing-value display |
-| `runner/` | Mihomo lifecycle, listener ownership and cleanup |
+| `report/` | Localized labels, table layout (`report/table.zsh`), `report_query_status`, `report_source_visible`, missing-value display |
+| `runner/` | Mihomo lifecycle, listener ownership and cleanup; `safe_snapshot.rb` (verified owner-controlled reads) and `text.rb` (printable metadata), used only by the runner |
 | `runner/prefix_sample.rb` | /24 input policy, fixed sample expansion, target-bound batch results and private summaries; single product caller, not a general network utility |
 
 A similar `jq` expression alone is not a shared schema contract.
@@ -136,7 +128,8 @@ owning MCP; provider-account module APIs are in
 
 ## Validation
 
-Run `/bin/zsh -f scripts/test-offline`. `test/common_test.rb` covers encoding,
-byte and control-character limits, jq predicates, terminal tables, the curl
-stdin stub, proxy overrides and snapshot boundaries; [TESTING.md](TESTING.md)
+Run `/bin/zsh -f scripts/test-offline`. `test/common_test.rb` covers the zsh/jq
+helpers, the curl stdin stub and proxy overrides; table layout tests are in
+`test/report_test.rb` and the runner's snapshot/text tests in
+`test/route_runner_test.rb`; [TESTING.md](TESTING.md)
 maps the other suites.

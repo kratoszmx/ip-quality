@@ -103,3 +103,14 @@ for (( index = 1; index <= $#; index++ ));do
 provider_fields[${@[index]}]="${values[index]}"
 done
 }
+
+# Decimal shapes for provider coordinates, radii and ratios (no arithmetic).
+is_nonnegative_decimal(){
+local decimal_pattern='^[0-9]+([.][0-9]+)?$'
+[[ "$1" =~ $decimal_pattern ]]
+}
+
+is_signed_decimal(){
+local decimal_pattern='^-?[0-9]+([.][0-9]+)?$'
+[[ "$1" =~ $decimal_pattern ]]
+}

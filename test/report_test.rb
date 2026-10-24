@@ -682,6 +682,45 @@ class ReportTest < ReporterTestCase
     end
   end
 
+  def test_terminal_tables_share_independent_widths_without_report_state_or_option_changes
+    probe = <<~'ZSH'
+      setopt KSH_ARRAYS SH_WORD_SPLIT NO_CASE_MATCH
+      source "$1"
+      widths=$(terminal_table_widths 3 3 Name 地区 Status A $'\033[31m香港\033[0m' unknown)
+      print -r -- "$widths"
+      terminal_table_row "$widths" Name 地区 Status
+      terminal_table_rule "$widths"
+      terminal_table_row "$widths" A $'\033[31m香港\033[0m' unknown
+      [[ -o KSH_ARRAYS && -o SH_WORD_SPLIT && -o NO_CASE_MATCH ]]
+    ZSH
+    stdout, stderr, status = zsh(probe, REPORT_TABLE_LIBRARY)
+    assert status.success?, stderr
+    assert_empty stderr
+    assert_equal "4 4 7\nName | 地区 | Status \n-----+------+--------\nA    | \e[31m香港\e[0m | unknown\n", stdout
+  end
+
+  def test_terminal_tables_reject_incomplete_rows_and_invalid_widths_without_output
+    probe = <<~'ZSH'
+      source "$1"
+      terminal_table_widths 3 0
+      (( $? == 2 ))||exit 1
+      terminal_table_widths 3 2 one
+      (( $? == 2 ))||exit 1
+      terminal_table_widths invalid 2 one two
+      (( $? == 2 ))||exit 1
+      terminal_table_row '3 4' one
+      (( $? == 2 ))||exit 1
+      terminal_table_row '3 -4' one two
+      (( $? == 2 ))||exit 1
+      terminal_table_rule '3 invalid'
+      (( $? == 2 ))||exit 1
+    ZSH
+    stdout, stderr, status = zsh(probe, REPORT_TABLE_LIBRARY)
+    assert status.success?, stderr
+    assert_empty stdout
+    assert_empty stderr
+  end
+
   private
 
   # Keep the width oracle independent of production zsh helpers. A lone row

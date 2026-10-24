@@ -20,6 +20,7 @@ class ReporterTestCase < Minitest::Test
   COMMON_PROVIDER_LIBRARY = File.join(ROOT, "common", "provider_values.zsh")
   COMMON_HTTP_LIBRARY = File.join(ROOT, "common", "http_request.zsh")
   TERMINAL_LIBRARY = File.join(ROOT, "common", "terminal.zsh")
+  REPORT_TABLE_LIBRARY = File.join(ROOT, "report", "table.zsh")
   REPUTATION_REPORT = File.join(ROOT, "report", "reputation.zsh")
   QUERY_ROUTE_LIBRARY = File.join(ROOT, "providers", "query_route.zsh")
   IPQS_FIXTURE = File.join(ROOT, "test", "fixtures", "ipqualityscore", "official.json")

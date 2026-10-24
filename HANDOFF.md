@@ -1,5 +1,19 @@
 # Current handoff
 
+## Shared-library boundary and doc cleanup — 2026-10-24
+
+Reporter `v2026-10-24-standalone.45`; query behavior is unchanged. `common/` now
+holds only helpers used by two or more modules: `show_progress`, the decimal
+predicates and `provider_fetch_public_json` moved in from `bin/ip-quality`, and
+the coordinate helpers became `common/location.zsh` (`generate_googlemap_url` is
+now `location_map_url`; it builds a Check.Place link). Report-only table layout
+moved to `report/table.zsh`, and the runner-only `safe_snapshot.rb`/`text.rb` to
+`runner/`; their tests moved with them. Obsolete docs removed: superseded live
+evidence rows, the abandoned October 12 IP2Location note and the dated
+NodeQuality comparison. MCPs: the `test:offline:raw` and provider-accounts
+`check` script aliases are gone, and IPQS now rejects unused TypeScript locals
+and parameters like myutils. Validation is in the commit message.
+
 ## Independent regression review — 2026-10-23
 
 Reporter `v2026-10-23-standalone.44`. Reviewed the 14 commits after `214f0f4`;
@@ -132,7 +146,7 @@ CLI, jq and DMS changes through fresh direct and ATT reports.
 ## Latest saved live evidence
 
 These observations are dated; offline success is not a current availability
-claim. Reports remain private/ignored and active Clash state was not changed.
+claim. Older runs superseded by these are in Git history and `reports/`. Reports remain private/ignored and active Clash state was not changed.
 
 | Date / scope | Result / private evidence |
 | --- | --- |
@@ -140,18 +154,7 @@ claim. Reports remain private/ignored and active Clash state was not changed.
 | October 23, ATT all-source v43 and focused recheck | Cloudflare, IP2Location and the other table providers succeeded except DB-IP's daily quota and IPQS's initial timeout after direct fallback. A focused IPQS recheck succeeded through direct fallback after selected-route TLS failure, with the same discovered target preserved. Ping0 was unavailable. `reports/att-20261023-codex-audit.{json,txt,stderr}` and `reports/att-ipqs-20261023-codex-audit-recheck.{json,txt,stderr}` |
 | October 23, Ping0 v44 | Focused direct check returned `verified`; isolated ATT returned `tls_error`. A separate bounded ATT HTTP probe confirmed curl exit 35, HTTP 000 and no response body. This endpoint observes the caller, so a direct fallback would not measure ATT. `reports/ping0-{direct,att}-20261023-codex-audit-fixed.{json,stderr}` |
 | October 18, prefix sampling (one /24, three addresses) | All 12 usable target providers returned data; Check.Place MaxMind was blocked and DB-IP/Ping0 were inapplicable. `reports/prefix-samples-20261018-010049-20261018-26159-p9t2sj/`; earlier six-prefix comparison `reports/us-prefix-samples-20261018/summary.md` |
-| October 18, ATT full v33 after repairs | Ten of 11 table providers returned `ok`, including ipdata's public fallback, IP2Location and IPQS. DB-IP reported daily quota exhaustion. Cloudflare succeeded; IPQS used direct fallback after selected-route TLS failure. MaxMind was blocked, with IPinfo supplying basic information; Ping0 remained unknown. `reports/att-20261018-codex-audit-fixed.{json,txt,stderr}` |
-| October 18, direct v33 focused verification | MaxMind and IPinfo returned `ok`, verifying the new schema against a real response. Cloudflare intelligence timed out again; unauthenticated `/client/v4/ips` on the same host returned HTTP 200 with both system DNS and AliDNS, so the exact intelligence-timeout cause is unconfirmed. `reports/{maxmind,cloudflare}-direct-20261018-codex-audit.{json,txt,stderr}` |
-| October 17, direct full v32 baseline | Nine of 11 table providers returned `ok`; DB-IP reported daily quota exhaustion, Cloudflare timed out, MaxMind was available and Ping0 verified. `reports/direct-20261017-codex-audit.{json,txt,stderr}` |
-| October 12, ATT IP2Location-only check | `ok`; `reports/att-ip2location-20261012-baseline.{json,txt,stderr}` |
-| October 12, ATT full v31 report | All 11 table providers returned `ok`, including IP2Location and DB-IP; Check.Place MaxMind remained blocked. `reports/att-20261012-v31-baseline.{json,txt,stderr}` |
-| October 11, full direct/ATT reports | Ten table providers returned `ok`; DB-IP reported daily quota exhaustion. ATT IPQS recovered through direct fallback while retaining `tls_error`; Cloudflare succeeded on its selected route. `reports/{direct,att}-20261011-v31.{json,txt,stderr}` |
 | October 11, route diagnostics | ATT IPQS failed TLS before HTTP on multiple host/TLS variants, while the same key/target succeeded through another route. DB-IP supplied no recovery timestamp. `reports/att-ipqs-20261011-route-diagnostics.json`, `reports/dbip-20261011-route-diagnostics.json` |
-
-The user paused the proposed extra IP2Location route change on October 12 after
-successful baseline checks, pending their own run. That change was not shipped;
-the abandoned patch was removed during this cleanup. Existing selected-route
-public-example fallback remains in place.
 
 ## Unresolved external observations
 

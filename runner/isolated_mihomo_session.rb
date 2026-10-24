@@ -5,7 +5,7 @@ require "open3"
 require "socket"
 require "tmpdir"
 require_relative "../common/network_environment"
-require_relative "../common/safe_snapshot"
+require_relative "safe_snapshot"
 
 module IpQuality
   class IsolatedMihomoSession

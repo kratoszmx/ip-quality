@@ -1,5 +1,7 @@
 # Terminal rendering for reputation observations. Providers are columns and
 # source-specific dimensions are rows; score scales are never collapsed.
+# Table layout lives beside this renderer; standalone fixture runs load it here.
+(( ${+functions[terminal_table_row]} ))||source "${${(%):-%x}:A:h}/table.zsh"
 
 report_unknown_label(){
 [[ "$YY" == "cn" ]]&&print -rn -- "未知"||print -rn -- "Unknown"

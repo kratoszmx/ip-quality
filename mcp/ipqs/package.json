@@ -16,8 +16,7 @@
     "doctor": "tsx scripts/doctor.ts",
     "probe:sanitized": "tsx scripts/probe.ts",
     "auth:check": "node dist/scripts/browser-probe.js",
-    "test:offline:raw": "tsx --test tests/*.test.ts",
-    "test:offline": "npm run build && npm run test:offline:raw",
+    "test:offline": "npm run build && tsx --test tests/*.test.ts",
     "test:browser-text": "npm run build && node dist/scripts/test-browser-text.js",
     "check": "npm run test:offline && npm run doctor",
     "audit:prod": "npm audit --omit=dev"

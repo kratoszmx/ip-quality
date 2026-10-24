@@ -132,16 +132,17 @@ never clean. Exact-leaf mode stays reputation-only. DNSBL concurrency is 1–50.
 - `bin/ip-quality`: CLI policy, module load order, egress discovery and run
   orchestration; sourcing it loads definitions without running the CLI.
 - `bin/ip-quality-route`: Ruby route runner, CLI policy and route selection.
-- `common/`: credential-safe HTTP, provider values, jq predicates, terminal
-  layout, printable metadata, verified snapshots, proxy overrides.
+- `common/`: helpers used by two or more modules: credential-safe and public
+  HTTP, provider values, jq predicates, ANSI cleanup/progress, coordinate
+  formatting, proxy overrides.
 - `providers/`: one file per source (fixture-testable parser plus its live
   `db_*` adapter), mail/DNSBL probes, credentials and source/relay policy;
   `sources.tsv` is the source catalog both entrypoints read for IDs and plans;
   `<source>.md` beside an adapter is that source's contract.
-- `report/`: cn/en labels, terminal sections and JSON assembly.
+- `report/`: cn/en labels, table layout, terminal sections and JSON assembly.
 - `runner/`: cached-subscription selection, exact-leaf extraction,
-  loopback Mihomo ownership/cleanup, prefix sampling, local batch evidence and
-  the Ruby reader of the source catalog.
+  loopback Mihomo ownership/cleanup, prefix sampling, local batch evidence, the
+  Ruby reader of the source catalog, verified file snapshots and printable text.
 - `mcp/`: account MCP workspaces; `.state/`, `node_modules/`, `dist/` are private.
 - `ref/`: vendored runtime data, including the shared non-public IPv4 ranges.
 - `test/`: offline suites on one shared base class in `test/support/`, plus

@@ -379,22 +379,6 @@ report evidence; the old DB-IP scraper/paid-adapter removal and other exclusions
 [UPSTREAM.md](UPSTREAM.md). A new source needs a named access contract,
 sanitized fixture, conservative parser, route boundary, and disclosure.
 
-### NodeQuality comparison (dated)
-
-The user's [NodeQuality report](https://nodequality.com/r/IHfGBj2jD8OT7BqBNUbCWTWV3XRIbpMB)
-is dated 2025-03-24 (v2025-03-13). That upstream version queried DB-IP's old
-target demo, IPWHOIS `/widget` and third-party `ip.nodeget.com/json`
-`.ip.riskScore` under the Cloudflare label; on 2026-09-24 that endpoint returned
-HTTP 200 without `riskScore`, and Cloudflare documents its old Threat Score as
-always zero. On 2026-10-10 the [current launcher](https://github.com/LloydAsp/NodeQuality/blob/main/NodeQuality.sh)
-still loaded IP.Check.Place, matching the [current xykt script](https://github.com/xykt/IPQuality/blob/main/ip.sh)
-v2026-09-16, which still uses `ipinfo.check.place` for IPQS and other datasets
-(HTTP 403 Cloudflare block from ATT that day) and DB-IP's visitor demo, the
-contract this reporter adopted. The installer was read as text, never executed.
-Neither the saved report nor these checks establish current end-to-end health;
-compare historical and current code, and an API response versus a populated
-risk field, separately.
-
 ## Official references
 
 DB-IP, Cloudflare IP Intelligence and ipwho.is contracts checked on 2026-09-24;

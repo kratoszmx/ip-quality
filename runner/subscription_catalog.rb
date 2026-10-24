@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 require "yaml"
-require_relative "../common/safe_snapshot"
-require_relative "../common/text"
+require_relative "safe_snapshot"
+require_relative "text"
 require_relative "profile"
 
 module IpQuality

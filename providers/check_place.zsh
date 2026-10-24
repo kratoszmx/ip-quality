@@ -96,7 +96,7 @@ fi
 fi
 if is_signed_decimal "${maxmind[lat]}"&&is_signed_decimal "${maxmind[lon]}"&&is_nonnegative_decimal "${maxmind[rad]}";then
 maxmind[dms]=$(generate_dms "${maxmind[lat]}" "${maxmind[lon]}")
-maxmind[map]=$(generate_googlemap_url "${maxmind[lat]}" "${maxmind[lon]}" "${maxmind[rad]}")
+maxmind[map]=$(location_map_url "${maxmind[lat]}" "${maxmind[lon]}" "${maxmind[rad]}")
 else
 maxmind[dms]="null"
 maxmind[map]="null"

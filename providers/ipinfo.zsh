@@ -44,7 +44,7 @@ ipinfo[continent]=$(print -rn -- "$ISO3166"|jq --arg code "${ipinfo[countrycode]
 ipinfo[regcountry]=$(print -rn -- "$ISO3166"|jq --arg code "${ipinfo[regcountrycode]}" -r '.[] | select(.["alpha-2"] == $code) | .name')
 if is_signed_decimal "${ipinfo[lat]}"&&is_signed_decimal "${ipinfo[lon]}";then
 ipinfo[dms]=$(generate_dms "${ipinfo[lat]}" "${ipinfo[lon]}")
-ipinfo[map]=$(generate_googlemap_url "${ipinfo[lat]}" "${ipinfo[lon]}" "1001")
+ipinfo[map]=$(location_map_url "${ipinfo[lat]}" "${ipinfo[lon]}" "1001")
 else
 ipinfo[dms]="null"
 ipinfo[map]="null"

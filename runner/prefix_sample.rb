@@ -4,7 +4,7 @@ require "ipaddr"
 require "json"
 require "time"
 require "tmpdir"
-require_relative "../common/safe_snapshot"
+require_relative "safe_snapshot"
 require_relative "source_catalog"
 
 module IpQuality

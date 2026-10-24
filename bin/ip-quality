@@ -9,19 +9,20 @@ umask 077
 # Display widths and byte validation need UTF-8 whatever the caller locale is.
 export LC_ALL=en_US.UTF-8
 
-script_version="v2026-10-23-standalone.44"
+script_version="v2026-10-24-standalone.45"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
 # Load order: shared helpers, source policy, providers (parser + adapter), report.
 typeset -a reporter_modules=(
 common/json_values.jq common/provider_values.zsh common/http_request.zsh common/terminal.zsh
+common/location.zsh
 providers/credentials.zsh providers/check_place.zsh providers/query_route.zsh providers/sources.tsv providers/selection.zsh
 providers/ipinfo.zsh providers/ipregistry.zsh providers/scamalytics.zsh providers/ipapi.zsh
 providers/ipwhois.zsh providers/dbip.zsh providers/cloudflare.zsh providers/abuseipdb.zsh
 providers/ip2location.zsh providers/ipdata.zsh providers/ipqualityscore.zsh providers/ping0.zsh
 providers/ripestat.zsh providers/shodan_internetdb.zsh providers/mail.zsh providers/dnsbl.zsh
-report/labels.zsh report/reputation.zsh report/sections.zsh report/json.zsh)
+report/labels.zsh report/table.zsh report/reputation.zsh report/sections.zsh report/json.zsh)
 typeset local_library
 for local_library in "${reporter_modules[@]}";do
 local_library="$SCRIPT_DIR/$local_library"
@@ -132,53 +133,11 @@ shead[time_raw]=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 fi
 shead[time]="${shead[time_label]}${shead[time_raw]}"
 }
-show_progress(){
-print -ru2 -- "[ip-quality] $1"
-}
 
 scope_includes(){
 local requested="$1"
 [[ "$query_scope" == "full" || "$query_scope" == "$requested" ||
    ( "$query_scope" == "mail-dnsbl" && ( "$requested" == "mail" || "$requested" == "dnsbl" ) ) ]]
-}
-
-is_nonnegative_decimal(){
-local decimal_pattern='^[0-9]+([.][0-9]+)?$'
-[[ "$1" =~ $decimal_pattern ]]
-}
-
-is_signed_decimal(){
-local decimal_pattern='^-?[0-9]+([.][0-9]+)?$'
-[[ "$1" =~ $decimal_pattern ]]
-}
-
-typeset -g PROVIDER_RESPONSE_BODY=""
-typeset -g PROVIDER_RESPONSE_STATUS="unknown"
-
-provider_fetch_public_json(){
-emulate -LR zsh
-setopt SH_WORD_SPLIT
-typeset address_family="$1"
-typeset endpoint="$2"
-typeset maximum_bytes="${3:-262144}"
-if (( $# >= 3 ));then shift 3;else shift 2;fi
-typeset wire_response response_body
-
-PROVIDER_RESPONSE_BODY=""
-PROVIDER_RESPONSE_STATUS="unknown"
-wire_response=$(curl -q $CurlARG -sS -L -$address_family -m 10 \
-  --max-filesize "$maximum_bytes" --write-out $'\n%{http_code}' "$@" "$endpoint" 2>/dev/null)
-provider_decode_http_response "$wire_response" "$?"
-PROVIDER_RESPONSE_STATUS="${provider_http_response[status]}"
-[[ "$PROVIDER_RESPONSE_STATUS" == ok ]]||return 1
-response_body="${provider_http_response[body]}"
-if ! provider_json_is_object "$response_body";then
-PROVIDER_RESPONSE_STATUS="invalid_response"
-return 1
-fi
-PROVIDER_RESPONSE_BODY="$response_body"
-PROVIDER_RESPONSE_STATUS="ok"
-return 0
 }
 
 set_cli_error(){
@@ -550,59 +509,9 @@ shown+=("$(( [##16] 16#$group ))")
 done
 IPhide="${(L)${(j.:.)shown}}:*:*:*:*:*"
 }
-calc_padding(){
-local input_text="$1"
-local total_width=$2
-display_width "$input_text"
-local title_length=$REPLY
-local left_padding=$(((total_width-title_length)/2))
-if [[ $left_padding -gt 0 ]];then
-PADDING=$(printf '%*s' $left_padding)
-else
-PADDING=""
-fi
-}
-generate_dms(){
-local lat=$1
-local lon=$2
-if ! is_signed_decimal "$lat"||! is_signed_decimal "$lon";then
-echo ""
-return
-fi
-print -r -- "$(format_dms_coordinate "$lon" E W), $(format_dms_coordinate "$lat" N S)"
-}
 # VALUE (validated signed decimal degrees) as D°M′S″ plus POSITIVE/NEGATIVE
 # hemisphere. Integer arithmetic on 12 fraction digits rounds total seconds, so
 # 59.6″ carries into the next minute instead of printing 60″.
-format_dms_coordinate(){
-emulate -LR zsh
-local value=$1 direction=$2 fraction=""
-[[ $value == -* ]]&&{ direction=$3; value=${value#-}; }
-[[ $value == *.* ]]&&fraction=${value#*.}
-fraction=${(r:12::0:)fraction}
-local -i seconds=$(( (10#$fraction * 3600 + 500000000000) / 1000000000000 ))
-local -i degrees=$(( 10#${value%%.*} + seconds / 3600 ))
-seconds=$(( seconds % 3600 ))
-print -rn -- "$degrees°$(( seconds / 60 ))′$(( seconds % 60 ))″$direction"
-}
-generate_googlemap_url(){
-local lat=$1
-local lon=$2
-local radius=$3
-if ! is_signed_decimal "$lat"||! is_signed_decimal "$lon"||! is_nonnegative_decimal "$radius";then
-echo ""
-return
-fi
-local zoom_level=15
-if [[ $radius -gt 1000 ]];then
-zoom_level=12
-elif [[ $radius -gt 500 ]];then
-zoom_level=13
-elif [[ $radius -gt 250 ]];then
-zoom_level=14
-fi
-echo "https://check.place/$lat,$lon,$zoom_level,$YY"
-}
 show_help(){
 print -r -- "$shelp"
 exit 0
