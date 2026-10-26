@@ -28,7 +28,7 @@ class ReportTest < ReporterTestCase
       assert status.success?, stderr
       assert_empty stderr
       types, scores, factors = stdout.split(/Scores\n|Factors\n/)
-      assert_includes scores, language == "cn" ? "公开示例/日额度用完" : "public demo/daily quota used"
+      assert_includes scores, language == "cn" ? "公开示例/上游报日限额" : "public demo/upstream daily limit"
       assert_match(/\|\s+#{language == "cn" ? "限流" : "rate limit"}\s*(?:\||$)/, factors)
       %w[IPinfo Ipregistry IPQS ipapi.is IP2Location AbuseIPDB].each { |name| assert_includes types, name }
       %w[IP2Location Scamalytics ipapi.is AbuseIPDB IPQS DB-IP].each { |name| assert_includes scores, name }

@@ -167,10 +167,11 @@ runtime dependency:
   2026-09-22; provider accounts owns free ipapi/Cloudflare setup and account-free
   public API/demo probes. They now directly reuse the sibling myutils libraries;
   private browser state, credentials and account receipts are excluded from Git.
-  Routine ipapi/Cloudflare account checks now use bounded HTTP with exact saved
-  identity validation; ipapi recovery defaults to verified headless Chrome.
-  IPQS retains its verified headed dashboard fallback after independent HTTP
-  and headless login trials did not establish authentication. Added provider-bound
+  Routine account checks now use bounded HTTP with saved-state validation.
+  Browser operations reuse myutils native hidden Chrome, with visible Chrome
+  only for explicitly requested human recovery. IPQS hidden login and HTTP
+  authentication passed on October 26; ipapi automated password login is disabled
+  after the provider's `bot_login` account suspension. Added provider-bound
   IPQS TOTP enrollment/challenge handling through shared TOTP primitives, private
   seed/recovery storage, one-attempt reservation and fixture/synthetic regressions.
   The formal server inventory and dated login proofs live in MCP.md.

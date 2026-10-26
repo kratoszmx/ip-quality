@@ -36,6 +36,7 @@ configuration, never process arguments, Git configuration or reports.
 | Existing IPQS login | Fixed private two-line bundle under `/Users/zmx/codexworkspace/secrets/infrastructure/network/ipqs/`; discovered by `mcp/ipqs/src/credentials.ts` |
 | Registration identity | `secrets/accounts/registration-email`, the email confirmed by the user |
 | Provider login | `secrets/accounts/{ipapi,cloudflare,abuseipdb}/credentials.json`, private email/password and any explicitly authorized registration fields |
+| ipapi authorized key rotation | `secrets/accounts/ipapi/key-rotation-20261026.json` records the sole submission and result; `key-before-rotation-20261026` preserves the previous key privately. `secrets/ipapi` holds the new dashboard key, still API-unusable while the account is suspended |
 | Cloudflare authenticator | `secrets/accounts/cloudflare/totp-uri`, private RFC 6238 provisioning URI |
 | Cloudflare recovery codes | `secrets/accounts/cloudflare/recovery-codes.json`, private recovery data after enrollment |
 | IPQS authenticator | `secrets/accounts/ipqs/totp-uri`, private exact-account provisioning URI; issuer provisions an 80-bit seed |

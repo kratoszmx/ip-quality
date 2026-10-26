@@ -2,7 +2,7 @@
 
 ## Status — 2026-10-26
 
-- Reporter `v2026-10-26-standalone.46` (`script_version` in `bin/ip-quality`).
+- Reporter `v2026-10-26-standalone.47` (`script_version` in `bin/ip-quality`).
 - Offline: `/bin/zsh -f scripts/test-offline` passes — reporter 144 Minitest
   cases, IPQS MCP 22, provider accounts 40. The separate synthetic IPQS
   browser-text suite last passed 10/10 at commit `782bce3`, with no live requests.
@@ -41,15 +41,27 @@
   confirmed support's October 20 request for IPv4 website/account access and
   full curl failure output; the earlier OAuth failure was not persistent.
   Chinese/English drafts and sanitized curl evidence are prepared privately,
-  **not sent**; see [support record](mcp/ipqs/SUPPORT-TLS-20261010.md).
+  **not sent; the user explicitly declined both IPQS and ipapi mail**.
+  A later October 26 isolated ATT reporter run returned score 75 through
+  `direct_fallback`, with `OriginalRouteFailure=tls_error` and
+  `TargetUnchanged=true`. The reputation lookup works through fallback; the
+  unresolved original transport is not a prerequisite for that result.
+  See [support record](mcp/ipqs/SUPPORT-TLS-20261010.md).
 - **DB-IP demo:** October 26 default proxy, direct and isolated ATT received
   fresh HTTP 200 daily-quota errors; no Retry-After. No local persistent cache.
   Free geography succeeded, but supplies no risk label. No recovery ETA for the
   public visitor demo; official keyed-API midnight reset is not its guarantee.
+  The current upstream script's POST request also returned the same error.
+  Default-proxy and direct page reads exposed the same visitor key in memory;
+  no personal DB-IP key is used. UI now says `上游报日限额`, not a local counter.
 - **ipapi account:** User-approved updated terms were accepted October 26.
   Exact-account HTTP and visible Chrome password login succeed, but the account
   explicitly reports `bot_login` suspension and API 403. Stored key matches.
-  Automated password login is disabled; provider support must restore access.
+  Automated password login is disabled. The user later authorized the normal
+  dashboard key-regeneration action; it produced a new key, now saved in
+  `secrets/ipapi`, but its test still returned 403/INVALID_API_KEY and suspension
+  remained. Its old key and one-submit receipt are private. The Check.Place
+  ipapi relay returned 403 on default proxy, direct IPv4 and isolated ATT too.
 - **Cloudflare account:** Native hidden Chrome loaded the login form, but one
   password submission required human verification. Existing saved HTTP identity
   returned 403 on proxy/direct. Official Intel API still succeeded; no GUI
@@ -65,6 +77,9 @@
 
 Full detail is in `git log`; these are the ones a new session could trip over.
 
+- v47: DB-IP quota wording identifies the upstream report, without asserting
+  a personal allowance or next-day recovery. The regression covers cn/en table
+  alignment and unknown risk. Updated MCP provenance to native hidden Chrome.
 - 2026-10-26: MCPs use myutils native hidden Chrome; IPQS auth checks use HTTP.
   Only origin-scoped private-state restoration is shared in `mcp/common/`.
   Pending verification state stays separate; browsers close with their owner.

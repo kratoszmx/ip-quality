@@ -31,6 +31,17 @@ visitor-demo refusal, not a cached result or exhaustion of an owned account's
 free allowance. A daily message does not establish when the public demo will
 be usable again. Do not promise a next-day recovery or substitute free geography
 for a missing threat label.
+The terminal labels it `上游报日限额` / `upstream daily limit`: the provider's
+error classification is observable, but its internal counter is not. A bounded
+October 26 check using the current upstream script's POST/currency-conversion
+request returned the same HTTP 200 daily-limit JSON as GET, so the observed
+failure is not explained by our GET method. DB-IP's official JavaScript client
+uses GET without conversion data and POST with it; neither variant supplied
+a risk observation in these checks.
+Two independent page reads over the default proxy and explicit direct route
+returned the same visitor key (compared only in memory). This supports a shared
+demo-credential explanation, not a measurement of its internal daily counter
+or proof that every visitor shares the same quota.
 The no-key free geography contract is retained only for the MCP's optional
 `free_api` probe; unexpected premium fields there still cannot supply risk.
 

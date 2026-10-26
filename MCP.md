@@ -80,7 +80,9 @@ do not establish authentication. Existing manual tools remain available.
   matches the dashboard; API HTTP 403 is not a stale-key or pending-terms result.
   One subsequently authorized real visible Chrome password login reached the
   same suspended account. Automatic ipapi password submission is now disabled;
-  recovery requires provider support, not a different browser or another key.
+  a later authorized normal key regeneration produced a new key but its first
+  lookup still returned HTTP 403/INVALID_API_KEY. The reporter key was updated
+  privately; the suspended account did not become usable through rotation.
 - Signups through proxy routes were rejected: ipapi succeeded only on explicit
   DIRECT, and AbuseIPDB's fresh ATT headless signup needed its dedicated headed
   profile.

@@ -30,6 +30,18 @@ and unlocks the complete response used by the type, score, and factor tables.
 The reporter reads that optional key from the file assignment `IPAPI_API_KEY`
 or the raw-key file `secrets/ipapi`.
 
+October 26 recovery check: the dashboard reported `bot_login` account suspension.
+With explicit user authorization, its normal `Generate new API key` action
+produced a different key and the reporter's owner-only key file was updated.
+One lookup with the new key still returned HTTP 403 (`ERR_FORBIDDEN_INVALID_API_KEY`);
+the authenticated dashboard still reported suspension. Key rotation is not proof
+of restored API access; the previous key and one-submit receipt remain private.
+The current upstream `xykt/IPQuality` script instead reads
+`https://ipinfo.check.place/{IP}?db=ipapi`. A fixed public-target check of that
+relay returned HTTP 403 over the default proxy, direct IPv4 and isolated ATT.
+No working relay recovery was established, so the reporter does not silently
+substitute an unverified relay response or label it as an official API result.
+
 The similarly named `ipapi.co` is a different product with a contact-gated free
 trial. This project uses `ipapi.is`, with a free key when configured; the two
 providers must not be silently combined.

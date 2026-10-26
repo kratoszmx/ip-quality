@@ -63,3 +63,9 @@ asking whether IPv4 website/account access works and requesting full curl error
 output. The drafts were revised against that actual reply. No email or server
 draft was created. Private source IPs, mail routing/security tokens and account
 credentials are omitted from the drafts and diagnostic attachment.
+
+The user subsequently declined both the IPQS follow-up and ipapi appeal. Do not
+send either without a new explicit request. A further October 26 ATT reputation
+run succeeded via the reporter's direct-query fallback with the ATT target
+unchanged. The follow-up would diagnose the original transport, not enable a
+reporter lookup that already works through that fallback.

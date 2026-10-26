@@ -174,7 +174,7 @@ cn:upstream_insufficient_credits|cn:official_insufficient_credits)state_label="�
 ;;
 cn:rate_limited)state_label="限流"
 ;;
-cn:daily_quota_exhausted)state_label="日额度用完"
+cn:daily_quota_exhausted)state_label="上游报日限额"
 ;;
 cn:skipped_relay_cloudflare_blocked)state_label="中继封锁/暂停"
 ;;
@@ -212,7 +212,7 @@ en:upstream_insufficient_credits|en:official_insufficient_credits)state_label="n
 ;;
 en:rate_limited)state_label="rate limit"
 ;;
-en:daily_quota_exhausted)state_label="daily quota used"
+en:daily_quota_exhausted)state_label="upstream daily limit"
 ;;
 en:skipped_relay_cloudflare_blocked)state_label="relay blocked/skipped"
 ;;
