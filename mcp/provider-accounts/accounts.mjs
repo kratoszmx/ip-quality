@@ -2,53 +2,60 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { Agent } from 'node:https';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { chromium } from 'playwright-core';
-import { connectOrLaunchChromeOverCDP, ensurePrivateDirectoryStrict, verifyChromeProfileBinding, withLoopbackOperationLease, saveStorageStateSafely } from '@myutils/browser-session';
+import { withLoopbackOperationLease, saveStorageStateSafely } from '@myutils/browser-session';
+import { launchChromeSession } from '@myutils/browser-session/chrome';
 import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@myutils/secret-file';
 import { requestHttpRead } from '@myutils/http-read';
 import { redactText } from '@myutils/redaction';
-import { providerConfig, accountUrl, accountPagePath, accountNetworkOptions, accountRouteMatches, assertAccountOrigin, classifyAccountPage, ipapiDashboardAccepted, validApiKey, ipapiKeyAccepted } from './policy.mjs';
+import { providerConfig, accountUrl, accountPagePath, accountNetworkOptions, assertAccountOrigin, classifyAccountPage, ipapiDashboardAccepted, validApiKey, ipapiKeyAccepted } from './policy.mjs';
 import { submitReviewedSignup } from './signup.mjs';
-import { httpStatePath, readHttpAccount } from './http-account.mjs';
+import { httpStatePath, pendingLoginPath, readHttpAccount } from './http-account.mjs';
+import { restoreBrowserState } from '../common/browser-state.mjs';
 
 export const ROOT = path.dirname(fileURLToPath(import.meta.url));
 export const SECRETS = path.resolve(ROOT, '../../secrets');
 const secret = (provider, name) => path.join(SECRETS, 'accounts', providerConfig(provider) && provider, name);
 const keyFile = provider => path.join(SECRETS, provider === 'ipapi' ? 'ipapi' : 'cloudflare_token');
 const keyPolicy = { minBytes: 8, maxBytes: 256, validate: validApiKey };
+const activeSessions = new Map();
 
 export async function withSession(provider, operation, { foreground = false } = {}) {
   const config = providerConfig(provider);
   return withLoopbackOperationLease({ port: config.port + 100 }, async () => {
-    const profileDir = path.join(ROOT, '.state', provider);
-    await ensurePrivateDirectoryStrict(profileDir);
     const routing = accountNetworkOptions();
-    const headless = provider === 'ipapi' && !foreground;
-    const session = await connectOrLaunchChromeOverCDP(chromium, {
-      profileDir, cdpPort: config.port, proxyServer: routing.proxyServer,
-      headless, extraArgs: routing.chromeArgs, startUrl: 'about:blank',
-      background: !foreground, hidden: !foreground, detached: true, unref: true,
-      preserveContextSettings: true, timeoutMs: 20_000, killLaunchedProcessOnClose: false,
-    });
-    try {
-      await verifyChromeProfileBinding(session.browser, profileDir);
-      if (routing.proxyServer || routing.chromeArgs.length) {
-        const cdp = await session.browser.newBrowserCDPSession();
-        try {
-          const { processInfo } = await cdp.send('SystemInfo.getProcessInfo');
-          const processes = processInfo.filter(value => value.type === 'browser');
-          if (processes.length !== 1 || !Number.isSafeInteger(processes[0].id) || processes[0].id <= 0) throw new Error('Cannot verify account browser route.');
-          const { stdout } = await promisify(execFile)('/bin/ps', ['-ww', '-p', String(processes[0].id), '-o', 'command='], { timeout: 2000, maxBuffer: 262144 });
-          if (!accountRouteMatches(stdout, routing)) throw new Error('The retained account browser has a different route; close that owned browser before changing routes.');
-        } finally { await cdp.detach().catch(() => {}); }
+    const mode = foreground ? 'visible' : 'hidden';
+    const route = routing.proxyServer ? { mode: 'proxy', server: routing.proxyServer } : { mode: 'direct' };
+    let session = activeSessions.get(provider);
+    if (session && (!session.browser.isConnected() || session.page.isClosed() ||
+        session.mode !== mode || JSON.stringify(session.route) !== JSON.stringify(route))) {
+      await session.close(); activeSessions.delete(provider); session = null;
+    }
+    if (!session) {
+      // Only this isolated MCP process sees the hidden-target attach flag.
+      process.env.PW_CHROMIUM_ATTACH_TO_OTHER = '1';
+      session = await launchChromeSession(chromium, {
+        stateDir: path.join(ROOT, '.state', 'sessions', provider), mode, route,
+        startupTimeoutMs: 20_000, lifetimeMs: 30 * 60 * 1000,
+      });
+      try {
+        const pending = await inspectPrivateSecretFile(pendingLoginPath(provider));
+        await restoreBrowserState(session.context, pending.exists ? pendingLoginPath(provider) : httpStatePath(provider), config.origin);
       }
-      if (session.browser.contexts().length !== 1 || session.context.pages().length !== 1) throw new Error('Expected one dedicated account page.');
-      if (foreground) await session.page.bringToFront();
-      return await operation(session.page);
-    } finally { await session.close(); }
+      catch (error) { await session.close(); throw error; }
+      activeSessions.set(provider, session);
+      const owned = session;
+      void owned.closed.finally(() => { if (activeSessions.get(provider) === owned) activeSessions.delete(provider); }).catch(() => {});
+    }
+    return operation(session.page);
   });
+}
+
+export async function closeAccountBrowsers() {
+  const sessions = [...activeSessions.values()]; activeSessions.clear();
+  const results = await Promise.allSettled(sessions.map(session => session.close()));
+  if (results.some(result => result.status === 'rejected')) throw new Error('Account browser cleanup was not confirmed.');
+  return { closed: sessions.length };
 }
 
 export async function privateAccount(provider) {
@@ -79,7 +86,8 @@ async function snapshot(provider, page, submitted = false) {
   });
   const account = await privateAccount(provider).catch(() => null);
   return { provider, page: accountPagePath(provider, page.url()),
-    state: classifyAccountPage({ ...view, submitted, allowTextAuthentication: provider !== 'ipapi', authenticatedAccount: provider === 'ipapi' && ipapiDashboardAccepted(view.account, account?.email) }),
+    state: classifyAccountPage({ ...view, submitted, termsRequired: provider === 'ipapi' && new URL(page.url()).pathname === '/app/accept-terms',
+      allowTextAuthentication: provider !== 'ipapi', authenticatedAccount: provider === 'ipapi' && ipapiDashboardAccepted(view.account, account?.email) }),
     text: /two.factor|2FA|recovery codes|authenticator|secret key/i.test(view.text)
       ? '[security values omitted; inspect value-free controls]' : redactText(view.text, { secrets: account ? [account.email, account.password] : [] }).slice(0, 6000),
     controls: view.controls.map(e => ({ ...e, ...(e.label ? { label: redactText(e.label).slice(0, 6000) } : {}) })),
@@ -102,10 +110,14 @@ export async function openAccount(provider, surface, visible = false) {
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20_000 });
     if (response && response.status() >= 400) return { provider, state: 'access_unavailable', httpStatus: response.status() };
     await page.locator('body').waitFor({ timeout: 10_000 });
+    if (provider === 'cloudflare') await page.waitForFunction(() =>
+      !!document.querySelector('input[type="password"],a[href*="logout"]') ||
+      /verify you are human|let us know you are human|checking your browser/i.test(document.body?.innerText || ''),
+    undefined, { timeout: 10_000, polling: 100 }).catch(() => {});
     const result = await snapshot(provider, page);
     if (provider === 'ipapi' && result.state === 'authenticated') await saveStorageStateSafely(page.context(), httpStatePath(provider));
     return result;
-  }, { foreground: visible || provider === 'cloudflare' });
+  }, { foreground: visible });
 }
 
 export async function readAccount(provider, mode = 'http') {

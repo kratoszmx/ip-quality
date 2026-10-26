@@ -13,8 +13,9 @@ stdin, never saved or printed. No remote script is executed. The returned
 egress becomes `ip_mismatch`, never another IP's risk. It validates bounded
 geography and a `threatLevel` of low/medium/high. A missing label remains unknown. The original
 label is in section 3 and `ScoreMeta.DBIP.Band`; `Score.DBIP` remains null.
-HTTP 200 with `OVER_QUERY_LIMIT` or an explicit daily quota message means
-`daily_quota_exhausted`; other query-limit messages remain `rate_limited`. No label is
+HTTP 200 with an explicit daily quota message means
+`daily_quota_exhausted`; `OVER_QUERY_LIMIT` alone and other query-limit messages
+remain `rate_limited`, since the code alone supplies no reset period. No label is
 converted to a 0/50/100 score. The public visitor token is used only in memory;
 no account key is obtained or saved.
 The [official FAQ](https://db-ip.com/faq.php) documents daily API-key allowance
@@ -22,6 +23,14 @@ resets at midnight CET. That is 07:00 in Asia/Shanghai when interpreted as
 CET (UTC+1); the public visitor demo supplies no reset timestamp or guaranteed
 recovery schedule. On October 11, both direct and ATT returned the daily-limit
 body without `Retry-After`, so changing routes was not a recovery for this demo.
+On October 26, fresh page-plus-demo requests on the default proxy, direct and
+isolated ATT each returned HTTP 200 with `OVER_QUERY_LIMIT` and
+`maximum number of queries per day exceeded`, without `Retry-After`. The free
+geography endpoint still returned valid data for `1.1.1.1`. This is a live
+visitor-demo refusal, not a cached result or exhaustion of an owned account's
+free allowance. A daily message does not establish when the public demo will
+be usable again. Do not promise a next-day recovery or substitute free geography
+for a missing threat label.
 The no-key free geography contract is retained only for the MCP's optional
 `free_api` probe; unexpected premium fields there still cannot supply risk.
 

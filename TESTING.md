@@ -74,8 +74,8 @@ Each suite maps to one area of the code; check it before adding coverage.
 | `test/repository_test.rb` | Runtime-source bans, vendored references, file safety, AGPL provenance |
 | `test/route_runner_test.rb` | `bin/ip-quality-route` and `runner/`: menus, listings, option rules, leaf rendering, Mihomo lifecycle, snapshots, printable text |
 | `test/prefix_sample_test.rb` | Prefix input rules, batch files, failure/interrupt evidence |
-| `mcp/ipqs/tests/` | IPQS API, account/auth classification, TOTP policy, secrets, stdio contract |
-| `mcp/provider-accounts/tests/` | HTTP identity, signup/TOTP/recovery policy, public-provider probes, stdio contract |
+| `mcp/ipqs/tests/` | IPQS API, HTTP/session auth classification, TOTP policy, secrets, default-windowless stdio contract |
+| `mcp/provider-accounts/tests/` | HTTP identity versus account suspension, reviewed login/terms/challenge outcomes, ipapi automatic-login stop, signup/TOTP, public-provider probes, private origin-scoped restoration and default-windowless stdio contract |
 
 All reporter suites inherit `test/support/reporter_test_case.rb`:
 

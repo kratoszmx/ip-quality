@@ -23,23 +23,40 @@ this package as the working directory.
 
 ## Authentication check
 
-`npm run auth:check` verifies the browser dashboard and exits nonzero without positive proof; official API status remains `npm run probe:sanitized`. The verified default uses a no-store same-origin HTTP GET from a retained background headed Chrome container, so adjacent checks attach instead of repeatedly restarting a GUI. `--headless` is an explicit bounded experiment; on 2026-09-22 it returned 403 and was not adopted. HTTP rejection is distinct from a DOM verification challenge. Standard HTTPS_PROXY/HTTP_PROXY or IPQS_PROXY_SERVER may select the existing task-scoped proxy. A real login form under /user/dashboard is expired authentication even at HTTP 200.
+`npm run auth:check` verifies the saved session with one bounded HTTP dashboard
+read and exits nonzero without positive proof; it opens no Chrome. API status
+remains `npm run probe:sanitized`. The ordinary headless experiment returned
+403 on October 26 and its unused runtime branch was removed. Native hidden Chrome completed password + TOTP login that
+day, and its freshly saved state passed HTTP authentication. A 200 login/TOTP
+page remains unauthenticated. Standard HTTPS_PROXY/HTTP_PROXY or
+IPQS_PROXY_SERVER selects the explicit route; without a proxy, native sessions
+use direct networking. No failure opens a GUI automatically.
 
 ## Access Strategy
 
 1. For account usage and reputation lookups, use the official API directly without Chrome. Dashboard login is independent of API credential readiness.
-2. When dashboard-only evidence or account actions are needed, establish or reuse login in a dedicated real Chrome/CDP profile under `.state/chrome-profile/`; an explicitly authorized task may use the fixed owner-only two-line email/password bundle for one bounded submission.
+2. Dashboard actions and saved login use `@myutils/browser-session/chrome`, the
+   same native hidden engine as the myutils text browser. It creates a verified
+   windowless target in an owned temporary profile under `.state/chrome-profile/sessions/`.
+   Restore only this origin's private state; an authorized task may submit the
+   fixed owner-only email/password bundle once and complete its reviewed TOTP.
 3. Read dashboard text with a same-origin browser `fetch` and inert HTML extraction. Use rendered DOM only when control metadata or dynamic content is required.
 4. Import an existing visible dashboard API key directly into the ignored parent secret file without returning the key to the agent.
 5. Official JSON API authentication uses headers for explicit fraud-intelligence lookups, and the documented path-auth form for account usage.
 
-The dedicated profile is the login container. API requests use the local key file and do not depend on exported browser cookies. Saved credentials are read only after task-level confirmation, never enter MCP arguments or output, and are not read when the profile is already authenticated. Authorized saved login may complete one exact reviewed TOTP challenge using the private seed. CAPTCHA, email verification and passkeys stay in the visible browser as human-auth steps.
+The private `http-session.json` is saved only after successful authentication.
+Temporary browser profiles are cleaned by the shared lifecycle worker; account
+API requests use the key independently. Credentials never enter MCP output and
+are not read when restored authentication succeeds. CAPTCHA/email/passkey
+verification stops the flow. An explicitly requested `visible=true` or the
+manual login script provides a human window; there is no automatic GUI fallback.
 
 ## Directory Map
 
 - `src/server.ts`: MCP stdio entrypoint and tool schemas.
 - `src/browser.ts`: Chrome/CDP lifecycle, authentication evidence, redacted dashboard reads, API-key import, and two-stage setting changes.
 - `src/dashboard-text.ts`: bounded same-origin GET and inert HTML text projection; no page navigation, script execution, session export or input values.
+- `src/http-auth.ts`: owner-only saved-session HTTP auth probe; rejects redirects, login and TOTP pages without opening Chrome.
 - `src/auth.ts`: exact IPQS login-form recognition, authenticated-page classification, and one-submit credential policy.
 - `src/totp.ts`: issuer/account-bound textual enrollment, private emergency recovery, and one-submit authenticator challenge. Uses the shared TOTP library's explicit legacy-80-bit option for this issuer.
 - `src/api.ts`: bounded read-only IPQS JSON API client.
@@ -62,7 +79,7 @@ The dedicated profile is the login container. API requests use the local key fil
 ## MCP Tools
 
 - `ipqs_status`: report sanitized package, browser-profile, and API credential readiness; browser probing is opt-in.
-- `ipqs_open_login`: keep the dedicated real Chrome session open on the login page for human authentication.
+- `ipqs_open_login`: open the reviewed login in native hidden Chrome; `visible=true` explicitly requests human interaction.
 - `ipqs_finish_login`: verify the current authenticated dashboard and optionally keep the browser open.
 - `ipqs_login_with_saved_credentials`: reuse the profile first, then after explicit confirmation read the fixed owner-only bundle and submit the reviewed IPQS login form at most once.
 - `ipqs_enable_totp`: after `ENABLE_IPQS_TOTP`, prove usable API credits, save the bound seed and emergency backup code privately, reserve and submit one enrollment. Existing factors/attempts are preserved.
@@ -74,11 +91,12 @@ The dedicated profile is the login container. API requests use the local key fil
 - `ipqs_apply_setting_change`: revalidate and apply one prepared low-risk setting after literal confirmation, then return sanitized success evidence.
 - `ipqs_account_usage`: read current credits and usage through the official account API.
 - `ipqs_lookup`: perform one explicit IP, email, phone, or URL reputation lookup through the official API.
-- `ipqs_close_browser`: close this server's active Chrome/CDP session; it stops Chrome only when that session launched it with shutdown ownership. An attached retained container can remain open.
+- `ipqs_close_browser`: stop this server's owned session and temporary profile, preserving its separately saved HTTP state.
 
 ## Frontend Experience
 
-- Use `ipqs_open_login`, complete login in the visible browser, then call `ipqs_finish_login`.
+- Normal saved login and dashboard work are windowless. For explicitly approved
+  human recovery use `ipqs_open_login(visible=true)`, then `ipqs_finish_login`.
 - For an explicitly authorized saved login, use `ipqs_login_with_saved_credentials` with the literal confirmation. It keeps Chrome open by default so the session can serve following dashboard tools; a successful existing session does not read the bundle, and a failed submission is never retried automatically.
 - The current dashboard home is `/user/dashboard`. API-key reads wait for the page's asynchronous metrics and rows to settle; adjacent key-like text is only a candidate until the non-lookup account endpoint accepts it.
 - Use `ipqs_read_dashboard` with `mode=controls` before changing a preference; control values are deliberately omitted, while exact names, labels, types, select option labels, and safe buttons remain searchable.
@@ -99,10 +117,10 @@ The dedicated profile is the login container. API requests use the local key fil
 ## Browser Environment
 
 - `IPQS_BROWSER_PROFILE_DIR`: normalized absolute dedicated profile path.
-- `IPQS_CDP_PORT`: local CDP port, default `19453`.
+- CDP ports are dynamically allocated on loopback by the shared native browser.
 - `IPQS_CHROME_PATH`: optional Chrome executable override.
 - `IPQS_PROXY_SERVER`: optional credential-free HTTP, HTTPS, or SOCKS5 proxy URL.
-- `IPQS_LOCALE`: browser locale, default `en-US`.
+- Native hidden Chrome preserves its own locale and browser properties.
 - `IPQS_TIMEOUT_MS`: bounded browser/API timeout from 1 to 60 seconds.
 
 ## Safety Evidence

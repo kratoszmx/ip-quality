@@ -48,14 +48,14 @@ export async function verifyAbuseipdb(confirmation, dependencies = {}) {
 
 // Only reviewed signup/login surfaces. Account creation, CAPTCHA, key import
 // and security settings are explicit maintenance operations, never auto-retried.
-export async function openAbuseipdb(surface) {
+export async function openAbuseipdb(surface, visible = false) {
   if (!['signup', 'login'].includes(surface)) throw new Error('Select signup or login.');
   return withSession('abuseipdb', async page => {
     const response = await page.goto(`https://www.abuseipdb.com/${surface === 'signup' ? 'register' : 'login'}`,
       { waitUntil: 'domcontentloaded', timeout: 20000 });
     const current = new URL(page.url());
     if (current.origin !== 'https://www.abuseipdb.com') throw new Error('Unreviewed account redirect.');
-    return { provider: 'abuseipdb', backend: 'headed_chrome', httpStatus: response?.status(),
+    return { provider: 'abuseipdb', backend: visible ? 'visible_chrome' : 'windowless_native_chrome', httpStatus: response?.status(),
       path: ['/register', '/login', '/account', '/email/verify'].includes(current.pathname) ? current.pathname : 'unrecognized', submitted: false };
-  }, { foreground: true });
+  }, { foreground: visible });
 }

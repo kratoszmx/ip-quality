@@ -10,6 +10,11 @@ export function httpStatePath(provider) {
   return fileURLToPath(new URL(`./.state/${provider}-http.json`, import.meta.url));
 }
 
+export function pendingLoginPath(provider) {
+  providerConfig(provider);
+  return fileURLToPath(new URL(`./.state/${provider}-pending-login.json`, import.meta.url));
+}
+
 export function httpAccountIdentity(provider, status, contentType, body, expectedEmail) {
   providerConfig(provider);
   const unavailable = { provider, backend: 'http', authenticated: false,
@@ -55,7 +60,9 @@ export function httpAccountIdentity(provider, status, contentType, body, expecte
     inputs.filter(input => input.name === 'key').length === 1 &&
     !inputs.some(input => input.type?.toLowerCase() === 'password') &&
     /<a\b[^>]*\bhref=["']\/app\/logout["']/i.test(html);
-  return { ...unavailable, authenticated, state: authenticated ? 'authenticated' : 'login_required' };
+  const suspended = authenticated && /your account has been banned|your account was suspended/i.test(html);
+  return { ...unavailable, authenticated, state: suspended ? 'account_suspended' : authenticated ? 'authenticated' : 'login_required',
+    ...(suspended ? { apiUsable: false, restriction: /\bbot_login\b/.test(html) ? 'bot_login' : 'account_suspended' } : {}) };
 }
 
 export async function readHttpAccount(provider, expectedEmail, dependencies = {}) {

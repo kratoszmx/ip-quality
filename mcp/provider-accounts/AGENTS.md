@@ -28,7 +28,9 @@ The formal inventory and current account/2FA evidence are in
 | Tool | Effect |
 | --- | --- |
 | provider_account_status | Local credential and submission metadata; no network |
-| provider_account_open | Explicit setup/recovery: ipapi defaults to headless; `visible=true` requests its human UI. Cloudflare keeps headed Chrome |
+| provider_account_open | Native hidden Chrome by default; `visible=true` explicitly requests a human window |
+| provider_account_login | USE_SAVED_ACCOUNT_CREDENTIALS: Cloudflare/AbuseIPDB HTTP reuse first, otherwise one reviewed windowless submission; ipapi automatic login disabled after bot_login suspension |
+| provider_account_close_browsers | Close only this MCP's owned temporary sessions; preserve saved HTTP and pending state |
 | provider_account_read | Default `mode=http`: bounded exact-account identity read with saved state and no Chrome. Explicit `mode=browser`: redacted existing-page text/controls |
 | provider_account_create_free | One free signup after CREATE_FREE_ACCOUNT; uses the confirmed private email/country |
 | ipapi_import_free_key | Import a labelled key after one full-response free lookup and IMPORT_FREE_API_KEY |
@@ -42,7 +44,7 @@ The formal inventory and current account/2FA evidence are in
 | abuseipdb_account_status | Local private account/key presence only; no network or claim of current quota |
 | abuseipdb_account_check | Bounded HTTP read of the exact saved account; returns authentication, email-verification and public-profile/domain-visibility booleans |
 | abuseipdb_verify_free_api | VERIFY_FREE_API makes one official APIv2 CHECK for 1.1.1.1 using the reporter's private key; no browser or abuse-report submission |
-| abuseipdb_account_open | Explicit signup/login recovery in the dedicated headed profile; no form submission |
+| abuseipdb_account_open | Windowless native signup/login page; explicit visible=true for human recovery; no form submission |
 
 The user requires API usability before 2FA. A missing key, unavailable API,
 changed account/key or stale proof stops before authenticator enrollment. Existing
@@ -85,12 +87,18 @@ account-basics form: unrelated feedback email and password-change fields must
 not imply a different account or a login page. API observations bind the public
 test target and project only score/country; personal account fields stay private.
 
-The September 24 trial passed both HTTP identity checks with the owned Chrome
-containers closed. ipapi's isolated headless dashboard also passed, so its setup
-default now selects shared `headless:true`; the shared launcher suppresses GUI
-launch/window flags without consumer-built headless arguments. Cloudflare
-headless returned 403; its explicit setup/recovery browser stays headed. Switching an existing container's mode
-requires closing that verified owned container first.
+October 26 verification adopted the myutils text browser's native hidden engine,
+`@myutils/browser-session/chrome`. It proves the target has no OS window, keeps
+the browser sandbox and uses explicit routes; it is distinct from ordinary
+headless Chrome. AbuseIPDB saved login and HTTP identity passed. Cloudflare
+required human verification after submission. ipapi terms were accepted with
+explicit user permission, but its authenticated dashboard reports `bot_login`
+suspension and its API returns 403. One separately authorized visible Chrome
+password login reached the same suspended account. Automatic ipapi password
+submission is disabled; saved HTTP reads distinguish authentication from
+`account_suspended`/`apiUsable:false`. Provider support must restore the account.
+These gates do not trigger another password submission or an automatic GUI. A caller may explicitly
+request `visible=true` for a human recovery step. Existing state is preserved.
 
 ## HTTP state recovery
 
@@ -127,17 +135,21 @@ submission receipts, API proof, TOTP URI and recovery codes stay in private
 ../../secrets/accounts/provider directories; raw API keys use the reporter's
 flat secrets/ipapi, secrets/cloudflare_token and secrets/abuseipdb paths.
 
-Profiles are .state/ipapi, .state/cloudflare and .state/abuseipdb, bound to CDP
-19503/19504/19505 with exclusive operation leases at 19603/19604/19605.
+Temporary profiles are under `.state/sessions/{provider}/`, with dynamic
+loopback CDP ports and operation leases at 19603/19604/19605. Native sessions
+are retained within this server for multi-step flows; the shared worker cleans
+them on close, controller exit or the 30-minute lifetime limit. Verified HTTP
+state and pending terms/verification state are separate owner-only files. The
+legacy `.state/{provider}` profiles remain private recovery data.
 PROVIDER_ACCOUNTS_PROXY chooses a credential-free HTTP proxy only for this
 package. Set it to DIRECT for explicit direct access: Chrome receives
---no-proxy-server and bypasses macOS system proxy preferences. The bound
-process's actual routing flags are verified before reuse; changing the requested
-route requires closing that owned browser first. Local CDP traffic stays direct;
+--no-proxy-server and bypasses macOS system proxy preferences. The shared engine
+verifies actual launch routing; an explicit route change closes and replaces
+only this server's owned session. Local CDP traffic stays direct;
 when launching a child through an isolated ATT session, pass its proxy with that
 variable and retain localhost in NO_PROXY. No live Clash setting changes.
-Browser shutdown verifies profile binding before Browser.close. The temporary
-ATT signup browser is closed before its private Mihomo exits.
+The shared worker verifies owned process shutdown and removes its temporary
+profile. Close a temporary ATT browser before its private Mihomo exits.
 
 Passwords are random and saved before signup. Durable receipts prevent automatic
 duplicate registration/token/enrollment submissions after timeouts. Registration
@@ -159,9 +171,13 @@ receipts stay under `../../secrets/accounts/`.
 Inside `mcp/provider-accounts`, `accounts.mjs::withSession` owns the shared
 provider profile binding and lease, `privateAccount` validates saved identities,
 and `policy.mjs::accountNetworkOptions` validates a task-scoped browser/API route.
-Its explicit `DIRECT` mode emits Chrome's `--no-proxy-server`, overriding macOS
-system proxy preferences; `accountRouteMatches` checks the actual bound process
-before reusing it for an explicitly chosen route. `cloudflare.mjs`
+Its explicit `DIRECT` mode selects the shared native browser's verified direct
+route. The shared lifecycle verifies process/profile/route ownership; the MCP
+replaces only its own session when an explicit route/display mode changes.
+`login.mjs` owns reviewed POST forms and distinct credential/terms/verification
+outcomes and stops ipapi automated login locally after the observed suspension.
+`../common/browser-state.mjs` restores only the selected site's state.
+`cloudflare.mjs`
 owns its fixed account paths, server identity check and token policy; its TOTP
 consumer reuses these directly. `cloudflare-policy.mjs` contains fixture-testable
 identity, token scope, response and API-before-MFA decisions. MCP action entrypoints

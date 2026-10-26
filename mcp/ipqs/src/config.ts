@@ -59,16 +59,8 @@ export function getApiKeyFile() {
   return env("IPQS_API_KEY_FILE", DEFAULT_API_KEY_FILE);
 }
 
-export function getCdpPort() {
-  return integerEnv("IPQS_CDP_PORT", 19453, 1024, 65535);
-}
-
 export function getTimeoutMs() {
   return integerEnv("IPQS_TIMEOUT_MS", 20_000, 1_000, 60_000);
-}
-
-export function getLocale() {
-  return env("IPQS_LOCALE", "en-US");
 }
 
 export function getProxyServer() {

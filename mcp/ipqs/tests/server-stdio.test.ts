@@ -48,6 +48,10 @@ test("compiled stdio MCP lists the complete tool surface and returns a secret-fr
     for (const tool of tools.tools) {
       assert.match(tool.description || "", /MCP server usage instructions/);
     }
+    for (const name of ["ipqs_open_login", "ipqs_open_dashboard"]) {
+      const schema = tools.tools.find(tool => tool.name === name)?.inputSchema.properties?.visible as { default?: boolean };
+      assert.equal(schema.default, false);
+    }
     const raw = await client.callTool({ name: "ipqs_status", arguments: { probeBrowser: false } });
     const parsed = CallToolResultSchema.parse(raw);
     assert.notEqual(parsed.isError, true);

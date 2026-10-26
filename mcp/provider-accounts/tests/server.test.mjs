@@ -10,14 +10,19 @@ test('stdio exposes bounded provider actions and rejects unknown providers befor
   try {
     await client.connect(transport);
     const { tools } = await client.listTools();
-    assert.equal(tools.length, 16);
-    for (const name of ['abuseipdb_account_status', 'abuseipdb_account_check', 'abuseipdb_verify_free_api', 'abuseipdb_account_open']) {
+    assert.equal(tools.length, 18);
+    for (const name of ['abuseipdb_account_status', 'abuseipdb_account_check', 'abuseipdb_verify_free_api', 'abuseipdb_account_open', 'provider_account_login', 'provider_account_close_browsers']) {
       assert.ok(tools.some(tool => tool.name === name));
+    }
+    for (const name of ['provider_account_open', 'abuseipdb_account_open']) {
+      assert.equal(tools.find(tool => tool.name === name).inputSchema.properties.visible.default, false);
     }
     for (const tool of tools) assert.match(tool.description, /Free accounts only/);
     const response = await client.callTool({ name: 'provider_account_status', arguments: { provider: 'foreign.invalid' } });
     assert.equal(response.isError, true);
     const invalid = await client.callTool({ name: 'public_provider_verify_free_api', arguments: { provider: 'foreign.invalid', confirmation: 'VERIFY_FREE_API' } });
     assert.equal(invalid.isError, true);
+    const unconfirmed = await client.callTool({ name: 'provider_account_login', arguments: { provider: 'ipapi', confirmation: 'WRONG' } });
+    assert.equal(unconfirmed.isError, true);
   } finally { await client.close(); await transport.close(); }
 });

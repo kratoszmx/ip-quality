@@ -1,12 +1,13 @@
 # Current handoff
 
-## Status — 2026-10-24
+## Status — 2026-10-26
 
-- Reporter `v2026-10-24-standalone.45` (`script_version` in `bin/ip-quality`).
-- Offline: `/bin/zsh -f scripts/test-offline` passes — reporter 143 Minitest
-  cases, IPQS MCP 21, provider accounts 34. The separate synthetic IPQS
+- Reporter `v2026-10-26-standalone.46` (`script_version` in `bin/ip-quality`).
+- Offline: `/bin/zsh -f scripts/test-offline` passes — reporter 144 Minitest
+  cases, IPQS MCP 22, provider accounts 40. The separate synthetic IPQS
   browser-text suite last passed 10/10 at commit `782bce3`, with no live requests.
-- Live: direct and ATT all-source reports on 2026-10-23 (table below). Offline
+- Live: focused IPQS/DB-IP and MCP login checks on October 26; the latest
+  complete direct/ATT reports remain October 23 (table below). Offline
   success is not a provider-availability claim.
 - Git: only `main`. Push to `github-kratoszmx` (`kratoszmx/ip-quality`) and
   `github-kratosbackup` (`kratosbackup/ipquality`), then read both back.
@@ -33,13 +34,25 @@
 
 ## Open issues
 
-- **ATT to IPQS:** TLS still fails before HTTP; on 2026-10-23 the first full run
-  also timed out on the direct fallback, while a focused recheck succeeded. The
-  remote cause is unconfirmed. The support inquiry
-  ([record](mcp/ipqs/SUPPORT-TLS-20261010.md)) was sent 2026-10-10; the last
-  mailbox check (2026-10-11) found no reply.
-- **DB-IP demo:** `ok` on 2026-10-12, daily quota exhausted on direct and ATT on
-  2026-10-23; no published reset time.
+- **ATT to IPQS:** October 26 curl still fails with 35/HTTP 000 for `/login`
+  and the account API, including pinned IPv4/TLS 1.2. Direct IPv4 website login
+  and API succeeded with the same credentials. The route/intermediary/edge
+  cause remains unconfirmed. The October 10 support inquiry has technical
+  questions to answer according to the user; fresh mailbox access failed.
+  Chinese/English drafts and sanitized curl evidence are prepared privately,
+  **not sent**; see [support record](mcp/ipqs/SUPPORT-TLS-20261010.md).
+- **DB-IP demo:** October 26 default proxy, direct and isolated ATT received
+  fresh HTTP 200 daily-quota errors; no Retry-After. No local persistent cache.
+  Free geography succeeded, but supplies no risk label. No recovery ETA for the
+  public visitor demo; official keyed-API midnight reset is not its guarantee.
+- **ipapi account:** User-approved updated terms were accepted October 26.
+  Exact-account HTTP and visible Chrome password login succeed, but the account
+  explicitly reports `bot_login` suspension and API 403. Stored key matches.
+  Automated password login is disabled; provider support must restore access.
+- **Cloudflare account:** Native hidden Chrome loaded the login form, but one
+  password submission required human verification. Existing saved HTTP identity
+  returned 403 on proxy/direct. Official Intel API still succeeded; no GUI
+  fallback or challenge automation was performed.
 - **Ping0 on ATT:** `tls_error` (curl 35) on 2026-10-23 while direct verified.
   Ping0 observes the caller, so a direct fallback would not measure ATT.
 - **Outside this repository:** the Supervisor skill's `inventory.md` row for
@@ -51,6 +64,15 @@
 
 Full detail is in `git log`; these are the ones a new session could trip over.
 
+- 2026-10-26: MCPs use myutils native hidden Chrome; IPQS auth checks use HTTP.
+  Only origin-scoped private-state restoration is shared in `mcp/common/`.
+  Pending verification state stays separate; browsers close with their owner.
+  Explicit visible Chrome remains a human recovery option. Retired the failed
+  headless auth probe and unused fixed-CDP settings. DB-IP generic limit codes
+  no longer imply a daily reset; added suspension/login and quota regressions.
+- October 26 cleanup keeps only consolidated private verification, the latest
+  offline-test log, bilingual drafts and a sanitized curl attachment; temporary
+  probe scripts, duplicate outputs and owned temporary Chrome profiles removed.
 - 2026-10-24: `common/` holds only helpers with two or more callers.
   `generate_googlemap_url` became `location_map_url` (`common/location.zsh`);
   table layout moved to `report/table.zsh`; `safe_snapshot.rb` and `text.rb`

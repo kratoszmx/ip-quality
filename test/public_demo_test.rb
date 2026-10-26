@@ -45,6 +45,15 @@ class PublicDemoTest < ReporterTestCase
     end
   end
 
+  def test_dbip_limit_code_alone_does_not_invent_a_daily_reset
+    [nil, "too many requests", "maximum number of queries per minute exceeded", []].each do |message|
+      result = parse("dbip", { "errorCode" => "OVER_QUERY_LIMIT", "error" => message })
+      assert_match(/\A1\|rate_limited\|\|+\z/, result)
+    end
+    result = parse("dbip", { "error" => "maximum number of queries per day exceeded" })
+    assert_match(/\A1\|daily_quota_exhausted\|\|+\z/, result)
+  end
+
   def test_dbip_runtime_keeps_both_demo_requests_on_route_and_stops_on_failure_or_mismatch
     probe = <<~'ZSH'
       source "$1"

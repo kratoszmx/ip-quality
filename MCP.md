@@ -42,30 +42,45 @@ and quotas differ from `free_api`; see [providers/dbip.md](providers/dbip.md).
 ## Access methods
 
 HTTP with saved cookies reuses an earlier login; it is not a fresh password login.
-Playwright's `request.newContext` is an HTTP client and starts no browser; a
-hidden headed Chrome still counts as a GUI browser.
+Playwright's `request.newContext` is an HTTP client and starts no browser.
+Browser operations reuse the same `@myutils/browser-session/chrome` native
+`hidden` engine as myutils' text browser: Chrome has a verified hidden CDP
+target with no OS window, rather than a minimized GUI. Ordinary `headless`
+is a different mode and still received IPQS HTTP 403 on October 26.
 
 | Platform | Routine access | Fresh login or recovery | 2FA |
 | --- | --- | --- | --- |
-| IPQS | API key over native HTTP; dashboard reads are same-origin fetches inside retained headed Chrome | GUI Chrome/CDP; saved credentials and TOTP only after explicit recovery intent | TOTP enabled |
-| ipapi.is | Saved-state HTTP dashboard read; API key over HTTP | Headless Chrome by default; `visible=true` for GUI | No enrollment entry offered |
-| Cloudflare | Saved-state HTTP identity read; Intel token over HTTP | Headed Chrome for login, token setup and TOTP recovery | TOTP enabled, recovery codes saved |
-| AbuseIPDB | Saved-state HTTP account read; APIv2 key over HTTP | Headed Chrome in its dedicated profile | No enrollment entry offered |
+| IPQS | API and saved-session auth check over HTTP; dashboard content/controls through native hidden Chrome | Windowless saved credentials + reviewed TOTP; verified October 26 | TOTP enabled |
+| ipapi.is | Saved-state HTTP dashboard read; API currently HTTP 403 | Automated login disabled after `bot_login` account suspension. October 26 authorized visible Chrome login also succeeded but did not remove the suspension | No enrollment entry offered |
+| Cloudflare | Saved-state HTTP identity read; Intel token over HTTP | Native hidden Chrome; October 26 password flow required human verification; Intel API still passed | TOTP enabled, recovery codes saved |
+| AbuseIPDB | Saved-state HTTP account read; APIv2 key over HTTP | Native hidden Chrome; login and subsequent HTTP identity verified October 26 | No enrollment entry offered |
 | Ipregistry | API key in the reporter only | No account MCP | Not audited |
 | DB-IP, IPWHOIS | Account-free HTTP free API and website demo | None | Not applicable |
 | IPinfo, Scamalytics, IP2Location, ipdata, Check.Place, Ping0, RIPEstat, Shodan | Public HTTP pages/demos/relays used by the reporter | None | Not applicable |
 
 A failed HTTP identity read returns its failure; it never silently opens a
 browser, submits credentials, retries or treats a saved file as success.
+Default browser tools also open no window. `visible=true` is an explicit
+human-recovery exception; no failure automatically switches to GUI. Pending
+terms/verification cookies are stored separately from verified HTTP state and
+do not establish authentication. Existing manual tools remain available.
 
 ## Lessons from setup and recovery
 
 - Clearing proxy environment variables leaves Chrome on the macOS system proxy;
   use `PROVIDER_ACCOUNTS_PROXY=DIRECT` (Chrome gets `--no-proxy-server`).
-- Cloudflare's and IPQS's isolated headless dashboards returned 403, so their
-  recovery browsers stay headed; ipapi's headless dashboard works.
-- IPQS saved HTTP state returned login HTML even after a 302 from its one
-  password submission; dashboard work therefore keeps the retained Chrome.
+- October 26 IPQS native-hidden password + TOTP login succeeded, and the fresh
+  saved state passed an independent HTTP dashboard check. Older failed HTTP
+  snapshots do not establish that HTTP is intrinsically unsupported.
+- A loaded login page is not successful login. Cloudflare's hidden page loaded
+  but its submitted flow required a challenge. No automatic credential retry.
+- After explicit user approval, ipapi's October 3 terms were accepted on
+  October 26. Exact-account HTTP identity passed, but the dashboard explicitly
+  reported `bot_login` suspension for automated browser sign-in. The stored key
+  matches the dashboard; API HTTP 403 is not a stale-key or pending-terms result.
+  One subsequently authorized real visible Chrome password login reached the
+  same suspended account. Automatic ipapi password submission is now disabled;
+  recovery requires provider support, not a different browser or another key.
 - Signups through proxy routes were rejected: ipapi succeeded only on explicit
   DIRECT, and AbuseIPDB's fresh ATT headless signup needed its dedicated headed
   profile.
@@ -84,6 +99,7 @@ Dated observations, not availability guarantees; private receipts stay under
 
 | Date | Evidence |
 | --- | --- |
+| 2026-10-26 | IPQS direct IPv4 login + TOTP and API passed; ATT curl still failed pre-HTTP TLS, including a pinned IPv4/TLS 1.2 test. Native-hidden IPQS login and restored hidden dashboard passed; HTTP auth passed. AbuseIPDB native-hidden login and HTTP identity passed; public profile/domain still off. Cloudflare challenge remains, while Intel API passed. ipapi terms accepted with user permission; both hidden and explicit visible Chrome reached the account, but `bot_login` suspension/API 403 persists. Private evidence/drafts: `reports/ipqs-support-20261026-rerun/`; no follow-up sent. |
 | 2026-10-23 | Reporter direct and ATT runs returned official IPQS and Cloudflare results with the saved keys (see [HANDOFF.md](HANDOFF.md#latest-saved-live-evidence)) |
 | 2026-10-10 to 10-12 | IPQS account API passed over direct IPv6 and `awshk` while ATT failed TLS before HTTP; Cloudflare Intel passed, including through ATT |
 | 2026-10-11 | AbuseIPDB free signup, email verification and one owned key; HTTP identity, privacy booleans and API proof passed with Chrome closed |
@@ -93,11 +109,18 @@ Dated observations, not availability guarantees; private receipts stay under
 ## Routine verification and recovery
 
 - IPQS: `npm --prefix mcp/ipqs run probe:sanitized` performs one non-lookup
-  account read; `npm --prefix mcp/ipqs run auth:check` checks the retained
-  browser. Authorized login recovery uses `ipqs_login_with_saved_credentials`
+  account read; `npm --prefix mcp/ipqs run auth:check` checks private saved
+  HTTP state without Chrome. Authorized recovery uses `ipqs_login_with_saved_credentials`
   (`confirm=USE_SAVED_IPQS_CREDENTIALS`), completing one reviewed TOTP challenge;
   `ipqs_complete_totp` (`confirm=USE_SAVED_IPQS_TOTP`) handles a pending one.
-- Provider accounts: `provider_account_open` opens one allowlisted page and
+- Provider accounts: `provider_account_login` with
+  `confirmation=USE_SAVED_ACCOUNT_CREDENTIALS` checks existing HTTP identity
+  then permits one reviewed windowless Cloudflare/AbuseIPDB password submission.
+  ipapi returns a local manual-recovery requirement without reading credentials
+  or launching Chrome. Updated terms,
+  human verification, rejected credentials and unconfirmed outcomes remain
+  distinct. `provider_account_close_browsers` closes this server's owned
+  browsers. `provider_account_open` opens one allowlisted page and
   `provider_account_read` with `mode=browser` inspects it. A verified ipapi
   dashboard visit refreshes its HTTP state; Cloudflare and AbuseIPDB need the
   steps in [HTTP state recovery](mcp/provider-accounts/AGENTS.md#http-state-recovery).

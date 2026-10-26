@@ -15,7 +15,7 @@
     "login:saved": "npm run build && node dist/scripts/login-saved.js",
     "doctor": "tsx scripts/doctor.ts",
     "probe:sanitized": "tsx scripts/probe.ts",
-    "auth:check": "node dist/scripts/browser-probe.js",
+    "auth:check": "node dist/scripts/http-auth-probe.js",
     "test:offline": "npm run build && tsx --test tests/*.test.ts",
     "test:browser-text": "npm run build && node dist/scripts/test-browser-text.js",
     "check": "npm run test:offline && npm run doctor",

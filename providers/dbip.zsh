@@ -21,9 +21,9 @@ dbip_parsed=()
 print -rn -- "$response"|jq -e 'type == "object"' >/dev/null 2>&1||return 1
 if print -rn -- "$response"|jq -e 'type == "object" and (.errorCode != null or .error != null)' >/dev/null 2>&1;then
 dbip_parsed[status]=upstream_error
-if print -rn -- "$response"|jq -e '.errorCode == "OVER_QUERY_LIMIT" or (.error | type == "string" and test("maximum number of queries per day"; "i"))' >/dev/null 2>&1;then
+if print -rn -- "$response"|jq -e '.error | type == "string" and test("maximum number of queries per day"; "i")' >/dev/null 2>&1;then
 dbip_parsed[status]=daily_quota_exhausted
-elif print -rn -- "$response"|jq -e '.error | type == "string" and test("over query limit|maximum number of queries"; "i")' >/dev/null 2>&1;then
+elif print -rn -- "$response"|jq -e '.errorCode == "OVER_QUERY_LIMIT" or (.error | type == "string" and test("over query limit|maximum number of queries"; "i"))' >/dev/null 2>&1;then
 dbip_parsed[status]=rate_limited
 fi
 return 1

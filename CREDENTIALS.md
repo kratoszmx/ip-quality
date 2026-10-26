@@ -41,6 +41,8 @@ configuration, never process arguments, Git configuration or reports.
 | IPQS authenticator | `secrets/accounts/ipqs/totp-uri`, private exact-account provisioning URI; issuer provisions an 80-bit seed |
 | IPQS emergency recovery | `secrets/accounts/ipqs/recovery-code`; `enrollment-attempt.json` prevents duplicate activation |
 | Browserless account sessions | `mcp/provider-accounts/.state/{ipapi,cloudflare,abuseipdb}-http.json`, owner-only saved state; never emitted or committed |
+| IPQS HTTP/browser session | `mcp/ipqs/.state/chrome-profile/http-session.json` (under `IPQS_BROWSER_PROFILE_DIR` when overridden); saved only after authentication |
+| Pending provider login | `mcp/provider-accounts/.state/{provider}-pending-login.json`; terms/challenge continuation only, distinct from verified account state |
 | Account action evidence | Provider-local registration/token/enrollment receipts and `availability.json` under `secrets/accounts/` |
 
 A saved registration password does not establish that an account was created.

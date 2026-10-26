@@ -11,21 +11,10 @@ export function providerConfig(provider) {
 
 export function accountNetworkOptions(environment = process.env) {
   const value = environment.PROVIDER_ACCOUNTS_PROXY || environment.HTTPS_PROXY || environment.https_proxy;
-  if (value === 'DIRECT') return { proxyServer: undefined, chromeArgs: ['--no-proxy-server'] };
-  if (!value) return { proxyServer: undefined, chromeArgs: [] };
+  if (value === 'DIRECT' || !value) return { proxyServer: undefined };
   const url = new URL(value);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error('Invalid credential-free proxy URL.');
-  return { proxyServer: value, chromeArgs: [] };
-}
-
-export function accountRouteMatches(commandLine, routing) {
-  const args = commandLine.trim().split(/\s+/);
-  const proxies = args.filter(value => value.startsWith('--proxy-server'));
-  const direct = args.includes('--no-proxy-server');
-  const automatic = args.some(value => value.startsWith('--proxy-pac-url') || value === '--proxy-auto-detect');
-  if (routing.chromeArgs.includes('--no-proxy-server')) return direct && proxies.length === 0 && !automatic;
-  if (routing.proxyServer) return !direct && !automatic && proxies.length === 1 && proxies[0] === `--proxy-server=${routing.proxyServer}`;
-  return true; // No explicit route was requested; this is the system route.
+  return { proxyServer: value };
 }
 
 export function accountUrl(provider, surface) {
@@ -46,8 +35,10 @@ export function accountPagePath(provider, value) {
   return new URL(value).pathname.replace(/\b[a-f0-9]{32}\b/gi, '[private account]');
 }
 
-export function classifyAccountPage({ text, hasPassword, challenge, authenticatedAccount = false, allowTextAuthentication = true, submitted = false }) {
+export function classifyAccountPage({ text, hasPassword, challenge, termsRequired = false, authenticatedAccount = false, allowTextAuthentication = true, submitted = false }) {
   if (challenge) return 'human_verification_required';
+  if (termsRequired) return 'terms_acceptance_required';
+  if (/your account has been banned|your account was suspended/i.test(text)) return 'account_suspended';
   if (/could not complete your registration from this connection/i.test(text)) return 'registration_connection_blocked';
   if (/verify (?:your )?email|verification (?:email|link)|confirm (?:your )?email|check your inbox|account is not activated|activation link|activate your account/i.test(text)) return 'email_verification_required';
   if (/already (?:registered|exists)|email.*(?:taken|in use)/i.test(text)) return 'existing_account';

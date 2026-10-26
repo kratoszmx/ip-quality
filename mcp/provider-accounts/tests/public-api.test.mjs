@@ -123,6 +123,19 @@ test('demo verification distinguishes useful context from supplied risk fields',
   }
 });
 
+test('DB-IP generic query-limit codes do not promise a daily reset', async () => {
+  for (const error of [null, 'too many requests', 'maximum number of queries per minute exceeded', []]) {
+    const result = await verifyPublicProvider('dbip', 'VERIFY_FREE_API', async request =>
+      request.url === 'https://db-ip.com/api/core/' ? guestPage : {
+        status: 200, contentType: 'application/json',
+        body: Buffer.from(JSON.stringify({ errorCode: 'OVER_QUERY_LIMIT', error })),
+      }, 'public_demo');
+    assert.equal(result.status, 'rate_limited');
+    assert.equal(result.usable, false);
+    assert.equal(result.riskLabelAvailable, false);
+  }
+});
+
 test('DB-IP visitor demo stops at a failed page and never exposes a guest URL', async () => {
   for (const page of [
     { status: 429 }, { status: 302 },

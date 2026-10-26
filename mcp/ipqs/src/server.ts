@@ -16,10 +16,10 @@ import {
   localStatus,
   openInteractiveDashboard,
   prepareSettingChange,
-  probeBrowserAuth,
   readDashboard,
   startInteractiveLogin,
 } from "./browser.js";
+import { probeHttpAuth } from "./http-auth.js";
 import { getTimeoutMs } from "./config.js";
 import { sanitizedError } from "./redaction.js";
 import { SERVER_INSTRUCTIONS as IPQS_SERVER_INSTRUCTIONS } from "./tool-policy.js";
@@ -58,7 +58,7 @@ server.registerTool(
   "ipqs_status",
   {
     title: "IPQS Status",
-    description: buildToolDescription("Report sanitized local profile and API credential readiness; live browser probing is explicit.", SERVER_INSTRUCTIONS),
+    description: buildToolDescription("Report sanitized local profile and API credential readiness. The legacy probeBrowser flag checks saved HTTP authentication without opening Chrome.", SERVER_INSTRUCTIONS),
     inputSchema: {
       probeBrowser: z.boolean().default(false),
     },
@@ -66,8 +66,8 @@ server.registerTool(
   async ({ probeBrowser }) => safeResult(async () => ({
     ...(await localStatus()),
     browser: probeBrowser
-      ? await probeBrowserAuth()
-      : { probed: false, note: "Set probeBrowser=true to open the dedicated profile and verify the current dashboard session." },
+      ? await probeHttpAuth()
+      : { probed: false, note: "Set probeBrowser=true to verify saved HTTP authentication without opening Chrome." },
     safety: {
       apiKeyReturned: false,
       browserProfileExported: false,
@@ -81,10 +81,10 @@ server.registerTool(
   "ipqs_open_login",
   {
     title: "Open IPQS Login",
-    description: buildToolDescription("Keep the dedicated real Chrome/CDP session open for human IPQS authentication.", SERVER_INSTRUCTIONS),
-    inputSchema: {},
+    description: buildToolDescription("Open the dedicated login without a window. visible=true is only for explicitly requested human verification; there is no automatic GUI fallback.", SERVER_INSTRUCTIONS),
+    inputSchema: { visible: z.boolean().default(false) },
   },
-  async () => safeResult(startInteractiveLogin),
+  async ({ visible }) => safeResult(() => startInteractiveLogin(visible)),
 );
 
 server.registerTool(
@@ -119,12 +119,13 @@ server.registerTool(
   "ipqs_open_dashboard",
   {
     title: "Open IPQS Dashboard",
-    description: buildToolDescription("Keep the dedicated browser open on one allowlisted IPQS dashboard page for visible review.", SERVER_INSTRUCTIONS),
+    description: buildToolDescription("Open one allowlisted dashboard in windowless native Chrome. visible=true explicitly requests a human window.", SERVER_INSTRUCTIONS),
     inputSchema: {
       page: dashboardPageSchema.default("home"),
+      visible: z.boolean().default(false),
     },
   },
-  async ({ page }) => safeResult(() => openInteractiveDashboard(page)),
+  async ({ page, visible }) => safeResult(() => openInteractiveDashboard(page, visible)),
 );
 
 server.registerTool(
@@ -231,6 +232,7 @@ server.registerTool(
 
 async function main() {
   const transport = new StdioServerTransport();
+  server.server.onclose = () => { void closeBrowser().catch(() => {}); };
   await server.connect(transport);
   console.error("codex-ipqs-mcp running on stdio");
 }

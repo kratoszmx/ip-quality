@@ -43,3 +43,16 @@ The inquiry was sent Saturday and checked Sunday, less than 24 hours later;
 no duplicate follow-up was sent. A normal business-day response window is more
 useful than another immediate message; no automatic mail job was created.
 The reporter DNS repair still does not change MCP transport.
+
+October 26 follow-up preparation (not sent): the user reports that support asks
+whether IPv4 website login works and requests sanitized curl failures. The
+fresh test proved direct IPv4 password + TOTP login and account API acceptance.
+ATT curl still failed TLS before HTTP on `/login` and the account endpoint;
+pinned IPv4 plus HTTP/1.1/TLS 1.2 reproduced it. These observations do not
+identify the component dropping the connection. Private Chinese/English drafts
+and redacted traces are in `reports/ipqs-support-20261026-rerun/`. They exclude
+keys, cookies, authorization headers and the user's exact source IP. No new
+message or server-side mail draft was created. The original new support reply
+was not independently reread because the mail connector's OAuth refresh was
+unavailable on the preceding check; the draft addresses the user's quoted
+questions without inventing other reply content.

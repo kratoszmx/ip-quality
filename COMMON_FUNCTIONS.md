@@ -15,6 +15,14 @@ functions print without a trailing newline.
 | `common/terminal.zsh` | All provider adapters (progress), `report/`, `bin/ip-quality` | ANSI cleanup and stderr progress lines |
 | `common/location.zsh` | Check.Place/MaxMind and IPinfo adapters | Coordinate DMS text and Check.Place map links |
 | `common/network_environment.rb` | Direct route command, isolated Mihomo session | Child-process overrides removing inherited proxies |
+| `mcp/common/browser-state.mjs` | IPQS and provider-account browser sessions | Restore owner-only cookies and origin storage into an owned windowless session; filter unrelated origins; no authentication claim |
+
+The MCP helper calls the existing myutils private-file reader and browser
+context directly. Its caller selects the site's origin and state path, verifies
+the live account, and uses myutils `saveStorageStateSafely` only after success.
+Browser lifetime, native hidden targets, process ownership and cleanup remain
+in `@myutils/browser-session/chrome`. Provider selectors and login/2FA rules
+stay in their respective MCP packages.
 
 ## zsh provider values (`provider_values.zsh`)
 

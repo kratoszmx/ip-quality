@@ -4,6 +4,16 @@ import { httpAccountIdentity, readHttpAccount } from '../http-account.mjs';
 
 const email = 'fixture@example.test';
 const html = `<input name="email" value="${email}"><input name="key" value="private"><a href="/app/logout">Logout</a>`;
+test('ipapi account suspension remains explicit even with a valid saved login', () => {
+  const notice = '<div>Your account has been banned: bot_login — Your account was suspended.</div>';
+  const result = httpAccountIdentity('ipapi', 200, 'text/html', html + notice, email);
+  assert.equal(result.authenticated, true);
+  assert.equal(result.state, 'account_suspended');
+  assert.equal(result.apiUsable, false);
+  assert.equal(result.restriction, 'bot_login');
+  assert.equal(httpAccountIdentity('ipapi', 200, 'text/html', html + `<script>${notice}</script>`, email).state, 'authenticated');
+  assert.equal(httpAccountIdentity('ipapi', 200, 'text/html', notice, email).authenticated, false);
+});
 test('HTTP identity requires the matching server account, not a local state file or status 200', () => {
   assert.equal(httpAccountIdentity('ipapi', 200, 'text/html', html, email).authenticated, true);
   for (const [status, body, account] of [[403, html, email], [302, html, email], [200, html, 'other@example.test'],

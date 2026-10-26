@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { access } from "node:fs/promises";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import {
-  connectOrLaunchChromeOverCDP,
-  verifyChromeProfileBinding,
-  withLoopbackOperationLease,
+  saveStorageStateSafely,
   waitForEnter,
 } from "@myutils/browser-session";
+import { launchChromeSession } from "@myutils/browser-session/chrome";
 import { reserveOneUseRecord, takeOneUseRecord } from "@myutils/one-use-token";
 import { writePrivateSecretFile } from "@myutils/secret-file";
 import { chromium, type Page } from "playwright-core";
@@ -15,15 +16,13 @@ import { validateIpqsApiCredential } from "./api.js";
 import { inspectIpqsAuthPage, submitIpqsCredentialsOnce } from "./auth.js";
 import {
   DASHBOARD_PAGES,
+  ROOT,
   IPQS_API_KEY_POLICY,
   IPQS_ORIGIN,
   dashboardUrl,
-  ensureBrowserProfileDirectory,
   env,
   getApiKeyFile,
   getBrowserProfileDir,
-  getCdpPort,
-  getLocale,
   getProxyServer,
   getTimeoutMs,
   inspectApiCredential,
@@ -33,6 +32,7 @@ import {
 } from "./config.js";
 import { inspectIpqsCredentials, readIpqsCredentials } from "./credentials.js";
 import { readDashboardText } from "./dashboard-text.js";
+import { HTTP_STATE_FILE } from "./http-auth.js";
 import {
   assertSafeSettingControl,
   dashboardContentReady,
@@ -50,7 +50,8 @@ import { boundedVisibleText } from "./redaction.js";
 import { probeIpqsAccount } from "./account-probe.js";
 import { enrollIpqsTotp, completeIpqsTotp } from "./totp.js";
 
-type ChromeSession = Awaited<ReturnType<typeof connectOrLaunchChromeOverCDP>>;
+type ChromeSession = Awaited<ReturnType<typeof launchChromeSession>>;
+const { restoreBrowserState } = await import(pathToFileURL(path.join(ROOT, "../common/browser-state.mjs")).href);
 
 interface PendingSettingChange {
   field: string;
@@ -84,32 +85,19 @@ function sessionIsUsable(session: ChromeSession | null): session is ChromeSessio
   return Boolean(session && !session.page.isClosed() && session.browser.isConnected());
 }
 
-async function openSession({ headless = false, statusOnly = false } = {}) {
-  const profileDir = await ensureBrowserProfileDirectory();
-  const session = await connectOrLaunchChromeOverCDP(chromium, {
-    profileDir,
-    cdpPort: getCdpPort(),
-    configuredChromePath: env("IPQS_CHROME_PATH") || undefined,
-    chromePathEnvName: "IPQS_CHROME_PATH",
-    locale: getLocale(),
-    proxyServer: getProxyServer(),
-    timeoutMs: getTimeoutMs(),
-    startUrl: "about:blank",
-    headless,
-    viewport: { width: 1440, height: 1000 },
-    startMaximized: !headless,
-    newWindow: false,
-    normalizeWindow: !headless,
-    preserveContextSettings: headless || statusOnly,
-    background: statusOnly && !headless,
-    hidden: statusOnly && !headless,
-    detached: statusOnly && !headless,
-    unref: statusOnly && !headless,
-    killLaunchedProcessOnClose: !statusOnly || headless,
+async function openSession({ visible = false } = {}) {
+  // This is the isolated MCP/controller process, never the parent App env.
+  process.env.PW_CHROMIUM_ATTACH_TO_OTHER = "1";
+  const proxy = getProxyServer();
+  const session = await launchChromeSession(chromium, {
+    stateDir: path.join(getBrowserProfileDir(), "sessions"),
+    mode: visible ? "visible" : "hidden",
+    route: proxy ? { mode: "proxy", server: proxy } : { mode: "direct" },
+    chromePath: env("IPQS_CHROME_PATH") || undefined,
+    startupTimeoutMs: Math.min(getTimeoutMs(), 20_000), lifetimeMs: 30 * 60 * 1000,
   });
   try {
-    await verifyChromeProfileBinding(session.browser, profileDir);
-    if (session.browser.contexts().length !== 1 || session.context.pages().length !== 1) throw new Error("IPQS requires one isolated page.");
+    await restoreBrowserState(session.context, HTTP_STATE_FILE, IPQS_ORIGIN);
     return session;
   } catch (error) { await session.close(); throw error; }
 }
@@ -219,10 +207,11 @@ async function collectDashboardSnapshot(page: Page, pageName: DashboardPageName,
 export function defaultStateSummary() {
   return {
     profileDir: getBrowserProfileDir(),
-    cdpPort: getCdpPort(),
+    httpStateFile: HTTP_STATE_FILE,
+    cdpPort: "dynamic loopback port",
     loginUrl: loginUrl(),
     dashboardPages: DASHBOARD_PAGES,
-    browserBackend: "real-chrome-cdp",
+    browserBackend: "windowless-native-chrome",
   };
 }
 
@@ -238,34 +227,22 @@ export async function localStatus() {
   };
 }
 
-export async function probeBrowserAuth({ headless = false } = {}) {
-  return withLoopbackOperationLease({ port: 19454 }, () => withBrowserLease(async () => {
-    const session = await openSession({ headless, statusOnly: true });
-    try {
-      if (new URL(session.page.url()).origin !== IPQS_ORIGIN) {
-        const response = await session.page.goto(dashboardUrl("home"), { waitUntil: "domcontentloaded", timeout: Math.min(getTimeoutMs(), 15_000) });
-        if (response?.status() === 403 || response?.status() === 429) return { authenticated: false, stage: "access-blocked" };
-      }
-      const value = await readDashboardText(session.page, "home", 500);
-      return { authenticated: value.authenticated, stage: value.authenticated ? "authenticated" : value.loginRequired ? "login"
-        : value.httpStatus === 403 || value.httpStatus === 429 ? "access-blocked" : "unknown" };
-    } finally { await session.close(); }
-  }));
-}
-
-export async function startInteractiveLogin() {
+export async function startInteractiveLogin(visible = false) {
   return withBrowserLease(async () => {
+    if (sessionIsUsable(activeSession) && (activeSession.mode === "visible") !== visible) {
+      await activeSession.close(); activeSession = null;
+    }
     if (!sessionIsUsable(activeSession)) {
       const staleSession = activeSession;
       if (staleSession) await (staleSession as ChromeSession).close().catch(() => undefined);
-      activeSession = await openSession();
+      activeSession = await openSession({ visible });
     }
     await activeSession.page.goto(loginUrl(), { waitUntil: "domcontentloaded", timeout: getTimeoutMs() });
     return {
       opened: true,
-      backend: "real-chrome-cdp",
+      backend: activeSession.mode === "visible" ? "visible-chrome" : "windowless-native-chrome",
       path: summarizeIpqsUrl(activeSession.page.url()).path,
-      note: "Complete IPQS authentication in the visible browser, then call ipqs_finish_login.",
+      note: "Use the confirmed saved-login tool; request visible=true only for a human verification step.",
     };
   });
 }
@@ -307,6 +284,7 @@ export async function loginWithSavedCredentials(options: {
       await completeIpqsTotp(page);
       status = await inspectIpqsAuthPage(page);
     }
+    if (status.authenticated) await saveStorageStateSafely(activeSession.context, HTTP_STATE_FILE);
     const shouldKeepBrowser = !status.authenticated || options.keepBrowser !== false;
     if (!shouldKeepBrowser) {
       await activeSession.close().catch(() => undefined);
@@ -328,12 +306,12 @@ export async function loginWithSavedCredentials(options: {
       ...(status.authenticated
         ? {
           note: credentialsRead
-            ? "IPQS returned an authenticated dashboard after one bounded saved-credential submission. Chrome retains the session only in the dedicated ignored profile."
+            ? "IPQS returned an authenticated dashboard after one bounded windowless login. Private HTTP state was saved."
             : "The dedicated IPQS profile already had an authenticated dashboard session; saved credentials were not read.",
         }
         : secondary
-          ? { humanAction: "Complete the visible CAPTCHA, 2FA, passkey, or email verification in the dedicated IPQS Chrome window." }
-          : { note: "The bounded IPQS login stopped without an automatic credential retry. Inspect the visible login state before another explicit attempt." }),
+          ? { humanAction: "Human verification is required; no window opens automatically. Request visible=true only with explicit permission." }
+          : { note: "The bounded IPQS login stopped without an automatic retry or visible browser fallback." }),
     };
   });
 }
@@ -343,6 +321,7 @@ export async function finishInteractiveLogin(keepBrowser = false) {
     if (!sessionIsUsable(activeSession)) activeSession = await openSession();
     await activeSession.page.goto(dashboardUrl("home"), { waitUntil: "domcontentloaded", timeout: getTimeoutMs() });
     const status = await inspectIpqsAuthPage(activeSession.page);
+    if (status.authenticated) await saveStorageStateSafely(activeSession.context, HTTP_STATE_FILE);
     if (status.authenticated && !keepBrowser) {
       await activeSession.close().catch(() => undefined);
       activeSession = null;
@@ -352,22 +331,25 @@ export async function finishInteractiveLogin(keepBrowser = false) {
       browserKeptOpen: sessionIsUsable(activeSession),
       note: status.authenticated
         ? "The dedicated profile currently reaches an authenticated IPQS dashboard."
-        : "Authentication is not yet proven. Continue in the visible browser; do not copy credentials into MCP arguments.",
+        : "Authentication is not yet proven. Inspect the existing session; a human window requires an explicit visible=true request.",
     };
   });
 }
 
 export async function manualLogin() {
-  await startInteractiveLogin();
+  await startInteractiveLogin(true);
   await waitForEnter("Finish IPQS login in the visible Chrome window, then press Enter here to verify the dashboard.");
   const result = await finishInteractiveLogin(false);
   if (!result.authenticated) throw new Error("IPQS login could not be verified from the current dashboard page.");
   return result;
 }
 
-export async function openInteractiveDashboard(pageName: DashboardPageName) {
+export async function openInteractiveDashboard(pageName: DashboardPageName, visible = false) {
   return withBrowserLease(async () => {
-    if (!sessionIsUsable(activeSession)) activeSession = await openSession();
+    if (sessionIsUsable(activeSession) && (activeSession.mode === "visible") !== visible) {
+      await activeSession.close(); activeSession = null;
+    }
+    if (!sessionIsUsable(activeSession)) activeSession = await openSession({ visible });
     await activeSession.page.goto(dashboardUrl(pageName), { waitUntil: "domcontentloaded", timeout: getTimeoutMs() });
     const auth = await inspectIpqsAuthPage(activeSession.page);
     return {
@@ -413,6 +395,7 @@ export async function finishIpqsTotp() {
   return withDashboardSession("home", async ({ page }) => {
     await completeIpqsTotp(page);
     const result = await inspectIpqsAuthPage(page);
+    if (result.authenticated) await saveStorageStateSafely(page.context(), HTTP_STATE_FILE);
     return { authenticated: result.authenticated, stage: result.stage, submittedOnce: true };
   });
 }

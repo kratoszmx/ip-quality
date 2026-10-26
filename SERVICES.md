@@ -13,8 +13,8 @@ weekly offline test, owned outside this repository.
 | Exact-leaf plan or name listing | Reads local inputs only |
 | `--config-test-only` | Runs Mihomo with `-t` on a rendered private profile, then exits; no listener or lookup |
 | Confirmed exact-leaf report | Starts a private Mihomo on a random `127.0.0.1` port, verifies it owns the listener, runs the reporter through it, then stops it |
-| `mcp/ipqs` | Stdio server; dashboard work may retain its own Chrome on CDP 19453 |
-| `mcp/provider-accounts` | Stdio server; account reads use HTTP only. Explicit setup/recovery may retain Chrome on CDP 19503/19504/19505 (ipapi/Cloudflare/AbuseIPDB), with operation leases on 19603/19604/19605 |
+| `mcp/ipqs` | Stdio server; auth checks use HTTP. Dashboard/login tools use owned native hidden Chrome on a dynamic loopback CDP port |
+| `mcp/provider-accounts` | Stdio server; account reads use HTTP. Explicit login/setup tools retain owned native hidden Chrome on dynamic loopback ports; operation leases remain 19603/19604/19605 |
 
 Ctrl-C, HUP or TERM stops the runner, its reporter and its owned Mihomo; success,
 failure and handled interruption remove the private workspace. A later run
@@ -31,15 +31,19 @@ reloads or rewrites them.
 | IPQS | `npm --prefix mcp/ipqs run build` | `npm --prefix mcp/ipqs start` | `npm --prefix mcp/ipqs run check` |
 | Provider accounts | None | `npm --prefix mcp/provider-accounts start` | `npm --prefix mcp/provider-accounts test` |
 
-Closing the client transport (or Ctrl-C in a terminal) stops a server. Browser
-containers are separate and can outlive it:
+Browsers are owned by myutils' native Chrome lifecycle worker, with a 30-minute
+maximum lifetime and cleanup on controller exit. Their fresh profiles are
+removed on shutdown; owner-only HTTP/pending login files persist separately:
 
-- IPQS `ipqs_close_browser` stops Chrome only when this server launched it;
-  `auth:check` deliberately leaves its background headed container running.
-- Provider-account browser tools detach and keep their Chrome; there is no
-  shutdown tool. Authorized maintenance verifies the profile with
-  `verifyChromeProfileBinding`, then sends `Browser.close` to that owned
-  container only, keeping its `.state/` login files.
+- IPQS `ipqs_close_browser` stops its active owned browser; `auth:check` opens
+  none. Temporary dashboard reads close their browser after completion.
+- `provider_account_close_browsers` closes the provider server's owned browser
+  sessions. Multi-step setup tools reuse the same session until closed, expired,
+  or explicitly switched between routes/display modes.
+- A GUI is available only through an explicitly requested `visible=true` or
+  the manual IPQS login script. No failed HTTP/headless/hidden operation opens
+  a window automatically. Old persistent profiles are retained as private
+  recovery data and are not the default runtime browser.
 - Close a browser started through a temporary proxy before stopping that proxy,
   and close it before changing its route. Routing details:
   [provider-accounts guide](mcp/provider-accounts/AGENTS.md#private-files-and-lifetime).

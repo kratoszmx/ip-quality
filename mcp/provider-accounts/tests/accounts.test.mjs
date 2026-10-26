@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
-import { accountUrl, accountPagePath, accountNetworkOptions, accountRouteMatches, assertAccountOrigin, classifyAccountPage, ipapiDashboardAccepted, ipapiKeyAccepted } from '../policy.mjs';
+import { accountUrl, accountPagePath, accountNetworkOptions, assertAccountOrigin, classifyAccountPage, ipapiDashboardAccepted, ipapiKeyAccepted } from '../policy.mjs';
 import { submitReviewedSignup } from '../signup.mjs';
 
 test('account origins and surfaces reject credential-bearing and foreign URLs', () => {
@@ -12,25 +12,20 @@ test('account origins and surfaces reject credential-bearing and foreign URLs', 
   assert.throws(() => accountUrl('ipapi', 'security'));
 });
 
-test('explicit direct Chrome disables the OS proxy and overrides inherited HTTP proxy', () => {
+test('explicit direct routing overrides an inherited HTTP proxy', () => {
   const direct = accountNetworkOptions({ PROVIDER_ACCOUNTS_PROXY: 'DIRECT', HTTPS_PROXY: 'http://127.0.0.1:7897' });
   assert.equal(direct.proxyServer, undefined);
-  assert.deepEqual(direct.chromeArgs, ['--no-proxy-server']);
-  assert.equal(accountRouteMatches('/Chrome --user-data-dir=/private --no-proxy-server', direct), true);
-  assert.equal(accountRouteMatches('/Chrome --user-data-dir=/private', direct), false);
-  assert.equal(accountRouteMatches('/Chrome --no-proxy-server --proxy-server=http://127.0.0.1:7897', direct), false);
-  assert.equal(accountRouteMatches('/Chrome --no-proxy-server --proxy-auto-detect', direct), false);
 });
 
-test('an explicit account proxy cannot silently reuse a differently routed browser', () => {
+test('account proxy selection validates explicit credential-free endpoints', () => {
   const routing = accountNetworkOptions({ PROVIDER_ACCOUNTS_PROXY: 'http://127.0.0.1:12345' });
-  assert.equal(accountRouteMatches('/Chrome --proxy-server=http://127.0.0.1:12345', routing), true);
-  assert.equal(accountRouteMatches('/Chrome --proxy-server=http://127.0.0.1:7897', routing), false);
-  assert.equal(accountRouteMatches('/Chrome --no-proxy-server', routing), false);
+  assert.equal(routing.proxyServer, 'http://127.0.0.1:12345');
   for (const value of ['https://user:pass@proxy.invalid/', 'file:///private', 'http://proxy.invalid/path']) assert.throws(() => accountNetworkOptions({ PROVIDER_ACCOUNTS_PROXY: value }));
 });
 
 test('provider failures, verification and saved forms never become authentication', () => {
+  assert.equal(classifyAccountPage({ text: 'Your account has been banned bot_login', authenticatedAccount: true }), 'account_suspended');
+  assert.equal(classifyAccountPage({ text: 'Already registered? Terms of Service', termsRequired: true }), 'terms_acceptance_required');
   assert.equal(classifyAccountPage({ text: 'Account dashboard Sign out', hasPassword: false, challenge: true }), 'human_verification_required');
   assert.equal(classifyAccountPage({ text: 'We could not complete your registration from this connection.', hasPassword: true }), 'registration_connection_blocked');
   assert.equal(classifyAccountPage({ text: 'Verify your email', hasPassword: false }), 'email_verification_required');
