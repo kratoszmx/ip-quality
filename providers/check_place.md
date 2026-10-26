@@ -31,3 +31,16 @@ supplement fills only missing fields after the same validation, so a failed
 translation cannot erase valid primary data. JSON text is passed unchanged
 to jq, including literal backslashes. The other provider adapters use the same
 literal-input rule so unrelated escaped text cannot corrupt their JSON reads.
+
+## October 26 recovery evidence
+
+The exact ipapi relay URL for a fixed public target returned HTTP 403 with the
+Cloudflare block page over both the explicit configured proxy and direct HTTP.
+A newly started text-browser MCP 0.5.17 also returned 403/`BROWSER_CHALLENGE`
+on a fresh direct Chrome read, with no target data. This verifies the current
+failure independently of the older 0.5.16 MCP connection retained by the chat.
+The text-browser development chat additionally records the user's confirmation
+that Safari was blocked at this exact relay too. Browser reachability of a
+different site or an anonymous API is not relay recovery. Keep the existing
+source-specific pause and independent-source fallbacks; no valid response was
+available to justify a new automatic relay retry or browser dependency.

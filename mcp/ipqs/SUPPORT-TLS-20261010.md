@@ -69,3 +69,13 @@ send either without a new explicit request. A further October 26 ATT reputation
 run succeeded via the reporter's direct-query fallback with the ATT target
 unchanged. The follow-up would diagnose the original transport, not enable a
 reporter lookup that already works through that fallback.
+
+The latest review-only revision further minimizes network disclosure at the
+user's request. Its generic subject and bilingual bodies omit the provider/node
+name, carrier, source/target IPs, exact timestamps, local proxy configuration and
+client-version details. They retain only IPv4 login/API success, a connection
+failing with curl 35/HTTP 000/TLS error, and same-target success through another
+connection. `curl-diagnostics-redacted.txt` is now a minimal proposed excerpt;
+the detailed trace was renamed `curl-diagnostics-internal.txt` and is not a
+proposed attachment. Do not include the former detailed subject or quoted
+history automatically. No message or server-side draft has been created.

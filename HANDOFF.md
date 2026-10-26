@@ -48,6 +48,9 @@
   unresolved original transport is not a prerequisite for that result.
   The Chinese/English review drafts now state this distinction explicitly;
   the renewed request is to preview them only, not send a follow-up.
+  The latest privacy revision uses a generic subject/connection description,
+  omits network identifiers and exact timestamps, and supplies only a minimal
+  error excerpt. Detailed diagnostics remain private and are not an attachment.
   See [support record](mcp/ipqs/SUPPORT-TLS-20261010.md).
 - **DB-IP demo:** October 26 default proxy, direct and isolated ATT received
   fresh HTTP 200 daily-quota errors; no Retry-After. No local persistent cache.
@@ -59,6 +62,11 @@
   Official Extended offers include a seven-day subscription trial, not permanent
   free risk data; the smallest plan requires annual billing. No trial activated.
   See [account and trial options](providers/dbip.md#account-and-trial-options).
+  A subsequent shared text-browser fix restored the public IPv4 detail page:
+  an independent fresh-process read of `db-ip.com/1.1.1.1` returned HTTP 200
+  and an explicit LOW label without login or GUI. This is separate from the
+  visitor API; the reporter has not yet integrated the browser page fallback.
+  Local inventory confirms no owned DB-IP account/key/login or activated trial.
 - **ipapi account:** User-approved updated terms were accepted October 26.
   Exact-account HTTP and visible Chrome password login succeed, but the account
   explicitly reports `bot_login` suspension and API 403. Stored key matches.
@@ -67,6 +75,8 @@
   `secrets/ipapi`, but its test still returned 403/INVALID_API_KEY and suspension
   remained. Its old key and one-submit receipt are private. The Check.Place
   ipapi relay returned 403 on default proxy, direct IPv4 and isolated ATT too.
+  A fresh direct Chrome read through a newly started MCP 0.5.17 also returned
+  403/challenge; the user separately confirmed the same relay block in Safari.
 - **Cloudflare account:** Native hidden Chrome loaded the login form, but one
   password submission required human verification. Existing saved HTTP identity
   returned 403 on proxy/direct. Official Intel API still succeeded; no GUI

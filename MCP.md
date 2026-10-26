@@ -65,6 +65,11 @@ human-recovery exception; no failure automatically switches to GUI. Pending
 terms/verification cookies are stored separately from verified HTTP state and
 do not establish authentication. Existing manual tools remain available.
 
+October 26 local inventory confirms that this project has no DB-IP account
+credentials, owned API key or saved HTTP/browser login state. No DB-IP signup,
+login or subscription trial has been performed. Reading its public offers or
+website through a browser is not account authentication.
+
 ## Lessons from setup and recovery
 
 - Clearing proxy environment variables leaves Chrome on the macOS system proxy;

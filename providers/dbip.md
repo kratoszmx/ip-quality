@@ -73,6 +73,17 @@ integration is not currently enabled. The public IP detail page was also checked
 as a possible alternative: proxy/direct HTTP returned 403, and hidden Chrome
 stopped at an unresolved challenge; it supplied no risk observation.
 
+Later October 26, text-browser development fixed the shared guard's rejection
+of the normal verification return on this public detail page. An independent
+fresh MCP process using the updated shared build successfully read
+`https://db-ip.com/1.1.1.1` without a login or visible window: HTTP 200, matching
+IP heading/title, `nativeRecovery.outcome=ready`, and the explicit page label
+`Estimated threat level for this IP address is LOW`. This is a genuine public
+page observation, separate from the still-limited visitor API and the paid
+keyed Extended API. It does not establish a personal DB-IP login or an API
+allowance. At this checkpoint the reporter still uses the visitor API; the
+browser page has not been integrated as an automatic reporter fallback.
+
 Lesson from 2026-09-24: the limit errors came from the old target demo, while
 the current visitor flow returned a `low` label. When a demo is throttled, stop
 and respect any Retry-After/reset time; repeating requests or rotating accounts
