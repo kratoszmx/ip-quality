@@ -54,6 +54,25 @@ which this project does not use. That quota says nothing about the website demo
 the reporter uses (one page plus one visitor lookup per report), whose allowance
 is unspecified. The account MCP probes `free_api` and `public_demo` separately.
 
+## Account and trial options
+
+Official pages checked October 26 distinguish the
+[permanent free geography API](https://db-ip.com/api/free.php) from the
+[Extended API](https://db-ip.com/api/extended/), which includes threat data.
+The [Starter 2K offer](https://db-ip.com/api/key/FULL2) has a seven-day trial,
+then annual billing of EUR 197.88 (advertised as EUR 16.49/month); cancellation
+before the trial ends avoids the charge. The
+[Starter 10K offer](https://db-ip.com/api/key/FULL10) also offers monthly
+billing at EUR 32.90 after its seven-day trial. These are subscription trials,
+not permanent free threat-data allowances. No trial or subscription was activated.
+
+Logging into an account alone does not change this adapter's public visitor
+credential. An active, separately provisioned Extended key and an explicit
+keyed-API integration would be needed to use personal quota. Such a paid/trial
+integration is not currently enabled. The public IP detail page was also checked
+as a possible alternative: proxy/direct HTTP returned 403, and hidden Chrome
+stopped at an unresolved challenge; it supplied no risk observation.
+
 Lesson from 2026-09-24: the limit errors came from the old target demo, while
 the current visitor flow returned a `low` label. When a demo is throttled, stop
 and respect any Retry-After/reset time; repeating requests or rotating accounts

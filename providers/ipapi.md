@@ -22,9 +22,11 @@ Runtime keeps certificate checks and the chosen route; it does not secretly
 fetch the observation through direct access or pin a diagnostic hostname.
 
 The anonymous `ipapi.is` path requires no key and returns a minimal response.
-On 2026-09-24 its official pages disagree on the anonymous daily limit (30 on
-the free-tier page; 100 on the developer page). Treat HTTP 429/Retry-After as
-authoritative for an actual request, without retrying into a firewall ban. A free
+The [official developer documentation](https://ipapi.is/developers.html), checked
+October 26, now specifies 30 anonymous lookups per IP per UTC day (IPv6 uses
+a /64 budget). It supplies ownership/location, not detection flags. Treat
+HTTP 429/Retry-After as authoritative for an actual request, without retrying
+into a firewall ban. A free
 ipapi.is account key raises the documented allowance to 1,000 lookups per day
 and unlocks the complete response used by the type, score, and factor tables.
 The reporter reads that optional key from the file assignment `IPAPI_API_KEY`
@@ -41,6 +43,11 @@ The current upstream `xykt/IPQuality` script instead reads
 relay returned HTTP 403 over the default proxy, direct IPv4 and isolated ATT.
 No working relay recovery was established, so the reporter does not silently
 substitute an unverified relay response or label it as an official API result.
+The official error contract distinguishes `ERR_FORBIDDEN_NOT_ALLOWED` (account
+may not query; contact support), `ERR_FORBIDDEN_INVALID_API_KEY` (unknown or
+disabled key), and `ERR_QUOTA_EXCEEDED` (account quota). Purchasing credits is
+not evidence of an account unlock. Anonymous context and other named providers
+can preserve report coverage, but cannot replace ipapi risk fields under its name.
 
 The similarly named `ipapi.co` is a different product with a contact-gated free
 trial. This project uses `ipapi.is`, with a free key when configured; the two

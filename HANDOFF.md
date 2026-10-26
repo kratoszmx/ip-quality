@@ -46,6 +46,8 @@
   `direct_fallback`, with `OriginalRouteFailure=tls_error` and
   `TargetUnchanged=true`. The reputation lookup works through fallback; the
   unresolved original transport is not a prerequisite for that result.
+  The Chinese/English review drafts now state this distinction explicitly;
+  the renewed request is to preview them only, not send a follow-up.
   See [support record](mcp/ipqs/SUPPORT-TLS-20261010.md).
 - **DB-IP demo:** October 26 default proxy, direct and isolated ATT received
   fresh HTTP 200 daily-quota errors; no Retry-After. No local persistent cache.
@@ -54,6 +56,9 @@
   The current upstream script's POST request also returned the same error.
   Default-proxy and direct page reads exposed the same visitor key in memory;
   no personal DB-IP key is used. UI now says `上游报日限额`, not a local counter.
+  Official Extended offers include a seven-day subscription trial, not permanent
+  free risk data; the smallest plan requires annual billing. No trial activated.
+  See [account and trial options](providers/dbip.md#account-and-trial-options).
 - **ipapi account:** User-approved updated terms were accepted October 26.
   Exact-account HTTP and visible Chrome password login succeed, but the account
   explicitly reports `bot_login` suspension and API 403. Stored key matches.
