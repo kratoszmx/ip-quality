@@ -37,8 +37,9 @@
 - **ATT to IPQS:** October 26 curl still fails with 35/HTTP 000 for `/login`
   and the account API, including pinned IPv4/TLS 1.2. Direct IPv4 website login
   and API succeeded with the same credentials. The route/intermediary/edge
-  cause remains unconfirmed. The October 10 support inquiry has technical
-  questions to answer according to the user; fresh mailbox access failed.
+  cause remains unconfirmed. A later October 26 Gmail read succeeded and
+  confirmed support's October 20 request for IPv4 website/account access and
+  full curl failure output; the earlier OAuth failure was not persistent.
   Chinese/English drafts and sanitized curl evidence are prepared privately,
   **not sent**; see [support record](mcp/ipqs/SUPPORT-TLS-20261010.md).
 - **DB-IP demo:** October 26 default proxy, direct and isolated ATT received

@@ -56,3 +56,10 @@ message or server-side mail draft was created. The original new support reply
 was not independently reread because the mail connector's OAuth refresh was
 unavailable on the preceding check; the draft addresses the user's quoted
 questions without inventing other reply content.
+
+Later October 26, a bounded Gmail API read through the default proxy succeeded.
+It independently confirmed the October 11 acknowledgement and October 20 reply
+asking whether IPv4 website/account access works and requesting full curl error
+output. The drafts were revised against that actual reply. No email or server
+draft was created. Private source IPs, mail routing/security tokens and account
+credentials are omitted from the drafts and diagnostic attachment.
