@@ -63,8 +63,12 @@ places threat/VPN data outside that keyless tier. This fallback restores usable
 geography without claiming to restore full risk coverage. Data attribution:
 [ipdata](https://ipdata.co/).
 
-The public IP detail page still required verification during the October 27
-Chrome checks. That page is unnecessary for the verified owned-key path.
+The later October 27 website recheck succeeded through myutils' fresh native
+hidden Chrome on the default proxy, without an API key or personal Safari state.
+The shared reader now waits for the exact IP's complete Analysis/trust-score
+record after passive verification; the first HTTP 200 geography shell is not
+enough. Use the existing [text-browser call](/Users/zmx/Projects/myutils/docs/NETWORK_API.md#ipdata-public-ip-detail).
+This is website-access recovery; the verified owned-key reporter path is unchanged.
 The [official FAQ](https://docs.ipdata.co/docs/frequently-asked-questions) and
 [signup page](https://dashboard.ipdata.co/sign-up.html) led to the separate
 developer account; its useful fields were established by live API responses,

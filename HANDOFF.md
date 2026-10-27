@@ -20,6 +20,13 @@
   identity confirms `bot_login` suspension. Its anonymous API root returns
   geography successfully, which does not establish access with this account's
   key. The requested bilingual appeal is saved privately and was not sent.
+- Later October 27 website-only follow-up: the shared myutils text browser
+  returned ipdata's full `1.1.1.1` page on the default proxy in fresh hidden
+  Chrome, including Analysis, ASN/company and Trust score. It waits past the
+  partial geography shell for the matching complete record and passive check.
+  No API key or personal Safari state was used. Reporter/API behavior and keys
+  are unchanged; implementation, tests and current usage belong to
+  [myutils](/Users/zmx/Projects/myutils/docs/NETWORK_API.md#ipdata-public-ip-detail).
 - DB-IP recovered in the later October 26 recheck: the unmodified reporter's
   focused direct and isolated ATT runs both returned `Status=ok`, `Band=low`,
   with its existing target-IP validation. No personal account or manual token
@@ -56,12 +63,6 @@
 
 ## Open issues
 
-- **ipdata public page:** Chrome checks over proxy/direct, including visible
-  Chrome, still stopped at the public page's verification. This is no longer a
-  reporter blocker: the authorized free developer key restored supplied risk
-  flags in v49. The keyless API still provides geography only; do not conflate
-  these two free surfaces. Missing VPN/robot flags are provider capability
-  limits, not values to fill from another source.
 - **ATT to IPQS:** October 26 curl still fails with 35/HTTP 000 for `/login`
   and the account API, including pinned IPv4/TLS 1.2. Direct IPv4 website login
   and API succeeded with the same credentials. The route/intermediary/edge
