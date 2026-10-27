@@ -55,8 +55,12 @@
   all-folder search, but found no recent ipapi verification message.
   The user's next step is manual signup in ordinary Chrome: myutils
   `openRealChrome` opened a persistent dedicated profile without CDP. Native
-  text filling is currently blocked by macOS Apple Events permission (-1743);
-  do not claim the fields were filled, account created or a new key verified.
+  Chrome window creation and target-bound tab access passed on the later retry
+  using native JavaScript for Automation, without CDP. Page DOM access is now
+  blocked by Chrome's own disabled "Allow JavaScript from Apple Events" setting;
+  the user must enable that setting before native text filling. This is a text
+  workflow, not screenshot/OCR automation. Do not claim the fields were filled,
+  account created or a new key verified.
   Candidate paths: [CREDENTIALS.md](CREDENTIALS.md#account-mcp-files).
   Current offline evidence: `reports/ipapi-registration-20261027/offline.log`.
 - Git: only `main`. Push to `github-kratoszmx` (`kratoszmx/ip-quality`) and
