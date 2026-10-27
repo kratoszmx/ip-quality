@@ -29,8 +29,9 @@
   [PROVIDERS.md](PROVIDERS.md).
 - Code layout and shared helpers: [AGENTS.md](AGENTS.md#architecture) and
   [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md). Account MCPs: [MCP.md](MCP.md).
-  No project daemon exists; the only external registration is Supervisor's
-  weekly `test.ipquality.test-offline` ([SERVICES.md](SERVICES.md)).
+  No project daemon exists. Supervisor owns the weekly
+  `test.ipquality.test-offline` and the finite support-reply watch described in
+  [SERVICES.md](SERVICES.md).
 
 ## Open issues
 

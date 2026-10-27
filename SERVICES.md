@@ -2,8 +2,8 @@
 
 This project runs no daemon, launchd job or cron entry. Both CLI entrypoints run
 on demand and exit with the report; the account MCP servers are stdio processes
-that live as long as their client. The only scheduled work is Supervisor's
-weekly offline test, owned outside this repository.
+that live as long as their client. Supervisor owns the weekly offline test and
+finite support-reply watches outside this repository.
 
 ## Processes a run can start
 
@@ -58,6 +58,16 @@ The schedule belongs to `/Users/zmx/Projects/supervisor`
 (`supervisor/integrations/testing.py`). As of 2026-10-23 it registers no IPQS
 account probe or API-expiry check for this project; manual probes in
 [MCP.md](MCP.md) are not scheduled monitoring.
+
+## External support-reply watch
+
+On October 26, after the user's explicit authorization and independent Sent
+verification, the existing Supervisor mail-watch service registered
+`mail.ipqs-tls-reply-20261026`. Native status readback confirmed it was active
+with a scheduled next check. It watches only for a newer reply in the verified
+support conversation, stops after a confirmed reply, and sends no automatic
+reminders. It does not probe account login or API health. Current evidence and
+private receipt locations: [IPQS support record](mcp/ipqs/SUPPORT-TLS-20261010.md).
 
 ## Health checks
 
