@@ -11,7 +11,7 @@ dbip	DB-IP	yes	public page + one visitor-egress lookup (must match target); no a
 cloudflare	Cloudflare	yes	IP Intelligence threat categories when configured; no numeric score (legacy Threat Score is retired)	-
 abuseipdb	AbuseIPDB	no	official CHECK API with an owned key, otherwise its named Check.Place relay; no abuse report is submitted	-
 ip2location	IP2Location	no	Check.Place relay; if it fails, its target-bound public website JSON on the same route	-
-ipdata	ipdata	no	Check.Place relay; if it fails, the website's current demo key (in memory) for one target request on the same route	-
+ipdata	ipdata	no	Check.Place relay; on failure, one same-route ipdata.free target lookup for country only; risk stays unknown	-
 ipqs	IPQS	yes	official API with credit preflight when a key is configured, otherwise its named Check.Place relay (never in independent mode)	-
 ping0	Ping0	yes	official free /geo endpoint: IP, location, ASN, organization; not a risk score	not applicable to an explicit target (/geo reports only the caller's egress); no request
 ripestat	RIPEstat	yes	routed prefix and origin ASN; not a risk score	-

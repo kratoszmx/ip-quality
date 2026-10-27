@@ -480,13 +480,13 @@ tors+=("${provider[tor]:-}") servers+=("${provider[server]:-}") abusers+=("${pro
 show_factor(){
 typeset -a headers countries proxies vpns tors servers abusers robots statuses
 typeset ipdata_source_kind=relay
-[[ "${ipdata[source]:-}" == public_demo ]]&&ipdata_source_kind=demo
+[[ "${ipdata[source]:-}" == official_free_api ]]&&ipdata_source_kind=official
 report_factor_column ip2location IP2Location "$(report_query_status "${ip2location[status]:-ok}")"
 report_factor_column ipapi ipapi.is "$(report_query_status "${ipapi[risk_status]:-${ipapi[status]:-ok}}")"
 report_factor_column ipregistry Ipregistry "$(report_query_status "${ipregistry[status]:-ok}")"
 report_factor_column ipqs IPQS "$(report_query_status "${ipqs[status]:-ok}" "${ipqs[query_route]:-}")"
 report_factor_column scamalytics Scamalytics "$(report_query_status "${scamalytics[status]:-ok}")"
-report_factor_column ipdata ipdata "$(report_score_source_status "$ipdata_source_kind" "${ipdata[status]:-ok}")"
+report_factor_column ipdata ipdata "$(report_score_source_status "$ipdata_source_kind" "${ipdata[risk_status]:-${ipdata[status]:-ok}}")"
 report_factor_column ipinfo IPinfo "$(report_query_status "${ipinfo[status]:-ok}")"
 report_factor_column ipwhois IPWHOIS "$(report_query_status "${ipwhois[risk_status]:-${ipwhois[status]}}")"
 (( ${#headers[@]} ))||return 0

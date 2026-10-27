@@ -9,7 +9,7 @@ umask 077
 # Display widths and byte validation need UTF-8 whatever the caller locale is.
 export LC_ALL=en_US.UTF-8
 
-script_version="v2026-10-26-standalone.47"
+script_version="v2026-10-26-standalone.48"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"

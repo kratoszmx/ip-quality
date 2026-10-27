@@ -8,8 +8,7 @@ class PublicFallbacksTest < ReporterTestCase
   IP2_LIBRARY = File.join(ROOT, "providers", "ip2location.zsh")
   IPDATA_LIBRARY = File.join(ROOT, "providers", "ipdata.zsh")
   IP2_PAGE = File.join(ROOT, "test", "fixtures", "ip2location", "public-page.html")
-  IPDATA_PAGE = File.join(ROOT, "test", "fixtures", "ipdata", "public-page.html")
-  IPDATA_FETCH_PAGE = File.join(ROOT, "test", "fixtures", "ipdata", "public-fetch-page.html")
+  IPDATA_FREE_RESPONSE = File.join(ROOT, "test", "fixtures", "ipdata", "free-response.json")
   IPDATA_RESPONSE = File.join(ROOT, "test", "fixtures", "ipdata", "public-response.json")
 
   def test_ip2location_page_binds_both_heading_and_json_without_executing_scripts
@@ -41,18 +40,28 @@ class PublicFallbacksTest < ReporterTestCase
     end
   end
 
-  def test_ipdata_demo_key_requires_one_exact_public_origin_and_safe_value
-    pages = [File.read(IPDATA_PAGE), File.read(IPDATA_FETCH_PAGE)]
-    invalid = pages.flat_map do |page|
-      [page + page, page.sub("api.ipdata.co", "attacker.invalid"),
-       page.sub("api.ipdata.co", "api.ipdata.co.attacker.invalid"),
-       page.sub("abcdef0123456789abcdef0123456789", 'unsafe"value'), page + " " * 262_144]
-    end + [pages.join]
-    (pages + invalid).each_with_index do |body, index|
-      out, err, status = zsh('source "$1"; ipdata_demo_key_from_page "$(cat)"', IPDATA_LIBRARY, stdin_data: body)
+  def test_ipdata_free_api_accepts_reduced_geography_but_rejects_wrong_targets_and_error_bodies
+    full = JSON.parse(File.read(IPDATA_FREE_RESPONSE))
+    ["198.51.100.23", "2001:4860:4860::8888"].each do |ip|
+      valid = full.merge("ip" => ip)
+      [valid, valid.slice("ip", "country", "asn", "org")].each do |body|
+        assert_equal "", zsh!('source "$1"; ipdata_free_response_is_valid "$(cat)" "$2"',
+          IPDATA_LIBRARY, ip, stdin_data: JSON.generate(body))
+      end
+    end
+    invalid = [full.merge("ip" => "8.8.8.8"), full.merge("country" => nil),
+      full.merge("country" => "United States"), full.merge("country" => []),
+      full.merge("country" => "us"), full.merge("error" => "blocked"),
+      full.merge("message" => "quota exceeded"), {"message" => "quota exceeded"},
+      [], "bad", nil].map { |body| JSON.generate(body) }
+    invalid += ["{broken", "<html>Just a moment</html>", File.read(IPDATA_RESPONSE),
+      JSON.generate(full) * 2, "null\n#{JSON.generate(full)}"]
+    invalid.each do |body|
+      out, err, status = zsh('source "$1"; ipdata_free_response_is_valid "$(cat)" 198.51.100.23',
+        IPDATA_LIBRARY, stdin_data: body)
+      refute status.success?
+      assert_empty out
       assert_empty err
-      assert_equal index < pages.length, status.success?
-      assert_equal(index < pages.length ? "abcdef0123456789abcdef0123456789\n" : "", out)
     end
   end
 
@@ -66,21 +75,22 @@ class PublicFallbacksTest < ReporterTestCase
       assert_empty err
       assert_equal [0, 6].include?(index), status.success?
     end
+    [JSON.generate(valid) * 2, "null\n#{JSON.generate(valid)}"].each do |body|
+      _out, err, status = zsh('source "$1"; ipdata_response_is_valid "$(cat)" 198.51.100.23',
+        IPDATA_LIBRARY, stdin_data: body)
+      refute status.success?
+      assert_empty err
+    end
   end
 
-  def test_default_report_recovers_both_sources_and_keeps_demo_key_out_of_arguments_and_report
+  def test_default_report_recovers_ip2location_and_keeps_ipdata_free_geography_separate_from_risk
     calls = File.join(reporter_workspace, "calls")
     text_report = File.join(reporter_workspace, "report.txt")
     write_fake_command("curl", <<~'ZSH')
       print -rl -- "$@" >> "$IPQUALITY_TEST_CALLS"
-      request=$(cat)
       if [[ "$*" == *'https://www.ip2location.com/8.8.8.8'* ]];then
         sed 's/198.51.100.23/8.8.8.8/g' "$IPQUALITY_TEST_IP2_PAGE"
-      elif [[ "$*" == *'https://ipdata.co/'* && "$*" != *'--config'* ]];then
-        cat "$IPQUALITY_TEST_IPDATA_PAGE"
-      elif [[ "$request" == *'https://api.ipdata.co/8.8.8.8?api-key=abcdef0123456789abcdef0123456789'* ]];then
-        [[ "$*" == *'Origin: https://ipdata.co'* && "$*" == *'Referer: https://ipdata.co/'* ]]||exit 99
-        print -r -- ipdata-lookup >> "$IPQUALITY_TEST_CALLS"
+      elif [[ "$*" == *'https://ipdata.free/8.8.8.8'* ]];then
         sed 's/198.51.100.23/8.8.8.8/g' "$IPQUALITY_TEST_IPDATA_RESPONSE"
       elif [[ "$*" == *'https://ipinfo.check.place/'* ]];then
         print -rn -- $'Sorry, you have been blocked by Cloudflare\n403'
@@ -93,30 +103,35 @@ class PublicFallbacksTest < ReporterTestCase
     ZSH
     out, err, status = run_script("--confirm-network-lookup", "-4", "-j", "-o", text_report, "8.8.8.8",
       env: {"IPQUALITY_TEST_CALLS" => calls, "IPQUALITY_TEST_IP2_PAGE" => IP2_PAGE,
-        "IPQUALITY_TEST_IPDATA_PAGE" => IPDATA_FETCH_PAGE, "IPQUALITY_TEST_IPDATA_RESPONSE" => IPDATA_RESPONSE})
+        "IPQUALITY_TEST_IPDATA_RESPONSE" => IPDATA_FREE_RESPONSE})
     assert status.success?, err
     refute_match(/jq: error/, err)
     report = JSON.parse(out)
     assert_equal "all", report.dig("Query", "SourceSelection")
     assert_equal "ok", report.dig("ProviderStatus", "IP2Location")
     assert_equal "0", report.dig("Score", "IP2LOCATION")
+    assert_equal false, report.dig("Factor", "VPN", "IP2LOCATION")
+    assert_equal true, report.dig("Factor", "Server", "IP2LOCATION")
+    assert_equal "public_demo", report.dig("FactorMeta", "IP2LOCATION", "Source")
     assert_equal "ok", report.dig("ProviderStatus", "ipdata")
+    assert_equal "US", report.dig("Factor", "CountryCode", "ipdata")
+    %w[Proxy VPN Tor Server Abuser Robot].each do |name|
+      assert_nil report.dig("Factor", name, "ipdata")
+    end
+    assert_equal "official_free_api", report.dig("FactorMeta", "ipdata", "Source")
+    assert_equal "not_provided", report.dig("FactorMeta", "ipdata", "Status")
+    assert_equal "free_geolocation_only", report.dig("FactorMeta", "ipdata", "Reason")
     %w[IP2LOCATION ipdata].each do |name|
-      assert_equal false, report.dig("Factor", "VPN", name)
-      assert_equal true, report.dig("Factor", "Server", name)
-      assert_equal "public_demo", report.dig("FactorMeta", name, "Source")
       assert_equal "skipped_relay_cloudflare_blocked", report.dig("FactorMeta", name, "RelayStatus")
     end
     assert_equal "public_demo", report.dig("ScoreMeta", "IP2LOCATION", "Source")
     args = File.readlines(calls, chomp: true)
     assert_equal 1, args.count("https://www.ip2location.com/8.8.8.8")
-    assert_equal 1, args.count("https://ipdata.co/")
-    assert_equal 1, args.count("ipdata-lookup")
+    assert_equal 1, args.count("https://ipdata.free/8.8.8.8")
+    refute args.any? { |a| a.include?("ipdata.co") }
     assert_equal 1, args.count { |a| a.start_with?("https://ipinfo.check.place/") }
-    [out, err, File.read(calls), File.read(text_report)].each do |text|
-      refute_includes text, "abcdef0123456789abcdef0123456789"
-    end
     assert_includes File.read(text_report), "公开示例/可用"
+    assert_includes File.read(text_report), "官方/未提供风险"
   end
 
   def test_fallbacks_preserve_route_stop_on_failure_and_leave_missing_flags_unknown
@@ -126,39 +141,47 @@ class PublicFallbacksTest < ReporterTestCase
       IP=198.51.100.23
       CurlARG='--proxy http://127.0.0.1:12345'; setopt SH_WORD_SPLIT
       show_progress(){ :; }
-      calls_file="$5" page_file="$6" data_file="$7" scenario="$8"
+      calls_file="$5" page_file="$6" family="$7" scenario="$8"
       check_place_fetch_json(){ PROVIDER_RESPONSE_STATUS=skipped_relay_cloudflare_blocked; PROVIDER_RESPONSE_BODY=''; }
       curl(){
         print -r -- called >> "$calls_file"
-        [[ "$*" == *'--proxy http://127.0.0.1:12345'* && "$*" == *'-6'* ]]||exit 99
-        if [[ "$scenario" == tls ]];then print -rn -- $'\n000'; return 35;fi
-        if [[ "$scenario" == limit ]];then print -rn -- $'limit\n429'; return 0;fi
-        if [[ "$*" == *'--config'* ]];then
-          request=$(cat)
-          [[ "$request" == *'https://api.ipdata.co/198.51.100.23?api-key='* ]]||exit 99
-          print -r -- '{"ip":"198.51.100.23","country_code":"US","threat":{"is_proxy":false}}'
-        else print -r -- "$(<"$page_file")";fi
+        [[ "$*" == *'--proxy http://127.0.0.1:12345'* && "$*" == *"-$family"* ]]||exit 99
+        if [[ "$scenario" == ipdata* ]];then
+          [[ "$*" == *'https://ipdata.free/198.51.100.23'* ]]||exit 99
+        fi
+        if [[ "$scenario" == *tls ]];then print -rn -- $'\n000'; return 35;fi
+        if [[ "$scenario" == *limit ]];then print -rn -- $'limit\n429'; return 0;fi
+        if [[ "$scenario" == *timeout ]];then print -rn -- $'\n000'; return 28;fi
+        if [[ "$scenario" == *invalid ]];then
+          print -r -- '{"ip":"8.8.8.8","country":"US"}'
+        else
+          # Even an unexpected threat field on this geo-only API is not a risk observation.
+          jq '. + {threat: {is_proxy: false, is_vpn: true}}' "$page_file"
+        fi
         print -rn -- 200
       }
-      if [[ "$scenario" == ipdata ]];then
-        db_ipdata 6
-        print -r -- "${ipdata[status]}|${ipdata[proxy]}|${ipdata[vpn]}|${ipdata[abuser]}"
+      if [[ "$scenario" == ipdata* ]];then
+        ipdata[proxy]=false ipdata[vpn]=true ipdata[countrycode]=CN ipdata[risk_status]=ok
+        db_ipdata "$family"
+        print -r -- "${ipdata[status]}|${ipdata[countrycode]}|${ipdata[risk_status]}|${ipdata[proxy]}|${ipdata[vpn]}|${ipdata[abuser]}"
       else
-        ip2location[score]=99; db_ip2location 6
+        ip2location[score]=99; db_ip2location "$family"
         print -r -- "${ip2location[status]}|${ip2location[score]}"
       fi
     ZSH
     Dir.mktmpdir("source-fallback-") do |dir|
       calls = File.join(dir, "calls")
-      [["tls", IP2_PAGE, "tls_error|\n", 1], ["limit", IP2_PAGE, "rate_limited|\n", 1],
-        ["ipdata", IPDATA_PAGE, "ok|false|null|\n", 2]].each do |scenario, page, expected, count|
+      [["tls", "tls_error|\n"], ["limit", "rate_limited|\n"],
+        ["ipdata", "ok|US|not_provided|||\n"], ["ipdata_tls", "tls_error|||||\n"],
+        ["ipdata_limit", "rate_limited|||||\n"], ["ipdata_timeout", "timeout|||||\n"],
+        ["ipdata_invalid", "invalid_response|||||\n"]].product(%w[4 6]).each do |(scenario, expected), family|
         File.write(calls, "")
         out, err, status = zsh(probe, COMMON_PROVIDER_LIBRARY, IP2_LIBRARY, IPDATA_LIBRARY,
-          reporter_functions("db_ip2location", "db_ipdata"), calls, page, IPDATA_RESPONSE, scenario, COMMON_HTTP_LIBRARY)
+          reporter_functions("db_ip2location", "db_ipdata"), calls, IPDATA_FREE_RESPONSE, family, scenario, COMMON_HTTP_LIBRARY)
         assert status.success?, err
         assert_empty err
         assert_equal expected, out
-        assert_equal count, File.readlines(calls).length
+        assert_equal 1, File.readlines(calls).length
       end
     end
   end

@@ -46,9 +46,11 @@ runtime dependency:
   and visitor/self demos stay on the measured route; quota/auth/certificate and
   response errors do not retry. DB-IP daily-quota responses have an explicit
   status rather than a generic rate-limit label.
-- Added same-route public-demo fallbacks for IP2Location and ipdata. The former
-  reads the target-bound JSON example on IP2Location.com; the latter discovers
-  its website's published demo key for one in-memory request. Explicit false
+- Added same-route fallbacks for IP2Location and ipdata. The former reads the
+  target-bound JSON example on IP2Location.com; ipdata now uses its official
+  free geography API after the October 26 website redesign removed its public
+  demo key. The country remains visible, with missing risk identified separately
+  from a failed query. A successful relay still supplies risk flags. Explicit false
   and zero survive, absent fields stay unknown, and JSON preserves both source
   and relay outcomes. Added owned-key AbuseIPDB APIv2 support and account-MCP
   maintenance. No new paid plan, hard-coded demo key or browser dependency was
@@ -161,8 +163,6 @@ runtime dependency:
 - Validated the MaxMind-labeled relay schema before field reads and IPinfo
   fallback; rejected malformed English supplements without erasing valid primary
   data. Preserved literal JSON escapes across the remaining legacy adapters.
-  Updated ipdata public-demo discovery for the October 18 `fetch` page syntax,
-  retaining the exact official origin, one-key bound and private request config.
 - Added optional Node account MCPs under `mcp/`: IPQS moved from mcps on
   2026-09-22; provider accounts owns free ipapi/Cloudflare setup and account-free
   public API/demo probes. They now directly reuse the sibling myutils libraries;

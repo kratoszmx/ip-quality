@@ -153,6 +153,9 @@ class CommonTest < ReporterTestCase
       source "$1"
       provider_json_is_object '{"provider":"fixture"}' || exit 1
       provider_json_is_object '[]' && exit 2
+      provider_json_is_object '{}{}' && exit 2
+      provider_json_is_object 'null {}' && exit 2
+      provider_json_is_object '' && exit 2
       provider_integer_in_range 99 0 99 || exit 3
       provider_integer_in_range 100 0 99 && exit 4
       provider_integer_in_range null 0 99 && exit 5

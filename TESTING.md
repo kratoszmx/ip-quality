@@ -66,7 +66,7 @@ Each suite maps to one area of the code; check it before adding coverage.
 | `test/providers_test.rb` | Provider parsers and adapters: literal JSON, ipapi and Ping0 outcomes, Cloudflare/Ipregistry/IPQS/Shodan/RIPEstat, credentials, IPQS preflight |
 | `test/check_place_test.rb` | Check.Place relay pauses and MaxMind validation with IPinfo fallback |
 | `test/scamalytics_test.rb` | Scamalytics page parsing and its single same-route fallback |
-| `test/public_fallbacks_test.rb` | IP2Location and ipdata public fallbacks; official AbuseIPDB key use |
+| `test/public_fallbacks_test.rb` | IP2Location public fallback; ipdata full relay versus free geography, target binding, unknown risk and route/failure preservation; official AbuseIPDB key use |
 | `test/public_demo_test.rb` | DB-IP visitor and IPWHOIS demos; explicit-target request suppression |
 | `test/source_selection_test.rb` | Source presets/IDs, IPQS AliDNS policy, deselected versus failed sources |
 | `test/query_route_test.rb` | IPQS/Cloudflare direct-IPv4 fallback, target preservation, provenance |

@@ -10,7 +10,7 @@ functions print without a trailing newline.
 | File | Production callers | Responsibility |
 | --- | --- | --- |
 | `common/provider_values.zsh` | Provider parsers/adapters (each imports it for standalone fixture runs) and `bin/ip-quality` | Validate/normalize provider values and HTTP envelopes, no source schemas |
-| `common/http_request.zsh` | Credential-bearing adapters, Check.Place/IPWHOIS public reads, `providers/query_route.zsh`, `bin/ip-quality` | Secret URL/header options over curl stdin, bounded public JSON GETs and proxy-route detection |
+| `common/http_request.zsh` | Credential-bearing adapters, Check.Place/IPWHOIS/ipdata public reads, `providers/query_route.zsh`, `bin/ip-quality` | Secret URL/header options over curl stdin, bounded public JSON GETs and proxy-route detection |
 | `common/json_values.jq` | Check.Place/MaxMind, ipapi, Cloudflare, IPWHOIS, DB-IP, IP2Location, ipdata, Ipregistry, IPQS, AbuseIPDB, Shodan parsers | Nullable boolean and bounded text/integer predicates |
 | `common/terminal.zsh` | All provider adapters (progress), `report/`, `bin/ip-quality` | ANSI cleanup and stderr progress lines |
 | `common/location.zsh` | Check.Place/MaxMind and IPinfo adapters | Coordinate DMS text and Check.Place map links |
@@ -28,7 +28,7 @@ stay in their respective MCP packages.
 
 | Function | Result |
 | --- | --- |
-| `provider_json_is_object JSON` | Exit 0 only for a JSON object accepted by `jq`; parser output suppressed |
+| `provider_json_is_object JSON` | Exit 0 only for exactly one JSON object; empty input, concatenated documents and non-objects are rejected; parser output suppressed |
 | `provider_integer_in_range VALUE MIN MAX` | Exit 0 for three nonnegative integer strings with `MIN <= VALUE <= MAX` |
 | `provider_merge_boolean_signals SIGNAL...` | `true` if any signal is `true`; `false` only for a nonempty all-`false` list; otherwise empty (unknown) |
 | `provider_has_observation VALUE...` | Exit 0 if any value is not empty, `null` or `unknown` (case-insensitive); `false` counts |

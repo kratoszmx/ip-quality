@@ -108,6 +108,8 @@ ipjson=$(jq -n \
 --arg source_ip2location "${ip2location[source]:-check_place_relay}" \
 --arg relay_status_ip2location "${ip2location[relay_status]:-}" \
 --arg status_ipdata "${ipdata[status]:-unknown}" \
+--arg risk_status_ipdata "${ipdata[risk_status]:-${ipdata[status]:-unknown}}" \
+--arg reason_ipdata "${ipdata[reason]:-}" \
 --arg source_ipdata "${ipdata[source]:-check_place_relay}" \
 --arg relay_status_ipdata "${ipdata[relay_status]:-}" \
 --arg status_ipapi "${ipapi[status]:-unknown}" \
@@ -261,7 +263,7 @@ def dnsresults($value):
   },
   FactorMeta: {
     IP2LOCATION: {Status: $status_ip2location, Source: $source_ip2location, RelayStatus: opt($relay_status_ip2location)},
-    ipdata: {Status: $status_ipdata, Source: $source_ipdata, RelayStatus: opt($relay_status_ipdata)},
+    ipdata: {Status: $risk_status_ipdata, Source: $source_ipdata, RelayStatus: opt($relay_status_ipdata), Reason: opt($reason_ipdata)},
     SCAMALYTICS: {Status: $status_scamalytics, Source: $source_scamalytics},
     ipapi: {Status: $ipapi_risk_status, Source: "public_api", Mode: opt($ipapi_mode), CredentialMode: opt($ipapi_credential_mode)},
     IPWhois: {Status: $ipwhois_risk_status, Source: "public_demo", Reason: "website_demo_security_flags"}

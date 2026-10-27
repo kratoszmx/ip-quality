@@ -2,7 +2,7 @@
 
 provider_json_is_object(){
 emulate -LR zsh
-print -rn -- "$1"|jq -e 'type == "object"' >/dev/null 2>&1
+print -rn -- "$1"|jq -se 'length == 1 and (.[0] | type == "object")' >/dev/null 2>&1
 }
 
 provider_integer_in_range(){
