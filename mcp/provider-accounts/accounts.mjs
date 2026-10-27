@@ -136,7 +136,7 @@ export async function createFreeAccount(provider, country, confirmation) {
     assertAccountOrigin(provider, page.url());
     if (new URL(page.url()).pathname !== config.signup) throw new Error('Open the reviewed signup page first.');
     const current = await snapshot(provider, page);
-    if (current.state === 'human_verification_required') return current;
+    if (['human_verification_required', 'automated_browser_blocked'].includes(current.state)) return current;
     const attempt = await inspectPrivateSecretFile(secret(provider, 'registration-attempt.json'));
     if (attempt.exists) throw new Error('Registration was already attempted; inspect the account or use its saved login.');
     if (provider === 'ipapi' && !current.text.includes('1,000 free daily API requests')) throw new Error('Free offer could not be verified.');

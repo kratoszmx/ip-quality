@@ -41,6 +41,13 @@ test('page metadata omits Cloudflare account ids and verification query tokens',
   assert.throws(() => accountPagePath('cloudflare', 'https://foreign.invalid/home'));
 });
 
+test('explicit browser automation refusal is neither an ambiguous submission nor authentication', () => {
+  const text = 'This request was blocked because your browser session looked automated (a headless or bot-controlled browser).';
+  assert.equal(classifyAccountPage({ text, hasPassword: true, submitted: true }), 'automated_browser_blocked');
+  assert.equal(classifyAccountPage({ text, authenticatedAccount: true }), 'automated_browser_blocked');
+  assert.equal(classifyAccountPage({ text: 'Create Free Account', hasPassword: true, submitted: true }), 'submission_unconfirmed');
+});
+
 test('key validation requires the keyed contract and exact target with successful HTTP', () => {
   const body = { ip: '1.1.1.1', company: { name: 'Fixture' }, is_proxy: false };
   assert.equal(ipapiKeyAccepted(200, body, '1.1.1.1'), true);
@@ -94,6 +101,17 @@ test('an ipapi activation notice completes the signup wait without another submi
     const evaluate = text => runInNewContext(`(${predicate.toString()})(initialPath)`, { initialPath, location: { pathname: initialPath }, document: { body: { innerText: text } } });
     assert.equal(evaluate('Create Free Account'), false);
     assert.equal(evaluate('We have just sent a new activation link. Please activate your account.'), true);
+  };
+  await submit(page);
+  assert.equal(events.filter(event => event === 'submit').length, 1);
+});
+
+test('an explicit automation refusal ends the signup wait without retrying', async () => {
+  const { events, page } = signupPage();
+  page.waitForFunction = async (predicate, initialPath) => {
+    const evaluate = text => runInNewContext(`(${predicate.toString()})(initialPath)`, { initialPath, location: { pathname: initialPath }, document: { body: { innerText: text } } });
+    assert.equal(evaluate('Create Free Account'), false);
+    assert.equal(evaluate('This request was blocked because your browser session looked automated.'), true);
   };
   await submit(page);
   assert.equal(events.filter(event => event === 'submit').length, 1);

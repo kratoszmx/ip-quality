@@ -77,6 +77,13 @@ page exposes no 2FA entry; the security surface therefore stops locally instead
 of navigating to a guessed settings path. An activation notice remains pending
 email verification even when a password form is present.
 
+The signup page can explicitly reject a browser session as automated, including
+visible Chrome controlled over CDP. This is `automated_browser_blocked`, not a
+successful registration or an ambiguous timeout. The signup wait recognizes
+the refusal immediately and never retries. Keep candidate credentials and
+submission receipts separate from the active account until a full-risk API
+lookup verifies the new key; an HTTP 200 signup response alone is insufficient.
+
 Routine account reads use `http-account.mjs` and the shared bounded HTTP context
 reader with private saved state, without launching Chrome. Cloudflare uses one
 fixed GET to /api/v4/user; ipapi uses /app/home; AbuseIPDB uses /account.

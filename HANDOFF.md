@@ -2,10 +2,10 @@
 
 ## Status — 2026-10-27
 
-- Reporter `v2026-10-27-standalone.50` (`script_version` in `bin/ip-quality`).
+- Reporter `v2026-10-27-standalone.51` (`script_version` in `bin/ip-quality`).
 - Last complete offline run, October 27: `/bin/zsh -f scripts/test-offline`
   passed — reporter 151 Minitest cases / 4397 assertions,
-  IPQS MCP 22, provider accounts 53. The separate synthetic IPQS
+  IPQS MCP 22, provider accounts 55. The separate synthetic IPQS
   browser-text suite last passed 10/10 at commit `782bce3`, with no live requests.
 - Live: complete all-source direct report on October 27; latest complete ATT
   remains October 23 (table below). Direct DB-IP recovered through its new
@@ -45,6 +45,20 @@
   that method with the saved key still returned 403/NOT_ALLOWED. No independent
   website risk fallback was established, so the existing HTTP context fallback
   stays in place. Details: [ipapi contract](providers/ipapi.md#public-website-fallback-investigation).
+- October 27 new-account task: the user authorized a different ipapi identity
+  with the existing password. Candidate credentials and durable submission
+  receipts are private and separate; the active account/key were not replaced.
+  A direct visible Chrome signup received an explicit automated-browser/CDP
+  rejection (HTTP 200). The MCP now reports `automated_browser_blocked` and
+  ends that wait without retrying; two regressions cover the refusal.
+  Mail-manager authenticated the requested Outlook mailbox, including an
+  all-folder search, but found no recent ipapi verification message.
+  The user's next step is manual signup in ordinary Chrome: myutils
+  `openRealChrome` opened a persistent dedicated profile without CDP. Native
+  text filling is currently blocked by macOS Apple Events permission (-1743);
+  do not claim the fields were filled, account created or a new key verified.
+  Candidate paths: [CREDENTIALS.md](CREDENTIALS.md#account-mcp-files).
+  Current offline evidence: `reports/ipapi-registration-20261027/offline.log`.
 - Git: only `main`. Push to `github-kratoszmx` (`kratoszmx/ip-quality`) and
   `github-kratosbackup` (`kratosbackup/ipquality`), then read both back.
 

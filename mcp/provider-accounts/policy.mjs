@@ -38,6 +38,7 @@ export function accountPagePath(provider, value) {
 export function classifyAccountPage({ text, hasPassword, challenge, termsRequired = false, authenticatedAccount = false, allowTextAuthentication = true, submitted = false }) {
   if (challenge) return 'human_verification_required';
   if (termsRequired) return 'terms_acceptance_required';
+  if (/your browser session looked automated/i.test(text)) return 'automated_browser_blocked';
   if (/your account has been banned|your account was suspended/i.test(text)) return 'account_suspended';
   if (/could not complete your registration from this connection/i.test(text)) return 'registration_connection_blocked';
   if (/verify (?:your )?email|verification (?:email|link)|confirm (?:your )?email|check your inbox|account is not activated|activation link|activate your account/i.test(text)) return 'email_verification_required';

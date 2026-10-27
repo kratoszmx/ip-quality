@@ -38,6 +38,7 @@ configuration, never process arguments, Git configuration or reports.
 | Registration identity | `secrets/accounts/registration-email`, the email confirmed by the user |
 | Provider login | `secrets/accounts/{ipapi,cloudflare,abuseipdb,ipdata}/credentials.json`, private email/password and any explicitly authorized registration fields |
 | ipapi authorized key rotation | `secrets/accounts/ipapi/key-rotation-20261026.json` records the sole submission and result; `key-before-rotation-20261026` preserves the previous key privately. `secrets/ipapi` holds the new dashboard key, still API-unusable while the account is suspended |
+| ipapi candidate registration | `secrets/accounts/ipapi/candidate-20261027/credentials.json` holds the separately authorized new identity with the same saved password; attempt/result receipts remain beside it. These files do not replace the active account or prove successful registration. Candidate Chrome state stays under `mcp/provider-accounts/.state/ipapi-candidate-20261027/` |
 | Cloudflare authenticator | `secrets/accounts/cloudflare/totp-uri`, private RFC 6238 provisioning URI |
 | Cloudflare recovery codes | `secrets/accounts/cloudflare/recovery-codes.json`, private recovery data after enrollment |
 | IPQS authenticator | `secrets/accounts/ipqs/totp-uri`, private exact-account provisioning URI; issuer provisions an 80-bit seed |

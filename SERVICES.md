@@ -57,6 +57,14 @@ removed on shutdown; owner-only HTTP/pending login files persist separately:
   and close it before changing its route. Routing details:
   [provider-accounts guide](mcp/provider-accounts/AGENTS.md#private-files-and-lifetime).
 
+An explicitly requested manual-account handoff may instead use myutils
+`openRealChrome` with a dedicated persistent profile and no CDP. The user owns
+that visible browser's remaining lifetime; it is not one of the MCP's temporary
+sessions and is not closed by `provider_account_close_browsers`. The October 27
+ipapi candidate profile is listed in [CREDENTIALS.md](CREDENTIALS.md#account-mcp-files).
+Retaining it proves neither signup nor authentication. It is never a reporter
+cache and must not be restored into another account's automated session.
+
 ## External weekly check
 
 | Supervisor ID | Runs |
