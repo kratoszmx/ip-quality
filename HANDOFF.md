@@ -9,6 +9,11 @@
 - Live: focused IPQS/DB-IP and MCP login checks on October 26; the latest
   complete direct/ATT reports remain October 23 (table below). Offline
   success is not a provider-availability claim.
+- DB-IP recovered in the later October 26 recheck: the unmodified reporter's
+  focused direct and isolated ATT runs both returned `Status=ok`, `Band=low`,
+  with its existing target-IP validation. No personal account or manual token
+  rotation was used. Public detail-page browser reading also succeeded. This
+  establishes current availability, not a guaranteed quota or recovery cause.
 - Git: only `main`. Push to `github-kratoszmx` (`kratoszmx/ip-quality`) and
   `github-kratosbackup` (`kratosbackup/ipquality`), then read both back.
 
@@ -25,7 +30,8 @@
   Scamalytics, IP2Location and ipdata fall back to their target-bound public
   pages on the same route; an owned AbuseIPDB key selects its official API;
   basic data falls back to IPinfo. DB-IP's visitor demo stays on the tested
-  egress and reports quota exhaustion without a score. Contracts:
+  egress, returns the provider's original risk label when available, and leaves
+  risk unknown on quota errors. Contracts:
   [PROVIDERS.md](PROVIDERS.md).
 - Code layout and shared helpers: [AGENTS.md](AGENTS.md#architecture) and
   [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md). Account MCPs: [MCP.md](MCP.md).
@@ -56,21 +62,15 @@
   Supervisor watch `mail.ipqs-tls-reply-20261026` is active; delivery/read and a
   provider diagnosis are not yet confirmed.
   See [support record](mcp/ipqs/SUPPORT-TLS-20261010.md).
-- **DB-IP demo:** October 26 default proxy, direct and isolated ATT received
-  fresh HTTP 200 daily-quota errors; no Retry-After. No local persistent cache.
-  Free geography succeeded, but supplies no risk label. No recovery ETA for the
-  public visitor demo; official keyed-API midnight reset is not its guarantee.
-  The current upstream script's POST request also returned the same error.
-  Default-proxy and direct page reads exposed the same visitor key in memory;
-  no personal DB-IP key is used. UI now says `上游报日限额`, not a local counter.
-  Official Extended offers include a seven-day subscription trial, not permanent
-  free risk data; the smallest plan requires annual billing. No trial activated.
-  See [account and trial options](providers/dbip.md#account-and-trial-options).
-  A subsequent shared text-browser fix restored the public IPv4 detail page:
-  an independent fresh-process read of `db-ip.com/1.1.1.1` returned HTTP 200
-  and an explicit LOW label without login or GUI. This is separate from the
-  visitor API; the reporter has not yet integrated the browser page fallback.
-  Local inventory confirms no owned DB-IP account/key/login or activated trial.
+- **Check.Place relay:** The later October 26 recheck still returned HTTP 403
+  for the fixed-target ipapi URL on default proxy, direct IPv4, isolated ATT and
+  isolated `awshk` (three distinct egresses verified). Direct Chrome failed in
+  both windowless and visible modes with the branded block page; no IP data was
+  returned. One `awshk` response was plain-text 403, followed by the branded
+  block page on its bounded recheck. This is not a TLS connection failure or
+  proof of one bad node. The exact WAF/security rule requires the site owner's
+  Ray-ID lookup; no new relay recovery is established. Private evidence:
+  `reports/access-recheck-20261026/`; [contract](providers/check_place.md).
 - **ipapi account:** User-approved updated terms were accepted October 26.
   Exact-account HTTP and visible Chrome password login succeed, but the account
   explicitly reports `bot_login` suspension and API 403. Stored key matches.
@@ -87,10 +87,6 @@
   fallback or challenge automation was performed.
 - **Ping0 on ATT:** `tls_error` (curl 35) on 2026-10-23 while direct verified.
   Ping0 observes the caller, so a direct fallback would not measure ATT.
-- **Outside this repository:** the Supervisor skill's `inventory.md` row for
-  IPQuality now shows `/bin/zsh -f scripts/test-offline`, matching the
-  registered job. It is codexworkspace commit `5c8cdb7` (2026-10-24), local
-  until that repo's maintenance session pushes it.
 
 ## Recent changes worth knowing
 

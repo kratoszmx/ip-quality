@@ -44,3 +44,21 @@ that Safari was blocked at this exact relay too. Browser reachability of a
 different site or an anonymous API is not relay recovery. Keep the existing
 source-specific pause and independent-source fallbacks; no valid response was
 available to justify a new automatic relay retry or browser dependency.
+
+A later bounded recheck used the same public target and URL over the configured
+proxy, direct IPv4, isolated ATT and isolated `awshk`. All returned HTTP 403;
+three distinct exits were verified without changing live Clash state. The first
+three had the branded Cloudflare block page. `awshk` first supplied plain-text
+403, then the branded page on one follow-up; neither response contained target
+data. Fresh Chrome via direct routing, both windowless and visible, also
+returned 403/`BROWSER_CHALLENGE`. Text-browser MCP was 0.5.18. Private sanitized
+HTTP and browser receipts are in `reports/access-recheck-20261026/`.
+
+Cloudflare's [403 documentation](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/4xx-client-error/error-403/)
+lists managed/custom WAF rules and other security settings as possible causes
+of branded blocks. The generic page does not identify the matching rule or
+prove that the visitor attacked the site. The site owner can look up the
+[Ray ID in Security Events](https://developers.cloudflare.com/fundamentals/reference/cloudflare-ray-id/),
+subject to its sampling and retention. Our separate Cloudflare account cannot
+change Check.Place's policy. These observations establish a site-access refusal,
+not a transport outage, an account-key failure or a cause fixed by more retries.

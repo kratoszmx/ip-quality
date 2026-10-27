@@ -3,6 +3,14 @@
 Visitor-demo token flow, egress binding and quota semantics. Adapter and parser: [`dbip.zsh`](dbip.zsh).
 Cross-source policy (consent, routes, fallbacks, display): [PROVIDERS.md](../PROVIDERS.md).
 
+Current live checkpoint, later October 26: the unmodified reporter's focused
+direct and isolated ATT runs both returned `ProviderStatus.DBIP=ok` and the
+original `low` label, passing its existing IP-match parser. No owned account,
+manual token rotation or code change was needed. Earlier daily-limit responses
+below remain historical evidence, not the current availability verdict. The
+precise recovery time and upstream counter are unobserved. Private receipts:
+`reports/access-recheck-20261026/{direct-dbip,att-dbip}.json`.
+
 DB-IP reads `https://db-ip.com/api/core/`, extracts its bounded public visitor
 token into memory, then reads `https://api.db-ip.com/v2/{token}/self?convertCurrencies`
 with the website headers. This visitor endpoint returned a risk label when
@@ -42,6 +50,10 @@ Two independent page reads over the default proxy and explicit direct route
 returned the same visitor key (compared only in memory). This supports a shared
 demo-credential explanation, not a measurement of its internal daily counter
 or proof that every visitor shares the same quota.
+The later successful recheck again found the same key across those two page
+reads. The public flow exposes an existing visitor credential, not an observed
+per-visit key-issuance API or independent allowances. No bulk key pool was
+created, and refreshing the page is not established as obtaining fresh quota.
 The no-key free geography contract is retained only for the MCP's optional
 `free_api` probe; unexpected premium fields there still cannot supply risk.
 
@@ -83,6 +95,9 @@ page observation, separate from the still-limited visitor API and the paid
 keyed Extended API. It does not establish a personal DB-IP login or an API
 allowance. At this checkpoint the reporter still uses the visitor API; the
 browser page has not been integrated as an automatic reporter fallback.
+The later recheck with text-browser MCP 0.5.18 again confirmed HTTP 200 and the
+explicit LOW label on that same public detail page. Unlike the earlier
+checkpoint, the visitor API also succeeded in both focused reporter routes.
 
 Lesson from 2026-09-24: the limit errors came from the old target demo, while
 the current visitor flow returned a `low` label. When a demo is throttled, stop
