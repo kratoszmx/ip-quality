@@ -53,14 +53,18 @@
   ends that wait without retrying; two regressions cover the refusal.
   Mail-manager authenticated the requested Outlook mailbox, including an
   all-folder search, but found no recent ipapi verification message.
-  The user's next step is manual signup in ordinary Chrome: myutils
-  `openRealChrome` opened a persistent dedicated profile without CDP. Native
-  Chrome window creation and target-bound tab access passed on the later retry
-  using native JavaScript for Automation, without CDP. Page DOM access is now
-  blocked by Chrome's own disabled "Allow JavaScript from Apple Events" setting;
-  the user must enable that setting before native text filling. This is a text
-  workflow, not screenshot/OCR automation. Do not claim the fields were filled,
-  account created or a new key verified.
+  The user's next step is clicking Create Free Account in ordinary Chrome.
+  myutils `openRealChrome` opened the persistent dedicated profile without CDP.
+  After the user granted macOS Accessibility, native text controls bound to
+  that exact Chrome process and signup URL filled and verified the candidate
+  email, populated password and Hong Kong country. The browser's standard
+  `--force-renderer-accessibility` flag exposes these controls; Chrome's
+  "Allow JavaScript from Apple Events" setting is no longer needed. No
+  screenshot/OCR or automatic form submission was used. Native Apple Events
+  addressed by app name had resolved another Chrome process, so future native
+  access must bind the owned profile's PID and verify the page URL. Private
+  `native-fill-result.json` records the successful fill, not registration.
+  Account creation, verification mail and a working new key remain unproved.
   Candidate paths: [CREDENTIALS.md](CREDENTIALS.md#account-mcp-files).
   Current offline evidence: `reports/ipapi-registration-20261027/offline.log`.
 - Git: only `main`. Push to `github-kratoszmx` (`kratoszmx/ip-quality`) and
