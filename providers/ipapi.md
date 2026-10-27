@@ -82,6 +82,36 @@ anonymous ASN/organization/geography, while all three matrices correctly kept
 `账户受限` and null risk fields. This confirms partial context recovery, not an
 account unlock. Evidence: `reports/direct-source-recheck-20261027/`.
 
+## Public website fallback investigation
+
+Later October 27, fresh windowless Chrome successfully loaded the official
+homepage on both the configured proxy and direct routes. Entering `1.1.1.1`
+and clicking its normal lookup control on direct produced the matching flat
+anonymous JSON, with the live limited-output notice and no proxy/VPN/Tor/abuse
+flags or abuser score. The same direct browser interaction on
+[IP to Abuser](https://ipapi.is/ip-to-abuser.html) replaced its initially visible
+example with anonymous data for `1.1.1.1`, again without risk fields. The proxy
+homepage lookup yielded no useful live record during the bounded read.
+All three retained test sessions were closed; no personal browser state was used.
+
+The current official frontend, `js/app-page.min.js?v=13`, distinguishes baked
+examples from live queries. `renderBakedExample` reads embedded example data;
+it is not evidence that a newly entered target has been queried. For other
+inputs, `makeApiRequest` reads `/app/session`: without a key it GETs the same
+anonymous API, and with the session's key it POSTs `{q, key}` to
+`https://api.ipapi.is`. A separate bounded direct IPv4 request reproducing that
+POST with the existing key still returned HTTP 403 / `ERR_FORBIDDEN_NOT_ALLOWED`.
+Only status/error metadata was saved, never the key or request body.
+
+The [homepage](https://ipapi.is/) and
+[developer contract](https://ipapi.is/developers.html) agree with these observed
+tiers. No independent live website-risk surface was established, unlike DB-IP's
+usable public detail page. Adding this browser flow to the reporter would
+duplicate the existing anonymous result and add latency without restoring risk.
+Keep the current HTTP anonymous fallback and explicit account restriction.
+Private evidence: `reports/ipapi-web-recheck-20261027/`. No login, account change,
+subscription or support email was submitted during this investigation.
+
 The similarly named `ipapi.co` is a different product with a contact-gated free
 trial. This project uses `ipapi.is`, with a free key when configured; the two
 providers must not be silently combined.

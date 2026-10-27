@@ -37,6 +37,14 @@
   Both focused and full reports kept `DemoStatus=daily_quota_exhausted` beside
   `Source=public_page` / `PageStatus=ok`. No personal account, key rotation or
   persistent cache was used; the visitor API itself remains limited.
+- Later October 27 website fallback audit: fresh windowless Chrome completed
+  an explicit `1.1.1.1` lookup on the ipapi homepage and IP-to-Abuser demo over
+  direct access. Both returned anonymous location/ownership, without risk.
+  The frontend's other full-risk displays include baked examples. Its live
+  authenticated path uses the same API with a JSON `{q,key}` POST; reproducing
+  that method with the saved key still returned 403/NOT_ALLOWED. No independent
+  website risk fallback was established, so the existing HTTP context fallback
+  stays in place. Details: [ipapi contract](providers/ipapi.md#public-website-fallback-investigation).
 - Git: only `main`. Push to `github-kratoszmx` (`kratoszmx/ip-quality`) and
   `github-kratosbackup` (`kratosbackup/ipquality`), then read both back.
 
