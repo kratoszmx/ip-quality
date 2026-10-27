@@ -14,6 +14,7 @@ project-local raw key overrides the global value of the same provider:
 | --- | --- | --- |
 | Ipregistry | `IPREGISTRY_API_KEY` | `secrets/ipregistry` |
 | ipapi.is (free plan) | `IPAPI_API_KEY` | `secrets/ipapi` |
+| ipdata (free developer plan) | `IPDATA_API_KEY` | `secrets/ipdata` |
 | IPQS (shared with `mcp/ipqs`) | `IPQS_API_KEY` | `secrets/ipqs` |
 | AbuseIPDB CHECK | `ABUSEIPDB_API_KEY` | `secrets/abuseipdb` |
 | Cloudflare Intel Read token | `CLOUDFLARE_API_TOKEN` | `secrets/cloudflare_token` |
@@ -35,13 +36,13 @@ configuration, never process arguments, Git configuration or reports.
 | --- | --- |
 | Existing IPQS login | Fixed private two-line bundle under `/Users/zmx/codexworkspace/secrets/infrastructure/network/ipqs/`; discovered by `mcp/ipqs/src/credentials.ts` |
 | Registration identity | `secrets/accounts/registration-email`, the email confirmed by the user |
-| Provider login | `secrets/accounts/{ipapi,cloudflare,abuseipdb}/credentials.json`, private email/password and any explicitly authorized registration fields |
+| Provider login | `secrets/accounts/{ipapi,cloudflare,abuseipdb,ipdata}/credentials.json`, private email/password and any explicitly authorized registration fields |
 | ipapi authorized key rotation | `secrets/accounts/ipapi/key-rotation-20261026.json` records the sole submission and result; `key-before-rotation-20261026` preserves the previous key privately. `secrets/ipapi` holds the new dashboard key, still API-unusable while the account is suspended |
 | Cloudflare authenticator | `secrets/accounts/cloudflare/totp-uri`, private RFC 6238 provisioning URI |
 | Cloudflare recovery codes | `secrets/accounts/cloudflare/recovery-codes.json`, private recovery data after enrollment |
 | IPQS authenticator | `secrets/accounts/ipqs/totp-uri`, private exact-account provisioning URI; issuer provisions an 80-bit seed |
 | IPQS emergency recovery | `secrets/accounts/ipqs/recovery-code`; `enrollment-attempt.json` prevents duplicate activation |
-| Browserless account sessions | `mcp/provider-accounts/.state/{ipapi,cloudflare,abuseipdb}-http.json`, owner-only saved state; never emitted or committed |
+| Browserless account sessions | `mcp/provider-accounts/.state/{ipapi,cloudflare,abuseipdb,ipdata}-http.json`, owner-only saved state; never emitted or committed. ipdata includes Cognito access/refresh tokens in dashboard local storage; treat the whole file as a credential |
 | IPQS HTTP/browser session | `mcp/ipqs/.state/chrome-profile/http-session.json` (under `IPQS_BROWSER_PROFILE_DIR` when overridden); saved only after authentication |
 | Pending provider login | `mcp/provider-accounts/.state/{provider}-pending-login.json`; terms/challenge continuation only, distinct from verified account state |
 | Account action evidence | Provider-local registration/token/enrollment receipts and `availability.json` under `secrets/accounts/` |
@@ -53,6 +54,11 @@ local keys are preserved. AbuseIPDB registration, privacy-setting and
 key-creation receipts stay under its private account directory. Documents and
 fixtures contain no real registration identity, key, session cookie or
 email-verification URL.
+
+ipdata signup, email activation and login have separate one-submit receipts.
+Its API key is independent of the short-lived account access token: an expired
+HTTP account session does not invalidate reporter queries. The MCP does not
+refresh tokens or repeat password login automatically.
 
 Browser profiles live in each MCP's private `.state/` directory. Saved HTTP
 state serves account checks only; the reporter uses no cookies or duplicate

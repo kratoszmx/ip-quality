@@ -114,7 +114,7 @@ Both entrypoints pin a UTF-8 locale themselves. Optional API keys are listed in
 [mcp/ipqs/AGENTS.md](mcp/ipqs/AGENTS.md) owns the IPQS dashboard, account probe
 and the API key shared with the reporter.
 [mcp/provider-accounts/AGENTS.md](mcp/provider-accounts/AGENTS.md) owns the
-ipapi/Cloudflare/AbuseIPDB accounts and account-free DB-IP/IPWHOIS probes.
+ipapi/Cloudflare/AbuseIPDB/ipdata accounts and account-free DB-IP/IPWHOIS probes.
 Both are optional for the reporter; start with [MCP.md](MCP.md). Account
 mutations require explicit task intent.
 

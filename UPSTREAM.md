@@ -49,11 +49,14 @@ runtime dependency:
 - Added same-route fallbacks for IP2Location and ipdata. The former reads the
   target-bound JSON example on IP2Location.com; ipdata now uses its official
   free geography API after the October 26 website redesign removed its public
-  demo key. The country remains visible, with missing risk identified separately
+  demo key. Added an owned free developer-key path on October 27, restoring the
+  supplied risk flags independently of the relay; absent VPN data stays unknown.
+  Without a key, the country remains visible, with missing risk identified separately
   from a failed query. A successful relay still supplies risk flags. Explicit false
   and zero survive, absent fields stay unknown, and JSON preserves both source
   and relay outcomes. Added owned-key AbuseIPDB APIv2 support and account-MCP
-  maintenance. No new paid plan, hard-coded demo key or browser dependency was
+  maintenance, including ipdata saved-token HTTP identity and official API proof.
+  No new paid plan, hard-coded demo key or browser dependency was
   introduced into the reporter.
 - Integrated direct IPv4 IPQS HTTPS DNS resolution into the normal all-source
   flow, keeping existing IPv6/proxy routes and maintenance overrides. Added one

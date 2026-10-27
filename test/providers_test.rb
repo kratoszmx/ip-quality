@@ -386,7 +386,7 @@ class ProvidersTest < ReporterTestCase
     probe = <<~'ZSH'
       source "$1"
       provider_load_credentials "$2" || exit $?
-      for key in IPREGISTRY_API_KEY IPQS_API_KEY IPAPI_API_KEY CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID;do
+      for key in IPREGISTRY_API_KEY IPQS_API_KEY IPAPI_API_KEY IPDATA_API_KEY CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID;do
         print -rn -- "${provider_credentials[$key]}|"
       done
       provider_api_key_is_valid fixture_key-123456 || exit 3
@@ -396,9 +396,9 @@ class ProvidersTest < ReporterTestCase
     Dir.mktmpdir("ipquality-credentials-test") do |directory|
       credentials = File.join(directory, "credentials")
       File.write(credentials, "# fixture keys only\nIPREGISTRY_API_KEY=registry123\nIPQS_API_KEY=ipqs12345\n" \
-        "IPAPI_API_KEY=ipapi_fixture_123\nCLOUDFLARE_API_TOKEN=token_fixture_123\nCLOUDFLARE_ACCOUNT_ID=account_fixture_123\n")
+        "IPAPI_API_KEY=ipapi_fixture_123\nIPDATA_API_KEY=ipdata_fixture_123\nCLOUDFLARE_API_TOKEN=token_fixture_123\nCLOUDFLARE_ACCOUNT_ID=account_fixture_123\n")
       File.chmod(0o600, credentials)
-      assert_equal "registry123|ipqs12345|ipapi_fixture_123|token_fixture_123|account_fixture_123|",
+      assert_equal "registry123|ipqs12345|ipapi_fixture_123|ipdata_fixture_123|token_fixture_123|account_fixture_123|",
         zsh!(probe, library, credentials)
 
       File.chmod(0o644, credentials)
@@ -437,17 +437,18 @@ class ProvidersTest < ReporterTestCase
     probe = <<~'ZSH'
       source "$1"
       provider_load_credentials "$2" "$3" || exit $?
-      print -r -- "${provider_credentials[IPREGISTRY_API_KEY]}|${provider_credentials[IPQS_API_KEY]}"
+      print -r -- "${provider_credentials[IPREGISTRY_API_KEY]}|${provider_credentials[IPQS_API_KEY]}|${provider_credentials[IPDATA_API_KEY]}"
     ZSH
     library = provider_library("credentials")
     Dir.mktmpdir("ipquality-project-secrets-test") do |directory|
       credentials = File.join(directory, "credentials")
       project_secrets = File.join(directory, "secrets")
       Dir.mkdir(project_secrets, 0o700)
-      File.write(credentials, "IPREGISTRY_API_KEY=globalregistry123\nIPQS_API_KEY=globalipqs12345\n", perm: 0o600)
+      File.write(credentials, "IPREGISTRY_API_KEY=globalregistry123\nIPQS_API_KEY=globalipqs12345\nIPDATA_API_KEY=globalipdata12345\n", perm: 0o600)
       File.write(File.join(project_secrets, "ipregistry"), "projectregistry123\n", perm: 0o600)
       File.write(File.join(project_secrets, "ipqs"), "projectipqs12345\n", perm: 0o600)
-      assert_equal "projectregistry123|projectipqs12345\n", zsh!(probe, library, credentials, project_secrets)
+      File.write(File.join(project_secrets, "ipdata"), "projectipdata12345\n", perm: 0o600)
+      assert_equal "projectregistry123|projectipqs12345|projectipdata12345\n", zsh!(probe, library, credentials, project_secrets)
 
       File.chmod(0o644, File.join(project_secrets, "ipqs"))
       _stdout, insecure_stderr, insecure_status = zsh(probe, library, credentials, project_secrets)

@@ -66,7 +66,7 @@ Each suite maps to one area of the code; check it before adding coverage.
 | `test/providers_test.rb` | Provider parsers and adapters: literal JSON, ipapi and Ping0 outcomes, Cloudflare/Ipregistry/IPQS/Shodan/RIPEstat, credentials, IPQS preflight |
 | `test/check_place_test.rb` | Check.Place relay pauses and MaxMind validation with IPinfo fallback |
 | `test/scamalytics_test.rb` | Scamalytics page parsing and its single same-route fallback |
-| `test/public_fallbacks_test.rb` | IP2Location public fallback; ipdata full relay versus free geography, target binding, unknown risk and route/failure preservation; official AbuseIPDB key use |
+| `test/public_fallbacks_test.rb` | IP2Location public fallback; ipdata owned-key risk, relay versus keyless geography, target binding, unknown risk, key redaction and route/failure preservation; official AbuseIPDB key use |
 | `test/public_demo_test.rb` | DB-IP visitor and IPWHOIS demos; explicit-target request suppression |
 | `test/source_selection_test.rb` | Source presets/IDs, IPQS AliDNS policy, deselected versus failed sources |
 | `test/query_route_test.rb` | IPQS/Cloudflare direct-IPv4 fallback, target preservation, provenance |
@@ -75,7 +75,7 @@ Each suite maps to one area of the code; check it before adding coverage.
 | `test/route_runner_test.rb` | `bin/ip-quality-route` and `runner/`: menus, listings, option rules, leaf rendering, Mihomo lifecycle, snapshots, printable text |
 | `test/prefix_sample_test.rb` | Prefix input rules, batch files, failure/interrupt evidence |
 | `mcp/ipqs/tests/` | IPQS API, HTTP/session auth classification, TOTP policy, secrets, default-windowless stdio contract |
-| `mcp/provider-accounts/tests/` | HTTP identity versus account suspension, reviewed login/terms/challenge outcomes, ipapi automatic-login stop, signup/TOTP, public-provider probes, private origin-scoped restoration and default-windowless stdio contract |
+| `mcp/provider-accounts/tests/` | HTTP identity versus account suspension, reviewed login/terms/challenge outcomes, ipapi automatic-login stop, signup/TOTP, public-provider probes, ipdata Cognito identity/expired tokens/official risk projection, private origin-scoped restoration and default-windowless stdio contract |
 
 All reporter suites inherit `test/support/reporter_test_case.rb`:
 

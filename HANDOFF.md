@@ -2,18 +2,24 @@
 
 ## Status — 2026-10-27
 
-- Reporter `v2026-10-26-standalone.48` (`script_version` in `bin/ip-quality`).
-- Last complete offline run, October 26: `/bin/zsh -f scripts/test-offline`
-  passed — reporter 144 Minitest
-  cases, IPQS MCP 22, provider accounts 40. The separate synthetic IPQS
+- Reporter `v2026-10-27-standalone.49` (`script_version` in `bin/ip-quality`).
+- Last complete offline run, October 27: `/bin/zsh -f scripts/test-offline`
+  passed — reporter 146 Minitest cases / 4146 assertions,
+  IPQS MCP 22, provider accounts 48. The separate synthetic IPQS
   browser-text suite last passed 10/10 at commit `782bce3`, with no live requests.
 - Live: focused IPQS/DB-IP/ipdata and MCP login checks on October 26; the latest
   complete direct/ATT reports remain October 23 (table below). Offline
   success is not a provider-availability claim.
-- October 27: focused direct and isolated ATT runs still return ipdata country
-  only (`risk_status=not_provided`) and ipapi HTTP 403. The ipapi saved-account
-  HTTP read confirms `account_suspended`, restriction `bot_login`; a separate
-  bounded keyed lookup returns `ERR_FORBIDDEN_NOT_ALLOWED`. No appeal was sent.
+- October 27: user-approved ipdata free developer signup, email verification
+  and key import restored official proxy/Tor/datacenter/abuse flags on direct
+  and isolated ATT. Dashboard: Free Tier/$0/1,500 daily queries. VPN/robot remain
+  unknown because the response lacks those fields. HTTP account identity and
+  native headless dashboard/Profile passed; the existing provider-accounts
+  MCP now maintains this account. No billing trial or 2FA control was enabled.
+  ipapi still returns API 403 with `ERR_FORBIDDEN_NOT_ALLOWED`; saved HTTP
+  identity confirms `bot_login` suspension. Its anonymous API root returns
+  geography successfully, which does not establish access with this account's
+  key. The requested bilingual appeal is saved privately and was not sent.
 - DB-IP recovered in the later October 26 recheck: the unmodified reporter's
   focused direct and isolated ATT runs both returned `Status=ok`, `Band=low`,
   with its existing target-IP validation. No personal account or manual token
@@ -35,8 +41,9 @@
   original failure and the effective route; IPQS keeps its credit preflight.
 - Check.Place block/429 pauses later relay calls for the same target/family.
   Scamalytics and IP2Location fall back to their target-bound public pages;
-  ipdata falls back to its official free geography API with unknown risk. All
-  three stay on the selected route; an owned AbuseIPDB key selects its official API;
+  ipdata uses its owned official developer key for risk, or without a key falls
+  back from relay to keyless geography with unknown risk. These paths stay on
+  the selected route; an owned AbuseIPDB key selects its official API;
   basic data falls back to IPinfo. DB-IP's visitor demo stays on the tested
   egress, returns the provider's original risk label when available, and leaves
   risk unknown on quota errors. Contracts:
@@ -49,20 +56,12 @@
 
 ## Open issues
 
-- **ipdata risk coverage:** The October 26 website redesign removed the demo
-  key previously scraped by the reporter. This caused the reproduced
-  `invalid_response`. v48 uses the documented `ipdata.free/{IP}` fallback,
-  verified through direct and isolated ATT routes, with country available and
-  `FactorMeta.ipdata.Status=not_provided`. That free API has no risk factors;
-  full relay risk parsing remains available if Check.Place recovers. No paid
-  plan, trial or website-verification workaround was enabled.
-  October 27 Chrome checks over proxy/direct, including visible Chrome, stayed
-  at verification without full risk data. A distinct account route remains
-  unverified: the official FAQ and signup bundle still describe a $0, 1500/day
-  developer key, while the new pricing page describes keyless geography.
-  Signup also submits email, browser fingerprint and referrer; explicit privacy
-  approval was requested before registering. No ipdata account or MCP was
-  created. Do not equate the geography fallback with restored risk coverage.
+- **ipdata public page:** Chrome checks over proxy/direct, including visible
+  Chrome, still stopped at the public page's verification. This is no longer a
+  reporter blocker: the authorized free developer key restored supplied risk
+  flags in v49. The keyless API still provides geography only; do not conflate
+  these two free surfaces. Missing VPN/robot flags are provider capability
+  limits, not values to fill from another source.
 - **ATT to IPQS:** October 26 curl still fails with 35/HTTP 000 for `/login`
   and the account API, including pinned IPv4/TLS 1.2. Direct IPv4 website login
   and API succeeded with the same credentials. The route/intermediary/edge
@@ -126,6 +125,15 @@
 
 Full detail is in `git log`; these are the ones a new session could trip over.
 
+- v49: ipdata owned free developer-key support precedes the relay, keeps keys
+  out of argv/output, validates target-bound booleans and preserves keyed
+  failures. Added three ipdata tools to the existing provider-accounts MCP:
+  private readiness, saved-token HTTP identity and one official risk query.
+  Expired account access tokens do not establish API-key failure. No automatic
+  signup/login/refresh, paid plan or new daemon. Added account/session/schema,
+  credential loading, route, failure and report regressions; removed temporary
+  onboarding code, duplicate key/state and verification-message copies after
+  saving the formal credentials and one-submit receipts.
 - v48: replaced obsolete ipdata demo-key discovery with one same-route free
   API lookup; preserved country, unknown risk and original relay failure in
   both terminal/JSON. Removed obsolete HTML fixtures. Regressions cover the
@@ -164,6 +172,7 @@ history. Live runs never changed the active Clash state.
 
 | Date / scope | Result / private evidence |
 | --- | --- |
+| October 27, ipdata v49 | Official owned free key succeeded through direct and isolated ATT: `ProviderStatus.ipdata=ok`, `FactorMeta.ipdata.Source=official_api`; proxy/Tor/server/abuse supplied, VPN/robot null. Native headless account/Profile and browserless GetUser proved the account and matching key. `reports/provider-recheck-20261027/{direct-keyed,att-keyed,ipdata-mcp}.json`; offline log and unsent bilingual ipapi draft in the same private directory. |
 | October 27, ipdata/ipapi v48 | Direct and isolated ATT: ipdata free country data with unknown risk, ipapi HTTP 403. Saved HTTP identity confirms ipapi `bot_login` suspension; fixed-target API probe returns `ERR_FORBIDDEN_NOT_ALLOWED`. Public ipdata browser checks did not complete verification. Private evidence: `reports/provider-recheck-20261027/`. |
 | October 26, ipdata v48 | Focused direct and isolated ATT reports returned `ProviderStatus.ipdata=ok`, `Source=official_free_api`, country data and `FactorMeta.ipdata.Status=not_provided`; all six risk fields remain null. Check.Place returned `cloudflare_blocked` on both routes. Before/after reports and offline test output: `reports/ipdata-recheck-20261026/`. |
 | October 23, direct all-source v43 | 14 of 15 sources returned usable observations, including IPQS, Cloudflare and Ping0. DB-IP returned `daily_quota_exhausted`. `reports/direct-20261023-codex-audit.{json,txt,stderr}` |

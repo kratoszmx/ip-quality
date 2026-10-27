@@ -4,12 +4,13 @@ import { z } from 'zod';
 import { buildToolDescription, textResult } from '@myutils/mcp-server';
 import { accountStatus, openAccount, readAccount, createFreeAccount, importIpapiKey, closeAccountBrowsers } from './accounts.mjs';
 import { abuseipdbStatus, verifyAbuseipdb, openAbuseipdb } from './abuseipdb.mjs';
+import { ipdataStatus, verifyIpdata, checkIpdataAccount } from './ipdata.mjs';
 import { prepareCloudflareToken, createCloudflareToken, verifyCloudflareApi } from './cloudflare.mjs';
 import { enableCloudflareTotp, saveCloudflareRecoveryCodes } from './cloudflare-totp.mjs';
 import { verifyPublicProvider } from './public-api.mjs';
 import { loginAccount } from './login.mjs';
 
-const instructions = 'IPQuality provider accounts. Dedicated ipapi/Cloudflare/AbuseIPDB profiles only. Free accounts only; no billing or plan upgrade tools. Account creation needs task authorization and CREATE_FREE_ACCOUNT. Stop for human verification; never solve CAPTCHA. Store secrets privately and never return keys, passwords, OTPs, recovery codes or cookies. A saved file is not live authentication. No automatic signup or lookup retries.';
+const instructions = 'IPQuality provider accounts. Dedicated ipapi/Cloudflare/AbuseIPDB/ipdata accounts only. Free accounts only; no billing or plan upgrade tools. Account creation needs task authorization and CREATE_FREE_ACCOUNT. Stop for human verification; never solve CAPTCHA. Store secrets privately and never return keys, passwords, OTPs, recovery codes or cookies. A saved file is not live authentication. No automatic signup or lookup retries.';
 const server = new McpServer({ name: 'ipquality-provider-accounts', version: '0.1.0' }, { instructions });
 const provider = z.enum(['ipapi', 'cloudflare']);
 async function result(operation) {
@@ -76,6 +77,16 @@ server.registerTool('abuseipdb_account_open', {
 server.registerTool('provider_account_close_browsers', {
   description: buildToolDescription('Close only the temporary browsers owned by this MCP; preserve the private saved login state.', instructions), inputSchema: {},
 }, () => result(closeAccountBrowsers));
+
+server.registerTool('ipdata_account_status', {
+  description: buildToolDescription('Read local ipdata developer-account, API-key and HTTP-session readiness without network access.', instructions), inputSchema: {},
+}, () => result(ipdataStatus));
+server.registerTool('ipdata_account_check', {
+  description: buildToolDescription('One read-only Cognito GetUser HTTP POST with the saved ipdata access token. Binds the saved email and compares the reporter key; no Chrome, password login, token refresh or quota-consuming IP lookup.', instructions), inputSchema: {},
+}, () => result(checkIpdataAccount));
+server.registerTool('ipdata_verify_free_api', {
+  description: buildToolDescription('One official ipdata lookup for 1.1.1.1 using the private developer key. Native HTTP, no browser, redirects or retries. Returns only target-bound risk flags; missing VPN data remains unknown.', instructions), inputSchema: { confirmation: z.literal('VERIFY_FREE_API') },
+}, ({ confirmation }) => result(() => verifyIpdata(confirmation)));
 
 server.server.onclose = () => { void closeAccountBrowsers().catch(() => {}); };
 await server.connect(new StdioServerTransport());

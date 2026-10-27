@@ -126,7 +126,7 @@ Both MCPs depend directly on sibling `/Users/zmx/Projects/myutils` packages:
 | `secret-file` | Private data-only files; reporter and IPQS share `secrets/ipqs` |
 | `mcp-server` | Tool descriptions and structured text results |
 | `one-use-token` | IPQS prepared setting-change reservations |
-| `http-read` | Provider accounts: bounded API reads without redirects or retries |
+| `http-read` | Provider accounts: bounded API reads, including ipdata's owned-key risk lookup, without redirects or retries |
 | `totp` | Provisioning URI validation and `generateFreshTotp` for Cloudflare and IPQS (IPQS opts into its 80-bit seed) |
 | `redaction` | Both MCPs: one union redactor for account pages, API data and errors (secrets, TOTP/recovery codes, credential syntax, emails, 16+ character tokens, 6+ digit numbers) |
 

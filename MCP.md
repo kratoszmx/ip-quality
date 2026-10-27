@@ -9,7 +9,7 @@ one reviewed lockfile and the sibling `/Users/zmx/Projects/myutils` packages
 | Server | Package guide | Start (from the project root) | Use it for |
 | --- | --- | --- | --- |
 | `codex-ipqs-mcp` | [mcp/ipqs/AGENTS.md](mcp/ipqs/AGENTS.md) | `npm --prefix mcp/ipqs run build`, then `npm --prefix mcp/ipqs start` | Official IPQS API usage/lookups, dashboard reads, saved login and private TOTP |
-| `ipquality-provider-accounts` | [mcp/provider-accounts/AGENTS.md](mcp/provider-accounts/AGENTS.md) | `npm --prefix mcp/provider-accounts start` (no build) | ipapi/Cloudflare/AbuseIPDB account maintenance; account-free DB-IP/IPWHOIS probes |
+| `ipquality-provider-accounts` | [mcp/provider-accounts/AGENTS.md](mcp/provider-accounts/AGENTS.md) | `npm --prefix mcp/provider-accounts start` (no build) | ipapi/Cloudflare/AbuseIPDB/ipdata account maintenance; account-free DB-IP/IPWHOIS probes |
 
 Offline checks are in [TESTING.md](TESTING.md); process and browser lifetime in
 [SERVICES.md](SERVICES.md); private file formats in [CREDENTIALS.md](CREDENTIALS.md).
@@ -28,11 +28,14 @@ offline. Live MCP reads run when called; the reporter's
 | IPQS local readiness | `ipqs_status` | `{"probeBrowser":false}` | None; saved files are not proof of login or credits |
 | ipapi/Cloudflare local readiness | `provider_account_status` | `{"provider":"ipapi"}` | None; use `cloudflare` for that account |
 | AbuseIPDB local readiness | `abuseipdb_account_status` | `{}` | None; account/key presence only |
+| ipdata local readiness | `ipdata_account_status` | `{}` | None; account/key/session presence only |
 | IPQS account/API acceptance | `ipqs_account_usage` | `{}` | One live account read; no lookup credit |
 | ipapi saved-session identity | `provider_account_read` | `{"provider":"ipapi","mode":"http"}` | Live HTTP, no Chrome; inspect `authenticated` and `state` |
 | Cloudflare identity and 2FA state | `cloudflare_account_check` | `{}` | Live HTTP, no Chrome or Intel lookup |
 | AbuseIPDB identity and privacy settings | `abuseipdb_account_check` | `{}` | Live HTTP; exact saved account, email-verification and public-profile booleans |
 | AbuseIPDB free API proof | `abuseipdb_verify_free_api` | `{"confirmation":"VERIFY_FREE_API"}` | One official `1.1.1.1` CHECK; no browser or abuse report |
+| ipdata saved-session identity | `ipdata_account_check` | `{}` | One read-only Cognito GetUser HTTP POST; exact saved email and reporter-key comparison, no browser or IP lookup |
+| ipdata free API proof | `ipdata_verify_free_api` | `{"confirmation":"VERIFY_FREE_API"}` | One official `1.1.1.1` query; returns only supplied risk flags, no browser |
 | DB-IP free geography probe | `public_provider_verify_free_api` | `{"provider":"dbip","surface":"free_api","confirmation":"VERIFY_FREE_API"}` | One live `1.1.1.1` lookup; context, not a risk verdict |
 
 For website risk observations choose `surface: "public_demo"`: IPWHOIS tests
@@ -54,9 +57,10 @@ is a different mode and still received IPQS HTTP 403 on October 26.
 | ipapi.is | Saved-state HTTP dashboard read; API currently HTTP 403 | Automated login disabled after `bot_login` account suspension. October 26 authorized visible Chrome login also succeeded but did not remove the suspension | No enrollment entry offered |
 | Cloudflare | Saved-state HTTP identity read; Intel token over HTTP | Native hidden Chrome; October 26 password flow required human verification; Intel API still passed | TOTP enabled, recovery codes saved |
 | AbuseIPDB | Saved-state HTTP account read; APIv2 key over HTTP | Native hidden Chrome; login and subsequent HTTP identity verified October 26 | No enrollment entry offered |
+| ipdata | Saved-token HTTP account check; owned free developer key over HTTP | October 27 one authorized native-hidden signup/login; saved state also verified in native headless Chrome. No automatic password submission or token refresh | No enrollment control on the reviewed Profile page; GetUser returned no enrolled factor |
 | Ipregistry | API key in the reporter only | No account MCP | Not audited |
 | DB-IP, IPWHOIS | Account-free HTTP free API and website demo | None | Not applicable |
-| IPinfo, Scamalytics, IP2Location, ipdata, Check.Place, Ping0, RIPEstat, Shodan | Public HTTP pages/demos/relays used by the reporter | None | Not applicable |
+| IPinfo, Scamalytics, IP2Location, Check.Place, Ping0, RIPEstat, Shodan | Public HTTP pages/demos/relays used by the reporter | None | Not applicable |
 
 A failed HTTP identity read returns its failure; it never silently opens a
 browser, submits credentials, retries or treats a saved file as success.
@@ -95,6 +99,12 @@ website through a browser is not account authentication.
   navigation/identity before clicking a Verify button that may have vanished.
 - AbuseIPDB's new account defaulted public profile and domain visibility to on;
   both were turned off and read back.
+- ipdata's keyless geography API and $0 developer account have different
+  capabilities. October 27 user-approved signup and email activation yielded
+  1,500 daily queries with risk flags. A native headless Chrome session restored
+  only this account's saved state through myutils, following the shared approach
+  used by RedNote. Its account check now uses a fixed HTTP GetUser request.
+  The missing VPN field stays unknown; no value is inferred from other flags.
 - Prove API usefulness before enrolling 2FA, save seeds and recovery codes
   before activation, and keep one-submit receipts so timeouts never cause a
   duplicate signup, token or enrollment.
@@ -106,6 +116,7 @@ Dated observations, not availability guarantees; private receipts stay under
 
 | Date | Evidence |
 | --- | --- |
+| 2026-10-27 | ipdata free developer account, email activation and API key verified; dashboard showed Free Tier/$0/1,500 daily queries. Direct and isolated ATT reporter runs returned official risk flags. Native headless dashboard/Profile and browserless GetUser proved the same account/key; no MFA control observed. ipapi HTTP account remained suspended, keyed API returned ERR_FORBIDDEN_NOT_ALLOWED, while the anonymous API root returned geography. Private evidence and unsent appeal draft: `reports/provider-recheck-20261027/`. |
 | 2026-10-26 | IPQS direct IPv4 login + TOTP and API passed; ATT curl still failed pre-HTTP TLS, including a pinned IPv4/TLS 1.2 test. Native-hidden IPQS login and restored hidden dashboard passed; HTTP auth passed. AbuseIPDB native-hidden login and HTTP identity passed; public profile/domain still off. Cloudflare challenge remains, while Intel API passed. ipapi terms accepted with user permission; both hidden and explicit visible Chrome reached the account, but `bot_login` suspension/API 403 persists. Private evidence/drafts: `reports/ipqs-support-20261026-rerun/`; no follow-up sent. |
 | 2026-10-23 | Reporter direct and ATT runs returned official IPQS and Cloudflare results with the saved keys (see [HANDOFF.md](HANDOFF.md#latest-saved-live-evidence)) |
 | 2026-10-10 to 10-12 | IPQS account API passed over direct IPv6 and `awshk` while ATT failed TLS before HTTP; Cloudflare Intel passed, including through ATT |
@@ -135,6 +146,12 @@ Dated observations, not availability guarantees; private receipts stay under
 - Enrollment: `ipqs_enable_totp` (`confirm=ENABLE_IPQS_TOTP`) verifies usable
   credits, binds issuer/account from the textual QR URL, saves seed/recovery data
   and reserves the one submission; Cloudflare keeps its API-before-2FA rule.
+- ipdata: `ipdata_account_check` reads its saved access token with no refresh or
+  login retry. `login_required` can mean that short-lived token expired; it does
+  not establish an invalid API key. `ipdata_verify_free_api` independently
+  checks the reporter key. Authorized session recovery restores only ipdata's
+  dedicated state with shared myutils Chrome, verifies the exact email and
+  labelled key, then saves `.state/ipdata-http.json`. Do not repeat signup.
 
 A past audit's authorization for recovery or 2FA is not a standing instruction;
 documentation and test work never repeats enrollment.

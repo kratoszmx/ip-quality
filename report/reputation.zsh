@@ -480,7 +480,7 @@ tors+=("${provider[tor]:-}") servers+=("${provider[server]:-}") abusers+=("${pro
 show_factor(){
 typeset -a headers countries proxies vpns tors servers abusers robots statuses
 typeset ipdata_source_kind=relay
-[[ "${ipdata[source]:-}" == official_free_api ]]&&ipdata_source_kind=official
+[[ "${ipdata[source]:-}" == official_api || "${ipdata[source]:-}" == official_free_api ]]&&ipdata_source_kind=official
 report_factor_column ip2location IP2Location "$(report_query_status "${ip2location[status]:-ok}")"
 report_factor_column ipapi ipapi.is "$(report_query_status "${ipapi[risk_status]:-${ipapi[status]:-ok}}")"
 report_factor_column ipregistry Ipregistry "$(report_query_status "${ipregistry[status]:-ok}")"

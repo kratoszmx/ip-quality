@@ -10,6 +10,7 @@ class PublicFallbacksTest < ReporterTestCase
   IP2_PAGE = File.join(ROOT, "test", "fixtures", "ip2location", "public-page.html")
   IPDATA_FREE_RESPONSE = File.join(ROOT, "test", "fixtures", "ipdata", "free-response.json")
   IPDATA_RESPONSE = File.join(ROOT, "test", "fixtures", "ipdata", "public-response.json")
+  IPDATA_OFFICIAL_RESPONSE = File.join(ROOT, "test", "fixtures", "ipdata", "official-response.json")
 
   def test_ip2location_page_binds_both_heading_and_json_without_executing_scripts
     code = <<~'ZSH'
@@ -132,6 +133,69 @@ class PublicFallbacksTest < ReporterTestCase
     assert_equal 1, args.count { |a| a.start_with?("https://ipinfo.check.place/") }
     assert_includes File.read(text_report), "公开示例/可用"
     assert_includes File.read(text_report), "官方/未提供风险"
+  end
+
+  def test_owned_ipdata_key_restores_risk_without_relay_or_exposing_credentials
+    calls = File.join(reporter_workspace, "calls")
+    text_report = File.join(reporter_workspace, "report.txt")
+    FileUtils.mkdir_p(File.join(reporter_workspace, "secrets"))
+    File.write(File.join(reporter_workspace, "secrets", "ipdata"), "fixtureipdata123", perm: 0o600)
+    write_fake_command("curl", <<~'ZSH')
+      print -rl -- "$@" >> "$IPQUALITY_TEST_CALLS"
+      request=$(cat)
+      [[ "$request" == 'url = "https://api.ipdata.co/8.8.8.8?api-key=fixtureipdata123"' && "$*" == *'-4'* ]]||exit 99
+      sed 's/198.51.100.23/8.8.8.8/g' "$IPQUALITY_TEST_IPDATA_RESPONSE"
+      print -rn -- 200
+    ZSH
+    out, err, status = run_script("--sources", "ipdata", "--confirm-network-lookup", "-4", "-j", "-o", text_report, "8.8.8.8",
+      env: {"IPQUALITY_TEST_CALLS" => calls, "IPQUALITY_TEST_IPDATA_RESPONSE" => IPDATA_OFFICIAL_RESPONSE})
+    assert status.success?, err
+    refute_match(/jq: error/, err)
+    report = JSON.parse(out)
+    assert_equal "ok", report.dig("ProviderStatus", "ipdata")
+    assert_equal "official_api", report.dig("FactorMeta", "ipdata", "Source")
+    assert_equal "ok", report.dig("FactorMeta", "ipdata", "Status")
+    assert_nil report.dig("FactorMeta", "ipdata", "RelayStatus")
+    %w[Proxy Tor Abuser].each { |field| assert_equal false, report.dig("Factor", field, "ipdata") }
+    assert_equal true, report.dig("Factor", "Server", "ipdata")
+    %w[VPN Robot].each { |field| assert_nil report.dig("Factor", field, "ipdata") }
+    args = File.read(calls)
+    refute_match(/check\.place|ipdata\.free/, args)
+    assert_equal 1, File.readlines(calls, chomp: true).count("--config")
+    [out, err, args, File.read(text_report)].each { |text| refute_includes text, "fixtureipdata123" }
+    assert_includes File.read(text_report), "官方/可用"
+  end
+
+  def test_owned_ipdata_key_keeps_route_and_precise_failures_without_stale_risk_or_retries
+    probe = <<~'ZSH'
+      source "$1"
+      IP=198.51.100.23
+      provider_credentials[IPDATA_API_KEY]=fixtureipdata123
+      CurlARG='--proxy http://127.0.0.1:12345'
+      setopt SH_WORD_SPLIT
+      show_progress(){ :; }
+      check_place_fetch_json(){ print -u2 -- unexpected-relay; return 99; }
+      wire="$2" curl_exit="$3" calls="$4"
+      curl(){
+        print -r -- call >> "$calls"
+        [[ "$*" == *'-6'* && "$*" == *'--proxy http://127.0.0.1:12345'* ]]||return 99
+        request=$(cat)
+        [[ "$request" == 'url = "https://api.ipdata.co/198.51.100.23?api-key=fixtureipdata123"' ]]||return 99
+        print -rn -- "$wire"; return "$curl_exit"
+      }
+      ipdata[proxy]=false ipdata[server]=true ipdata[risk_status]=ok
+      db_ipdata 6
+      print -r -- "${ipdata[status]}|${ipdata[source]}|${ipdata[proxy]}|${ipdata[server]}|${ipdata[risk_status]}"
+    ZSH
+    calls = File.join(reporter_workspace, "calls")
+    [["\n000", 35, "tls_error"], ["\n000", 28, "timeout"],
+      ["{}\n403", 0, "http_403"], ["{}\n429", 0, "rate_limited"],
+      ["{\"ip\":\"8.8.8.8\"}\n200", 0, "invalid_response"],
+      ["{\"message\":\"quota reached\"}\n200", 0, "invalid_response"]].each do |wire, curl_exit, expected|
+      File.write(calls, "")
+      assert_equal "#{expected}|official_api|||\n", zsh!(probe, SCRIPT, wire, curl_exit.to_s, calls)
+      assert_equal 1, File.readlines(calls).length
+    end
   end
 
   def test_fallbacks_preserve_route_stop_on_failure_and_leave_missing_flags_unknown

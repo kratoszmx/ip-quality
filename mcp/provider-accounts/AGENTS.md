@@ -1,6 +1,6 @@
 # Provider accounts MCP
 
-Owns free ipapi.is, Cloudflare and AbuseIPDB account maintenance for the IPQuality reporter.
+Owns free ipapi.is, Cloudflare, AbuseIPDB and ipdata account maintenance for the IPQuality reporter.
 ipwho.is and DB-IP need no account or key for their free context APIs. This package
 reuses myutils' browser-session/http-read, secret-file, totp, redaction and
 mcp-server directly. Provider state, selectors, quotas and API contracts stay here.
@@ -45,6 +45,9 @@ The formal inventory and current account/2FA evidence are in
 | abuseipdb_account_check | Bounded HTTP read of the exact saved account; returns authentication, email-verification and public-profile/domain-visibility booleans |
 | abuseipdb_verify_free_api | VERIFY_FREE_API makes one official APIv2 CHECK for 1.1.1.1 using the reporter's private key; no browser or abuse-report submission |
 | abuseipdb_account_open | Windowless native signup/login page; explicit visible=true for human recovery; no form submission |
+| ipdata_account_status | Local private account/key/HTTP-state readiness only; no live authentication claim |
+| ipdata_account_check | One read-only Cognito GetUser HTTP POST with the dedicated saved access token; exact email/key binding, no browser, password login, refresh or IP query |
+| ipdata_verify_free_api | VERIFY_FREE_API makes one official 1.1.1.1 query using the reporter key; only supplied risk flags returned, missing VPN remains unknown |
 
 The user requires API usability before 2FA. A missing key, unavailable API,
 changed account/key or stale proof stops before authenticator enrollment. Existing
@@ -81,6 +84,11 @@ All bind the saved identity and reject login/error bodies, redirects and retries
 failure rather than automatically opening a browser. HTTP-state recovery is
 described below; opening a browser alone does not refresh every provider's state.
 Intel lookups use native bounded HTTP with the saved token and no Chrome.
+ipdata uses `ipdata.mjs` for its fixed read-only Cognito GetUser POST and official
+API lookup. The account parser binds the saved email, compares the reporter key
+and projects only verification/plan/MFA booleans. Response bodies are accepted
+only within 65536 bytes; Playwright buffers transport bytes before that check.
+No password login, refresh-token exchange or lookup retry runs automatically.
 AbuseIPDB uses the same shared HTTP context reader for account identity and the
 native HTTP reader for APIv2. Its identity parser scopes the email to the
 account-basics form: unrelated feedback email and password-change fields must
@@ -158,6 +166,16 @@ of the prior outcome; preserve the prior receipt. CAPTCHA is left for the user.
 No billing, upgrade, email-send, generic arbitrary-selector or recovery-code
 regeneration tool is exposed. Public results never include credentials, codes,
 seeds, cookies, account IDs or verification URL tokens.
+
+ipdata was registered once on October 27 after explicit disclosure approval,
+verified by email and confirmed as Free Tier/$0/1,500 daily queries. The private
+reporter key is `secrets/ipdata`; its saved Cognito state is
+`.state/ipdata-http.json`. Both the native hidden login and restored native
+headless dashboard/Profile were verified with shared myutils Chrome. Profile
+offered name/email/password fields but no 2FA control; no enrollment was made.
+The API returned proxy/Tor/datacenter/abuse flags on direct and ATT; VPN was
+absent. Saved-token expiry requires authorized session recovery, not a new
+account or API key. Preserve the private signup/activation/login receipts.
 
 ## Dated account evidence
 

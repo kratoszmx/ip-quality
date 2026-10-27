@@ -1,7 +1,36 @@
 # ipdata
 
-Relay risk results and official free-geography fallback. Adapter and parsers: [`ipdata.zsh`](ipdata.zsh).
+Owned developer-key risk API, relay risk results and keyless geography fallback.
+Adapter and parsers: [`ipdata.zsh`](ipdata.zsh).
 Cross-source policy (consent, routes, fallbacks, display): [PROVIDERS.md](../PROVIDERS.md).
+
+## Owned developer key
+
+With `IPDATA_API_KEY` in the private credentials file or a project-local
+`secrets/ipdata`, query `https://api.ipdata.co/{IP}?api-key=…` directly. The
+secret URL reaches curl through stdin configuration, never process arguments.
+One request stays on the selected route/address family, with a ten-second
+deadline, 262144-byte bound and no redirect. A configured key selects this
+source exclusively: a key, quota or transport failure stays visible rather
+than spending another request through the relay or geography API.
+
+Require one JSON object, the exact requested IP, a valid country code and a
+threat object containing explicit boolean or null fields. Preserve false;
+missing VPN or other flags stay unknown. Successful risk results use
+`Source=official_api` and `FactorMeta.ipdata.Status=ok`. No numerical score is
+inferred from these flags. The sanitized live response shape is in
+[`official-response.json`](../test/fixtures/ipdata/official-response.json).
+
+Verified October 27, 2026: after the user approved the registration disclosures,
+one free signup and email verification produced an account showing
+**Free Tier, $0, 1,500 daily queries**. Its official key returned proxy, Tor,
+datacenter and abuse flags through direct and isolated ATT routes; VPN was
+absent. The reporter uses that private key. No paid plan or billing trial was
+enabled. Account maintenance belongs to the existing provider-accounts MCP;
+see [MCP.md](../MCP.md). This developer-account tier is distinct from the
+new keyless geography tier described on the public pricing page.
+
+## Without a developer key
 
 After an unavailable or malformed Check.Place relay response, make one request
 to `https://ipdata.free/{IP}` on the selected route and address family. This
@@ -27,23 +56,16 @@ obsolete key scraper and its fixtures have been removed. A minimal successful
 free response is preserved as a sanitized fixture in
 [`test/fixtures/ipdata/free-response.json`](../test/fixtures/ipdata/free-response.json).
 
-According to [ipdata's free API documentation](https://ipdata.co/free), the
+According to [ipdata's keyless API documentation](https://ipdata.co/free), the
 first 1000 daily lookups per calling IP include city-level data; later lookups
 retain country and ASN. Both shapes are accepted. The [pricing page](https://ipdata.co/pricing.html)
-places threat/VPN data outside that free tier. This fallback restores usable
+places threat/VPN data outside that keyless tier. This fallback restores usable
 geography without claiming to restore full risk coverage. Data attribution:
 [ipdata](https://ipdata.co/).
 
-October 27 follow-up: direct and isolated ATT runs still returned country only.
-Chrome over the default proxy and direct route, including visible Chrome,
-loaded the public IP page but did not complete its verification or return risk
-fields. Do not label a successful geography lookup as restored risk coverage.
-
-A separate free-account possibility is unresolved: the [official FAQ](https://docs.ipdata.co/docs/frequently-asked-questions)
-still describes a 1500/day free API key, and the live signup bundle lists a $0
-Free Tier. These older account materials differ from the new keyless pricing
-page; neither proves a newly created account would include risk fields.
-The [signup page](https://dashboard.ipdata.co/sign-up.html) submits email,
-browser fingerprint and referrer to its configured backend. Under the user's
-privacy requirement, account creation awaits explicit consent to those fields.
-No developer account, paid plan, trial or account MCP was created in this check.
+The public IP detail page still required verification during the October 27
+Chrome checks. That page is unnecessary for the verified owned-key path.
+The [official FAQ](https://docs.ipdata.co/docs/frequently-asked-questions) and
+[signup page](https://dashboard.ipdata.co/sign-up.html) led to the separate
+developer account; its useful fields were established by live API responses,
+not inferred from a successful webpage load or geography response.

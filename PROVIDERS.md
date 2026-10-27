@@ -182,7 +182,7 @@ These are dated observations, not permanent availability guarantees.
 | Cloudflare Security Center IP Intelligence | Direct official API when both Cloudflare credentials are configured | Country, ASN/provider context, infrastructure type, named threat categories; no universal numeric score |
 | AbuseIPDB | Official APIv2 with an owned key; otherwise Check.Place relay | Abuse-confidence score and usage type, validated against the requested IP |
 | IP2Location | Check.Place relay, then its public target page on failure | Original 0-99 potential-risk score, usage/company type and explicit proxy-category flags |
-| ipdata | Check.Place relay, then official ipdata.free on failure | Relay: country and explicit risk factors; free fallback: country only, risk unknown |
+| ipdata | Owned developer key: official API; otherwise Check.Place relay, then ipdata.free on failure | Owned free key/relay: country and supplied risk flags; keyless fallback: country only, risk unknown |
 | IPQualityScore | Direct official API with `IPQS_API_KEY`; otherwise the named Check.Place relay | Connection type, 0-100 fraud score, country, proxy/VPN/Tor/abuse/bot factors |
 | Ping0 public `/geo` | Direct official public endpoint | Exact returned IP match, location, ASN, organization; no public risk score |
 | RIPEstat Network Info | Direct official public API | Covering routed prefix and origin ASNs; context, not a score |
@@ -216,15 +216,19 @@ The default all-source run has independent fallbacks for three relay-backed sour
 
 Each additional request uses the selected route/address family, a ten-second
 deadline and a response-size bound. There is no redirect, retry or direct-route
-escape. Successful IP2Location/ipdata relays need no fallback request.
+escape. Successful IP2Location/ipdata relays need no fallback request. An owned
+ipdata developer key selects its official risk API before any relay request;
+keyed failures retain their status without trying another source.
 `ScoreMeta.IP2LOCATION`, `FactorMeta.IP2LOCATION` and `FactorMeta.ipdata` retain
 `Source`, final `Status` and `RelayStatus`; AbuseIPDB's score metadata records
 its chosen source. Terminal labels distinguish relay, public demo and official
 API. The provider schemas remain in `providers/`, using shared HTTP/value helpers.
-For ipdata, the free fallback restores only country data. Its provider status
+For ipdata without a key, the keyless fallback restores only country data. Its provider status
 is `ok`, while `FactorMeta.ipdata.Status=not_provided` and
 `Reason=free_geolocation_only`; the factor table retains unknown risk cells.
 The October 26 website redesign removed the previously published demo key.
+The October 27 free developer account restored the supplied risk flags through
+both direct and ATT, without relying on that old demo key or Check.Place.
 
 On October 11, the current NodeQuality launcher still delegated to Check.Place.
 Other tools such as [howismyip's IP2Location adapter](https://github.com/superagents-lab/howismyip/blob/main/packages/core/src/providers/ip2location.ts)
