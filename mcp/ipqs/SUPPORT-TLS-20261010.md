@@ -64,18 +64,43 @@ output. The drafts were revised against that actual reply. No email or server
 draft was created. Private source IPs, mail routing/security tokens and account
 credentials are omitted from the drafts and diagnostic attachment.
 
-The user subsequently declined both the IPQS follow-up and ipapi appeal. Do not
-send either without a new explicit request. A further October 26 ATT reputation
+The user subsequently declined both the IPQS follow-up and ipapi appeal. That
+refusal held until the new IPQS-only authorization recorded below; the ipapi
+appeal remains unsent. A further October 26 ATT reputation
 run succeeded via the reporter's direct-query fallback with the ATT target
 unchanged. The follow-up would diagnose the original transport, not enable a
 reporter lookup that already works through that fallback.
 
-The latest review-only revision further minimizes network disclosure at the
+The subsequent review-only revision further minimized network disclosure at the
 user's request. Its generic subject and bilingual bodies omit the provider/node
 name, carrier, source/target IPs, exact timestamps, local proxy configuration and
 client-version details. They retain only IPv4 login/API success, a connection
 failing with curl 35/HTTP 000/TLS error, and same-target success through another
 connection. `curl-diagnostics-redacted.txt` is now a minimal proposed excerpt;
 the detailed trace was renamed `curl-diagnostics-internal.txt` and is not a
-proposed attachment. Do not include the former detailed subject or quoted
-history automatically. No message or server-side draft has been created.
+proposed attachment. At this preparation stage, no message or server-side draft
+had been created.
+
+## October 26 authorized reply — sent and verified
+
+The user then explicitly requested a reply to the existing support conversation,
+not a separate new message. A bounded native-mail check identified the latest
+incoming support message and verified that its references include the original
+inquiry. The reviewed English body was sent once as a reply to that message.
+The incoming support subject was preserved to maintain Gmail threading; the
+body contains no node/carrier names, source/target IPs, exact test times, client
+versions or local proxy settings. There are no attachments, CC/BCC recipients
+or quoted history.
+
+An independent Sent readback verified the native message and thread IDs,
+`In-Reply-To`/`References`, sender, recipient, subject and exact body digest.
+This establishes a successful send in the support thread, not recipient
+delivery, reading or a diagnosis. No duplicate send is needed.
+
+Private preview, one-attempt dispatch markers, draft/Sent verification and watch
+receipts are under
+`/Users/zmx/codexworkspace/secrets/mail/operations/ipqs-tls-reply-20261026/`.
+The existing Supervisor mail-watch service accepted
+`mail.ipqs-tls-reply-20261026`; status readback confirmed `active` and a scheduled
+next check. It waits for a newer support reply and does not automatically send
+reminders. The separate ipapi appeal remains unauthorized and unsent.

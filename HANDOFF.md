@@ -40,17 +40,20 @@
   cause remains unconfirmed. A later October 26 Gmail read succeeded and
   confirmed support's October 20 request for IPv4 website/account access and
   full curl failure output; the earlier OAuth failure was not persistent.
-  Chinese/English drafts and sanitized curl evidence are prepared privately,
-  **not sent; the user explicitly declined both IPQS and ipapi mail**.
+  After reviewing privacy-minimized drafts, the user explicitly authorized an
+  IPQS reply on October 26. It was sent once to the latest support message;
+  native Sent readback confirmed the same thread and reply headers. The earlier
+  refusal still applies to the separate ipapi appeal, which was not sent.
   A later October 26 isolated ATT reporter run returned score 75 through
   `direct_fallback`, with `OriginalRouteFailure=tls_error` and
   `TargetUnchanged=true`. The reputation lookup works through fallback; the
   unresolved original transport is not a prerequisite for that result.
-  The Chinese/English review drafts now state this distinction explicitly;
-  the renewed request is to preview them only, not send a follow-up.
-  The latest privacy revision uses a generic subject/connection description,
+  The reply states this distinction, uses a generic connection description,
   omits network identifiers and exact timestamps, and supplies only a minimal
-  error excerpt. Detailed diagnostics remain private and are not an attachment.
+  error excerpt. It preserves the incoming support subject for threading, with
+  no attachments or quoted history. Detailed diagnostics remain private.
+  Supervisor watch `mail.ipqs-tls-reply-20261026` is active; delivery/read and a
+  provider diagnosis are not yet confirmed.
   See [support record](mcp/ipqs/SUPPORT-TLS-20261010.md).
 - **DB-IP demo:** October 26 default proxy, direct and isolated ATT received
   fresh HTTP 200 daily-quota errors; no Retry-After. No local persistent cache.
