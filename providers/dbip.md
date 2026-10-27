@@ -10,6 +10,13 @@ manual token rotation or code change was needed. Earlier daily-limit responses
 below remain historical evidence, not the current availability verdict. The
 precise recovery time and upstream counter are unobserved. Private receipts:
 `reports/access-recheck-20261026/{direct-dbip,att-dbip}.json`.
+The last recorded failures and the later successful probes straddle the daily
+midnight-CET reset documented in the official FAQ. Together with the explicit
+daily-limit JSON and no manual key rotation or reporter change, this makes an
+allowance reset a supported hypothesis. It is not a measured reset event:
+there was no continuous monitoring, no counter access, and no retained earlier
+visitor key to establish whether the website changed its credential. A recovered
+allowance or service change by DB-IP also remains possible.
 
 DB-IP reads `https://db-ip.com/api/core/`, extracts its bounded public visitor
 token into memory, then reads `https://api.db-ip.com/v2/{token}/self?convertCurrencies`

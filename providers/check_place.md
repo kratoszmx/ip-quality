@@ -62,3 +62,38 @@ prove that the visitor attacked the site. The site owner can look up the
 subject to its sampling and retention. Our separate Cloudflare account cannot
 change Check.Place's policy. These observations establish a site-access refusal,
 not a transport outage, an account-key failure or a cause fixed by more retries.
+
+## Current NodeQuality comparison
+
+The live `run.NodeQuality.com` entry resolved to the official
+[NodeQuality.sh](https://github.com/LloydAsp/NodeQuality/blob/a92fca6c0067df29ddd03fdc2fee6f3000f64545/NodeQuality.sh#L414)
+at main commit `a92fca6`; its IP test downloads `https://IP.Check.Place` and runs
+it inside BenchOS. That URL resolved to xykt/IPQuality's current `ip.sh`,
+version `v2026-09-16`, inspected at main commit `87397e2`. Its
+[MaxMind and ipapi requests](https://github.com/xykt/IPQuality/blob/87397e2c3196ec796f5477c83343c2354df601ea/ip.sh#L700)
+use the same `ipinfo.check.place/{IP}?lang=cn` and `?db=ipapi` endpoints;
+those request paths contain no special NodeQuality authentication or alternate
+relay. A working script download is separate from a working data API.
+
+A bounded reproduction queried each route's freshly observed actual egress,
+not just the earlier fixed public target. Both requests returned HTTP 403 and
+the branded Cloudflare block page on default proxy, direct IPv4 and isolated
+ATT: six refusals, no JSON observations. This verifies the HTTP request path
+from this environment, not a complete Linux/BenchOS run or a global outage.
+The local IPv6 discovery did not establish a verifiable IPv6 egress, so no IPv6
+relay success or failure is claimed. No downloaded program was executed and
+no benchmark report was uploaded. Private source/response evidence:
+`reports/nodequality-checkplace-20261026/`.
+
+Upstream's `db_maxmind` sets `mode_lite=1` when its response is not JSON.
+The subsequent source-selection code skips Scamalytics, AbuseIPDB,
+IP2Location, ipdata and IPQS in Lite mode while continuing other work. Thus a
+completed NodeQuality report does not establish that its Check.Place datasets
+worked. We retain explicit unknown/unavailable rows and the independent-source
+fallbacks instead of copying that omission behavior.
+
+[Upstream issue 79](https://github.com/xykt/IPQuality/issues/79), opened September
+25, reports the same own-egress `?lang=cn` 403 and no recovery after a day and a
+half. It was closed September 26 with zero public comments as checked here.
+The reporter's suggestion of excessive querying is not a confirmed cause, and
+issue closure alone does not prove an unblock or a documented remedy.

@@ -14,6 +14,8 @@
   with its existing target-IP validation. No personal account or manual token
   rotation was used. Public detail-page browser reading also succeeded. This
   establishes current availability, not a guaranteed quota or recovery cause.
+  The failure/success interval crosses the documented midnight-CET reset;
+  allowance reset is a supported inference, not an observed provider counter.
 - Git: only `main`. Push to `github-kratoszmx` (`kratoszmx/ip-quality`) and
   `github-kratosbackup` (`kratosbackup/ipquality`), then read both back.
 
@@ -71,6 +73,12 @@
   proof of one bad node. The exact WAF/security rule requires the site owner's
   Ray-ID lookup; no new relay recovery is established. Private evidence:
   `reports/access-recheck-20261026/`; [contract](providers/check_place.md).
+  A further audit of current NodeQuality and its fetched xykt script found the
+  same relay URLs. Reproducing the two original request shapes against each
+  route's actual IPv4 egress returned six branded 403s on default proxy, direct
+  and ATT. Upstream can still render a Lite report by skipping several relay
+  sources; that is not relay recovery. Source versions, evidence and scope:
+  [NodeQuality comparison](providers/check_place.md#current-nodequality-comparison).
 - **ipapi account:** User-approved updated terms were accepted October 26.
   Exact-account HTTP and visible Chrome password login succeed, but the account
   explicitly reports `bot_login` suspension and API 403. Stored key matches.
