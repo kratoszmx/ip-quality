@@ -1,14 +1,19 @@
 # Current handoff
 
-## Status — 2026-10-26
+## Status — 2026-10-27
 
 - Reporter `v2026-10-26-standalone.48` (`script_version` in `bin/ip-quality`).
-- Offline: `/bin/zsh -f scripts/test-offline` passes — reporter 144 Minitest
+- Last complete offline run, October 26: `/bin/zsh -f scripts/test-offline`
+  passed — reporter 144 Minitest
   cases, IPQS MCP 22, provider accounts 40. The separate synthetic IPQS
   browser-text suite last passed 10/10 at commit `782bce3`, with no live requests.
 - Live: focused IPQS/DB-IP/ipdata and MCP login checks on October 26; the latest
   complete direct/ATT reports remain October 23 (table below). Offline
   success is not a provider-availability claim.
+- October 27: focused direct and isolated ATT runs still return ipdata country
+  only (`risk_status=not_provided`) and ipapi HTTP 403. The ipapi saved-account
+  HTTP read confirms `account_suspended`, restriction `bot_login`; a separate
+  bounded keyed lookup returns `ERR_FORBIDDEN_NOT_ALLOWED`. No appeal was sent.
 - DB-IP recovered in the later October 26 recheck: the unmodified reporter's
   focused direct and isolated ATT runs both returned `Status=ok`, `Band=low`,
   with its existing target-IP validation. No personal account or manual token
@@ -51,6 +56,13 @@
   `FactorMeta.ipdata.Status=not_provided`. That free API has no risk factors;
   full relay risk parsing remains available if Check.Place recovers. No paid
   plan, trial or website-verification workaround was enabled.
+  October 27 Chrome checks over proxy/direct, including visible Chrome, stayed
+  at verification without full risk data. A distinct account route remains
+  unverified: the official FAQ and signup bundle still describe a $0, 1500/day
+  developer key, while the new pricing page describes keyless geography.
+  Signup also submits email, browser fingerprint and referrer; explicit privacy
+  approval was requested before registering. No ipdata account or MCP was
+  created. Do not equate the geography fallback with restored risk coverage.
 - **ATT to IPQS:** October 26 curl still fails with 35/HTTP 000 for `/login`
   and the account API, including pinned IPv4/TLS 1.2. Direct IPv4 website login
   and API succeeded with the same credentials. The route/intermediary/edge
@@ -97,6 +109,12 @@
   ipapi relay returned 403 on default proxy, direct IPv4 and isolated ATT too.
   A fresh direct Chrome read through a newly started MCP 0.5.17 also returned
   403/challenge; the user separately confirmed the same relay block in Safari.
+  October 27 account HTTP identity still proves suspension. The official API
+  now explicitly returns `ERR_FORBIDDEN_NOT_ALLOWED` (rather than the earlier
+  invalid/disabled-key code), strengthening the account-restriction diagnosis.
+  The appropriate next step is a support review at the official contact address,
+  not another key rotation or paid upgrade. The user's hold on the ipapi appeal
+  remains in force; this check sent no message and submitted no password.
 - **Cloudflare account:** Native hidden Chrome loaded the login form, but one
   password submission required human verification. Existing saved HTTP identity
   returned 403 on proxy/direct. Official Intel API still succeeded; no GUI
@@ -146,6 +164,7 @@ history. Live runs never changed the active Clash state.
 
 | Date / scope | Result / private evidence |
 | --- | --- |
+| October 27, ipdata/ipapi v48 | Direct and isolated ATT: ipdata free country data with unknown risk, ipapi HTTP 403. Saved HTTP identity confirms ipapi `bot_login` suspension; fixed-target API probe returns `ERR_FORBIDDEN_NOT_ALLOWED`. Public ipdata browser checks did not complete verification. Private evidence: `reports/provider-recheck-20261027/`. |
 | October 26, ipdata v48 | Focused direct and isolated ATT reports returned `ProviderStatus.ipdata=ok`, `Source=official_free_api`, country data and `FactorMeta.ipdata.Status=not_provided`; all six risk fields remain null. Check.Place returned `cloudflare_blocked` on both routes. Before/after reports and offline test output: `reports/ipdata-recheck-20261026/`. |
 | October 23, direct all-source v43 | 14 of 15 sources returned usable observations, including IPQS, Cloudflare and Ping0. DB-IP returned `daily_quota_exhausted`. `reports/direct-20261023-codex-audit.{json,txt,stderr}` |
 | October 23, ATT all-source v43 and focused recheck | Cloudflare, IP2Location and the other table providers succeeded except DB-IP's daily quota and IPQS's initial timeout after direct fallback. A focused IPQS recheck succeeded through direct fallback after selected-route TLS failure, with the same discovered target preserved. Ping0 was unavailable. `reports/att-20261023-codex-audit.{json,txt,stderr}` and `reports/att-ipqs-20261023-codex-audit-recheck.{json,txt,stderr}` |

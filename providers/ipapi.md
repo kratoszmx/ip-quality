@@ -49,6 +49,17 @@ disabled key), and `ERR_QUOTA_EXCEEDED` (account quota). Purchasing credits is
 not evidence of an account unlock. Anonymous context and other named providers
 can preserve report coverage, but cannot replace ipapi risk fields under its name.
 
+October 27 recheck: the reporter returned HTTP 403 on both direct and isolated
+ATT. The exact saved-account HTTP check still returned `authenticated=true`,
+`state=account_suspended`, `restriction=bot_login`, `apiUsable=false`. A separate
+bounded keyed request for 1.1.1.1 returned `ERR_FORBIDDEN_NOT_ALLOWED`, which the
+current official documentation explicitly identifies as an account denied
+permission to query. This is stronger evidence than the earlier invalid-key
+code; connection troubleshooting or another key rotation cannot clear an
+account restriction. The next recovery step is an account review through the
+[official support contact](https://ipapi.is/contact.html). The user has not
+authorized the ipapi appeal to be sent; no message or automatic login was made.
+
 The similarly named `ipapi.co` is a different product with a contact-gated free
 trial. This project uses `ipapi.is`, with a free key when configured; the two
 providers must not be silently combined.

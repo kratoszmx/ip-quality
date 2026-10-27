@@ -33,3 +33,17 @@ retain country and ASN. Both shapes are accepted. The [pricing page](https://ipd
 places threat/VPN data outside that free tier. This fallback restores usable
 geography without claiming to restore full risk coverage. Data attribution:
 [ipdata](https://ipdata.co/).
+
+October 27 follow-up: direct and isolated ATT runs still returned country only.
+Chrome over the default proxy and direct route, including visible Chrome,
+loaded the public IP page but did not complete its verification or return risk
+fields. Do not label a successful geography lookup as restored risk coverage.
+
+A separate free-account possibility is unresolved: the [official FAQ](https://docs.ipdata.co/docs/frequently-asked-questions)
+still describes a 1500/day free API key, and the live signup bundle lists a $0
+Free Tier. These older account materials differ from the new keyless pricing
+page; neither proves a newly created account would include risk fields.
+The [signup page](https://dashboard.ipdata.co/sign-up.html) submits email,
+browser fingerprint and referrer to its configured backend. Under the user's
+privacy requirement, account creation awaits explicit consent to those fields.
+No developer account, paid plan, trial or account MCP was created in this check.
