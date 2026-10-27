@@ -9,7 +9,7 @@ umask 077
 # Display widths and byte validation need UTF-8 whatever the caller locale is.
 export LC_ALL=en_US.UTF-8
 
-script_version="v2026-10-27-standalone.49"
+script_version="v2026-10-27-standalone.50"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
@@ -274,7 +274,7 @@ print -r -- "IP Quality query plan (no network access has occurred)"
 print -r -- "  scope: $query_scope"
 print -r -- "  DNSBL concurrency cap: $dnsbl_concurrency"
 print -r -- "  output: masked IP by default; local stdout/file only"
-print -r -- "  telemetry/report upload/remote code: disabled"
+print -r -- "  telemetry/report upload/downloaded CLI execution: disabled"
 [[ -n "$requested_ip" ]]&&print -r -- "  target: explicit IP, sent to providers as a lookup parameter"
 if scope_includes reputation;then
 print -r -- "  selected source IDs: ${(j:,:)selected_reputation_sources[@]}"

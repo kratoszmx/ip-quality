@@ -227,6 +227,73 @@ class ProvidersTest < ReporterTestCase
     assert_equal cases.values, zsh!(probe, SCRIPT, *arguments).lines(chomp: true)
   end
 
+  def test_ipapi_crawler_name_is_a_detection_without_accepting_invalid_types
+    body = fixture_json("ipapi/valid.json")
+    probe = 'source "$1"; ipapi_parse_response "$2" 198.51.100.23 || exit 1; print -r -- "${ipapi_parsed[robot]}"'
+    {"Examplebot" => "true", true => "true", false => "false", nil => ""}.each do |crawler, expected|
+      assert_equal "#{expected}\n", zsh!(probe, provider_library("ipapi"), JSON.generate(body.merge("is_crawler" => crawler)))
+    end
+    ["", "\e[31minjected", [], {}, 1].each do |crawler|
+      refute zsh(probe, provider_library("ipapi"), JSON.generate(body.merge("is_crawler" => crawler)))[2].success?
+    end
+  end
+
+  def test_ipapi_account_denial_uses_one_keyless_same_route_context_lookup_and_retains_risk_failure
+    probe = <<~'ZSH'
+      source "$1"
+      IP=198.51.100.23 CurlARG='--interface fixture-interface'
+      provider_credentials[IPAPI_API_KEY]=fixture-key
+      code="$2" body="$3" http="$4" calls="$5"
+      show_progress(){ :; }
+      curl_with_secret_url(){
+        [[ "$1" == 'https://api.ipapi.is/?q=198.51.100.23&key=fixture-key' && "$*" == *'-6'* && "$*" == *'--interface fixture-interface'* ]]||exit 98
+        print key >> "$calls"
+        print -r -- "{\"error_code\":\"$code\"}"
+        print -r -- 403
+      }
+      curl(){
+        [[ "$*" == *'https://api.ipapi.is/?q=198.51.100.23'* && "$*" != *'key='* && "$*" == *'-6'* && "$*" == *'--interface fixture-interface'* ]]||exit 99
+        print anonymous >> "$calls"
+        print -r -- "$body"
+        print -r -- "$http"
+      }
+      ipapi[proxy]=false ipapi[score]=0
+      db_ipapi 6
+      save_json
+      print -r -- "$ipjson"
+    ZSH
+    anonymous = fixture_json("ipapi/anonymous.json")
+    cases = [
+      ["ERR_FORBIDDEN_NOT_ALLOWED", anonymous, 200, "account_restricted", "ok"],
+      ["ERR_FORBIDDEN_INVALID_API_KEY", anonymous, 200, "invalid_api_key", "ok"],
+      ["ERR_FORBIDDEN_NOT_ALLOWED", {}, 429, "account_restricted", "rate_limited"],
+      ["ERR_FORBIDDEN_NOT_ALLOWED", anonymous.merge("ip" => "8.8.8.8"), 200, "account_restricted", "invalid_response"],
+      ["ERR_FORBIDDEN_NOT_ALLOWED", fixture_json("ipapi/valid.json"), 200, "account_restricted", "invalid_response"],
+      ["OTHER_403", anonymous, 200, "http_403", nil]
+    ]
+    Dir.mktmpdir("ipquality-ipapi-test-") do |dir|
+      calls = File.join(dir, "calls")
+      cases.each do |code, body, http, risk, fallback|
+        File.write(calls, "")
+        report = JSON.parse(zsh!(probe, SCRIPT, code, JSON.generate(body), http.to_s, calls))
+        assert_equal fallback ? %w[key anonymous] : %w[key], File.readlines(calls, chomp: true)
+        assert_equal risk, report.dig("FactorMeta", "ipapi", "Status")
+        assert_equal risk, report.dig("ScoreMeta", "ipapi", "Status")
+        assert_equal risk, report.dig("Type", "Status", "ipapi")
+        assert_equal fallback == "ok" ? "ok" : risk, report.dig("ProviderStatus", "ipapi")
+        assert_equal [fallback], [report.dig("FactorMeta", "ipapi", "FallbackStatus")]
+        assert_nil report.dig("Factor", "Proxy", "ipapi")
+        assert_nil report.dig("Score", "ipapi")
+        if fallback == "ok"
+          assert_equal "anonymous_fallback", report.dig("FactorMeta", "ipapi", "CredentialMode")
+          assert_equal "AS64500 Example ISP", report.dig("ProviderContext", "IPAPI", "ASN")
+          assert_equal code, report.dig("ScoreMeta", "ipapi", "ErrorCode")
+        end
+        refute_includes JSON.generate(report), "fixture-key"
+      end
+    end
+  end
+
   def test_ipwhois_parser_keeps_demo_context_without_security_and_rejects_target_mismatch
     probe = <<~'ZSH'
       setopt KSH_ARRAYS

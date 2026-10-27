@@ -401,7 +401,7 @@ module IpQuality
       @stdout.puts "Direct reputation route plan (no network access has occurred)"
       @stdout.puts "  route: current system IPv#{@family == "-6" ? "6" : "4"} route with inherited proxy environment removed"
       @stdout.puts "  live Clash profile/selection: read only and unchanged"
-      @stdout.puts "  runtime: reporter only; no temporary Mihomo process"
+      @stdout.puts "  runtime: reporter; optional DB-IP hidden-browser fallback; no temporary Mihomo process"
       @stdout.puts "  reporter scope: reputation only"
       @stdout.puts "  measurement boundary: current system route only; no subscription leaf is claimed"
       @stdout.puts "  reputation sources:"

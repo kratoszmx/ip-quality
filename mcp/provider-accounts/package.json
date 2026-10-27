@@ -18,6 +18,7 @@
     "@myutils/redaction": "file:../../../../myutils/other_utils/node/redaction",
     "@myutils/secret-file": "file:../../../../myutils/file_utils/node/secret-file",
     "@myutils/totp": "file:../../../../myutils/other_utils/node/totp",
+    "@myutils/web-text": "file:../../../../myutils/net_utils/node/web-text",
     "playwright-core": "^1.61.1",
     "zod": "^4.4.3"
   }

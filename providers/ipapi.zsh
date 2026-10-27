@@ -43,8 +43,9 @@ print -rn -- "$response"|jq -L "${${(%):-%x}:A:h:h}/common" -e --arg expected "$
     end;
   def valid_boolean_fields:
     ([.is_bogon, .is_mobile, .is_satellite, .is_proxy, .is_tor, .is_vpn,
-      .is_datacenter, .is_abuser, .is_crawler]
-      | all(boolean_or_null(.)));
+      .is_datacenter, .is_abuser] | all(boolean_or_null(.))) and
+    (boolean_or_null(.is_crawler) or
+      ((.is_crawler | type) == "string" and text_or_null(.is_crawler; 256) and (.is_crawler | length) > 0));
   def valid_ip:
     (.ip | type == "string" and length <= 128 and (contains("\u0000") | not));
   def valid_full_response:
@@ -81,7 +82,9 @@ provider_json_fields "$response" '.ip,
   (if (.location|type) == "object" then (.location.country_code // "") elif (.country|type) == "string" and (.country|length) == 2 then .country else "" end),
   (if (.asn|type) == "string" or (.asn|type) == "number" then (.asn|tostring) else "" end),
   ([.company, .country, .city, .region, .timezone] | map(if type == "string" then . else "" end) | .[]),
-  ([.is_proxy, .is_tor, .is_vpn, .is_datacenter, .is_abuser, .is_crawler] | map(if . == null then "" else . end) | .[])' \
+  ([.is_proxy, .is_tor, .is_vpn, .is_datacenter, .is_abuser,
+    (if (.is_crawler | type) == "string" then true else .is_crawler end)]
+    | map(if . == null then "" else . end) | .[])' \
   ip mode usage_type score_text company_type country_code anonymous_asn anonymous_company anonymous_country \
   anonymous_city anonymous_region anonymous_timezone proxy tor vpn server abuser robot||return 1
 typeset field
@@ -109,7 +112,7 @@ ipapi[credential_mode]=anonymous
 [[ -n "$api_key" ]]&&ipapi[credential_mode]=key
 typeset endpoint="https://api.ipapi.is/?q=$IP"
 [[ -n "$api_key" ]]&&endpoint="$endpoint&key=$api_key"
-typeset wire_response RESPONSE
+typeset wire_response RESPONSE ipapi_curl_exit error_code
 if [[ -n "$api_key" ]];then
 wire_response=$(curl_with_secret_url "$endpoint" $CurlARG -sS -L -$1 -m 10 \
   --max-filesize 262144 --write-out $'\n%{http_code}' 2>/dev/null)
@@ -117,8 +120,37 @@ else
 wire_response=$(curl -q $CurlARG -sS -L -$1 -m 10 -H 'origin: https://ipapi.is' \
   --max-filesize 262144 --write-out $'\n%{http_code}' "$endpoint" 2>/dev/null)
 fi
-provider_decode_http_response "$wire_response" "$?"
+ipapi_curl_exit=$?
+provider_decode_http_response "$wire_response" "$ipapi_curl_exit"
 ipapi[status]="${provider_http_response[status]}"
+# Classify only the provider's documented JSON error, never a generic 403/WAF
+# page or a transport failure. The key stays private and is not rotated.
+if [[ -n "$api_key" && "$ipapi_curl_exit" == 0 && "${provider_http_response[http_code]}" == 403 ]]&&
+   provider_json_is_object "${wire_response%$'\n'*}";then
+error_code=$(print -rn -- "${wire_response%$'\n'*}"|jq -r '.error_code // empty' 2>/dev/null)
+case "$error_code" in
+ERR_FORBIDDEN_NOT_ALLOWED)ipapi[status]=account_restricted ;;
+ERR_FORBIDDEN_INVALID_API_KEY)ipapi[status]=invalid_api_key ;;
+esac
+if [[ "${ipapi[status]}" == account_restricted || "${ipapi[status]}" == invalid_api_key ]];then
+ipapi[primary_status]="${ipapi[status]}"
+ipapi[error_code]="$error_code"
+# One published anonymous lookup supplies context only. Never retry a quota
+# error or firewall 403, switch egress, or pass the denied key to this request.
+wire_response=$(curl -q $CurlARG -sS -$1 -m 10 -H 'origin: https://ipapi.is' \
+  --max-filesize 262144 --write-out $'\n%{http_code}' "https://api.ipapi.is/?q=$IP" 2>/dev/null)
+provider_decode_http_response "$wire_response" "$?"
+ipapi[fallback_status]="${provider_http_response[status]}"
+[[ "${ipapi[fallback_status]}" == ok ]]||return 1
+RESPONSE="${provider_http_response[body]}"
+if ! ipapi_parse_response "$RESPONSE" "$IP" || [[ "${ipapi_parsed[mode]}" != anonymous ]];then
+ipapi[fallback_status]=invalid_response
+return 1
+fi
+ipapi[credential_mode]=anonymous_fallback
+ipapi[status]=ok
+fi
+fi
 [[ "${ipapi[status]}" == ok ]]||return 1
 RESPONSE="${provider_http_response[body]}"
 if ! ipapi_parse_response "$RESPONSE" "$IP";then
@@ -176,5 +208,6 @@ ipapi[abuser]="${ipapi_parsed[abuser]}"
 ipapi[robot]="${ipapi_parsed[robot]}"
 ipapi[risk_status]=not_provided
 provider_has_observation "${ipapi[proxy]}" "${ipapi[vpn]}" "${ipapi[tor]}" "${ipapi[server]}" "${ipapi[abuser]}" "${ipapi[robot]}"&&ipapi[risk_status]=ok
+[[ -n "${ipapi[primary_status]:-}" ]]&&ipapi[risk_status]="${ipapi[primary_status]}"
 return 0
 }

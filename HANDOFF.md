@@ -2,14 +2,18 @@
 
 ## Status — 2026-10-27
 
-- Reporter `v2026-10-27-standalone.49` (`script_version` in `bin/ip-quality`).
+- Reporter `v2026-10-27-standalone.50` (`script_version` in `bin/ip-quality`).
 - Last complete offline run, October 27: `/bin/zsh -f scripts/test-offline`
-  passed — reporter 146 Minitest cases / 4146 assertions,
-  IPQS MCP 22, provider accounts 48. The separate synthetic IPQS
+  passed — reporter 151 Minitest cases / 4397 assertions,
+  IPQS MCP 22, provider accounts 53. The separate synthetic IPQS
   browser-text suite last passed 10/10 at commit `782bce3`, with no live requests.
-- Live: focused IPQS/DB-IP/ipdata and MCP login checks on October 26; the latest
-  complete direct/ATT reports remain October 23 (table below). Offline
-  success is not a provider-availability claim.
+- Live: complete all-source direct report on October 27; latest complete ATT
+  remains October 23 (table below). Direct DB-IP recovered through its new
+  public-page fallback; ipapi recovered anonymous context only, with its risk
+  tables still account-restricted. Check.Place/MaxMind remained blocked and
+  basic information used IPinfo. Every other selected source supplied data.
+  Private receipts: `reports/direct-source-recheck-20261027/`. Offline success
+  is not a provider-availability claim.
 - October 27: user-approved ipdata free developer signup, email verification
   and key import restored official proxy/Tor/datacenter/abuse flags on direct
   and isolated ATT. Dashboard: Free Tier/$0/1,500 daily queries. VPN/robot remain
@@ -27,13 +31,12 @@
   No API key or personal Safari state was used. Reporter/API behavior and keys
   are unchanged; implementation, tests and current usage belong to
   [myutils](/Users/zmx/Projects/myutils/docs/NETWORK_API.md#ipdata-public-ip-detail).
-- DB-IP recovered in the later October 26 recheck: the unmodified reporter's
-  focused direct and isolated ATT runs both returned `Status=ok`, `Band=low`,
-  with its existing target-IP validation. No personal account or manual token
-  rotation was used. Public detail-page browser reading also succeeded. This
-  establishes current availability, not a guaranteed quota or recovery cause.
-  The failure/success interval crosses the documented midnight-CET reset;
-  allowance reset is a supported inference, not an observed provider counter.
+- DB-IP's visitor daily error returned October 27. The new automatic fallback
+  read the same actual direct egress from the public page in fresh hidden
+  Chrome, obtained the explicit `low` label and confirmed browser cleanup.
+  Both focused and full reports kept `DemoStatus=daily_quota_exhausted` beside
+  `Source=public_page` / `PageStatus=ok`. No personal account, key rotation or
+  persistent cache was used; the visitor API itself remains limited.
 - Git: only `main`. Push to `github-kratoszmx` (`kratoszmx/ip-quality`) and
   `github-kratosbackup` (`kratosbackup/ipquality`), then read both back.
 
@@ -51,9 +54,11 @@
   ipdata uses its owned official developer key for risk, or without a key falls
   back from relay to keyless geography with unknown risk. These paths stay on
   the selected route; an owned AbuseIPDB key selects its official API;
-  basic data falls back to IPinfo. DB-IP's visitor demo stays on the tested
-  egress, returns the provider's original risk label when available, and leaves
-  risk unknown on quota errors. Contracts:
+  basic data falls back to IPinfo. DB-IP keeps the visitor demo's selected
+  route, with one optional public-page hidden-browser read after an explicit
+  daily limit. ipapi's documented keyed account denial gets one same-route
+  anonymous context lookup, while type/score/factor statuses keep the denial.
+  Missing fallback data remains unknown. Contracts:
   [PROVIDERS.md](PROVIDERS.md).
 - Code layout and shared helpers: [AGENTS.md](AGENTS.md#architecture) and
   [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md). Account MCPs: [MCP.md](MCP.md).
@@ -126,6 +131,16 @@
 
 Full detail is in `git log`; these are the ones a new session could trip over.
 
+- v50: DB-IP daily-limit recovery directly reuses myutils/web-text from the
+  existing Node workspace, verifies the exact public IPv4 record and cleanup,
+  and keeps both surfaces' outcomes. No account MCP or GUI is launched. ipapi
+  recognizes documented account/key denial codes and makes one anonymous
+  context query without clearing the risk restriction. Its parser accepts
+  documented crawler-name strings as positive full-tier detections. Offline
+  regressions cover routes, consent, mismatches, missing labels, browser/error
+  states, unchanged null risk and bilingual tables. The locked MCP dependency
+  cache was replenished for missing existing tarballs and the workspace restored
+  using `npm ci --offline --ignore-scripts`; no dependency versions were upgraded.
 - v49: ipdata owned free developer-key support precedes the relay, keeps keys
   out of argv/output, validates target-bound booleans and preserves keyed
   failures. Added three ipdata tools to the existing provider-accounts MCP:
@@ -177,6 +192,7 @@ history. Live runs never changed the active Clash state.
 | October 27, ipdata/ipapi v48 | Direct and isolated ATT: ipdata free country data with unknown risk, ipapi HTTP 403. Saved HTTP identity confirms ipapi `bot_login` suspension; fixed-target API probe returns `ERR_FORBIDDEN_NOT_ALLOWED`. Public ipdata browser checks did not complete verification. Private evidence: `reports/provider-recheck-20261027/`. |
 | October 26, ipdata v48 | Focused direct and isolated ATT reports returned `ProviderStatus.ipdata=ok`, `Source=official_free_api`, country data and `FactorMeta.ipdata.Status=not_provided`; all six risk fields remain null. Check.Place returned `cloudflare_blocked` on both routes. Before/after reports and offline test output: `reports/ipdata-recheck-20261026/`. |
 | October 23, direct all-source v43 | 14 of 15 sources returned usable observations, including IPQS, Cloudflare and Ping0. DB-IP returned `daily_quota_exhausted`. `reports/direct-20261023-codex-audit.{json,txt,stderr}` |
+| October 27, direct all-source v50 | DB-IP page fallback returned `low` despite visitor daily quota; ipapi anonymous ASN/geography returned but keyed risk remained `account_restricted`. Check.Place/MaxMind was blocked and IPinfo supplied basic data. Other sources, including IPQS/Cloudflare/Ping0, succeeded. `reports/direct-source-recheck-20261027/all-after.{json,ansi,log}` |
 | October 23, ATT all-source v43 and focused recheck | Cloudflare, IP2Location and the other table providers succeeded except DB-IP's daily quota and IPQS's initial timeout after direct fallback. A focused IPQS recheck succeeded through direct fallback after selected-route TLS failure, with the same discovered target preserved. Ping0 was unavailable. `reports/att-20261023-codex-audit.{json,txt,stderr}` and `reports/att-ipqs-20261023-codex-audit-recheck.{json,txt,stderr}` |
 | October 23, Ping0 v44 | Focused direct check returned `verified`; isolated ATT returned `tls_error`. A separate bounded ATT HTTP probe confirmed curl exit 35, HTTP 000 and no response body. `reports/ping0-{direct,att}-20261023-codex-audit-fixed.{json,stderr}` |
 | October 23, DNSBL v44 | A loopback DNS responder verified NOERROR/NXDOMAIN/SERVFAIL/REFUSED handling against the real system `dig`. `reports/dnsbl-local-20261023-codex-audit-fixed.json` |

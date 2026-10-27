@@ -5,9 +5,9 @@ maxmind	MaxMind	no	Check.Place relay of MaxMind-labeled basic data; IPinfo suppl
 ipinfo	IPinfo	yes	public demo widget: basic location and network	-
 ipregistry	Ipregistry	yes	official API, only with a configured key	-
 scamalytics	Scamalytics	no	Check.Place relay; if it fails, one public target page on the same route (target and score must match)	-
-ipapi	ipapi.is	yes	official API (owned key optional): company abuse ratio and network flags	-
+ipapi	ipapi.is	yes	official API (owned key optional); a documented denied key gets one same-route anonymous context lookup with unknown risk	-
 ipwhois	IPWHOIS	yes	public website demo, one target lookup; no account or guaranteed quota	-
-dbip	DB-IP	yes	public page + one visitor-egress lookup (must match target); no account or guaranteed quota	not applicable to an explicit target (visitor egress only); no request
+dbip	DB-IP	yes	visitor-egress demo; daily-limit errors get one same-route IPv4 public detail-page read in temporary hidden Chrome (optional Node dependencies); no account or guaranteed quota	not applicable to an explicit target (visitor egress only); no request
 cloudflare	Cloudflare	yes	IP Intelligence threat categories when configured; no numeric score (legacy Threat Score is retired)	-
 abuseipdb	AbuseIPDB	no	official CHECK API with an owned key, otherwise its named Check.Place relay; no abuse report is submitted	-
 ip2location	IP2Location	no	Check.Place relay; if it fails, its target-bound public website JSON on the same route	-

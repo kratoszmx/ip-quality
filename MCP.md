@@ -59,7 +59,8 @@ is a different mode and still received IPQS HTTP 403 on October 26.
 | AbuseIPDB | Saved-state HTTP account read; APIv2 key over HTTP | Native hidden Chrome; login and subsequent HTTP identity verified October 26 | No enrollment entry offered |
 | ipdata | Saved-token HTTP account check; owned free developer key over HTTP | October 27 one authorized native-hidden signup/login; saved state also verified in native headless Chrome. No automatic password submission or token refresh | No enrollment control on the reviewed Profile page; GetUser returned no enrolled factor |
 | Ipregistry | API key in the reporter only | No account MCP | Not audited |
-| DB-IP, IPWHOIS | Account-free HTTP free API and website demo | None | Not applicable |
+| DB-IP | Account-free HTTP free API and visitor demo; reporter daily-limit fallback reads the exact public IP page in fresh hidden Chrome via myutils/web-text | None; no account state | Not applicable |
+| IPWHOIS | Account-free HTTP free API and website demo | None | Not applicable |
 | IPinfo, Scamalytics, IP2Location, Check.Place, Ping0, RIPEstat, Shodan | Public HTTP pages/demos/relays used by the reporter | None | Not applicable |
 
 A failed HTTP identity read returns its failure; it never silently opens a

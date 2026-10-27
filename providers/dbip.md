@@ -3,20 +3,32 @@
 Visitor-demo token flow, egress binding and quota semantics. Adapter and parser: [`dbip.zsh`](dbip.zsh).
 Cross-source policy (consent, routes, fallbacks, display): [PROVIDERS.md](../PROVIDERS.md).
 
-Current live checkpoint, later October 26: the unmodified reporter's focused
-direct and isolated ATT runs both returned `ProviderStatus.DBIP=ok` and the
-original `low` label, passing its existing IP-match parser. No owned account,
-manual token rotation or code change was needed. Earlier daily-limit responses
-below remain historical evidence, not the current availability verdict. The
-precise recovery time and upstream counter are unobserved. Private receipts:
-`reports/access-recheck-20261026/{direct-dbip,att-dbip}.json`.
-The last recorded failures and the later successful probes straddle the daily
-midnight-CET reset documented in the official FAQ. Together with the explicit
-daily-limit JSON and no manual key rotation or reporter change, this makes an
-allowance reset a supported hypothesis. It is not a measured reset event:
-there was no continuous monitoring, no counter access, and no retained earlier
-visitor key to establish whether the website changed its credential. A recovered
-allowance or service change by DB-IP also remains possible.
+Current live checkpoint, October 27: the direct visitor API again returned the
+explicit daily-limit JSON. The new fallback then read the **same tested IPv4**
+from the official detail page in fresh hidden Chrome and obtained its `low`
+label. Both focused and all-source direct reports returned `Source=public_page`,
+`DemoStatus=daily_quota_exhausted`, `PageStatus=ok` and `Band=low`. The original
+API quota has not recovered; the public website is a separate usable surface.
+Private receipts: `reports/direct-source-recheck-20261027/{before,after,all-after}.json`.
+
+Only the explicit daily-limit response triggers this optional fallback, once.
+`mcp/provider-accounts/dbip-page.mjs` directly imports myutils/web-text, without
+an MCP server, login or persistent cookies. Node 24.5+, installed Chrome and
+the reviewed local MCP dependencies are needed; missing dependencies leave the
+original error intact. The read has a 30-second budget and an owned fresh hidden
+profile. It accepts only HTTP 200, the exact target URL/title/H1/record, one
+explicit low/medium/high statement, and verified cleanup. A challenge, ambiguous
+record, missing label or cleanup failure never becomes a clean verdict.
+
+The browser preserves the selected HTTPS proxy, or explicitly uses the system
+route for direct runs. It does not switch egress, rotate visitor tokens or
+retry limits. Browser transport is dual-stack rather than curl's forced family;
+only IPv4 target pages are supported. IPv6, interface binding, unsupported
+proxy/bypass settings and explicit-target mode skip this fallback. Section 3
+labels success `网页备援/可用` / `page fallback/available`, with a null numeric
+score. Failed fallback metadata stays in JSON beside the original daily error.
+Website label success does not imply free geography, a paid account or restored
+visitor API quota.
 
 DB-IP reads `https://db-ip.com/api/core/`, extracts its bounded public visitor
 token into memory, then reads `https://api.db-ip.com/v2/{token}/self?convertCurrencies`

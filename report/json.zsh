@@ -115,12 +115,15 @@ ipjson=$(jq -n \
 --arg status_ipapi "${ipapi[status]:-unknown}" \
 --arg ipapi_risk_status "${ipapi[risk_status]:-${ipapi[status]:-unknown}}" --arg ipapi_credential_mode "${ipapi[credential_mode]:-}" \
 --arg ipapi_mode "${ipapi[mode]:-}" --arg ipapi_ip "${ipapi[ip]:+$displayed_ip}" \
+--arg ipapi_primary_status "${ipapi[primary_status]:-}" --arg ipapi_error_code "${ipapi[error_code]:-}" \
+--arg ipapi_fallback_status "${ipapi[fallback_status]:-}" \
 --arg ipapi_countrycode "${ipapi[countrycode]:-}" \
 --arg ipapi_asn "${ipapi[anonymous_asn]:-}" --arg ipapi_company "${ipapi[anonymous_company]:-}" \
 --arg ipapi_country "${ipapi[anonymous_country]:-}" --arg ipapi_city "${ipapi[anonymous_city]:-}" \
 --arg ipapi_region "${ipapi[anonymous_region]:-}" --arg ipapi_timezone "${ipapi[anonymous_timezone]:-}" \
 --arg status_ipwhois "${ipwhois[status]:-unknown}" \
 --arg status_dbip "${dbip[status]:-unknown}" --arg dbip_ip "${dbip[ip]:+$displayed_ip}" \
+--arg dbip_source "${dbip[source]:-public_demo}" --arg dbip_demo_status "${dbip[demo_status]:-}" --arg dbip_page_status "${dbip[page_status]:-}" \
 --arg dbip_risk_status "${dbip[risk_status]:-${dbip[status]:-unknown}}" --arg band_dbip "${dbip[threat_level]:-}" \
 --arg dbip_countrycode "${dbip[countrycode]:-}" --arg dbip_country "${dbip[country]:-}" \
 --arg dbip_region "${dbip[region]:-}" --arg dbip_city "${dbip[city]:-}" \
@@ -224,7 +227,7 @@ def dnsresults($value):
   },
   Type: {
     Source: {IPinfo: "public demo widget", Ipregistry: "official API", IPQS: $source_ipqs, ipapi: "direct public API", IP2LOCATION: "upstream relay", AbuseIPDB: "upstream relay"},
-    Status: {IPinfo: $status_ipinfo, Ipregistry: $status_ipregistry, IPQS: $status_ipqs, ipapi: $status_ipapi, IP2LOCATION: $status_ip2location, AbuseIPDB: $status_abuseipdb},
+    Status: {IPinfo: $status_ipinfo, Ipregistry: $status_ipregistry, IPQS: $status_ipqs, ipapi: (opt($ipapi_primary_status) // $status_ipapi), IP2LOCATION: $status_ip2location, AbuseIPDB: $status_abuseipdb},
     Usage: {IPinfo: opt($type_ipinfo_usage), Ipregistry: opt($type_ipregistry_usage), IPQS: opt($type_ipqs_usage), ipapi: opt($type_ipapi_usage), IP2LOCATION: opt($type_ip2_usage), AbuseIPDB: opt($type_abuse_usage)},
     Company: {IPinfo: opt($type_ipinfo_company), Ipregistry: opt($type_ipregistry_company), IPQS: null, ipapi: opt($type_ipapi_company), IP2LOCATION: opt($type_ip2_company), AbuseIPDB: null}
   },
@@ -232,11 +235,12 @@ def dnsresults($value):
   ScoreMeta: {
     IP2LOCATION: {Band: opt($band_ip2), Scale: "0-99 potential risk", Status: $status_ip2location, Source: $source_ip2location, RelayStatus: opt($relay_status_ip2location)},
     SCAMALYTICS: {Band: opt($band_scam), Scale: "0-100 fraud", Status: $status_scamalytics, Source: $source_scamalytics, RelayStatus: opt($relay_status_scamalytics)},
-    ipapi: {Band: opt($band_ipapi), Scale: "0-100% abuse"},
+    ipapi: {Band: opt($band_ipapi), Scale: "0-100% abuse", Status: $ipapi_risk_status, Source: "public_api", ErrorCode: opt($ipapi_error_code)},
     AbuseIPDB: {Band: opt($band_abuse), Scale: "0-100 confidence", Status: $status_abuseipdb, Source: $source_abuseipdb},
     IPQS: {Band: opt($band_ipqs), Scale: "0-100 fraud", Status: $status_ipqs, Source: $source_ipqs},
     Cloudflare: {Band: null, Scale: null, Status: $status_cloudflare, Source: "official_api", Reason: "numeric_score_not_provided", LegacyThreatScore: "retired_constant_zero", ThreatCategories: $cloudflare_threats},
-    DBIP: {Band: opt($band_dbip), Scale: "low/medium/high (provider label)", Status: $dbip_risk_status, Source: "public_demo", Reason: "provider_label_only"}
+    DBIP: {Band: opt($band_dbip), Scale: "low/medium/high (provider label)", Status: $dbip_risk_status, Source: $dbip_source,
+      DemoStatus: opt($dbip_demo_status), PageStatus: opt($dbip_page_status), Reason: "provider_label_only"}
   },
   ProviderStatus: {
     IPinfo: $status_ipinfo,
@@ -265,12 +269,13 @@ def dnsresults($value):
     IP2LOCATION: {Status: $status_ip2location, Source: $source_ip2location, RelayStatus: opt($relay_status_ip2location)},
     ipdata: {Status: $risk_status_ipdata, Source: $source_ipdata, RelayStatus: opt($relay_status_ipdata), Reason: opt($reason_ipdata)},
     SCAMALYTICS: {Status: $status_scamalytics, Source: $source_scamalytics},
-    ipapi: {Status: $ipapi_risk_status, Source: "public_api", Mode: opt($ipapi_mode), CredentialMode: opt($ipapi_credential_mode)},
+    ipapi: {Status: $ipapi_risk_status, Source: "public_api", Mode: opt($ipapi_mode), CredentialMode: opt($ipapi_credential_mode),
+      PrimaryStatus: opt($ipapi_primary_status), ErrorCode: opt($ipapi_error_code), FallbackStatus: opt($ipapi_fallback_status)},
     IPWhois: {Status: $ipwhois_risk_status, Source: "public_demo", Reason: "website_demo_security_flags"}
   },
   ProviderContext: {
     DBIP: {
-      Provider: "DB-IP", Status: $status_dbip, Mode: "public_demo", IP: opt($dbip_ip),
+      Provider: "DB-IP", Status: $status_dbip, Mode: $dbip_source, IP: opt($dbip_ip),
       CountryCode: opt($dbip_countrycode), Country: opt($dbip_country), Region: opt($dbip_region), City: opt($dbip_city),
       Attribution: "IP geolocation by DB-IP (https://db-ip.com/)"
     },

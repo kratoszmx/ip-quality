@@ -60,6 +60,33 @@ class ReportTest < ReporterTestCase
     refute_includes stdout, "official/available"
   end
 
+  def test_browser_fallback_and_account_restriction_are_distinct_in_both_languages
+    probe = <<~'ZSH'
+      source "$1"
+      source "$2"
+      YY="$3"
+      typeset -A stype sscore sfactor dbip ipapi
+      stype[title]=Types sscore[title]=Scores sfactor[title]=Factors
+      dbip[status]=ok dbip[source]=public_page dbip[risk]=low
+      ipapi[status]=ok ipapi[risk_status]=account_restricted ipapi[mode]=anonymous
+      ipapi[primary_status]=account_restricted
+      show_type
+      show_score
+      show_factor
+    ZSH
+    %w[cn en].each do |language|
+      output = zsh!(probe, REPUTATION_REPORT, TERMINAL_LIBRARY, language)
+      assert_includes output, language == "cn" ? "网页备援/可用" : "page fallback/available"
+      assert_includes output, language == "cn" ? "账户受限" : "account restricted"
+      assert_includes output, "ipapi.is"
+      types, scores, factors = output.split(/Scores\n|Factors\n/)
+      [types, scores, factors].each do |table|
+        assert_includes table, language == "cn" ? "账户受限" : "account restricted"
+        assert_aligned_table(table)
+      end
+    end
+  end
+
   def test_ipapi_factor_column_survives_anonymous_rate_limited_and_failed_queries
     probe = <<~'ZSH'
       source "$1"

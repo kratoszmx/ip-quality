@@ -1,0 +1,14 @@
+{
+  "backend": "real-chrome-cdp",
+  "launchMode": "hidden",
+  "sessionMode": "ephemeral",
+  "cleanupConfirmed": true,
+  "httpStatus": 200,
+  "challenge": false,
+  "url": "https://db-ip.com/198.51.100.23",
+  "title": "198.51.100.23 - Example ISP - IP address geolocation",
+  "headings": [{"level": "h1", "text": "198.51.100.23 - IP Address Geolocation"}],
+  "text": "IP ADDRESS GEOLOCATION\n198.51.100.23\n\nASN 64500 - Example ISP\nEstimated threat level for this IP address is LOW\nCountry United States",
+  "truncated": false,
+  "nativeRecovery": {"attempted": true, "outcome": "ready", "recipe": "dbip-public-ip", "verificationActivated": true}
+}

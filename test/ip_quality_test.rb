@@ -12,11 +12,11 @@ class IpQualityTest < ReporterTestCase
     assert_empty stderr
     [
       "no network access has occurred", "scope: reputation", "reputation sources:",
-      "telemetry/report upload/remote code: disabled",
+      "telemetry/report upload/downloaded CLI execution: disabled",
       "one direct IPv4 fallback, querying the same target IP",
       "same provider also sees the system-route egress",
       "visitor/self demos never switch routes", "--confirm-network-lookup",
-      "    DB-IP: public page + one visitor-egress lookup (must match target)",
+      "    DB-IP: visitor-egress demo; daily-limit errors get one same-route IPv4 public detail-page read in temporary hidden Chrome",
       "    IPWHOIS: public website demo, one target lookup",
       "legacy Threat Score is retired",
       "    Ipregistry: official API, only with a configured key",

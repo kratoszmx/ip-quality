@@ -115,6 +115,68 @@ class PublicDemoTest < ReporterTestCase
     end
   end
 
+  def test_dbip_daily_limit_uses_one_public_page_and_keeps_both_outcomes_in_json
+    probe = <<~'ZSH'
+      source "$1"
+      IP=198.51.100.23
+      body="$2" calls="$3" scenario="$4"
+      show_progress(){ :; }
+      curl_with_secret_url(){
+        if [[ "$1" == 'https://db-ip.com/api/core/' ]];then
+          print -r -- '<script data-api-key="fixture-key"></script>'
+        else
+          print -r -- "{\"error\":\"$scenario\"}"
+        fi
+        print -r -- 200
+      }
+      dbip_lookup_page(){ [[ "$1" == 4 ]]||exit 99; print page >> "$calls"; print -r -- "$body"; }
+      dbip[threat_level]=high
+      db_dbip 4
+      save_json
+      print -r -- "$ipjson"
+    ZSH
+    Dir.mktmpdir("ipquality-dbip-page-test-") do |dir|
+      calls = File.join(dir, "calls")
+      [{status: "ok", ipAddress: "198.51.100.23", threatLevel: "low"},
+       {status: "ok", ipAddress: "8.8.8.8", threatLevel: "low"},
+       {status: "ok", ipAddress: "198.51.100.23", threatLevel: 0},
+       {status: "cloudflare_blocked"}, {status: "dependency_missing"},
+       {status: "timeout"}, {status: "rate_limited"}, {status: "invented"}, []].each do |body|
+        File.write(calls, "")
+        report = JSON.parse(zsh!(probe, SCRIPT, JSON.generate(body), calls, "maximum number of queries per day exceeded"))
+        assert_equal ["page"], File.readlines(calls, chomp: true)
+        meta = report.fetch("ScoreMeta").fetch("DBIP")
+        success = body.is_a?(Hash) && body[:status] == "ok" && body[:ipAddress] == "198.51.100.23" && body[:threatLevel] == "low"
+        assert_equal "daily_quota_exhausted", meta.fetch("DemoStatus")
+        assert_equal success ? "ok" : "daily_quota_exhausted", meta.fetch("Status")
+        assert_equal success ? "public_page" : "public_demo", meta.fetch("Source")
+        assert_equal [success ? "low" : nil], [meta.fetch("Band")]
+        assert_nil report.dig("Score", "DBIP")
+        refute_equal "invented", meta.fetch("PageStatus")
+      end
+      File.write(calls, "")
+      report = JSON.parse(zsh!(probe, SCRIPT, '{}', calls, "maximum number of queries per minute exceeded"))
+      assert_empty File.read(calls)
+      assert_equal "rate_limited", report.dig("ProviderStatus", "DBIP")
+    end
+  end
+
+  def test_dbip_browser_never_drops_explicit_family_or_interface_or_requires_optional_dependencies
+    probe = <<~'ZSH'
+      source "$1"
+      IP=198.51.100.23
+      node(){ print -ru2 'unexpected browser'; exit 99; }
+      dbip_lookup_page 6
+      CurlARG='--interface fixture-interface'
+      dbip_lookup_page 4
+      CurlARG=''
+      dbip_page_program=/nonexistent/ipquality-test.mjs
+      dbip_lookup_page 4
+    ZSH
+    results = zsh!(probe, provider_library("dbip")).lines.map { |line| JSON.parse(line).fetch("status") }
+    assert_equal %w[route_unsupported route_unsupported dependency_missing], results
+  end
+
   def test_dbip_and_ping0_skip_visitor_requests_for_explicit_targets
     stdout, stderr, status = run_script("--sources", "dbip,ping0", "--confirm-network-lookup", "-4", "-j", "8.8.8.8")
     assert status.success?, stderr

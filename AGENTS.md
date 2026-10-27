@@ -70,6 +70,9 @@ COMMON_FUNCTIONS.md), `ref/` (vendored DNSBL zones, ISO countries, non-public
 IPv4 ranges), `mcp/` (optional account MCPs; `.state/`, `node_modules/`, `dist/`
 are private), `test/` (offline suites on one base class in `test/support/`,
 sanitized `test/fixtures/`), `secrets/` and `reports/` (private, ignored).
+DB-IP's optional public-page fallback lives in `mcp/provider-accounts/dbip-page.mjs`
+alongside its reviewed Node dependencies; it imports myutils' browser API
+directly and does not start an MCP server or log into an account.
 
 ## Choose a route
 
@@ -109,6 +112,12 @@ read-only. Missing dependencies stop explicitly; the project installs nothing.
 Both entrypoints pin a UTF-8 locale themselves. Optional API keys are listed in
 [CREDENTIALS.md](CREDENTIALS.md#reporter-api-keys).
 
+Only DB-IP's daily-limit recovery additionally uses installed Node 24.5+, Google
+Chrome and the optional `mcp/` dependencies (including sibling myutils/web-text).
+It reads one IPv4 target page in a fresh hidden browser on the selected route,
+then closes it. Missing optional dependencies leave DB-IP unknown; other
+providers continue. Runtime never installs dependencies or opens a GUI.
+
 ## Provider account MCPs
 
 [mcp/ipqs/AGENTS.md](mcp/ipqs/AGENTS.md) owns the IPQS dashboard, account probe
@@ -122,7 +131,9 @@ mutations require explicit task intent.
 
 - Run shell code with `/bin/zsh`; never install or invoke a newer Bash. The
   runner uses `/usr/bin/ruby --disable-gems` and the bundled standard library.
-- Runtime installs nothing and executes no downloaded code. MCP dependencies
+- Runtime installs nothing and executes no downloaded shell/CLI program. The
+  optional DB-IP browser renders the official public page under myutils' target
+  and lifecycle guards. MCP dependencies
   come only from the reviewed `mcp/package-lock.json`, restored with
   `npm ci --offline --ignore-scripts` in `mcp/`.
 - Default invocations stay network-free. Only the exact

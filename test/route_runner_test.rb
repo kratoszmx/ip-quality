@@ -474,7 +474,7 @@ class RouteRunnerTest < ReporterTestCase
 
     code, stdout, = run_route(["--direct", "--sources", "independent"])
     assert_equal 0, code
-    assert_includes stdout, "    DB-IP: public page + one visitor-egress lookup"
+    assert_includes stdout, "    DB-IP: visitor-egress demo; daily-limit errors get one same-route IPv4 public detail-page read in temporary hidden Chrome"
     refute_includes stdout, "Scamalytics"
   end
 

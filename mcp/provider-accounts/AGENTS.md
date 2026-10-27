@@ -108,6 +108,18 @@ submission is disabled; saved HTTP reads distinguish authentication from
 These gates do not trigger another password submission or an automatic GUI. A caller may explicitly
 request `visible=true` for a human recovery step. Existing state is preserved.
 
+## Reporter public-page recovery
+
+The provider-owned `dbip-page.mjs` is also imported by offline tests and called
+by the reporter after an explicit visitor-demo daily limit. It is a public-page
+projection, not another MCP server or account login. It directly reuses
+`@myutils/web-text/browser-text`, with a fresh native hidden Chrome profile,
+lease 19606, bounded read, target binding and verified cleanup. It follows the
+reporter's HTTPS proxy environment, not this MCP's default account route.
+Only `--confirm-network-lookup` plus a single stdin `{ip: ...}` request enables
+the CLI read. It saves no cookies, visitor keys or page cache. Dependencies are
+restored from the shared reviewed workspace lockfile; there is no runtime install.
+
 ## HTTP state recovery
 
 After an authorized login, `provider_account_open` on ipapi's `dashboard`

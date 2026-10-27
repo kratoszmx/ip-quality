@@ -163,6 +163,21 @@ would change the measured IP. Egress discovery, DNS and SMTP never use this
 fallback. Source fallback (for example Check.Place to Scamalytics's own page)
 remains distinct from lookup-route fallback to the same provider.
 
+DB-IP adds one selected-route public IP page read only after its visitor demo
+explicitly reports a daily quota. This optional hidden Chrome read uses myutils,
+binds the already discovered IPv4 target, and accepts only the page's explicit
+low/medium/high label after verified cleanup. It neither obtains another visitor
+key nor claims the demo quota recovered. JSON preserves `DemoStatus`, `PageStatus`
+and `Source=public_page`; missing browser dependencies leave risk unknown.
+Browser transport follows the selected proxy/system route; unlike curl it does
+not force an address family. IPv6 targets or curl interface bindings skip it.
+
+ipapi's documented account-denied/invalid-key JSON errors allow one keyless
+lookup for the same target on the same route/family. That published anonymous
+tier supplies context only; type, score and factor tables preserve the primary
+restriction. HTTP 429, generic 403, TLS and certificate errors do not trigger
+this fallback. JSON records both outcomes and the provider's error code.
+
 On October 10, a strict direct run with AliDNS completed the official IPQS
 lookup; the same-key ATT route still failed TLS. IPinfo, Ipregistry, ipapi,
 IPWHOIS and Cloudflare Intel worked on both routes. DB-IP was rate limited.
@@ -178,7 +193,7 @@ These are dated observations, not permanent availability guarantees.
 | Scamalytics | Check.Place relay, then one official public target-page fallback on failure | Fraud score, provider risk label when supplied, country and available proxy/VPN/Tor/server/blacklist/bot indicators; source labeled separately |
 | ipapi.is | Direct public API; anonymous or optional free-tier key | Anonymous ASN/ownership/geography context, or keyed ASN/company type, provider-supplied abuser-score label, and risk factors |
 | IPWHOIS website demo | Direct public demo, no account/key | Country, network context and any supplied proxy/VPN/Tor/hosting flags; explicit demo rate-limit status |
-| DB-IP website visitor demo | Public page token used transiently, no account | Original low/medium/high threat label plus geography, only if returned egress matches target; explicit demo failures |
+| DB-IP website visitor demo and public detail page | Public visitor token used transiently; daily quota can use one hidden-browser page read, no account | Original low/medium/high label bound to the target; geography only when supplied by the demo; each outcome retained |
 | Cloudflare Security Center IP Intelligence | Direct official API when both Cloudflare credentials are configured | Country, ASN/provider context, infrastructure type, named threat categories; no universal numeric score |
 | AbuseIPDB | Official APIv2 with an owned key; otherwise Check.Place relay | Abuse-confidence score and usage type, validated against the requested IP |
 | IP2Location | Check.Place relay, then its public target page on failure | Original 0-99 potential-risk score, usage/company type and explicit proxy-category flags |

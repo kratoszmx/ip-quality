@@ -67,7 +67,7 @@ Each suite maps to one area of the code; check it before adding coverage.
 | `test/check_place_test.rb` | Check.Place relay pauses and MaxMind validation with IPinfo fallback |
 | `test/scamalytics_test.rb` | Scamalytics page parsing and its single same-route fallback |
 | `test/public_fallbacks_test.rb` | IP2Location public fallback; ipdata owned-key risk, relay versus keyless geography, target binding, unknown risk, key redaction and route/failure preservation; official AbuseIPDB key use |
-| `test/public_demo_test.rb` | DB-IP visitor and IPWHOIS demos; explicit-target request suppression |
+| `test/public_demo_test.rb` | DB-IP visitor/page fallback and IPWHOIS demos; explicit-target suppression, quota distinctions, target binding and preserved failure metadata |
 | `test/source_selection_test.rb` | Source presets/IDs, IPQS AliDNS policy, deselected versus failed sources |
 | `test/query_route_test.rb` | IPQS/Cloudflare direct-IPv4 fallback, target preservation, provenance |
 | `test/report_test.rb` | `report/`: matrices, layout widths, JSON typing/masking, report files |
@@ -76,6 +76,13 @@ Each suite maps to one area of the code; check it before adding coverage.
 | `test/prefix_sample_test.rb` | Prefix input rules, batch files, failure/interrupt evidence |
 | `mcp/ipqs/tests/` | IPQS API, HTTP/session auth classification, TOTP policy, secrets, default-windowless stdio contract |
 | `mcp/provider-accounts/tests/` | HTTP identity versus account suspension, reviewed login/terms/challenge outcomes, ipapi automatic-login stop, signup/TOTP, public-provider probes, ipdata Cognito identity/expired tokens/official risk projection, private origin-scoped restoration and default-windowless stdio contract |
+
+`mcp/provider-accounts/tests/dbip-page.test.mjs` uses the sanitized DB-IP page
+fixture and an injected reader, never a live browser. It covers exact record
+matching, explicit threat labels, challenge/timeout/cleanup failure, route
+precedence and unsupported bypass, one bounded read and the CLI consent gate.
+Reporter tests mock page reads and ipapi's denied-key/anonymous responses;
+they also cover crawler-name detection and both languages' failure rows.
 
 All reporter suites inherit `test/support/reporter_test_case.rb`:
 

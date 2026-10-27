@@ -154,11 +154,15 @@ cn:relay)source_label="中继"
 ;;
 cn:demo)source_label="公开示例"
 ;;
+cn:page)source_label="网页备援"
+;;
 en:official)source_label="official"
 ;;
 en:direct)source_label="direct"
 ;;
 en:demo)source_label="public demo"
+;;
+en:page)source_label="page fallback"
 ;;
 *)source_label="relay"
 esac
@@ -175,6 +179,10 @@ cn:upstream_insufficient_credits|cn:official_insufficient_credits)state_label="�
 cn:rate_limited)state_label="限流"
 ;;
 cn:daily_quota_exhausted)state_label="上游报日限额"
+;;
+cn:account_restricted)state_label="账户受限"
+;;
+cn:invalid_api_key)state_label="密钥无效/停用"
 ;;
 cn:skipped_relay_cloudflare_blocked)state_label="中继封锁/暂停"
 ;;
@@ -213,6 +221,10 @@ en:upstream_insufficient_credits|en:official_insufficient_credits)state_label="n
 en:rate_limited)state_label="rate limit"
 ;;
 en:daily_quota_exhausted)state_label="upstream daily limit"
+;;
+en:account_restricted)state_label="account restricted"
+;;
+en:invalid_api_key)state_label="invalid/disabled key"
 ;;
 en:skipped_relay_cloudflare_blocked)state_label="relay blocked/skipped"
 ;;
@@ -302,7 +314,7 @@ companies+=("")
 fi
 if report_source_visible "${ipapi[status]:-}" "${ipapi[susetype]}" "${ipapi[scomtype]}";then
 headers+=("${Font_B}${Font_Cyan}ipapi.is$Font_Suffix")
-statuses+=("$(report_query_status "${ipapi[status]:-ok}")")
+statuses+=("$(report_query_status "${ipapi[primary_status]:-${ipapi[status]:-ok}}")")
 sources+=("$(report_type_source direct)")
 usages+=("${ipapi[susetype]}")
 companies+=("${ipapi[scomtype]}")
@@ -427,7 +439,9 @@ fi
 if report_source_visible "${dbip[status]:-}";then
 headers+=("${Font_B}${Font_Cyan}DB-IP$Font_Suffix")
 scores+=("") risks+=("${dbip[risk]}") scales+=("low/medium/high")
-source_statuses+=("$(report_score_source_status demo "${dbip[risk_status]:-${dbip[status]}}")")
+typeset dbip_source_kind=demo
+[[ "${dbip[source]:-}" == public_page ]]&&dbip_source_kind=page
+source_statuses+=("$(report_score_source_status "$dbip_source_kind" "${dbip[risk_status]:-${dbip[status]}}")")
 fi
 (( ${#headers[@]} )) || return 0
 print -r -- "$Font_B${sscore[title]}$Font_Suffix"

@@ -4,6 +4,19 @@
 # Parsers use provider_json_fields; standalone fixture runs load it here.
 (( ${+functions[provider_json_fields]} ))||source "${${(%):-%x}:A:h:h}/common/provider_values.zsh"
 typeset -gA dbip_parsed=()
+typeset -g dbip_page_program="${${(%):-%x}:A:h:h}/mcp/provider-accounts/dbip-page.mjs"
+
+dbip_lookup_page(){
+emulate -LR zsh
+# Native Chrome cannot pin curl's -6/interface options; never silently change them.
+if [[ "$1" != 4 || -n "${CurlARG:-}" ]];then
+print -r -- '{"status":"route_unsupported"}'
+elif (( ! $+commands[node] )) || [[ ! -f "$dbip_page_program" ]];then
+print -r -- '{"status":"dependency_missing"}'
+else
+jq -nc --arg ip "$IP" '{ip:$ip}'|node "$dbip_page_program" --confirm-network-lookup 2>/dev/null
+fi
+}
 
 dbip_demo_key_from_page(){
 emulate -LR zsh
@@ -91,7 +104,27 @@ return 0
 endpoint="https://api.db-ip.com/v2/$guest_key/self?convertCurrencies"
 fi
 done
-if dbip_parse_response "$response_body" "$IP";then
+if ! dbip_parse_response "$response_body" "$IP";then
+dbip[status]="${dbip_parsed[status]:-invalid_response}"
+[[ "${dbip[status]}" == daily_quota_exhausted ]]||return 0
+dbip[demo_status]="${dbip[status]}"
+show_progress 'DB-IP public page fallback'
+response_body=$(dbip_lookup_page "$1")
+dbip[page_status]=invalid_response
+if provider_json_is_object "$response_body";then
+dbip[page_status]=$(print -rn -- "$response_body"|jq -r '
+  .status | select(. == "ok" or . == "not_provided" or . == "rate_limited" or . == "cloudflare_blocked" or
+    . == "cleanup_unverified" or . == "timeout" or . == "cancelled" or . == "route_unsupported" or
+    . == "dependency_missing" or . == "browser_unavailable") // "invalid_response"' 2>/dev/null)
+fi
+if [[ "${dbip[page_status]}" != ok ]]||! print -rn -- "$response_body"|jq -e --arg ip "$IP" '
+  .ipAddress == $ip and (.threatLevel | type == "string" and test("^(low|medium|high)$"))' >/dev/null 2>&1;then
+[[ "${dbip[page_status]}" == ok ]]&&dbip[page_status]=invalid_response
+return 0
+fi
+dbip_parsed=([ip]="$IP" [risk_status]=ok [threat_level]="$(print -rn -- "$response_body"|jq -r '.threatLevel')")
+dbip[source]=public_page
+fi
 dbip[status]=ok
 dbip[risk_status]="${dbip_parsed[risk_status]}"
 dbip[threat_level]="${dbip_parsed[threat_level]}"
@@ -105,7 +138,4 @@ dbip[countrycode]="${dbip_parsed[country_code]}"
 dbip[country]="${dbip_parsed[country]}"
 dbip[region]="${dbip_parsed[region]}"
 dbip[city]="${dbip_parsed[city]}"
-else
-dbip[status]="${dbip_parsed[status]:-invalid_response}"
-fi
 }

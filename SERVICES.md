@@ -10,6 +10,7 @@ finite support-reply watches outside this repository.
 | Mode | Processes and lifetime |
 | --- | --- |
 | Reporter; direct, specific-IP or prefix-sample runner route | Runs `bin/ip-quality` (one at a time for prefix samples); starts no Mihomo |
+| DB-IP daily-limit recovery in an IPv4 egress report | One Node process imports myutils/web-text and reads the exact public IP page in fresh hidden Chrome; 30-second read budget, operation lease 19606 and dynamic loopback CDP; closes on completion/cancellation |
 | Exact-leaf plan or name listing | Reads local inputs only |
 | `--config-test-only` | Runs Mihomo with `-t` on a rendered private profile, then exits; no listener or lookup |
 | Confirmed exact-leaf report | Starts a private Mihomo on a random `127.0.0.1` port, verifies it owns the listener, runs the reporter through it, then stops it |
@@ -23,6 +24,14 @@ scavenges a workspace left by a dead owner and keeps live-owner workspaces and
 `runner/isolated_mihomo_session.rb`. The installed Clash Verge service, active
 profile and subscription cache are external; this project never starts, stops,
 reloads or rewrites them.
+
+DB-IP's optional browser uses an owned temporary profile under the system
+temporary directory, no saved login/cookies, no persistent cache and no GUI.
+The shared worker owns browser/profile cleanup; the provider accepts the label
+only when cleanup is confirmed. It removes only its empty temporary parent.
+An unverified cleanup leaves the observation unknown. It preserves the HTTPS
+proxy selected by the runner, or explicitly disables proxies for direct mode.
+Unsupported interface/bypass settings and IPv6 targets skip this fallback.
 
 ## Account MCP start and stop
 
