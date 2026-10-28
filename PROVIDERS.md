@@ -150,12 +150,16 @@ could already have consumed a credit, so the retry is capped at one; failures
 on direct do not trigger another provider, account or proxy chain.
 
 The same provider sees the tested target plus the fallback's system-route egress.
-The plan discloses this before confirmation. Terminal status marks direct fallback
-and retains the initial error; JSON `Query.ProviderTransport.IPQS` and
+The plan discloses this before confirmation. Terminal status uses
+`網路備援/<status>` / `network fallback/<status>` for this route recovery and
+DB-IP's page recovery. The route note retains the initial error; JSON
+`Query.ProviderTransport.IPQS` and
 `.Cloudflare` contain `Route` (`selected_route` or `direct_fallback`),
 `OriginalRouteFailure` and `TargetUnchanged`. Unattempted official queries have
 null route/failure. `ProviderStatus` describes the final response. This metadata
 does not claim that the selected node can now connect to that provider.
+The shared display label does not change provenance: JSON still distinguishes
+`direct_fallback` transport from DB-IP's `public_page` source.
 
 Other sources keep their existing selected-route contracts. In particular,
 DB-IP's visitor/self demo and Ping0 observe the caller: changing their transport

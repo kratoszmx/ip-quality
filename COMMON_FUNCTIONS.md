@@ -91,7 +91,10 @@ provider functions resolve the path from their own source file.
 
 Table layout (`display_width`, `terminal_table_*`, `calc_padding`) is report-only
 and lives in `report/table.zsh`; it needs a UTF-8 locale, which both entrypoints
-and the test suites pin.
+and the test suites pin. After ANSI cleanup, `display_width` uses zsh's native
+`(m)#` terminal-cell count: Chinese/full-width glyphs, narrow punctuation and
+combining marks retain their actual widths. Do not count every non-ASCII
+character as two cells; that shifts status rows containing a middle dot.
 
 ## Ruby helper (`network_environment.rb`)
 

@@ -145,6 +145,7 @@ esac
 report_score_source_status(){
 typeset source_kind="$1" query_state="$2"
 typeset source_label
+[[ "${3:-}" == direct_fallback ]]&&source_kind=fallback
 case "$YY:$source_kind" in
 cn:official)source_label="官方"
 ;;
@@ -154,7 +155,7 @@ cn:relay)source_label="中继"
 ;;
 cn:demo)source_label="公开示例"
 ;;
-cn:page)source_label="网页备援"
+cn:page|cn:fallback)source_label="網路備援"
 ;;
 en:official)source_label="official"
 ;;
@@ -162,11 +163,11 @@ en:direct)source_label="direct"
 ;;
 en:demo)source_label="public demo"
 ;;
-en:page)source_label="page fallback"
+en:page|en:fallback)source_label="network fallback"
 ;;
 *)source_label="relay"
 esac
-print -rn -- "${Font_Cyan:-}$source_label${Font_Suffix:-}/$(report_query_status "$query_state" "${3:-}")"
+print -rn -- "${Font_Cyan:-}$source_label${Font_Suffix:-}/$(report_query_status "$query_state")"
 }
 
 report_query_status(){
@@ -257,7 +258,7 @@ en:disabled)state_label="not selected"
 *)state_label="failed"
 esac
 if [[ "${2:-}" == direct_fallback ]];then
-[[ "$YY" == cn ]]&&state_label+="·直连备援"||state_label+=" via direct fallback"
+[[ "$YY" == cn ]]&&state_label="網路備援/$state_label"||state_label="network fallback/$state_label"
 fi
 print -rn -- "${state_color}$state_label${Font_Suffix:-}"
 }
@@ -265,9 +266,9 @@ print -rn -- "${state_color}$state_label${Font_Suffix:-}"
 report_query_route_note(){
 [[ "$2" == direct_fallback ]]||return 0
 if [[ "$YY" == cn ]];then
-print -r -- "$1 查询通路：原通路$(report_query_status "$3") → 直连备援；查询目标仍为所选 IP。"
+print -r -- "$1 查询通路：原通路$(report_query_status "$3") → 網路備援；查询目标仍为所选 IP。"
 else
-print -r -- "$1 lookup route: original route $(report_query_status "$3") → direct fallback; the selected target IP is unchanged."
+print -r -- "$1 lookup route: original route $(report_query_status "$3") → network fallback; the selected target IP is unchanged."
 fi
 }
 

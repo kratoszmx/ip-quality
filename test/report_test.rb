@@ -76,7 +76,7 @@ class ReportTest < ReporterTestCase
     ZSH
     %w[cn en].each do |language|
       output = zsh!(probe, REPUTATION_REPORT, TERMINAL_LIBRARY, language)
-      assert_includes output, language == "cn" ? "网页备援/可用" : "page fallback/available"
+      assert_includes output, language == "cn" ? "網路備援/可用" : "network fallback/available"
       assert_includes output, language == "cn" ? "账户受限" : "account restricted"
       assert_includes output, "ipapi.is"
       types, scores, factors = output.split(/Scores\n|Factors\n/)
@@ -380,6 +380,19 @@ class ReportTest < ReporterTestCase
     assert_empty stderr
   end
 
+  def test_display_width_counts_narrow_unicode_and_combining_marks_as_terminal_cells
+    probe = <<~'ZSH'
+      source "$1"
+      for value in '可用·直连备援' 'é' $'e\u0301' 'ＡB' '→' $'\033[32m可用·直连备援\033[0m'; do
+        display_width "$value"; print -r -- "$REPLY"
+      done
+      terminal_table_cell $'\033[32m可用·直连备援\033[0m' 16
+      print -r -- '|'
+    ZSH
+    output = zsh!(probe, REPORT_TABLE_LIBRARY)
+    assert_equal "13\n1\n1\n3\n1\n13\n\e[32m可用·直连备援\e[0m   |\n", output
+  end
+
   def test_reputation_report_uses_provider_rows_without_the_fragile_score_bar
     report_probe = <<~'ZSH'
       setopt KSH_ARRAYS
@@ -431,7 +444,7 @@ class ReportTest < ReporterTestCase
       Back_Yellow=$'\033[43m' Back_Purple=$'\033[45m' Font_Suffix=$'\033[0m'
       YY=cn
       typeset -A stype sscore sfactor
-      typeset -A ipinfo ipregistry ipapi ip2location abuseipdb scamalytics ipqs ipdata
+      typeset -A ipinfo ipregistry ipapi ip2location abuseipdb scamalytics ipqs ipdata dbip
       stype[title]='二、IP类型属性' sscore[title]='三、风险评分' sfactor[title]='四、风险因子'
       stype[isp]="   $Back_Green$Font_White$Font_B 家宽 $Font_Suffix   "
       stype[mobile]="   $Back_Green$Font_White$Font_B 手机 $Font_Suffix   "
@@ -443,6 +456,8 @@ class ReportTest < ReporterTestCase
       ipinfo[susetype]="${stype[isp]}" ipinfo[scomtype]="${stype[isp]}"
       ipregistry[susetype]="${stype[hosting]}" ipregistry[scomtype]="${stype[hosting]}"
       ipqs[susetype]="${stype[hosting]}" ipqs[source]=official_api
+      ipqs[status]=ok ipqs[query_route]=direct_fallback ipqs[primary_status]=tls_error
+      dbip[status]=ok dbip[source]=public_page dbip[risk]=low
       ipapi[susetype]="${stype[isp]}" ipapi[scomtype]="${stype[isp]}"
       ip2location[susetype]="${stype[mobile]}" ip2location[scomtype]="${stype[mobile]}"
       abuseipdb[susetype]="${stype[isp]}"
@@ -477,7 +492,7 @@ class ReportTest < ReporterTestCase
     refute_includes plain, "—"
     score_row = plain.lines.find { |line| line.start_with?("分值") }
     refute_nil score_row
-    assert_equal ["分值", "3", "3", "0.00%", "0", "87"], score_row.split("|").map(&:strip)
+    assert_equal ["分值", "3", "3", "0.00%", "0", "87", "-"], score_row.split("|").map(&:strip)
     sections = [
       plain[/二、IP类型属性\n(.*?)三、风险评分\n/m, 1],
       plain[/三、风险评分\n(.*?)四、风险因子\n/m, 1],
@@ -487,6 +502,11 @@ class ReportTest < ReporterTestCase
       refute_nil section
       assert_aligned_table(section)
     end
+    source_status = sections[1].lines.find { |line| line.start_with?("来源/状态") }
+    assert_equal ["網路備援/可用", "網路備援/可用"], source_status.split("|").last(2).map(&:strip)
+    [sections[0], sections[2]].each { |section| assert_includes section, "網路備援/可用" }
+    refute_includes plain, "直连备援"
+    refute_includes plain, "网页备援"
     assert_equal 1, sections[0].lines.count { |line| line.start_with?("参数") }
     assert_equal 1, sections[1].lines.count { |line| line.start_with?("参数") }
     assert_equal 1, sections[2].lines.count { |line| line.start_with?("参数") }
@@ -737,13 +757,24 @@ class ReportTest < ReporterTestCase
 
   private
 
-  # Keep the width oracle independent of production zsh helpers. A lone row
-  # cannot establish alignment; compare every cell, including the last column.
+  # Independent oracle for the fixture repertoire: CJK/full-width characters
+  # use two cells, combining marks use none, and Latin/punctuation use one.
+  # A lone row cannot prove alignment; include the last column in every row.
   def assert_aligned_table(output, minimum_rows: 2)
     rows = output.gsub(/\e\[[0-9;]*m/, "").lines.map(&:chomp).select { |line| line.include?("|") }
     assert_operator rows.length, :>=, minimum_rows, output
     widths = rows.map do |line|
-      line.split("|", -1).map { |cell| cell.chars.sum { |char| char.ascii_only? ? 1 : 2 } }
+      line.split("|", -1).map do |cell|
+        cell.chars.sum do |char|
+          if char.match?(/\p{M}/)
+            0
+          elsif char.match?(/[\p{Han}\p{Hiragana}\p{Katakana}\p{Hangul}\u3000-\u303f\uff01-\uff60\uffe0-\uffe6]/)
+            2
+          else
+            1
+          end
+        end
+      end
     end
     assert_equal 1, widths.uniq.length, rows.join("\n")
   end

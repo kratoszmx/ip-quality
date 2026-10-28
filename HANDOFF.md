@@ -2,11 +2,20 @@
 
 ## Status — 2026-10-28
 
-- Reporter `v2026-10-28-standalone.52` (`script_version` in `bin/ip-quality`).
+- Reporter `v2026-10-28-standalone.53` (`script_version` in `bin/ip-quality`).
 - Last complete offline run, October 28: `/bin/zsh -f scripts/test-offline`
-  passed — reporter 151 Minitest cases / 4397 assertions,
+  passed — reporter 152 Minitest cases / 4410 assertions,
   IPQS MCP 22, provider accounts 58. The separate synthetic IPQS
   browser-text suite last passed 10/10 at commit `782bce3`, with no live requests.
+- October 28 report layout: reproduced the shifted IPQS fallback row. The old
+  width heuristic counted every non-ASCII character twice, including the narrow
+  middle dot. Report tables now use zsh's native Unicode terminal widths.
+  IPQS/Cloudflare route recovery and DB-IP page recovery share the terminal
+  label `網路備援/<status>` (`network fallback/<status>` in English), with an
+  ASCII separator. JSON keeps the actual source, transport and original error.
+  Offline regressions cover both recoveries together across the type, score
+  and factor matrices, plus ANSI, narrow Latin letters and combining marks.
+  Evidence: `reports/table-alignment-20261028/offline.log`.
 - October 28 ipapi recovery: the user submitted the replacement account's
   signup in ordinary Chrome. Mail-manager retrieved the activation email;
   activation and the already-authorized October 3 terms completed for that

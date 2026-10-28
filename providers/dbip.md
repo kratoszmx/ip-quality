@@ -25,7 +25,7 @@ route for direct runs. It does not switch egress, rotate visitor tokens or
 retry limits. Browser transport is dual-stack rather than curl's forced family;
 only IPv4 target pages are supported. IPv6, interface binding, unsupported
 proxy/bypass settings and explicit-target mode skip this fallback. Section 3
-labels success `网页备援/可用` / `page fallback/available`, with a null numeric
+labels success `網路備援/可用` / `network fallback/available`, with a null numeric
 score. Failed fallback metadata stays in JSON beside the original daily error.
 Website label success does not imply free geography, a paid account or restored
 visitor API quota.

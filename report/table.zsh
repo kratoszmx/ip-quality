@@ -2,12 +2,12 @@
 # Only report/ draws tables; ANSI cleanup comes from common/terminal.zsh.
 (( ${+functions[ansi_plain]} ))||source "${${(%):-%x}:A:h:h}/common/terminal.zsh"
 
-# REPLY = display cells of one label after ANSI cleanup (ASCII 1, others 2).
+# REPLY = terminal cells after ANSI cleanup, using zsh's native Unicode widths.
+# Narrow punctuation/Latin letters use one cell; combining marks use none.
 display_width(){
 emulate -LR zsh
 ansi_plain "${1-}"
-typeset non_ascii="${REPLY//[[:ascii:]]/}"
-REPLY=$(( ${#REPLY} + ${#non_ascii} ))
+REPLY=${(m)#REPLY}
 }
 
 # Cells are supplied in row order; each column grows independently.
