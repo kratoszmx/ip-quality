@@ -25,11 +25,29 @@ test('saved login accepts only the reviewed origin, POST action and unique crede
   }
 });
 
-test('ipapi bot-login restriction stops before any saved credentials, browser or network use', async () => {
-  assert.equal(acceptsLoginForm('ipapi', { url: 'https://ipapi.is/app/', action: '/app/', method: 'post', fields: ['email', 'pass'], button: 'Sign In' }), false);
-  const result = await loginAccount('ipapi', 'USE_SAVED_ACCOUNT_CREDENTIALS');
-  assert.equal(result.state, 'manual_login_required');
-  assert.equal(result.liveAuthenticationChecked, false);
-  assert.equal(result.credentialsSubmitted, false);
-  assert.equal(result.retryAutomatically, false);
-});
+for (const [name, identity, expectedState] of [
+  ['valid session is reused over HTTP', { authenticated: true, state: 'authenticated', httpStatus: 200 }, 'authenticated'],
+  ['expired session never starts a password login', { authenticated: false, state: 'login_required', httpStatus: 302 }, 'manual_login_required'],
+  ['missing local session does not claim a live identity check', { authenticated: false, state: 'session_unavailable' }, 'manual_login_required'],
+  ['suspended identity is preserved rather than accepted as usable', { authenticated: true, state: 'account_suspended', apiUsable: false, restriction: 'bot_login', httpStatus: 200 }, 'account_suspended'],
+]) {
+  test(`ipapi ${name}`, async () => {
+    assert.equal(acceptsLoginForm('ipapi', { url: 'https://ipapi.is/app/', action: '/app/', method: 'post', fields: ['email', 'pass'], button: 'Sign In' }), false);
+    const calls = [];
+    const result = await loginAccount('ipapi', 'USE_SAVED_ACCOUNT_CREDENTIALS', {
+      privateAccount: async provider => { calls.push(['account', provider]); return { email: 'owner@example.invalid' }; },
+      readHttpAccount: async (provider, email) => { calls.push(['http', provider, email]); return { provider, backend: 'http', ...identity }; },
+      withSession: async () => { assert.fail('ipapi session reuse must never open a browser'); },
+    });
+    assert.deepEqual(calls, [['account', 'ipapi'], ['http', 'ipapi', 'owner@example.invalid']]);
+    assert.equal(result.state, expectedState);
+    assert.equal(result.authenticated, identity.authenticated);
+    assert.equal(result.liveAuthenticationChecked, Number.isInteger(identity.httpStatus));
+    assert.equal(result.credentialsSubmitted, false);
+    if (expectedState !== 'authenticated') assert.equal(result.retryAutomatically, false);
+    if (expectedState === 'account_suspended') {
+      assert.equal(result.apiUsable, false);
+      assert.equal(result.restriction, 'bot_login');
+    }
+  });
+}

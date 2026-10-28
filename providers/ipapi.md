@@ -48,7 +48,18 @@ and unlocks the complete response used by the type, score, and factor tables.
 The reporter reads that optional key from the file assignment `IPAPI_API_KEY`
 or the raw-key file `secrets/ipapi`.
 
-October 26 recovery check: the dashboard reported `bot_login` account suspension.
+October 28 replacement-account recovery: the user completed a separately
+authorized free signup, followed by mail activation and the previously accepted
+October 3 terms. The dashboard showed 1,000 daily requests. The new key returned
+full risk fields for `1.1.1.1` over direct and default-proxy HTTP routes before
+promotion to `secrets/ipapi`. A focused reporter run returned keyed full mode,
+type/score/factor statuses `ok`, and supplied risk flags. The old account/key
+and HTTP state are archived separately. This restores the official source;
+it does not establish recovery of Check.Place or the old suspended account.
+Evidence: `reports/ipapi-account-20261028/` and
+[private account records](../CREDENTIALS.md#account-mcp-files).
+
+October 26 recovery check on the former account: the dashboard reported `bot_login` account suspension.
 With explicit user authorization, its normal `Generate new API key` action
 produced a different key and the reporter's owner-only key file was updated.
 One lookup with the new key still returned HTTP 403 (`ERR_FORBIDDEN_INVALID_API_KEY`);
@@ -72,7 +83,7 @@ bounded keyed request for 1.1.1.1 returned `ERR_FORBIDDEN_NOT_ALLOWED`, which th
 current official documentation explicitly identifies as an account denied
 permission to query. This is stronger evidence than the earlier invalid-key
 code; connection troubleshooting or another key rotation cannot clear an
-account restriction. The next recovery step is an account review through the
+account restriction. Recovering that former account would require review through the
 [official support contact](https://ipapi.is/contact.html). The user has not
 authorized the ipapi appeal to be sent; no message or automatic login was made.
 

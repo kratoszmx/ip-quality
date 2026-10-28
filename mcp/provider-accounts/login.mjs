@@ -40,18 +40,26 @@ export function acceptsLoginForm(provider, metadata) {
   } catch { return false; }
 }
 
-export async function loginAccount(provider, confirmation) {
+export async function loginAccount(provider, confirmation, dependencies = {}) {
   if (confirmation !== 'USE_SAVED_ACCOUNT_CREDENTIALS') throw new Error('Saved login needs explicit task authorization.');
   const config = providerConfig(provider), policy = loginForms[provider];
-  // The provider explicitly suspended the account for bot-controlled login.
-  // Do not retry credentials in another browser or route to evade that decision.
-  if (!policy) return { provider, state: 'manual_login_required', liveAuthenticationChecked: false,
+  const account = await (dependencies.privateAccount || privateAccount)(provider);
+  const existing = await (dependencies.readHttpAccount || readHttpAccount)(provider, account.email);
+  const liveAuthenticationChecked = Number.isInteger(existing.httpStatus);
+  if (existing.authenticated && existing.state === 'authenticated') {
+    return { ...existing, liveAuthenticationChecked, credentialsSubmitted: false };
+  }
+  // Reusing a verified session is distinct from a new password submission.
+  // ipapi's former account was suspended for bot login; keep that submission
+  // disabled even after a manually registered replacement has a usable session.
+  if (!policy) return { ...existing,
+    state: existing.state === 'account_suspended' ? 'account_suspended' : 'manual_login_required',
+    liveAuthenticationChecked,
     credentialsSubmitted: false, retryAutomatically: false,
-    nextStep: 'Automated ipapi login is disabled after the provider bot_login suspension. Use the HTTP account read for existing state; account recovery requires provider support.' };
-  const account = await privateAccount(provider);
-  const existing = await readHttpAccount(provider, account.email);
-  if (existing.authenticated) return { ...existing, credentialsSubmitted: false };
-  return withSession(provider, async page => {
+    nextStep: existing.state === 'account_suspended'
+      ? 'The saved account is suspended; provider support must review it. No password retry was made.'
+      : 'Restore the dedicated saved session with the approved windowless recovery flow. Automated ipapi password submission remains disabled.' };
+  return (dependencies.withSession || withSession)(provider, async page => {
     const response = await page.goto(accountUrl(provider, 'login'), { waitUntil: 'domcontentloaded', timeout: 20000 });
     if (response?.status() >= 400) return { provider, authenticated: false, state: 'access_unavailable', httpStatus: response.status(), credentialsSubmitted: false };
     await page.waitForFunction(() => document.querySelector('input[type="password"]') || /verify you are human|let us know you are human/i.test(document.body?.innerText || ''), undefined, { timeout: 10000, polling: 100 }).catch(() => {});

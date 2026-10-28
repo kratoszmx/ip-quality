@@ -61,8 +61,11 @@ An explicitly requested manual-account handoff may instead use myutils
 `openRealChrome` with a dedicated persistent profile and no CDP. The user owns
 that visible browser's remaining lifetime; it is not one of the MCP's temporary
 sessions and is not closed by `provider_account_close_browsers`. The October 27
-ipapi candidate profile is listed in [CREDENTIALS.md](CREDENTIALS.md#account-mcp-files).
-Retaining it proves neither signup nor authentication. It is never a reporter
+ipapi registration profile is listed in [CREDENTIALS.md](CREDENTIALS.md#account-mcp-files).
+Its GUI process was closed after successful activation on October 28. myutils
+headless restored the saved profile; routine maintenance now uses HTTP or the
+native-hidden MCP browser, both verified without an OS window. Retaining a
+profile alone proves neither signup nor authentication. It is never a reporter
 cache and must not be restored into another account's automated session.
 
 ## External weekly check

@@ -54,7 +54,7 @@ is a different mode and still received IPQS HTTP 403 on October 26.
 | Platform | Routine access | Fresh login or recovery | 2FA |
 | --- | --- | --- | --- |
 | IPQS | API and saved-session auth check over HTTP; dashboard content/controls through native hidden Chrome | Windowless saved credentials + reviewed TOTP; verified October 26 | TOTP enabled |
-| ipapi.is | Saved-state HTTP dashboard read; API currently HTTP 403 | Automated login disabled after `bot_login` account suspension. October 26 authorized visible Chrome login also succeeded but did not remove the suspension | No enrollment entry offered |
+| ipapi.is | Replacement free account: keyed HTTP risk API and saved-state HTTP dashboard, verified October 28 | myutils headless restored the dedicated saved profile; native-hidden MCP dashboard also passed. Routine login reuses HTTP state. Automatic password submission remains disabled; no routine visible browser | No enrollment entry in the reviewed dashboard |
 | Cloudflare | Saved-state HTTP identity read; Intel token over HTTP | Native hidden Chrome; October 26 password flow required human verification; Intel API still passed | TOTP enabled, recovery codes saved |
 | AbuseIPDB | Saved-state HTTP account read; APIv2 key over HTTP | Native hidden Chrome; login and subsequent HTTP identity verified October 26 | No enrollment entry offered |
 | ipdata | Saved-token HTTP account check; owned free developer key over HTTP | October 27 one authorized native-hidden signup/login; saved state also verified in native headless Chrome. No automatic password submission or token refresh | No enrollment control on the reviewed Profile page; GetUser returned no enrolled factor |
@@ -84,7 +84,7 @@ website through a browser is not account authentication.
   snapshots do not establish that HTTP is intrinsically unsupported.
 - A loaded login page is not successful login. Cloudflare's hidden page loaded
   but its submitted flow required a challenge. No automatic credential retry.
-- After explicit user approval, ipapi's October 3 terms were accepted on
+- For the former account, ipapi's October 3 terms were accepted with approval on
   October 26. Exact-account HTTP identity passed, but the dashboard explicitly
   reported `bot_login` suspension for automated browser sign-in. The stored key
   matches the dashboard; API HTTP 403 is not a stale-key or pending-terms result.
@@ -93,6 +93,14 @@ website through a browser is not account authentication.
   a later authorized normal key regeneration produced a new key but its first
   lookup still returned HTTP 403/INVALID_API_KEY. The reporter key was updated
   privately; the suspended account did not become usable through rotation.
+- October 28 replacement-account signup was submitted by the user in ordinary
+  non-CDP Chrome, with native Accessibility text controls filling the form.
+  The same approved terms version was accepted after mail activation. The new
+  free key passed both direct and proxy full-risk queries before promotion.
+  The GUI was then closed; myutils headless restored its persistent profile,
+  exported private state, and pure HTTP independently verified the exact new
+  account with Chrome closed. This proves session reuse, not a new automated
+  password-login method. Preserve the password-submission stop if state expires.
 - Signups through proxy routes were rejected: ipapi succeeded only on explicit
   DIRECT, and AbuseIPDB's fresh ATT headless signup needed its dedicated headed
   profile.
@@ -117,7 +125,8 @@ Dated observations, not availability guarantees; private receipts stay under
 
 | Date | Evidence |
 | --- | --- |
-| 2026-10-27, candidate ipapi account | Separately authorized new credentials preserved privately; no new account/key proved. Direct visible CDP Chrome signup explicitly rejected automation. The parser now distinguishes `automated_browser_blocked` from an ambiguous submission. Outlook authentication/all-folder verification-mail search succeeded with no matching recent message. User-requested manual Chrome uses myutils `openRealChrome`, no CDP and a persistent private profile. After the user granted macOS Accessibility, native text controls bound to the owned Chrome PID and signup URL verified the filled email/password and Hong Kong selection. `--force-renderer-accessibility` exposes the form without Chrome's Apple Events JavaScript setting. Signup is left to the user; a filled form is not an account or key proof. The active suspended account/key remain unchanged. |
+| 2026-10-28, replacement ipapi account | User-completed signup, mail-manager activation and previously approved October 3 terms led to the exact new free account (1,000 daily queries). Labelled key and full-risk API passed direct and default-proxy checks. Reporter returned full keyed type/score/factors. Owned GUI closed; myutils headless recovery, native-hidden MCP dashboard and browser-closed HTTP identity/API passed. Canonical credentials/session promoted; former account archived. Evidence: `reports/ipapi-account-20261028/`. |
+| 2026-10-27, candidate ipapi account | Direct visible CDP signup explicitly rejected automation; the parser distinguishes `automated_browser_blocked`. The manual alternative used myutils `openRealChrome`, a persistent private profile and native Accessibility text controls bound to the owned PID and signup URL. No CDP, screenshots or automatic Signup click. The handoff completed October 28 as recorded above. |
 | 2026-10-27 | ipdata free developer account, email activation and API key verified; dashboard showed Free Tier/$0/1,500 daily queries. Direct and isolated ATT reporter runs returned official risk flags. Native headless dashboard/Profile and browserless GetUser proved the same account/key; no MFA control observed. ipapi HTTP account remained suspended, keyed API returned ERR_FORBIDDEN_NOT_ALLOWED, while the anonymous API root returned geography. Private evidence and unsent appeal draft: `reports/provider-recheck-20261027/`. |
 | 2026-10-26 | IPQS direct IPv4 login + TOTP and API passed; ATT curl still failed pre-HTTP TLS, including a pinned IPv4/TLS 1.2 test. Native-hidden IPQS login and restored hidden dashboard passed; HTTP auth passed. AbuseIPDB native-hidden login and HTTP identity passed; public profile/domain still off. Cloudflare challenge remains, while Intel API passed. ipapi terms accepted with user permission; both hidden and explicit visible Chrome reached the account, but `bot_login` suspension/API 403 persists. Private evidence/drafts: `reports/ipqs-support-20261026-rerun/`; no follow-up sent. |
 | 2026-10-23 | Reporter direct and ATT runs returned official IPQS and Cloudflare results with the saved keys (see [HANDOFF.md](HANDOFF.md#latest-saved-live-evidence)) |
@@ -136,8 +145,9 @@ Dated observations, not availability guarantees; private receipts stay under
 - Provider accounts: `provider_account_login` with
   `confirmation=USE_SAVED_ACCOUNT_CREDENTIALS` checks existing HTTP identity
   then permits one reviewed windowless Cloudflare/AbuseIPDB password submission.
-  ipapi returns a local manual-recovery requirement without reading credentials
-  or launching Chrome. Updated terms,
+  ipapi also reuses a verified HTTP session, but expired state returns a
+  manual-recovery requirement without launching Chrome or submitting a
+  password. A suspended identity remains explicitly suspended. Updated terms,
   human verification, rejected credentials and unconfirmed outcomes remain
   distinct. `provider_account_close_browsers` closes this server's owned
   browsers. `provider_account_open` opens one allowlisted page and

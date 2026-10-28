@@ -1,12 +1,27 @@
 # Current handoff
 
-## Status — 2026-10-27
+## Status — 2026-10-28
 
-- Reporter `v2026-10-27-standalone.51` (`script_version` in `bin/ip-quality`).
-- Last complete offline run, October 27: `/bin/zsh -f scripts/test-offline`
+- Reporter `v2026-10-28-standalone.52` (`script_version` in `bin/ip-quality`).
+- Last complete offline run, October 28: `/bin/zsh -f scripts/test-offline`
   passed — reporter 151 Minitest cases / 4397 assertions,
-  IPQS MCP 22, provider accounts 55. The separate synthetic IPQS
+  IPQS MCP 22, provider accounts 58. The separate synthetic IPQS
   browser-text suite last passed 10/10 at commit `782bce3`, with no live requests.
+- October 28 ipapi recovery: the user submitted the replacement account's
+  signup in ordinary Chrome. Mail-manager retrieved the activation email;
+  activation and the already-authorized October 3 terms completed for that
+  exact account. The free dashboard shows 1,000 daily queries. Its new key
+  returned full risk data for `1.1.1.1` on direct and default-proxy HTTP routes;
+  a reporter run also returned `Mode=full`, `CredentialMode=key`, and `ok` in
+  all three ipapi matrices. The reporter key/account and HTTP session now use
+  this verified account; the former suspended account is archived privately.
+  The owned GUI Chrome was closed. myutils headless restored its saved profile,
+  the normal native-hidden MCP dashboard passed, and independent HTTP identity
+  and API passed with browsers closed. Routine MCP login now reuses valid HTTP
+  state without a password submission; expired or suspended state still cannot
+  start an automated ipapi password login. Evidence:
+  `reports/ipapi-account-20261028/` and the private candidate receipts listed in
+  [CREDENTIALS.md](CREDENTIALS.md#account-mcp-files).
 - Live: complete all-source direct report on October 27; latest complete ATT
   remains October 23 (table below). Direct DB-IP recovered through its new
   public-page fallback; ipapi recovered anonymous context only, with its risk
@@ -20,7 +35,7 @@
   unknown because the response lacks those fields. HTTP account identity and
   native headless dashboard/Profile passed; the existing provider-accounts
   MCP now maintains this account. No billing trial or 2FA control was enabled.
-  ipapi still returns API 403 with `ERR_FORBIDDEN_NOT_ALLOWED`; saved HTTP
+  That day's old ipapi account returned API 403 with `ERR_FORBIDDEN_NOT_ALLOWED`; saved HTTP
   identity confirms `bot_login` suspension. Its anonymous API root returns
   geography successfully, which does not establish access with this account's
   key. The requested bilingual appeal is saved privately and was not sent.
@@ -53,18 +68,10 @@
   ends that wait without retrying; two regressions cover the refusal.
   Mail-manager authenticated the requested Outlook mailbox, including an
   all-folder search, but found no recent ipapi verification message.
-  The user's next step is clicking Create Free Account in ordinary Chrome.
-  myutils `openRealChrome` opened the persistent dedicated profile without CDP.
-  After the user granted macOS Accessibility, native text controls bound to
-  that exact Chrome process and signup URL filled and verified the candidate
-  email, populated password and Hong Kong country. The browser's standard
-  `--force-renderer-accessibility` flag exposes these controls; Chrome's
-  "Allow JavaScript from Apple Events" setting is no longer needed. No
-  screenshot/OCR or automatic form submission was used. Native Apple Events
-  addressed by app name had resolved another Chrome process, so future native
-  access must bind the owned profile's PID and verify the page URL. Private
-  `native-fill-result.json` records the successful fill, not registration.
-  Account creation, verification mail and a working new key remain unproved.
+  myutils `openRealChrome` then opened a persistent dedicated profile without
+  CDP. User-approved macOS Accessibility exposed the form as native text
+  controls, bound to the exact owned PID and signup URL. That manual handoff
+  completed on October 28 as recorded above; it is no longer pending.
   Candidate paths: [CREDENTIALS.md](CREDENTIALS.md#account-mcp-files).
   Current offline evidence: `reports/ipapi-registration-20261027/offline.log`.
 - Git: only `main`. Push to `github-kratoszmx` (`kratoszmx/ip-quality`) and
@@ -134,22 +141,6 @@
   and ATT. Upstream can still render a Lite report by skipping several relay
   sources; that is not relay recovery. Source versions, evidence and scope:
   [NodeQuality comparison](providers/check_place.md#current-nodequality-comparison).
-- **ipapi account:** User-approved updated terms were accepted October 26.
-  Exact-account HTTP and visible Chrome password login succeed, but the account
-  explicitly reports `bot_login` suspension and API 403. Stored key matches.
-  Automated password login is disabled. The user later authorized the normal
-  dashboard key-regeneration action; it produced a new key, now saved in
-  `secrets/ipapi`, but its test still returned 403/INVALID_API_KEY and suspension
-  remained. Its old key and one-submit receipt are private. The Check.Place
-  ipapi relay returned 403 on default proxy, direct IPv4 and isolated ATT too.
-  A fresh direct Chrome read through a newly started MCP 0.5.17 also returned
-  403/challenge; the user separately confirmed the same relay block in Safari.
-  October 27 account HTTP identity still proves suspension. The official API
-  now explicitly returns `ERR_FORBIDDEN_NOT_ALLOWED` (rather than the earlier
-  invalid/disabled-key code), strengthening the account-restriction diagnosis.
-  The appropriate next step is a support review at the official contact address,
-  not another key rotation or paid upgrade. The user's hold on the ipapi appeal
-  remains in force; this check sent no message and submitted no password.
 - **Cloudflare account:** Native hidden Chrome loaded the login form, but one
   password submission required human verification. Existing saved HTTP identity
   returned 403 on proxy/direct. Official Intel API still succeeded; no GUI

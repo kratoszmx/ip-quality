@@ -75,7 +75,7 @@ Each suite maps to one area of the code; check it before adding coverage.
 | `test/route_runner_test.rb` | `bin/ip-quality-route` and `runner/`: menus, listings, option rules, leaf rendering, Mihomo lifecycle, snapshots, printable text |
 | `test/prefix_sample_test.rb` | Prefix input rules, batch files, failure/interrupt evidence |
 | `mcp/ipqs/tests/` | IPQS API, HTTP/session auth classification, TOTP policy, secrets, default-windowless stdio contract |
-| `mcp/provider-accounts/tests/` | HTTP identity versus account suspension, reviewed login/terms/challenge outcomes, ipapi automatic-login stop, signup/TOTP, public-provider probes, ipdata Cognito identity/expired tokens/official risk projection, private origin-scoped restoration and default-windowless stdio contract |
+| `mcp/provider-accounts/tests/` | HTTP identity versus account suspension, reviewed login/terms/challenge outcomes, ipapi HTTP session reuse and password-submission stop for expired/suspended state, signup/TOTP, public-provider probes, ipdata Cognito identity/expired tokens/official risk projection, private origin-scoped restoration and default-windowless stdio contract |
 
 `mcp/provider-accounts/tests/dbip-page.test.mjs` uses the sanitized DB-IP page
 fixture and an injected reader, never a live browser. It covers exact record
