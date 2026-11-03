@@ -12,6 +12,8 @@ test('ipapi account suspension remains explicit even with a valid saved login', 
   assert.equal(result.apiUsable, false);
   assert.equal(result.restriction, 'bot_login');
   assert.equal(httpAccountIdentity('ipapi', 200, 'text/html', html + `<script>${notice}</script>`, email).state, 'authenticated');
+  assert.equal(httpAccountIdentity('ipapi', 200, 'text/html', html + `<template>${notice}</template>`, email).state, 'authenticated');
+  assert.equal(httpAccountIdentity('ipapi', 200, 'text/html', html + '<div data-msg="your account was suspended"></div>', email).state, 'authenticated');
   assert.equal(httpAccountIdentity('ipapi', 200, 'text/html', notice, email).authenticated, false);
 });
 test('HTTP identity requires the matching server account, not a local state file or status 200', () => {
@@ -64,4 +66,19 @@ test('AbuseIPDB HTTP identity ignores feedback/change-password forms and exposes
     assert.equal(httpAccountIdentity('abuseipdb', 200, 'text/html', invalid, email).authenticated, false);
   }
   assert.equal(httpAccountIdentity('abuseipdb', 302, 'text/html', body, email).authenticated, false);
+});
+
+test('hidden forms and data attributes cannot establish identity or privacy settings', () => {
+  const abuse = `<form action="/account/update-basics"><input name="email" value="${email}">
+    <input type="checkbox" name="public" title=" checked "></form><form action="/logout"></form>`;
+  for (const [provider, proof] of [['ipapi', html], ['abuseipdb', abuse]]) {
+    for (const hidden of [`<template>${proof}</template>`, `<div hidden>${proof}</div>`, `<section inert>${proof}</section>`,
+      `<div style="display: none">${proof}</div>`, proof.replace(/ (href|action)=/g, ' data-$1=')]) {
+      assert.equal(httpAccountIdentity(provider, 200, 'text/html', '<p>Loading</p>' + hidden, email).authenticated, false);
+    }
+  }
+  const result = httpAccountIdentity('abuseipdb', 200, 'text/html', abuse + '<template><form action="/account/resend-email-verification"></form></template>', email);
+  assert.equal(result.publicProfile, false);
+  assert.equal(result.emailVerificationPending, false);
+  assert.equal(httpAccountIdentity('ipapi', 200, 'text/html', html.replace('name="email"', 'type="hidden" name="email"'), email).authenticated, false);
 });

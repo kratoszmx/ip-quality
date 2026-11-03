@@ -2,6 +2,8 @@ import { fileURLToPath } from 'node:url';
 import { request } from 'playwright-core';
 import { readPrivateSecretFile } from '@myutils/secret-file';
 import { requestBinaryWithBrowserContext } from '@myutils/browser-session';
+import { parseActiveHtmlDocument } from '@myutils/web-text/http-text';
+import { DomUtils } from 'htmlparser2';
 import { providerConfig, accountNetworkOptions } from './policy.mjs';
 import { cloudflareIdentity } from './cloudflare-policy.mjs';
 
@@ -27,42 +29,34 @@ export function httpAccountIdentity(provider, status, contentType, body, expecte
     return { ...unavailable, ...identity, state: identity.authenticated ? 'authenticated' : 'login_required' };
   }
   if (!/^text\/html\b/i.test(contentType || '') || typeof expectedEmail !== 'string' || !expectedEmail) return unavailable;
-  // Only server-rendered, labelled account inputs prove the saved identity.
-  // Scripts/comments and password/login forms cannot supply that evidence.
-  const html = body.replace(/<!--[\s\S]*?-->|<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '');
+  const document = parseActiveHtmlDocument(body, { formEvidence: true });
+  const forms = DomUtils.getElementsByTagName('form', document.children);
   if (provider === 'abuseipdb') {
-    // The account page also has a password-change form and a feedback email.
-    // Bind only the account-basics form, never those unrelated inputs.
-    const forms = [...html.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form\s*>/gi)]
-      .filter(([, attrs]) => /\baction=["']\/account\/update-basics["']/i.test(attrs));
-    const accountForm = forms.length === 1 ? forms[0][2] : '';
-    const inputs = [...accountForm.matchAll(/<input\b[^>]*>/gi)].map(([tag]) => ({
-      ...Object.fromEntries([...tag.matchAll(/([\w-]+)\s*=\s*(["'])(.*?)\2/g)]
-        .map(([, key, , value]) => [key.toLowerCase(), value])),
-      checked: /\schecked(?:\s|=|\/?>)/i.test(tag),
-    }));
+    const basics = forms.filter(form => form.attribs.action === '/account/update-basics');
+    const inputs = basics.length === 1 ? DomUtils.getElementsByTagName('input', basics[0].children).map(el => el.attribs) : [];
     const emails = inputs.filter(input => input.name === 'email');
     const authenticated = emails.length === 1 && emails[0].value === expectedEmail &&
-      /<form\b[^>]*\baction=["']\/logout["']/i.test(html);
+      forms.some(form => form.attribs.action === '/logout');
     const privacy = name => {
-      const fields = inputs.filter(input => input.name === name && input.type === 'checkbox');
-      return authenticated && fields.length === 1 ? fields[0].checked : null;
+      const fields = inputs.filter(input => input.name === name && input.type?.toLowerCase() === 'checkbox');
+      return authenticated && fields.length === 1 ? Object.hasOwn(fields[0], 'checked') : null;
     };
     return { ...unavailable, authenticated, state: authenticated ? 'authenticated' : 'login_required',
-      ...(authenticated ? { emailVerificationPending: /\/account\/resend-email-verification/.test(html),
+      ...(authenticated ? { emailVerificationPending: DomUtils.existsOne(el =>
+        (el.name === 'form' && el.attribs.action === '/account/resend-email-verification')
+        || (el.name === 'a' && el.attribs.href === '/account/resend-email-verification'), document.children),
         publicProfile: privacy('public'), publicDomain: privacy('domain-visibility') } : {}) };
   }
-  if (/<input\b[^>]*\btype\s*=\s*(?:"password"|'password'|password(?=[\s/>]))/i.test(html)) return { ...unavailable, state: 'login_required' };
-  const inputs = [...html.matchAll(/<input\b[^>]*>/gi)].map(([tag]) => Object.fromEntries(
-    [...tag.matchAll(/([\w-]+)\s*=\s*(["'])(.*?)\2/g)].map(([, key, , value]) => [key.toLowerCase(), value])));
+  const inputs = DomUtils.getElementsByTagName('input', document.children).map(el => el.attribs);
   const emails = inputs.filter(input => input.name === 'email');
   const authenticated = emails.length === 1 && emails[0].value === expectedEmail &&
     inputs.filter(input => input.name === 'key').length === 1 &&
     !inputs.some(input => input.type?.toLowerCase() === 'password') &&
-    /<a\b[^>]*\bhref=["']\/app\/logout["']/i.test(html);
-  const suspended = authenticated && /your account has been banned|your account was suspended/i.test(html);
+    DomUtils.existsOne(el => el.name === 'a' && el.attribs.href === '/app/logout', document.children);
+  const text = authenticated ? DomUtils.innerText(document.children).replace(/\s+/g, ' ') : '';
+  const suspended = /your account has been banned|your account was suspended/i.test(text);
   return { ...unavailable, authenticated, state: suspended ? 'account_suspended' : authenticated ? 'authenticated' : 'login_required',
-    ...(suspended ? { apiUsable: false, restriction: /\bbot_login\b/.test(html) ? 'bot_login' : 'account_suspended' } : {}) };
+    ...(suspended ? { apiUsable: false, restriction: /\bbot_login\b/.test(text) ? 'bot_login' : 'account_suspended' } : {}) };
 }
 
 export async function readHttpAccount(provider, expectedEmail, dependencies = {}) {

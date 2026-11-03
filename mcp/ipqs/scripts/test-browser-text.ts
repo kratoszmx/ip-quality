@@ -53,6 +53,11 @@ try {
   assert.equal(await page.title(), "Synthetic session container", "text read must not navigate the page");
   assert.equal(await page.evaluate(() => "unwantedScript" in globalThis), false);
 
+  html = '<p>Loading</p><div style="visibility:hidden"><a href="/logout">Logout</a></div>';
+  assert.equal((await readDashboardText(page, "home", 5000)).authenticated, false);
+  html = '<a href="/logout">Logout</a><div inert><form action="/login/submit"></form></div>';
+  assert.equal((await readDashboardText(page, "home", 5000)).authenticated, true);
+
   html = '<form action="/login/submit"><input name="email"><input name="password"></form>';
   const login = await readDashboardText(page, "home", 5000);
   assert.equal(login.httpStatus, 200);
@@ -83,5 +88,5 @@ try {
   assert.deepEqual(candidates.map(candidate => candidate.secret).sort(),
     ["visibleApiKey1234567890", "splitApiKey1234567890"].sort());
   console.log(JSON.stringify({ status: "PASS", liveNetworkRequests: 0, realProfileUsed: false,
-    cases: ["same-origin-get", "no-navigation", "inert-no-subresources", "redaction", "login-html", "totp-challenge", "recovery-redaction", "http-error", "body-limit", "visible-key-candidates"] }));
+    cases: ["same-origin-get", "no-navigation", "inert-no-subresources", "redaction", "login-html", "totp-challenge", "recovery-redaction", "http-error", "body-limit", "visible-key-candidates", "hidden-logout", "inert-login"] }));
 } finally { await browser.close(); }

@@ -1,12 +1,15 @@
 # Current handoff
 
-## Status — 2026-10-28
+## Status — 2026-11-03
 
-- Reporter `v2026-10-28-standalone.53` (`script_version` in `bin/ip-quality`).
-- Last complete offline run, October 28: `/bin/zsh -f scripts/test-offline`
-  passed — reporter 152 Minitest cases / 4410 assertions,
-  IPQS MCP 22, provider accounts 58. The separate synthetic IPQS
-  browser-text suite last passed 10/10 at commit `782bce3`, with no live requests.
+- Reporter `v2026-11-03-standalone.54` (`script_version` in `bin/ip-quality`).
+- The IPQS, ipapi and AbuseIPDB HTTP readers use the shared form-evidence
+  parser. Hidden forms and lookalike data attributes previously produced false
+  login receipts. An ipapi suspension notice must appear in active body text.
+  The saved HTTP reads on November 3 confirmed ipapi and AbuseIPDB account
+  identity. IPQS returned its login state. No credentials were submitted.
+- Full offline run: 152 reporter cases / 4410 assertions, 22 IPQS MCP tests and
+  59 provider-account tests. All 12 synthetic Chrome text checks passed.
 - October 28 report layout: reproduced the shifted IPQS fallback row. The old
   width heuristic counted every non-ASCII character twice, including the narrow
   middle dot. Report tables now use zsh's native Unicode terminal widths.

@@ -2,7 +2,7 @@
 
 Owns free ipapi.is, Cloudflare, AbuseIPDB and ipdata account maintenance for the IPQuality reporter.
 ipwho.is and DB-IP need no account or key for their free context APIs. This package
-reuses myutils' browser-session/http-read, secret-file, totp, redaction and
+reuses myutils' web-text, browser-session/http-read, secret-file, totp, redaction and
 mcp-server directly. Provider state, selectors, quotas and API contracts stay here.
 
 ## Start here
@@ -139,6 +139,11 @@ the CLI read. It saves no cookies, visitor keys or page cache. Dependencies are
 restored from the shared reviewed workspace lockfile; there is no runtime install.
 
 ## HTTP state recovery
+
+The ipapi and AbuseIPDB readers inspect controls in the shared web-text form
+projection. Account and logout evidence must come from actual attributes.
+Only active body text can establish an ipapi suspension. AbuseIPDB privacy
+checkboxes are scoped to its unique account-basics form.
 
 After an authorized login, `provider_account_open` on ipapi's `dashboard`
 refreshes `.state/ipapi-http.json` only after exact account recognition.

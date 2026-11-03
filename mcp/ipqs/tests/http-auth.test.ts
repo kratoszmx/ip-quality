@@ -7,10 +7,14 @@ test("HTTP login proof requires a real logout link without login or TOTP form", 
   assert.equal(httpAuthStatus(200, "text/html; charset=utf-8", logout).authenticated, true);
   for (const body of [
     `<script>${logout}</script>`, `<!-- ${logout} -->`, `<template>${logout}</template>`,
+    `<div hidden>${logout}</div>`, `<div aria-hidden="true">${logout}</div>`,
+    `<section inert>${logout}</section>`, `<div style="display:none">${logout}</div>`,
+    '<a data-href="/user/logout">Logout</a>', '<p title=\'<a href="/logout">\'>Loading</p>',
     '<a href="https://foreign.invalid/logout">Logout</a>',
     `${logout}<form action="/login/submit"></form>`,
     `${logout}<input name="2fa">`, 'Account Dashboard Credits',
   ]) assert.equal(httpAuthStatus(200, "text/html", body).authenticated, false);
   for (const status of [302, 401, 403, 429, 500]) assert.equal(httpAuthStatus(status, "text/html", logout).authenticated, false);
   assert.equal(httpAuthStatus(200, "application/json", logout).authenticated, false);
+  assert.equal(httpAuthStatus(200, "text/html", logout + '<div hidden><input name="2fa"></div>').stage, "authenticated");
 });

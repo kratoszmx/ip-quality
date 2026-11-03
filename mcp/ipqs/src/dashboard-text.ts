@@ -51,22 +51,23 @@ export async function readDashboardText(page: Page, pageName: DashboardPageName,
       const template = document.createElement("template");
       template.innerHTML = html;
       const root = template.content;
-      const totpRequired = !!root.querySelector('input[name="2fa"]') && /Finish Login/.test(root.textContent || "");
-      const loginRequired = totpRequired || Array.from(root.querySelectorAll("form")).some(form => {
-        const action = new URL(form.getAttribute("action") || "", url);
-        return action.origin === location.origin && action.pathname === "/login/submit";
-      });
-      const logoutPresent = Array.from(root.querySelectorAll("a[href]")).some(anchor => {
-        const target = new URL(anchor.getAttribute("href") || "", url);
-        return target.origin === location.origin && /^\/(?:user\/)?logout\/?$/.test(target.pathname);
-      });
-      const title = root.querySelector("title")?.textContent || "";
-      root.querySelectorAll("script,style,noscript,template,svg,iframe,object,embed,input,textarea,select,[hidden],[inert],[aria-hidden='true']")
+      root.querySelectorAll("script,style,noscript,template,svg,iframe,object,embed,textarea,select,[hidden],[inert],[aria-hidden='true' i],input[type='hidden' i]")
         .forEach(element => element.remove());
       root.querySelectorAll("[style]").forEach(element => {
         const style = element.getAttribute("style") || "";
-        if (/(?:display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse)|opacity\s*:\s*0\s*(?:;|$))/i.test(style)) element.remove();
+        if (/(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse)|opacity\s*:\s*0(?:\.0+)?)\s*(?:!\s*important\s*)?(?:;|$)/i.test(style)) element.remove();
       });
+      const totpRequired = !!root.querySelector('input[name="2fa"]') && /Finish Login/.test(root.textContent || "");
+      const loginRequired = totpRequired || Array.from(root.querySelectorAll("form")).some(form => {
+        const action = URL.parse(form.getAttribute("action") || "", url);
+        return action?.origin === location.origin && action.pathname === "/login/submit";
+      });
+      const logoutPresent = Array.from(root.querySelectorAll("a[href]")).some(anchor => {
+        const target = URL.parse(anchor.getAttribute("href") || "", url);
+        return target?.origin === location.origin && /^\/(?:user\/)?logout\/?$/.test(target.pathname);
+      });
+      const title = root.querySelector("title")?.textContent || "";
+      root.querySelectorAll("input").forEach(element => element.remove());
       root.querySelectorAll("br,p,div,section,article,li,tr,h1,h2,h3,h4,h5,h6")
         .forEach(element => element.append(document.createTextNode("\n")));
       return { httpStatus: response.status, authenticated: logoutPresent && !loginRequired,

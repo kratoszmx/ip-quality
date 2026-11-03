@@ -125,7 +125,7 @@ manual login script provides a human window; there is no automatic GUI fallback.
 
 ## Safety Evidence
 
-- The package reuses myutils' `@myutils/browser-session`, `mcp-server`, `secret-file`, `one-use-token`, `redaction` and `totp` directly. IPQS URLs, quota messages, account state and selectors stay in this package.
+- The saved HTTP status reads active form controls with `parseActiveHtmlDocument(html, {formEvidence:true})` from `@myutils/web-text/http-text`. Only a real IPQS logout link can provide positive evidence. The package also reuses myutils' `browser-session`, `mcp-server`, `secret-file`, `one-use-token`, `redaction` and `totp`.
 - `@myutils/totp` supplies RFC 6238 validation/generation. The website's QR URL is read as text; no image processing occurs. Seed and recovery code are saved before activation, and a changed/foreign form stops before secret use.
 - The saved account directory must be an owned ordinary `0700` directory containing exactly one owned, singly linked, `0600` ordinary file with email and password as two positional lines.
 - Authentication checks recognize the reviewed visible `/login/submit` form rather than treating password-change fields on `/user/settings` as a login page.
