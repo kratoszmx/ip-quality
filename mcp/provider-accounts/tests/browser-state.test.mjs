@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdtemp, realpath, chmod, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { restoreBrowserState } from '../../common/browser-state.mjs';
+import { restoreBrowserState, readBrowserState } from '../../common/browser-state.mjs';
 
 test('private login restoration scopes cookies and storage to the requested origin', async () => {
   const dir = await realpath(await mkdtemp(path.join(tmpdir(), 'account-state-')));
@@ -19,6 +19,10 @@ test('private login restoration scopes cookies and storage to the requested orig
         { origin: 'https://foreign.invalid', localStorage: [] }],
     }), { mode: 0o600 });
     assert.equal(await restoreBrowserState(context, file, 'https://account.example'), true);
+    const state = await readBrowserState(file, 'https://account.example');
+    assert.equal(state.cookies.length, 1);
+    assert.equal(state.origins.length, 1);
+    assert.equal(state.origins[0].origin, 'https://account.example');
     assert.equal(events[0].length, 1);
     assert.equal(events[0][0].name, 'owned');
     assert.equal(events[1].origin, 'https://account.example');

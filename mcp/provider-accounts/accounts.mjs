@@ -3,15 +3,16 @@ import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { Agent } from 'node:https';
 import { chromium } from 'playwright-core';
-import { withLoopbackOperationLease, saveStorageStateSafely } from '@myutils/browser-session';
+import { withLoopbackOperationLease, saveStorageStateSafely, settleBrowserOperation } from '@myutils/browser-session';
 import { launchChromeSession } from '@myutils/browser-session/chrome';
+import { openIsolatedAccountRead } from '@myutils/web-text/browser-sessions';
 import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@myutils/secret-file';
 import { requestHttpRead } from '@myutils/http-read';
 import { redactText } from '@myutils/redaction';
 import { providerConfig, accountUrl, accountPagePath, accountNetworkOptions, assertAccountOrigin, classifyAccountPage, ipapiDashboardAccepted, validApiKey, ipapiKeyAccepted } from './policy.mjs';
 import { submitReviewedSignup } from './signup.mjs';
 import { httpStatePath, pendingLoginPath, readHttpAccount } from './http-account.mjs';
-import { restoreBrowserState } from '../common/browser-state.mjs';
+import { restoreBrowserState, readBrowserState } from '../common/browser-state.mjs';
 
 export const ROOT = path.dirname(fileURLToPath(import.meta.url));
 export const SECRETS = path.resolve(ROOT, '../../secrets');
@@ -121,7 +122,34 @@ export async function openAccount(provider, surface, visible = false) {
 }
 
 export async function readAccount(provider, mode = 'http') {
-  if (mode === 'browser') return withSession(provider, page => snapshot(provider, page));
+  if (mode === 'browser') {
+    const config = providerConfig(provider);
+    return withLoopbackOperationLease({port:config.port + 100}, async () => {
+      const active = activeSessions.get(provider);
+      const storageState = active?.browser.isConnected() && !active.page.isClosed() ? await active.context.storageState()
+        : await readBrowserState(httpStatePath(provider), config.origin);
+      if (!storageState) throw Error('No saved account session is available for a browser read.');
+      const stateDir = path.join(ROOT, '.state', 'reads', provider);
+      const paths = new Set([config.dashboard, config.login, config.security].filter(Boolean));
+      const session = await openIsolatedAccountRead({chromium, stateDir,
+        profileDir:path.join(stateDir,'chrome'), playwrightProfileDir:path.join(stateDir,'playwright'),
+        cdpPort:config.port, leasePort:config.port + 200,
+        proxyServer:accountNetworkOptions().proxyServer || 'http://127.0.0.1:7897'}, {
+        storageState,
+        allowNavigation(value) {
+          try { assertAccountOrigin(provider, value); const url = new URL(value);
+            return paths.has(url.pathname) || provider === 'cloudflare' && /^\/[a-f\d]{32}\/?$/.test(url.pathname);
+          } catch { return false; }
+        },
+      });
+      return settleBrowserOperation(async () => {
+        await session.page.goto(accountUrl(provider,'dashboard'), {waitUntil:'domcontentloaded',timeout:20000});
+        const result = await snapshot(provider, session.page);
+        session.assertAllowed();
+        return result;
+      }, session.close);
+    });
+  }
   if (mode !== 'http') throw new Error('Unknown read mode.');
   return readHttpAccount(provider, (await privateAccount(provider)).email);
 }

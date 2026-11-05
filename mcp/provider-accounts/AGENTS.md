@@ -31,7 +31,7 @@ The formal inventory and current account/2FA evidence are in
 | provider_account_open | Native hidden Chrome by default; `visible=true` explicitly requests a human window |
 | provider_account_login | USE_SAVED_ACCOUNT_CREDENTIALS: saved HTTP identity first; Cloudflare/AbuseIPDB may make one reviewed windowless password submission. ipapi reuses valid state but never automatically submits a password |
 | provider_account_close_browsers | Close only this MCP's owned temporary sessions; preserve saved HTTP and pending state |
-| provider_account_read | Default `mode=http`: bounded exact-account identity read with saved state and no Chrome. Explicit `mode=browser`: redacted existing-page text/controls |
+| provider_account_read | Default `mode=http`: bounded exact-account identity read with saved state and no Chrome. Explicit `mode=browser`: fresh isolated dashboard text/controls using this adapter's saved/current state |
 | provider_account_create_free | One free signup after CREATE_FREE_ACCOUNT; uses the confirmed private email/country |
 | ipapi_import_free_key | Import a labelled key after one full-response free lookup and IMPORT_FREE_API_KEY |
 | public_provider_verify_free_api | VERIFY_FREE_API with surface=free_api checks DB-IP/ipwho.is context for 1.1.1.1. public_demo checks IPWHOIS security for 1.1.1.1 or DB-IP's requesting egress via its page and one visitor lookup. No account/browser |
@@ -147,7 +147,12 @@ checkboxes are scoped to its unique account-basics form.
 
 After an authorized login, `provider_account_open` on ipapi's `dashboard`
 refreshes `.state/ipapi-http.json` only after exact account recognition.
-`provider_account_read` with `mode=browser` only inspects the page.
+`provider_account_read` with `mode=browser` navigates the known dashboard in
+web-text's fresh isolated account reader. Only reviewed dashboard/login/security
+routes are accepted, with no POST, private-destination, worker or socket traffic.
+It preserves retained login/write sessions and never exports the copied state.
+Shared bounded cleanup reports uncertainty without losing useful results or
+the original operation error. The normal HTTP reader remains the first path.
 
 Cloudflare's generic open/read tools do not refresh `.state/cloudflare-http.json`.
 The package currently has no dedicated MCP tool for that step. Authorized

@@ -17,6 +17,10 @@ Account mutations (signup, key import, setting changes, 2FA enrollment) need
 explicit task intent; each tool also demands a literal confirmation argument
 (`confirm` for IPQS, `confirmation` for provider accounts).
 
+Fresh dashboard reads share [myutils's account-read contract](/Users/zmx/Projects/myutils/docs/ACCOUNT_BROWSER_READS.md).
+This does not apply GET-only policy to login/2FA/confirmed writes. Private state
+belongs to its provider, and cleanup warnings remain distinct from authentication.
+
 ## Choose a first call
 
 Tool names are server-local; a client may add its own prefix. Readiness calls are

@@ -1,5 +1,20 @@
 # Current handoff
 
+## Browser read containment — 2026-11-05
+
+IPQS dashboard reads and provider explicit browser reads now import myutils's
+isolated account reader directly. Saved state remains adapter-owned; login,
+prepared writes, API calls and default provider HTTP identity checks are unchanged.
+`readBrowserState` validates and scopes private state before either restoration
+or an isolated copy. Cleanup uncertainty uses the shared fixed result contract.
+The 22 IPQS and 59 provider offline cases passed. The live IPQS text read remained
+unauthenticated, consistent with the November 3 saved-state observation; no
+credential submission or reputation lookup was attempted. An AbuseIPDB browser
+read completed with confirmed cleanup; that receipt alone did not record positive
+identity. A separate fresh ipapi browser read returned `authenticated` with
+confirmed cleanup. Shared local Chrome containment/proxy fixtures and Overleaf's
+live authenticated read supply separate integration evidence.
+
 ## Status — 2026-11-03
 
 - Reporter `v2026-11-03-standalone.54` (`script_version` in `bin/ip-quality`).
