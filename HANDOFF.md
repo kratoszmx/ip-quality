@@ -7,7 +7,8 @@ isolated account reader directly. Saved state remains adapter-owned; login,
 prepared writes, API calls and default provider HTTP identity checks are unchanged.
 `readBrowserState` validates and scopes private state before either restoration
 or an isolated copy. Cleanup uncertainty uses the shared fixed result contract.
-The 22 IPQS and 59 provider offline cases passed. The live IPQS text read remained
+The complete offline aggregate passed: 152 reporter cases (4,410 assertions),
+22 IPQS cases and 59 provider cases. The live IPQS text read remained
 unauthenticated, consistent with the November 3 saved-state observation; no
 credential submission or reputation lookup was attempted. An AbuseIPDB browser
 read completed with confirmed cleanup; that receipt alone did not record positive
