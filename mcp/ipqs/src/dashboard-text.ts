@@ -1,92 +1,41 @@
-import type { Page } from "playwright-core";
-
-import { dashboardUrl, getTimeoutMs, type DashboardPageName } from "./config.js";
+import { DomUtils } from "htmlparser2";
+import { extractHtmlTitle, htmlToReadableText, parseActiveHtmlDocument } from "@myutils/web-text/http-text";
 import { redactText } from "@myutils/redaction";
+
+import { dashboardUrl, type DashboardPageName } from "./config.js";
+import { httpAuthStatus, readSavedDashboardHtml } from "./http-auth.js";
 import { boundedVisibleText } from "./redaction.js";
 
-// Read an already visited dashboard URL inside its authenticated browser origin.
-// The response stays in the page; only a value-free, bounded text projection leaves it.
-export async function readDashboardText(page: Page, pageName: DashboardPageName, limit: number) {
-  const url = dashboardUrl(pageName);
-  const raw = await page.evaluate(async ({ url, timeoutMs, maximumBytes }) => {
-    if (location.origin !== new URL(url).origin) throw new Error("IPQS text read requires the dedicated authenticated origin.");
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const response = await fetch(url, {
-        method: "GET", credentials: "same-origin", redirect: "error", cache: "no-store", signal: controller.signal,
-        headers: { accept: "text/html" },
-      });
-      if (response.status !== 200) {
-        await response.body?.cancel();
-        return { httpStatus: response.status, authenticated: false, text: "", title: "", loginRequired: false };
-      }
-      if (!/^text\/html(?:;|$)/i.test(response.headers.get("content-type") || "")) {
-        await response.body?.cancel();
-        throw new Error("IPQS dashboard text read returned an unexpected content type.");
-      }
-      if (Number(response.headers.get("content-length")) > maximumBytes) {
-        await response.body?.cancel();
-        throw new Error("IPQS dashboard text response exceeded its byte limit.");
-      }
-      if (!response.body) throw new Error("IPQS dashboard text response was empty.");
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder("utf-8", { fatal: true });
-      let html = "", bytes = 0;
-      try {
-        for (;;) {
-          const part = await reader.read();
-          if (part.done) break;
-          bytes += part.value.byteLength;
-          if (bytes > maximumBytes) {
-            await reader.cancel();
-            throw new Error("IPQS dashboard text response exceeded its byte limit.");
-          }
-          html += decoder.decode(part.value, { stream: true });
-        }
-        html += decoder.decode();
-      } finally { reader.releaseLock(); }
-
-      // A template is inert: no scripts, frames, stylesheets or images execute/load.
-      const template = document.createElement("template");
-      template.innerHTML = html;
-      const root = template.content;
-      root.querySelectorAll("script,style,noscript,template,svg,iframe,object,embed,textarea,select,[hidden],[inert],[aria-hidden='true' i],input[type='hidden' i]")
-        .forEach(element => element.remove());
-      root.querySelectorAll("[style]").forEach(element => {
-        const style = element.getAttribute("style") || "";
-        if (/(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse)|opacity\s*:\s*0(?:\.0+)?)\s*(?:!\s*important\s*)?(?:;|$)/i.test(style)) element.remove();
-      });
-      const totpRequired = !!root.querySelector('input[name="2fa"]') && /Finish Login/.test(root.textContent || "");
-      const loginRequired = totpRequired || Array.from(root.querySelectorAll("form")).some(form => {
-        const action = URL.parse(form.getAttribute("action") || "", url);
-        return action?.origin === location.origin && action.pathname === "/login/submit";
-      });
-      const logoutPresent = Array.from(root.querySelectorAll("a[href]")).some(anchor => {
-        const target = URL.parse(anchor.getAttribute("href") || "", url);
-        return target?.origin === location.origin && /^\/(?:user\/)?logout\/?$/.test(target.pathname);
-      });
-      const title = root.querySelector("title")?.textContent || "";
-      root.querySelectorAll("input").forEach(element => element.remove());
-      root.querySelectorAll("br,p,div,section,article,li,tr,h1,h2,h3,h4,h5,h6")
-        .forEach(element => element.append(document.createTextNode("\n")));
-      return { httpStatus: response.status, authenticated: logoutPresent && !loginRequired,
-        loginRequired, title, text: root.textContent || "" };
-    } finally { clearTimeout(timer); }
-  }, { url, timeoutMs: getTimeoutMs(), maximumBytes: 1_048_576 });
-
+export async function readDashboardText(pageName: DashboardPageName, limit: number) {
+  const response = await readSavedDashboardHtml(pageName);
+  let html = "";
+  if (response.status === 200) {
+    if (!/^text\/html(?:;|$)/i.test(response.contentType || "")) {
+      throw new Error("IPQS dashboard text read returned an unexpected content type.");
+    }
+    const charset = /(?:^|;)\s*charset\s*=\s*["']?([^\s;"']+)/i.exec(response.contentType || "")?.[1];
+    if (charset && !/^(?:utf-8|utf8|us-ascii)$/i.test(charset)) {
+      throw new Error("IPQS dashboard text read returned an unsupported charset.");
+    }
+    html = new TextDecoder("utf-8", { fatal: true }).decode(response.body);
+  }
+  const auth = httpAuthStatus(response.status, response.contentType || "", html);
+  const document = parseActiveHtmlDocument(html, { formEvidence: true });
+  for (const element of DomUtils.findAll(({ name }) => name === "input" || name === "select", document.children)) {
+    DomUtils.removeElement(element);
+  }
   return {
-    source: "ipqs-dashboard-fetch",
+    source: "ipqs-dashboard-http",
     page: pageName,
-    path: new URL(url).pathname,
-    httpStatus: raw.httpStatus,
-    authenticated: raw.authenticated,
-    loginRequired: raw.loginRequired,
-    title: redactText(raw.title).slice(0, 200),
-    text: boundedVisibleText(raw.text, limit),
+    path: new URL(dashboardUrl(pageName)).pathname,
+    httpStatus: response.status,
+    authenticated: auth.authenticated,
+    loginRequired: auth.stage === "login" || auth.stage === "secondary-verification",
+    title: redactText(extractHtmlTitle(html)).slice(0, 200),
+    text: boundedVisibleText(htmlToReadableText(DomUtils.getOuterHTML(document), { bodyOnly: true }), limit),
     controls: [],
     buttons: [],
     controlsIncluded: false,
-    note: "HTML text from one same-origin GET without dashboard navigation or script execution; use mode=controls for rendered DOM/control inspection.",
+    note: "Saved-session HTTP GET with static, value-free HTML extraction and no browser launch; use mode=controls for native rendered DOM/control inspection.",
   };
 }

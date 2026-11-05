@@ -9,7 +9,6 @@ import {
   waitForEnter,
 } from "@myutils/browser-session";
 import { launchChromeSession } from "@myutils/browser-session/chrome";
-import { openIsolatedAccountRead } from "@myutils/web-text/browser-sessions";
 import { reserveOneUseRecord, takeOneUseRecord } from "@myutils/one-use-token";
 import { writePrivateSecretFile } from "@myutils/secret-file";
 import { chromium, type Page } from "playwright-core";
@@ -53,7 +52,7 @@ import { probeIpqsAccount } from "./account-probe.js";
 import { enrollIpqsTotp, completeIpqsTotp } from "./totp.js";
 
 type ChromeSession = Awaited<ReturnType<typeof launchChromeSession>>;
-const { restoreBrowserState, readBrowserState } = await import(pathToFileURL(path.join(ROOT, "../common/browser-state.mjs")).href);
+const { restoreBrowserState } = await import(pathToFileURL(path.join(ROOT, "../common/browser-state.mjs")).href);
 
 interface PendingSettingChange {
   field: string;
@@ -363,31 +362,10 @@ export async function openInteractiveDashboard(pageName: DashboardPageName, visi
 }
 
 export async function readDashboard(pageName: DashboardPageName, limit = 12_000, mode: "text" | "controls" = "text") {
-  return withBrowserLease(async () => {
-    // A fresh read may copy this adapter's current session in memory; it never
-    // replaces retained login/write state or creates another login attempt.
-    const storageState = sessionIsUsable(activeSession) ? await activeSession.context.storageState()
-      : await readBrowserState(HTTP_STATE_FILE, IPQS_ORIGIN);
-    if (!storageState) throw new Error("No saved IPQS session is available for a dashboard read.");
-    const stateDir = path.join(getBrowserProfileDir(), "read-runtime");
-    const selected = await openIsolatedAccountRead({ chromium, stateDir,
-      profileDir: path.join(stateDir, "chrome"), playwrightProfileDir: path.join(stateDir, "playwright"),
-      cdpPort: 19451, leasePort: 19452, proxyServer: getProxyServer() || "http://127.0.0.1:7897" }, {
-      storageState,
-      allowNavigation(value) {
-        try { const url = new URL(value); return url.origin === IPQS_ORIGIN && !url.username && !url.password
-          && (Object.values(DASHBOARD_PAGES).some(value => value === url.pathname) || url.pathname === "/login"); }
-        catch { return false; }
-      },
-    }, Math.min(120000, getTimeoutMs() * 2 + 20000));
-    return settleBrowserOperation(async () => {
-      await selected.page.goto(dashboardUrl(pageName), { waitUntil: "domcontentloaded", timeout: getTimeoutMs() });
-      let result;
-      if (mode === "text") result = await readDashboardText(selected.page, pageName, limit);
-      else { await waitForDashboardContent(selected.page, pageName); result = await collectDashboardSnapshot(selected.page, pageName, limit); }
-      selected.assertAllowed();
-      return result;
-    }, selected.close);
+  if (mode === "text") return readDashboardText(pageName, limit);
+  return withDashboardSession(pageName, async ({ page }) => {
+    await waitForDashboardContent(page, pageName);
+    return collectDashboardSnapshot(page, pageName, limit);
   });
 }
 

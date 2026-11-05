@@ -25,9 +25,10 @@ this package as the working directory.
 
 `npm run auth:check` verifies the saved session with one bounded HTTP dashboard
 read and exits nonzero without positive proof; it opens no Chrome. API status
-remains `npm run probe:sanitized`. The ordinary headless experiment returned
-403 on October 26 and its unused runtime branch was removed. Native hidden Chrome completed password + TOTP login that
-day, and its freshly saved state passed HTTP authentication. A 200 login/TOTP
+remains `npm run probe:sanitized`. Native hidden Chrome completed authorized password + TOTP recovery on November 5,
+and independent saved-session HTTP authentication passed. The isolated headless
+dashboard still returned 403 with valid state, so default text reads use HTTP
+and explicit control reads retain native hidden Chrome. A 200 login/TOTP
 page remains unauthenticated. Standard HTTPS_PROXY/HTTP_PROXY or
 IPQS_PROXY_SERVER selects the explicit route; without a proxy, native sessions
 use direct networking. No failure opens a GUI automatically.
@@ -40,7 +41,7 @@ use direct networking. No failure opens a GUI automatically.
    windowless target in an owned temporary profile under `.state/chrome-profile/sessions/`.
    Restore only this origin's private state; an authorized task may submit the
    fixed owner-only email/password bundle once and complete its reviewed TOTP.
-3. Read dashboard text with a same-origin browser `fetch` and inert HTML extraction. Use rendered DOM only when control metadata or dynamic content is required.
+3. Read dashboard text with one saved-session HTTP GET and static HTML extraction, directly reusing myutils transport, form parsing and text projection. No Chrome is launched. Use native hidden rendered DOM only when control metadata or dynamic content is required; a failed HTTP read does not trigger a browser or login retry.
 4. Import an existing visible dashboard API key directly into the ignored parent secret file without returning the key to the agent.
 5. Official JSON API authentication uses headers for explicit fraud-intelligence lookups, and the documented path-auth form for account usage.
 
@@ -55,8 +56,8 @@ manual login script provides a human window; there is no automatic GUI fallback.
 
 - `src/server.ts`: MCP stdio entrypoint and tool schemas.
 - `src/browser.ts`: Chrome/CDP lifecycle, authentication evidence, redacted dashboard reads, API-key import, and two-stage setting changes.
-- `src/dashboard-text.ts`: bounded same-origin GET and inert HTML text projection; no page navigation, script execution, session export or input values.
-- `src/http-auth.ts`: owner-only saved-session HTTP auth probe; rejects redirects, login and TOTP pages without opening Chrome.
+- `src/dashboard-text.ts`: redacted, bounded static HTML text with hidden/inert content and form values excluded; no browser launch or script execution.
+- `src/http-auth.ts`: origin-scoped saved-session HTTP reads for authentication and dashboard text; one GET, zero redirects/retries, 15-second request timeout and 1 MiB accepted body limit. The shared APIRequestContext transport buffers before validating the body limit. A 200 login/TOTP page never authenticates.
 - `src/auth.ts`: exact IPQS login-form recognition, authenticated-page classification, and one-submit credential policy.
 - `src/totp.ts`: issuer/account-bound textual enrollment, private emergency recovery, and one-submit authenticator challenge. Uses the shared TOTP library's explicit legacy-80-bit option for this issuer.
 - `src/api.ts`: bounded read-only IPQS JSON API client.
@@ -85,7 +86,7 @@ manual login script provides a human window; there is no automatic GUI fallback.
 - `ipqs_enable_totp`: after `ENABLE_IPQS_TOTP`, prove usable API credits, save the bound seed and emergency backup code privately, reserve and submit one enrollment. Existing factors/attempts are preserved.
 - `ipqs_complete_totp`: after `USE_SAVED_IPQS_TOTP`, submit one reviewed challenge from the private seed; no code is returned.
 - `ipqs_open_dashboard`: keep the browser open on the dashboard home, settings, or API-key page.
-- `ipqs_read_dashboard`: default `mode=text` returns redacted HTML text from one same-origin GET; `mode=controls` returns rendered DOM text plus value-free controls and buttons from an allowlisted dashboard page.
+- `ipqs_read_dashboard`: default `mode=text` returns redacted HTML text from one saved-session HTTP GET; `mode=controls` uses native hidden Chrome for rendered text, value-free controls and buttons. Both accept only the three named dashboard pages; neither logs in automatically.
 - `ipqs_import_api_key`: reveal when necessary, select one visible dashboard API key, and write it directly to the private local secret file; returns metadata and a fingerprint only.
 - `ipqs_prepare_setting_change`: exact-match a low-risk setting field and safe submit button, then create a short-lived in-memory change id without editing the page.
 - `ipqs_apply_setting_change`: revalidate and apply one prepared low-risk setting after literal confirmation, then return sanitized success evidence.
@@ -151,6 +152,6 @@ This builds TypeScript, runs offline tests (including a stdio MCP contract test 
 
 Browser entrypoints build and run compiled JavaScript: direct `tsx` execution can inject `__name` helpers into serialized Playwright callbacks and fail inside the page. Use the compiled `dist/src/browser.js` for task-scoped browser scripts too.
 
-For `dashboard-text.ts` changes, also run `npm run test:browser-text`. This separate test opens an isolated headless Chrome with a synthetic profile, intercepts every request locally, and verifies inert parsing, no navigation/subresource loading, redaction, login-HTML rejection, HTTP failures and body limits. It never uses the account profile or the live IPQS service.
+The offline `tests/dashboard-text.test.ts` exercises the public default read with synthetic private state and an intercepted HTTP client: exact target/proxy, one request, origin scoping, hidden content, redaction, login/TOTP rejection, HTTP/encoding/body limits and cleanup failures. No browser or live account is used. Also run `npm run test:browser-text` after dashboard-read changes; its synthetic Chrome fixture checks visible API-key candidates and hidden/CSS/inert exclusions with every request blocked.
 
 Run `npm run probe:sanitized` only when current account/API evidence is required. It performs one bounded official account read without browser fallback or automatic retry and does not consume a lookup credit.

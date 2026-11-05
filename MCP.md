@@ -53,11 +53,13 @@ Playwright's `request.newContext` is an HTTP client and starts no browser.
 Browser operations reuse the same `@myutils/browser-session/chrome` native
 `hidden` engine as myutils' text browser: Chrome has a verified hidden CDP
 target with no OS window, rather than a minimized GUI. Ordinary `headless`
-is a different mode and still received IPQS HTTP 403 on October 26.
+is a different mode and received IPQS HTTP 403 again on November 5 despite
+valid saved authentication. The HTTP text reader imports shared bounded transport
+and static parsing directly; it does not launch or fall back to a browser.
 
 | Platform | Routine access | Fresh login or recovery | 2FA |
 | --- | --- | --- | --- |
-| IPQS | API and saved-session auth check over HTTP; dashboard content/controls through native hidden Chrome | Windowless saved credentials + reviewed TOTP; verified October 26 | TOTP enabled |
+| IPQS | API, saved-session auth and default dashboard text over HTTP; explicit controls through native hidden Chrome | Windowless saved credentials + reviewed TOTP; verified November 5 | TOTP enabled |
 | ipapi.is | Replacement free account: keyed HTTP risk API and saved-state HTTP dashboard, verified October 28 | myutils headless restored the dedicated saved profile; native-hidden MCP dashboard also passed. Routine login reuses HTTP state. Automatic password submission remains disabled; no routine visible browser | No enrollment entry in the reviewed dashboard |
 | Cloudflare | Saved-state HTTP identity read; Intel token over HTTP | Native hidden Chrome; October 26 password flow required human verification; Intel API still passed | TOTP enabled, recovery codes saved |
 | AbuseIPDB | Saved-state HTTP account read; APIv2 key over HTTP | Native hidden Chrome; login and subsequent HTTP identity verified October 26 | No enrollment entry offered |
@@ -129,6 +131,7 @@ Dated observations, not availability guarantees; private receipts stay under
 
 | Date | Evidence |
 | --- | --- |
+| 2026-11-05, IPQS recovery | Authorized native-hidden saved-credential + TOTP login and independent HTTP auth passed. Default saved-session HTTP text and native-hidden controls both proved authentication with 3,000 characters; controls returned six value-free entries and confirmed cleanup. The incompatible isolated headless reader returned 403 and is no longer used for IPQS. No reputation lookup. Private receipts: `reports/browser-recovery-20261105-PqCmOh/`. |
 | 2026-10-28, replacement ipapi account | User-completed signup, mail-manager activation and previously approved October 3 terms led to the exact new free account (1,000 daily queries). Labelled key and full-risk API passed direct and default-proxy checks. Reporter returned full keyed type/score/factors. Owned GUI closed; myutils headless recovery, native-hidden MCP dashboard and browser-closed HTTP identity/API passed. Canonical credentials/session promoted; former account archived. Evidence: `reports/ipapi-account-20261028/`. |
 | 2026-10-27, candidate ipapi account | Direct visible CDP signup explicitly rejected automation; the parser distinguishes `automated_browser_blocked`. The manual alternative used myutils `openRealChrome`, a persistent private profile and native Accessibility text controls bound to the owned PID and signup URL. No CDP, screenshots or automatic Signup click. The handoff completed October 28 as recorded above. |
 | 2026-10-27 | ipdata free developer account, email activation and API key verified; dashboard showed Free Tier/$0/1,500 daily queries. Direct and isolated ATT reporter runs returned official risk flags. Native headless dashboard/Profile and browserless GetUser proved the same account/key; no MFA control observed. ipapi HTTP account remained suspended, keyed API returned ERR_FORBIDDEN_NOT_ALLOWED, while the anonymous API root returned geography. Private evidence and unsent appeal draft: `reports/provider-recheck-20261027/`. |

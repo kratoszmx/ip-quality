@@ -44,9 +44,11 @@ Reporter suites only:
 /usr/bin/ruby -e 'Dir.glob("test/*_test.rb").sort.each { |file| require File.expand_path(file) }'
 ```
 
-The IPQS browser-text suite is separate and manual: it needs installed Chrome,
-uses a synthetic profile and intercepts every request locally. Run it whenever
-`mcp/ipqs/src/dashboard-text.ts` changes:
+The complete runner covers browserless dashboard reads using synthetic private
+state and an intercepted HTTP client, including request bounds, authentication,
+redaction, encoding and cleanup failures. The separate manual Chrome fixture
+checks visible API-key candidates and hidden/CSS/inert exclusions, with every
+request blocked. Run it after dashboard-read changes:
 
 ```text
 npm --prefix mcp/ipqs run test:browser-text

@@ -125,13 +125,20 @@ Both MCPs depend directly on sibling `/Users/zmx/Projects/myutils` packages:
 
 | Package | Use |
 | --- | --- |
-| `browser-session` | Dedicated Chrome lifecycle and profile binding; provider accounts also save storage state and read bounded HTTP contexts |
+| `browser-session` | Dedicated Chrome lifecycle and profile binding; saved storage state and bounded HTTP contexts for provider accounts and IPQS |
+| `web-text/http-text` | Static active-form parsing, HTML title and text projection for saved HTTP dashboard reads |
 | `secret-file` | Private data-only files; reporter and IPQS share `secrets/ipqs` |
 | `mcp-server` | Tool descriptions and structured text results |
 | `one-use-token` | IPQS prepared setting-change reservations |
 | `http-read` | Provider accounts: bounded API reads, including ipdata's owned-key risk lookup, without redirects or retries |
 | `totp` | Provisioning URI validation and `generateFreshTotp` for Cloudflare and IPQS (IPQS opts into its 80-bit seed) |
 | `redaction` | Both MCPs: one union redactor for account pages, API data and errors (secrets, TOTP/recovery codes, credential syntax, emails, 16+ character tokens, 6+ digit numbers) |
+
+`mcp/ipqs/src/http-auth.ts:readSavedDashboardHtml(pageName)` owns the IPQS
+private state, exact named dashboard URLs, proxy, request bounds and context cleanup.
+`probeHttpAuth` and the default text reader share it; callers receive data only
+after response/context disposal. `mcp/ipqs/tests/dashboard-text.test.ts` covers
+the transport and public read contract.
 
 Provider origins, selectors, identities and API-before-2FA checks stay in the
 owning MCP; provider-account module APIs are in

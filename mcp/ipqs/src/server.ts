@@ -132,7 +132,7 @@ server.registerTool(
   "ipqs_read_dashboard",
   {
     title: "Read IPQS Dashboard",
-    description: buildToolDescription("Read one allowlisted dashboard through same-origin HTTP text by default, without navigating/rendering the dashboard. Use mode=controls for rendered DOM text and value-free controls.", SERVER_INSTRUCTIONS),
+    description: buildToolDescription("Read one allowlisted dashboard through saved-session HTTP text by default, without launching Chrome or executing page scripts. Use mode=controls for native hidden Chrome DOM text and value-free controls.", SERVER_INSTRUCTIONS),
     inputSchema: {
       page: dashboardPageSchema.default("home"),
       textLimit: z.number().int().min(500).max(50_000).default(12_000),
