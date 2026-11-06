@@ -92,7 +92,7 @@ manual login script provides a human window; there is no automatic GUI fallback.
 - `ipqs_apply_setting_change`: revalidate and apply one prepared low-risk setting after literal confirmation, then return sanitized success evidence.
 - `ipqs_account_usage`: read current credits and usage through the official account API.
 - `ipqs_lookup`: perform one explicit IP, email, phone, or URL reputation lookup through the official API.
-- `ipqs_close_browser`: stop this server's owned session and temporary profile, preserving its separately saved HTTP state.
+- `ipqs_close_browser`: stop this server's owned session and temporary profile, preserving its separately saved HTTP state. Confirmed closure keeps the existing boolean result. Failed or timed-out cleanup returns `closed:false`, `browserOpen:null` and the fixed cleanup uncertainty marker; it retains the session reference instead of asserting the browser is closed. The native session can retain a rejected close promise, so repeating close does not establish recovery.
 
 ## Frontend Experience
 
@@ -127,6 +127,7 @@ manual login script provides a human window; there is no automatic GUI fallback.
 ## Safety Evidence
 
 - Shared `settleBrowserOperation` bounds temporary cleanup and preserves useful results with a fixed cleanup warning. A combined failure retains the original error as its cause, without exposing raw cleanup diagnostics.
+- Explicit close uses the same bounded cleanup contract. Only confirmed cleanup clears the active-session reference; account actions and settings keep their existing policies.
 
 - The saved HTTP status reads active form controls with `parseActiveHtmlDocument(html, {formEvidence:true})` from `@myutils/web-text/http-text`. Only a real IPQS logout link can provide positive evidence. The package also reuses myutils' `browser-session`, `mcp-server`, `secret-file`, `one-use-token`, `redaction` and `totp`.
 - `@myutils/totp` supplies RFC 6238 validation/generation. The website's QR URL is read as text; no image processing occurs. Seed and recovery code are saved before activation, and a changed/foreign form stops before secret use.
@@ -153,5 +154,14 @@ This builds TypeScript, runs offline tests (including a stdio MCP contract test 
 Browser entrypoints build and run compiled JavaScript: direct `tsx` execution can inject `__name` helpers into serialized Playwright callbacks and fail inside the page. Use the compiled `dist/src/browser.js` for task-scoped browser scripts too.
 
 The offline `tests/dashboard-text.test.ts` exercises the public default read with synthetic private state and an intercepted HTTP client: exact target/proxy, one request, origin scoping, hidden content, redaction, login/TOTP rejection, HTTP/encoding/body limits and cleanup failures. No browser or live account is used. Also run `npm run test:browser-text` after dashboard-read changes; its synthetic Chrome fixture checks visible API-key candidates and hidden/CSS/inert exclusions with every request blocked.
+
+`tests/browser-close.test.ts` intercepts only the native launcher, then tests the
+actual public close entry and queue with synthetic sessions/private temporary
+state. It covers rejection, deadline/late rejection, confirmed close and repeated
+memoized failure without launching Chrome. To validate source while an existing
+server uses `dist`, run `../node_modules/.bin/tsc --noEmit -p tsconfig.json` and
+`../node_modules/.bin/tsx --test tests/*.test.ts` from this package. The stdio
+fixture then checks the existing compiled entry separately; it does not prove
+that a running server has adopted the changed source.
 
 Run `npm run probe:sanitized` only when current account/API evidence is required. It performs one bounded official account read without browser fallback or automatic retry and does not consume a lookup credit.

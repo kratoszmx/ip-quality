@@ -1,5 +1,25 @@
 # Current handoff
 
+## Explicit IPQS close uncertainty — 2026-11-06
+
+The explicit close tool no longer returns `browserOpen:false` after swallowing
+a failed browser shutdown. It directly uses the shared bounded cleanup
+coordinator, returning `closed:false`, `browserOpen:null` and a normalized cleanup
+marker when closure is unverified. The active reference is retained; a memoized
+native close rejection remains unverified on later calls. Confirmed success and
+the no-session result keep their existing shapes. No account action, login,
+guarded read, setting or launch policy changed.
+
+Source fixtures use a synthetic launcher and temporary private state, including
+deadline/late rejection and repeated memoized rejection. Type checking without
+emitting files and all 35 source tests passed before building. No active IPQS
+server was found by absolute entry or relative-entry working directory. The
+normal package `check` then built `dist`, passed all 35 tests and the static
+doctor; the next on-demand start uses the changed entry. No App or account
+browser was restarted. The root offline aggregate also passed: 152 reporter
+cases / 4,410 assertions, 35 IPQS cases and 59 provider-account cases.
+Receipts: `/Users/zmx/tmp/browser-persistent-final-lZvRIO/`.
+
 ## IPQS login and HTTP text recovery — 2026-11-05
 
 Project version: `v2026-11-05-standalone.55`. Authorized native-hidden saved

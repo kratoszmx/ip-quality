@@ -693,8 +693,11 @@ export async function applySettingChange(changeId: string) {
 export async function closeBrowser() {
   return withBrowserLease(async () => {
     const wasOpen = sessionIsUsable(activeSession);
-    if (activeSession) await activeSession.close().catch(() => undefined);
+    const result = await settleBrowserOperation(async () => ({ closed: wasOpen, browserOpen: false }), async () => {
+      if (activeSession) await activeSession.close();
+    });
+    if ("cleanup" in result) return { ...result, closed: false, browserOpen: null };
     activeSession = null;
-    return { closed: wasOpen, browserOpen: false };
+    return result;
   });
 }
