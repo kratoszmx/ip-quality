@@ -1,5 +1,31 @@
 # Current handoff
 
+## Steam keychain audit and account-read route fix — 2026-11-10
+
+Reporter version: `v2026-11-10-standalone.56`.
+
+Reviewed Claude's `Steam-mcp` session and the current shared launcher. Steam's
+saved-profile cookie loss outside macOS Aqua is applicable to persistent native
+Chrome launches. IPQuality's routine checks use HTTP; its native account flows
+use fresh temporary profiles with separately saved state, and isolated reads
+use fresh browser contexts. DB-IP uses no account state. No production path
+reopens a saved native profile. The shared persistent launcher now protects
+explicit manual recovery by default; its five offline keychain tests passed.
+Local Supervisor inventory lists this project's weekly offline suite, with no
+IPQS live account/API probe. No scheduler or account settings were changed.
+
+The audit found and reproduced a route bug in provider browser reads: explicit
+`DIRECT` (or no proxy) was replaced with `http://127.0.0.1:7897`. The reader now
+passes `accountNetworkOptions().proxyServer` unchanged to myutils. An offline
+entrypoint regression fails on the old code and passes after the fix; it also
+checks proxy precedence, cleanup and saved-state preservation on failures.
+Documentation now distinguishes this project's temporary sessions from Steam's
+persistent profiles and corrects the stale IPQS isolated-reader description.
+Full offline aggregate passed: 152 reporter cases / 4,410 assertions, 35 IPQS
+cases and 60 provider-account cases. Evidence:
+`reports/keychain-audit-20261110/offline.log`. No live login or provider lookup
+was needed for this audit.
+
 ## Explicit IPQS close uncertainty — 2026-11-06
 
 The explicit close tool no longer returns `browserOpen:false` after swallowing

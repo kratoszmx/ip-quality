@@ -86,6 +86,13 @@ precedence and unsupported bypass, one bounded read and the CLI consent gate.
 Reporter tests mock page reads and ipapi's denied-key/anonymous responses;
 they also cover crawler-name detection and both languages' failure rows.
 
+`mcp/provider-accounts/tests/browser-read.test.mjs` exercises the account read
+entry with synthetic state and an intercepted browser boundary. It verifies
+direct/proxy precedence, missing-state rejection, cleanup after navigation
+failure and byte-for-byte saved-state preservation. `browser-state.test.mjs`
+also verifies that a failed cookie restore leaves the source file intact.
+No real credentials, browser or provider request is used.
+
 All reporter suites inherit `test/support/reporter_test_case.rb`:
 
 | Helper | Use |

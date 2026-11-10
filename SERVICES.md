@@ -67,6 +67,11 @@ headless restored the saved profile; routine maintenance now uses HTTP or the
 native-hidden MCP browser, both verified without an OS window. Retaining a
 profile alone proves neither signup nor authentication. It is never a reporter
 cache and must not be restored into another account's automated session.
+Keep myutils' `requireUserKeychainSession` protection enabled for such a
+persistent-profile recovery. It refuses a new native Chrome launch outside the
+macOS GUI login session before encrypted cookies can be lost; the temporary
+MCP browsers and HTTP reads use their separate lifecycle above. See the
+[saved-login audit](MCP.md#saved-login-protection).
 
 ## External weekly check
 
@@ -75,7 +80,8 @@ cache and must not be restored into another account's automated session.
 | `test.ipquality.test-offline` | `/bin/zsh -f scripts/test-offline` from the project root: reporter, route runner and both account MCPs |
 
 The schedule belongs to `/Users/zmx/Projects/supervisor`
-(`supervisor/integrations/testing.py`). As of 2026-10-23 it registers no IPQS
+(`supervisor/integrations/testing.py`). Local `supervisor inventory` on
+2026-11-10 confirms this weekly test; it registers no IPQS
 account probe or API-expiry check for this project; manual probes in
 [MCP.md](MCP.md) are not scheduled monitoring.
 

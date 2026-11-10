@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtemp, realpath, chmod, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, realpath, chmod, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { restoreBrowserState, readBrowserState } from '../../common/browser-state.mjs';
@@ -26,6 +26,10 @@ test('private login restoration scopes cookies and storage to the requested orig
     assert.equal(events[0].length, 1);
     assert.equal(events[0][0].name, 'owned');
     assert.equal(events[1].origin, 'https://account.example');
+    const saved = await readFile(file, 'utf8');
+    await assert.rejects(restoreBrowserState({ addCookies: async () => { throw Error('browser unavailable'); } },
+      file, 'https://account.example'), /browser unavailable/);
+    assert.equal(await readFile(file, 'utf8'), saved);
     events.length = 0;
     await writeFile(file, '{"cookies":[],"origins":[{"origin":"https://account.example","localStorage":null}]}');
     await assert.rejects(restoreBrowserState(context, file, 'https://account.example'));

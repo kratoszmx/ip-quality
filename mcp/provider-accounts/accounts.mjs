@@ -134,7 +134,7 @@ export async function readAccount(provider, mode = 'http') {
       const session = await openIsolatedAccountRead({chromium, stateDir,
         profileDir:path.join(stateDir,'chrome'), playwrightProfileDir:path.join(stateDir,'playwright'),
         cdpPort:config.port, leasePort:config.port + 200,
-        proxyServer:accountNetworkOptions().proxyServer || 'http://127.0.0.1:7897'}, {
+        proxyServer:accountNetworkOptions().proxyServer}, {
         storageState,
         allowNavigation(value) {
           try { assertAccountOrigin(provider, value); const url = new URL(value);

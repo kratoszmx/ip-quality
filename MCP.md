@@ -71,10 +71,32 @@ and static parsing directly; it does not launch or fall back to a browser.
 
 A failed HTTP identity read returns its failure; it never silently opens a
 browser, submits credentials, retries or treats a saved file as success.
+Explicit browser reads preserve `PROVIDER_ACCOUNTS_PROXY=DIRECT` as direct;
+an absent proxy also stays direct. A proxy is used only when selected by
+`accountNetworkOptions`, with the same precedence as login and HTTP reads.
 Default browser tools also open no window. `visible=true` is an explicit
 human-recovery exception; no failure automatically switches to GUI. Pending
 terms/verification cookies are stored separately from verified HTTP state and
 do not establish authentication. Existing manual tools remain available.
+
+## Saved-login protection
+
+The November 10 Steam investigation established that launching a saved native
+Chrome profile outside macOS's GUI login session can discard its encrypted
+cookies when the login keychain is unavailable. This project's routine checks
+use HTTP state; native account sessions use a fresh temporary Chrome profile
+and restore only the owner's separately saved state. Isolated account reads
+also create a fresh browser context. DB-IP has no saved login. None of these
+paths reopens an old persistent cookie database, and failed reads never replace
+the saved state. This architecture does not need Steam's persistent-launch
+option on the temporary launcher.
+
+An explicitly authorized recovery of an old persistent profile is different:
+use myutils `openRealChrome` / `connectOrLaunchChromeOverCDP` with
+`requireUserKeychainSession: true` (now the shared default). A refusal outside
+the macOS GUI session means browser access is unavailable, not that the account
+logged out. Do not disable that guard to retry. Process details:
+[SERVICES.md](SERVICES.md#account-mcp-start-and-stop).
 
 October 26 local inventory confirms that this project has no DB-IP account
 credentials, owned API key or saved HTTP/browser login state. No DB-IP signup,
