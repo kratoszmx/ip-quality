@@ -46,38 +46,7 @@ browser was restarted. The root offline aggregate also passed: 152 reporter
 cases / 4,410 assertions, 35 IPQS cases and 59 provider-account cases.
 Receipts: `/Users/zmx/tmp/browser-persistent-final-lZvRIO/`.
 
-## IPQS login and HTTP text recovery — 2026-11-05
-
-Project version: `v2026-11-05-standalone.55`. Authorized native-hidden saved
-credentials and one reviewed TOTP completed login; an independent HTTP dashboard
-check returned authenticated HTTP 200 at 18:43 UTC. The newly migrated isolated
-headless reader still returned 403 with that valid state. This was an access-mode
-failure, not evidence that the successful login had expired.
-
-IPQS now uses one saved-session HTTP GET for default dashboard text, directly
-reusing myutils's bounded request, scoped private state, static form/text parsing
-and redaction. No browser or active page content is needed. Explicit controls
-retain the previously supported native hidden browser; login/prepared writes keep
-their existing owner. No failure retries login or switches containers. Temporary
-native cleanup still uses the shared fixed uncertainty contract.
-
-Live acceptance at 18:56 UTC: HTTP text returned authenticated HTTP 200 with
-3,000 characters; native controls separately returned authenticated content with
-3,000 characters, six value-free controls and confirmed cleanup. No reputation
-lookup or account setting change was made. Private receipts:
-`reports/browser-recovery-20261105-PqCmOh/`.
-
-The IPQS offline suite passed all 32 cases; the separate synthetic Chrome fixture
-passed visible-key and hidden/CSS/inert exclusions without external traffic.
-The complete offline aggregate also passed: 152 reporter cases (4,410
-assertions), 32 IPQS cases and 59 provider cases.
-
-Provider explicit browser reads retain the shared isolated account reader. The
-initial November 5 migration passed 152 reporter cases (4,410 assertions), 22
-IPQS cases and 59 provider cases. Its IPQS live read did not prove authentication
-and is superseded by the recovery above. Live ipapi proved authenticated isolated
-content and cleanup; the separate AbuseIPDB receipt only established completion
-and cleanup, not positive identity.
+Older dated entries (1) were moved to Git history: `git show 58e9861:HANDOFF.md`.
 
 ## Status — 2026-11-03
 
