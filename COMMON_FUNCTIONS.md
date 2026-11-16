@@ -24,6 +24,8 @@ Browser lifetime, native hidden targets, process ownership and cleanup remain
 in `@myutils/browser-session/chrome`. Provider selectors and login/2FA rules
 stay in their respective MCP packages.
 
+`mcp/provider-accounts/public-api.mjs` and `ipdata.mjs` import `isRecord` directly from `@myutils/value-shapes`. This accepts non-null objects other than arrays while each parser retains its provider-specific field, target and identity checks. The dependency is declared in the provider-account package and root MCP lockfile.
+
 ## zsh provider values (`provider_values.zsh`)
 
 | Function | Result |

@@ -1,3 +1,4 @@
+import { isRecord } from '@myutils/value-shapes';
 import { Agent } from 'node:https';
 import { isIP } from 'node:net';
 import { requestHttpRead } from '@myutils/http-read';
@@ -8,7 +9,6 @@ const sources = Object.freeze({
   dbip: { url: `https://api.db-ip.com/v2/free/${target}`, demo: 'https://db-ip.com/api/core/', dailyQuota: 500, documentation: 'https://db-ip.com/api/free', website: 'https://db-ip.com/' },
   ipwhois: { url: `https://ipwho.is/${target}`, demo: `https://ipwhois.io/demo?ip=${target}`, dailyQuota: 1000, documentation: 'https://ipwhois.io/documentation', website: 'https://ipwhois.io/' },
 });
-const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const text = value => value == null || (typeof value === 'string' && value.length <= 256 && !/[\u0000-\u001f\u007f]/.test(value));
 const demoUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36';
 
@@ -16,7 +16,7 @@ const demoUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537
 // Risk fields need a validated demo response for the exact requested IP.
 export function publicProviderObservation(provider, body, expected = target, surface = 'free_api') {
   if (!['free_api', 'public_demo'].includes(surface)) return null;
-  if (!record(body)) return null;
+  if (!isRecord(body)) return null;
   if (provider === 'dbip') {
     if (body.error != null || body.errorCode != null || body.ipAddress !== expected ||
         typeof body.countryCode !== 'string' || !/^[A-Z]{2}$/.test(body.countryCode) || ![body.countryName, body.stateProv, body.city].every(text)) return null;
@@ -25,12 +25,12 @@ export function publicProviderObservation(provider, body, expected = target, sur
   }
   if (provider === 'ipwhois') {
     if (body.success !== true || body.ip !== expected || typeof body.country_code !== 'string' || !/^[A-Z]{2}$/.test(body.country_code) ||
-        !record(body.connection) || !text(body.connection.org) || !text(body.connection.isp) ||
+        !isRecord(body.connection) || !text(body.connection.org) || !text(body.connection.isp) ||
         !['number', 'string'].includes(typeof body.connection.asn) ||
         !/^\d{1,10}$/.test(String(body.connection.asn)) || Number(body.connection.asn) > 4294967295) return null;
     let security;
     if (surface === 'public_demo') {
-      if (body.security != null && !record(body.security)) return null;
+      if (body.security != null && !isRecord(body.security)) return null;
       security = {};
       for (const key of ['proxy', 'vpn', 'tor', 'hosting']) {
         const value = body.security?.[key];
@@ -67,7 +67,7 @@ export async function verifyPublicProvider(provider, confirmation, request = req
     if (!/^application\/(?:json|[a-z0-9.-]+\+json)(?:;|$)/i.test(response.contentType ?? response.headers?.['content-type'] ?? '')) return { ...metadata, usable: false, status: 'invalid_response' };
     let body; try { body = JSON.parse(response.body.toString('utf8')); } catch { return { ...metadata, usable: false, status: 'invalid_response' }; }
     const error = body;
-    if (record(error) && ((provider === 'dbip' && (error.errorCode === 'OVER_QUERY_LIMIT' || (typeof error.error === 'string' && /over query limit|maximum number of queries/i.test(error.error)))) ||
+    if (isRecord(error) && ((provider === 'dbip' && (error.errorCode === 'OVER_QUERY_LIMIT' || (typeof error.error === 'string' && /over query limit|maximum number of queries/i.test(error.error)))) ||
         (provider === 'ipwhois' && error.success === false && typeof error.message === 'string' && /rate limit|too many requests/i.test(error.message)))) {
       const daily = provider === 'dbip' && typeof error.error === 'string' && /maximum number of queries per day/i.test(error.error);
       return { ...metadata, usable: false, status: daily ? 'daily_quota_exhausted' : 'rate_limited' };

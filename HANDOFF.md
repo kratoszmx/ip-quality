@@ -1,5 +1,14 @@
 # Current handoff
 
+## Direct shared record predicates — 2026-11-16
+
+Provider-account public API and ipdata parsers now import `isRecord` directly
+from `@myutils/value-shapes`, removing two equivalent local predicates. Their
+provider schemas, target binding and identity checks retain their existing
+contracts. The provider-account manifest and MCP lockfile declare the direct
+dependency. The full `/bin/zsh -f scripts/test-offline` passed with 152 reporter
+cases / 4,410 assertions, 35 IPQS cases and 60 provider-account cases.
+
 ## DB-IP page read on text-browser 0.6.0 — 2026-11-15
 
 text-browser 0.6.0 removes reads that answer a verification. The DB-IP

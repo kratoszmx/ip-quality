@@ -1,3 +1,4 @@
+import { isRecord } from '@myutils/value-shapes';
 import { fileURLToPath } from 'node:url';
 import { Agent } from 'node:https';
 import { request } from 'playwright-core';
@@ -10,13 +11,12 @@ const accountPath = fileURLToPath(new URL('../../secrets/accounts/ipdata/credent
 const statePath = fileURLToPath(new URL('./.state/ipdata-http.json', import.meta.url));
 const target = '1.1.1.1';
 const keyPolicy = { minBytes: 32, maxBytes: 128, validate: value => /^[a-f0-9]{32,128}$/.test(value) };
-const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const factors = ['is_proxy', 'is_vpn', 'is_tor', 'is_datacenter', 'is_threat', 'is_known_abuser', 'is_known_attacker'];
 
 export function ipdataObservation(status, body) {
   if (status !== 200) return { usable: false, status: status === 429 ? 'rate_limited' : `http_${status}` };
-  if (!record(body) || body.ip !== target || body.message != null || body.error != null ||
-      typeof body.country_code !== 'string' || !/^[A-Z]{2}$/.test(body.country_code) || !record(body.threat) ||
+  if (!isRecord(body) || body.ip !== target || body.message != null || body.error != null ||
+      typeof body.country_code !== 'string' || !/^[A-Z]{2}$/.test(body.country_code) || !isRecord(body.threat) ||
       !factors.every(name => body.threat[name] == null || typeof body.threat[name] === 'boolean') ||
       !factors.some(name => typeof body.threat[name] === 'boolean')) return { usable: false, status: 'invalid_response' };
   return { usable: true, status: 'ok', target, countryCode: body.country_code,
@@ -55,8 +55,8 @@ export async function verifyIpdata(confirmation, dependencies = {}) {
 export function ipdataAccountIdentity(status, body, expectedEmail, expectedKey) {
   const unknown = { provider: 'ipdata', backend: 'http', authenticated: false,
     state: status === 400 && body?.__type === 'NotAuthorizedException' ? 'login_required' : 'unconfirmed', httpStatus: status };
-  if (status !== 200 || !record(body) || !Array.isArray(body.UserAttributes) || body.UserAttributes.length > 40 ||
-      !body.UserAttributes.every(item => record(item) && typeof item.Name === 'string' && typeof item.Value === 'string') ||
+  if (status !== 200 || !isRecord(body) || !Array.isArray(body.UserAttributes) || body.UserAttributes.length > 40 ||
+      !body.UserAttributes.every(item => isRecord(item) && typeof item.Name === 'string' && typeof item.Value === 'string') ||
       new Set(body.UserAttributes.map(item => item.Name)).size !== body.UserAttributes.length) return unknown;
   const attributes = Object.fromEntries(body.UserAttributes.map(item => [item.Name, item.Value]));
   if (typeof expectedEmail !== 'string' || !expectedEmail || attributes.email !== expectedEmail ||
@@ -75,7 +75,7 @@ export async function checkIpdataAccount(dependencies = {}) {
     const account = JSON.parse((await read(accountPath, { maxBytes: 4096 })).secret);
     const state = JSON.parse((await read(statePath, { maxBytes: 524288 })).secret);
     const key = (await read(keyPath, keyPolicy)).secret;
-    if (!record(account) || typeof account.email !== 'string' || !account.email || !keyPolicy.validate(key)) throw new Error('Missing private identity.');
+    if (!isRecord(account) || typeof account.email !== 'string' || !account.email || !keyPolicy.validate(key)) throw new Error('Missing private identity.');
     const origins = state.origins?.filter(origin => origin.origin === 'https://dashboard.ipdata.co');
     if (origins?.length !== 1 || !Array.isArray(origins[0].localStorage)) throw new Error('Missing dedicated session.');
     const tokens = origins[0].localStorage.filter(item => typeof item.name === 'string' &&
