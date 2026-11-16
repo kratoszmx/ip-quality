@@ -71,9 +71,11 @@ and static parsing directly; it does not launch or fall back to a browser.
 
 A failed HTTP identity read returns its failure; it never silently opens a
 browser, submits credentials, retries or treats a saved file as success.
-Explicit browser reads preserve `PROVIDER_ACCOUNTS_PROXY=DIRECT` as direct;
-an absent proxy also stays direct. A proxy is used only when selected by
-`accountNetworkOptions`, with the same precedence as login and HTTP reads.
+`PROVIDER_ACCOUNTS_PROXY=DIRECT` is refused with a fixed error (見微: the system
+proxy only). With no proxy configured, sessions, HTTP reads and browser reads all
+use web-text's `SYSTEM_PROXY_SERVER` (text browser 0.6.1), so one flow keeps one
+exit; otherwise the proxy selected by `accountNetworkOptions` is used, with the
+same precedence for login, HTTP and browser reads.
 Default browser tools also open no window. `visible=true` is an explicit
 human-recovery exception; no failure automatically switches to GUI. Pending
 terms/verification cookies are stored separately from verified HTTP state and
@@ -105,8 +107,8 @@ website through a browser is not account authentication.
 
 ## Lessons from setup and recovery
 
-- Clearing proxy environment variables leaves Chrome on the macOS system proxy;
-  use `PROVIDER_ACCOUNTS_PROXY=DIRECT` (Chrome gets `--no-proxy-server`).
+- Clearing proxy environment variables leaves Chrome on the macOS system proxy.
+  `PROVIDER_ACCOUNTS_PROXY=DIRECT` is refused since text browser 0.6.1.
 - October 26 IPQS native-hidden password + TOTP login succeeded, and the fresh
   saved state passed an independent HTTP dashboard check. Older failed HTTP
   snapshots do not establish that HTTP is intrinsically unsupported.

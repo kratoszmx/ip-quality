@@ -6,7 +6,7 @@ import path from 'node:path';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 
-/** Match curl's HTTPS route without borrowing the text-browser's default proxy. */
+/** Match curl's selected HTTPS proxy; with none, web-text's default (the system proxy since 0.6.1) applies. */
 export function dbipPageProxy(env) {
   const proxy = env.https_proxy || env.HTTPS_PROXY || env.all_proxy || env.ALL_PROXY;
   if (!proxy) return undefined;

@@ -150,8 +150,8 @@ refreshes `.state/ipapi-http.json` only after exact account recognition.
 `provider_account_read` with `mode=browser` navigates the known dashboard in
 web-text's fresh isolated account reader. Only reviewed dashboard/login/security
 routes are accepted, with no POST, private-destination, worker or socket traffic.
-It uses `accountNetworkOptions` unchanged: explicit `DIRECT` and no configured
-proxy both remain direct; neither is replaced with a hard-coded localhost proxy.
+It uses `accountNetworkOptions` unchanged: `DIRECT` is refused with a fixed error,
+and with no configured proxy every path uses web-text's `SYSTEM_PROXY_SERVER` (0.6.1).
 It preserves retained login/write sessions and never exports the copied state.
 Shared bounded cleanup reports uncertainty without losing useful results or
 the original operation error. The normal HTTP reader remains the first path.

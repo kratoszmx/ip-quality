@@ -12,9 +12,11 @@ test('account origins and surfaces reject credential-bearing and foreign URLs', 
   assert.throws(() => accountUrl('ipapi', 'security'));
 });
 
-test('explicit direct routing overrides an inherited HTTP proxy', () => {
-  const direct = accountNetworkOptions({ PROVIDER_ACCOUNTS_PROXY: 'DIRECT', HTTPS_PROXY: 'http://127.0.0.1:7897' });
-  assert.equal(direct.proxyServer, undefined);
+test('DIRECT is refused with a fixed error, also over an inherited HTTP proxy', () => {
+  for (const value of ['DIRECT', 'direct']) {
+    assert.throws(() => accountNetworkOptions({ PROVIDER_ACCOUNTS_PROXY: value, HTTPS_PROXY: 'http://127.0.0.1:7897' }),
+      /PROVIDER_ACCOUNTS_PROXY=DIRECT is refused/);
+  }
 });
 
 test('account proxy selection validates explicit credential-free endpoints', () => {

@@ -1,3 +1,5 @@
+import { SYSTEM_PROXY_SERVER } from '@myutils/web-text/browser-options';
+
 const PROVIDERS = Object.freeze({
   ipapi: { origin: 'https://ipapi.is', signup: '/app/signup', login: '/app/', dashboard: '/app/home', security: null, port: 19503, passwordField: 'pass', signupButton: 'Create Free Account' },
   cloudflare: { origin: 'https://dash.cloudflare.com', signup: '/sign-up', login: '/login', dashboard: '/', security: '/profile/authentication', port: 19504, passwordField: 'password', signupButton: 'Sign up' },
@@ -11,7 +13,10 @@ export function providerConfig(provider) {
 
 export function accountNetworkOptions(environment = process.env) {
   const value = environment.PROVIDER_ACCOUNTS_PROXY || environment.HTTPS_PROXY || environment.https_proxy;
-  if (value === 'DIRECT' || !value) return { proxyServer: undefined };
+  // 見微: the system proxy only (默認使用系統代理); DIRECT is refused, never mapped to a proxy or a direct exit.
+  if (value?.trim().toUpperCase() === 'DIRECT') throw new Error('PROVIDER_ACCOUNTS_PROXY=DIRECT is refused: provider accounts use the system proxy or a named proxy.');
+  // No configured proxy: web-text's system proxy, so a session, its HTTP reads and its browser reads share one exit.
+  if (!value) return { proxyServer: SYSTEM_PROXY_SERVER };
   const url = new URL(value);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error('Invalid credential-free proxy URL.');
   return { proxyServer: value };

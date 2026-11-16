@@ -20,9 +20,9 @@ profile. It accepts only HTTP 200, the exact target URL/title/H1/record, one
 explicit low/medium/high statement, and verified cleanup. A challenge, ambiguous
 record, missing label or cleanup failure never becomes a clean verdict.
 
-The browser preserves the selected HTTPS proxy, or explicitly uses the system
-route for direct runs. It does not switch egress, rotate visitor tokens or
-retry limits. Browser transport is dual-stack rather than curl's forced family;
+The browser preserves the selected HTTPS proxy; for direct runs it takes
+web-text's default, the system proxy (text browser 0.6.1). It does not switch
+egress, rotate visitor tokens or retry limits. Browser transport is dual-stack rather than curl's forced family;
 only IPv4 target pages are supported. IPv6, interface binding, unsupported
 proxy/bypass settings and explicit-target mode skip this fallback. Section 3
 labels success `網路備援/可用` / `network fallback/available`, with a null numeric

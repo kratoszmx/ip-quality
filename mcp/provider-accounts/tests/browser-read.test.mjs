@@ -43,8 +43,7 @@ test('isolated account reads preserve explicit routing and saved state on failur
   try {
     const { readAccount } = await import('../accounts.mjs');
     for (const [explicit, upper, lower, expected] of [
-      ['DIRECT', 'http://127.0.0.1:17897', undefined, undefined],
-      [undefined, undefined, undefined, undefined],
+      [undefined, undefined, undefined, 'http://127.0.0.1:7897'],
       ['http://127.0.0.1:17898', 'http://127.0.0.1:17897', undefined, 'http://127.0.0.1:17898'],
       [undefined, 'http://127.0.0.1:17897', undefined, 'http://127.0.0.1:17897'],
       [undefined, undefined, 'http://127.0.0.1:17899', 'http://127.0.0.1:17899'],
@@ -64,6 +63,9 @@ test('isolated account reads preserve explicit routing and saved state on failur
     await assert.rejects(readAccount('ipapi', 'browser'));
     assert.equal(calls.length, before);
     process.env.PROVIDER_ACCOUNTS_PROXY = 'DIRECT';
+    await assert.rejects(readAccount('ipapi', 'browser'), /PROVIDER_ACCOUNTS_PROXY=DIRECT is refused/);
+    assert.equal(calls.length, before);
+    delete process.env.PROVIDER_ACCOUNTS_PROXY;
     failStartup = true;
     await assert.rejects(readAccount('ipapi', 'browser'), /synthetic startup failure/);
     assert.equal(calls.length, before + 1);
