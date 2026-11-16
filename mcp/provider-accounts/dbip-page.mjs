@@ -25,7 +25,6 @@ export function dbipPageObservation(result, ip) {
   if (typeof ip !== 'string' || !isIPv4(ip) || !result || result.ok === false || result.httpStatus !== 200 || result.challenge
     || result.url !== `https://db-ip.com/${ip}` || result.cleanupConfirmed !== true
     || result.launchMode !== 'hidden' || result.sessionMode !== 'ephemeral'
-    || result.nativeRecovery?.recipe !== 'dbip-public-ip' || result.nativeRecovery.outcome !== 'ready'
     || typeof result.text !== 'string' || result.text.length > 24000 || result.truncated
     || typeof result.title !== 'string' || !result.title.startsWith(`${ip} - `)
     || !Array.isArray(result.headings)) return failure;
@@ -56,7 +55,8 @@ export async function readDbipPage(ip, {env = process.env, signal, read} = {}) {
         cdpPort: 19607, leasePort: 19606, proxyServer, signal, keepBrowserOpen: false};
       read = options => extractBrowserText(options, runtime);
     }
-    const result = await read({url: `https://db-ip.com/${ip}`, backend: 'real-chrome-cdp',
+    // The shared default path (text-browser 0.6.0): no backend choice; the read answers no verification.
+    const result = await read({url: `https://db-ip.com/${ip}`,
       timeoutMs: 30000, maxChars: 24000, maxLinks: 0}, {proxyServer, signal});
     const status = result?.httpStatus ?? result?.error?.httpStatus;
     if (status === 429) return {status: 'rate_limited'};

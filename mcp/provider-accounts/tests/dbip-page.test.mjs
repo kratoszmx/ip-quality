@@ -21,9 +21,11 @@ test('public page binds the exact record and projects only its explicit risk lab
     {text: fixture.text + '\n' + ip}, {text: fixture.text + '\nEstimated threat level for this IP address is HIGH'},
     {text: fixture.text.replace(ip, '198.51.100.24')}, {text: 'x'.repeat(24001)},
     {httpStatus: 403}, {ok: false}, {challenge: true}, {truncated: true},
-    {cleanupConfirmed: false}, {launchMode: 'visible'}, {sessionMode: 'persistent'},
-    {nativeRecovery: {outcome: 'not_ready', recipe: 'dbip-public-ip'}}
+    {cleanupConfirmed: false}, {launchMode: 'visible'}, {sessionMode: 'persistent'}
   ]) assert.deepEqual(dbipPageObservation({...fixture, ...patch}, ip), {status: 'invalid_response'});
+  // The default path's result needs no particular native recipe (text-browser 0.6.0).
+  for (const nativeRecovery of [undefined, {attempted: true, outcome: 'ready', recipe: 'dbip-public-ip'}])
+    assert.equal(dbipPageObservation({...fixture, nativeRecovery}, ip).status, 'ok');
   for (const target of [null, '8.8.8.8', '::1'])
     assert.deepEqual(dbipPageObservation(fixture, target), {status: 'invalid_response'});
 });
@@ -46,7 +48,7 @@ test('one bounded public read uses no account session and preserves route and ca
     let count = 0;
     const result = await readDbipPage(ip, {env, signal, read: async (options, context) => {
       count++;
-      assert.deepEqual(options, {url: `https://db-ip.com/${ip}`, backend: 'real-chrome-cdp', timeoutMs: 30000, maxChars: 24000, maxLinks: 0});
+      assert.deepEqual(options, {url: `https://db-ip.com/${ip}`, timeoutMs: 30000, maxChars: 24000, maxLinks: 0});
       assert.deepEqual(context, {proxyServer: env.https_proxy, signal});
       return fixture;
     }});

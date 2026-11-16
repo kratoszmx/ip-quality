@@ -1,5 +1,15 @@
 # Current handoff
 
+## DB-IP page read on text-browser 0.6.0 — 2026-11-15
+
+text-browser 0.6.0 removes reads that answer a verification. The DB-IP
+daily-limit fallback now takes the shared default path: it names no backend and
+no longer requires `nativeRecovery.recipe=dbip-public-ip`; the IP heading,
+title and explicit threat label still decide the observation, and the proxy
+choice is unchanged. Offline aggregate passed against the 0.6.0 build: 152
+reporter cases / 4,410 assertions, 35 IPQS and 60 provider-account cases. No
+live lookup was run.
+
 ## Steam keychain audit and account-read route fix — 2026-11-10
 
 Reporter version: `v2026-11-10-standalone.56`.
