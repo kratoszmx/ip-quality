@@ -1,6 +1,14 @@
 # Current handoff
 
-## Direct shared record predicates — 2026-11-16
+Current state only. Each lane (writer) keeps at most one validation entry and
+replaces only its own; older entries stay in Git history
+(`git show <commit>:HANDOFF.md`; the last untrimmed version is
+`git show 6dd3b3e:HANDOFF.md`). Lasting behavior belongs in the documents
+listed in [AGENTS.md](AGENTS.md#start-here).
+
+## Latest entry per lane
+
+### user1 — 2026-11-16: direct shared record predicates
 
 Provider-account public API and ipdata parsers now import `isRecord` directly
 from `@myutils/value-shapes`, removing two equivalent local predicates. Their
@@ -9,7 +17,7 @@ contracts. The provider-account manifest and MCP lockfile declare the direct
 dependency. The full `/bin/zsh -f scripts/test-offline` passed with 152 reporter
 cases / 4,410 assertions, 35 IPQS cases and 60 provider-account cases.
 
-## DB-IP page read on text-browser 0.6.0 — 2026-11-15
+### user2 — 2026-11-15: DB-IP page read on text-browser 0.6.0
 
 text-browser 0.6.0 removes reads that answer a verification. The DB-IP
 daily-limit fallback now takes the shared default path: it names no backend and
@@ -19,7 +27,7 @@ choice is unchanged. Offline aggregate passed against the 0.6.0 build: 152
 reporter cases / 4,410 assertions, 35 IPQS and 60 provider-account cases. No
 live lookup was run.
 
-## Steam keychain audit and account-read route fix — 2026-11-10
+### zmxmacm4 — 2026-11-10: Steam keychain audit and account-read route fix
 
 Reporter version: `v2026-11-10-standalone.56`.
 
@@ -45,119 +53,9 @@ cases and 60 provider-account cases. Evidence:
 `reports/keychain-audit-20261110/offline.log`. No live login or provider lookup
 was needed for this audit.
 
-## Explicit IPQS close uncertainty — 2026-11-06
-
-The explicit close tool no longer returns `browserOpen:false` after swallowing
-a failed browser shutdown. It directly uses the shared bounded cleanup
-coordinator, returning `closed:false`, `browserOpen:null` and a normalized cleanup
-marker when closure is unverified. The active reference is retained; a memoized
-native close rejection remains unverified on later calls. Confirmed success and
-the no-session result keep their existing shapes. No account action, login,
-guarded read, setting or launch policy changed.
-
-Source fixtures use a synthetic launcher and temporary private state, including
-deadline/late rejection and repeated memoized rejection. Type checking without
-emitting files and all 35 source tests passed before building. No active IPQS
-server was found by absolute entry or relative-entry working directory. The
-normal package `check` then built `dist`, passed all 35 tests and the static
-doctor; the next on-demand start uses the changed entry. No App or account
-browser was restarted. The root offline aggregate also passed: 152 reporter
-cases / 4,410 assertions, 35 IPQS cases and 59 provider-account cases.
-Receipts: `/Users/zmx/tmp/browser-persistent-final-lZvRIO/`.
-
-Older dated entries (1) were moved to Git history: `git show 58e9861:HANDOFF.md`.
-
-## Status — 2026-11-03
-
-- Reporter `v2026-11-03-standalone.54` (`script_version` in `bin/ip-quality`).
-- The IPQS, ipapi and AbuseIPDB HTTP readers use the shared form-evidence
-  parser. Hidden forms and lookalike data attributes previously produced false
-  login receipts. An ipapi suspension notice must appear in active body text.
-  The saved HTTP reads on November 3 confirmed ipapi and AbuseIPDB account
-  identity. IPQS returned its login state. No credentials were submitted.
-- Full offline run: 152 reporter cases / 4410 assertions, 22 IPQS MCP tests and
-  59 provider-account tests. All 12 synthetic Chrome text checks passed.
-- October 28 report layout: reproduced the shifted IPQS fallback row. The old
-  width heuristic counted every non-ASCII character twice, including the narrow
-  middle dot. Report tables now use zsh's native Unicode terminal widths.
-  IPQS/Cloudflare route recovery and DB-IP page recovery share the terminal
-  label `網路備援/<status>` (`network fallback/<status>` in English), with an
-  ASCII separator. JSON keeps the actual source, transport and original error.
-  Offline regressions cover both recoveries together across the type, score
-  and factor matrices, plus ANSI, narrow Latin letters and combining marks.
-  Evidence: `reports/table-alignment-20261028/offline.log`.
-- October 28 ipapi recovery: the user submitted the replacement account's
-  signup in ordinary Chrome. Mail-manager retrieved the activation email;
-  activation and the already-authorized October 3 terms completed for that
-  exact account. The free dashboard shows 1,000 daily queries. Its new key
-  returned full risk data for `1.1.1.1` on direct and default-proxy HTTP routes;
-  a reporter run also returned `Mode=full`, `CredentialMode=key`, and `ok` in
-  all three ipapi matrices. The reporter key/account and HTTP session now use
-  this verified account; the former suspended account is archived privately.
-  The owned GUI Chrome was closed. myutils headless restored its saved profile,
-  the normal native-hidden MCP dashboard passed, and independent HTTP identity
-  and API passed with browsers closed. Routine MCP login now reuses valid HTTP
-  state without a password submission; expired or suspended state still cannot
-  start an automated ipapi password login. Evidence:
-  `reports/ipapi-account-20261028/` and the private candidate receipts listed in
-  [CREDENTIALS.md](CREDENTIALS.md#account-mcp-files).
-- Live: complete all-source direct report on October 27; latest complete ATT
-  remains October 23 (table below). Direct DB-IP recovered through its new
-  public-page fallback; ipapi recovered anonymous context only, with its risk
-  tables still account-restricted. Check.Place/MaxMind remained blocked and
-  basic information used IPinfo. Every other selected source supplied data.
-  Private receipts: `reports/direct-source-recheck-20261027/`. Offline success
-  is not a provider-availability claim.
-- October 27: user-approved ipdata free developer signup, email verification
-  and key import restored official proxy/Tor/datacenter/abuse flags on direct
-  and isolated ATT. Dashboard: Free Tier/$0/1,500 daily queries. VPN/robot remain
-  unknown because the response lacks those fields. HTTP account identity and
-  native headless dashboard/Profile passed; the existing provider-accounts
-  MCP now maintains this account. No billing trial or 2FA control was enabled.
-  That day's old ipapi account returned API 403 with `ERR_FORBIDDEN_NOT_ALLOWED`; saved HTTP
-  identity confirms `bot_login` suspension. Its anonymous API root returns
-  geography successfully, which does not establish access with this account's
-  key. The requested bilingual appeal is saved privately and was not sent.
-- Later October 27 website-only follow-up: the shared myutils text browser
-  returned ipdata's full `1.1.1.1` page on the default proxy in fresh hidden
-  Chrome, including Analysis, ASN/company and Trust score. It waits past the
-  partial geography shell for the matching complete record and passive check.
-  No API key or personal Safari state was used. Reporter/API behavior and keys
-  are unchanged; implementation, tests and current usage belong to
-  [myutils](/Users/zmx/Projects/myutils/docs/NETWORK_API.md#ipdata-public-ip-detail).
-- DB-IP's visitor daily error returned October 27. The new automatic fallback
-  read the same actual direct egress from the public page in fresh hidden
-  Chrome, obtained the explicit `low` label and confirmed browser cleanup.
-  Both focused and full reports kept `DemoStatus=daily_quota_exhausted` beside
-  `Source=public_page` / `PageStatus=ok`. No personal account, key rotation or
-  persistent cache was used; the visitor API itself remains limited.
-- Later October 27 website fallback audit: fresh windowless Chrome completed
-  an explicit `1.1.1.1` lookup on the ipapi homepage and IP-to-Abuser demo over
-  direct access. Both returned anonymous location/ownership, without risk.
-  The frontend's other full-risk displays include baked examples. Its live
-  authenticated path uses the same API with a JSON `{q,key}` POST; reproducing
-  that method with the saved key still returned 403/NOT_ALLOWED. No independent
-  website risk fallback was established, so the existing HTTP context fallback
-  stays in place. Details: [ipapi contract](providers/ipapi.md#public-website-fallback-investigation).
-- October 27 new-account task: the user authorized a different ipapi identity
-  with the existing password. Candidate credentials and durable submission
-  receipts are private and separate; the active account/key were not replaced.
-  A direct visible Chrome signup received an explicit automated-browser/CDP
-  rejection (HTTP 200). The MCP now reports `automated_browser_blocked` and
-  ends that wait without retrying; two regressions cover the refusal.
-  Mail-manager authenticated the requested Outlook mailbox, including an
-  all-folder search, but found no recent ipapi verification message.
-  myutils `openRealChrome` then opened a persistent dedicated profile without
-  CDP. User-approved macOS Accessibility exposed the form as native text
-  controls, bound to the exact owned PID and signup URL. That manual handoff
-  completed on October 28 as recorded above; it is no longer pending.
-  Candidate paths: [CREDENTIALS.md](CREDENTIALS.md#account-mcp-files).
-  Current offline evidence: `reports/ipapi-registration-20261027/offline.log`.
-- Git: only `main`. Push to `github-kratoszmx` (`kratoszmx/ip-quality`) and
-  `github-kratosbackup` (`kratosbackup/ipquality`), then read both back.
-
 ## Current behavior and ownership
 
+- The current reporter version is `script_version` in `bin/ip-quality`.
 - The runner defaults to `reputation` with all sources. Direct, specific-IP,
   prefix-sample and isolated-leaf routes share one reporter. Every attempted
   source stays visible on failure with unknown risk, never a clean result.
@@ -176,6 +74,10 @@ Older dated entries (1) were moved to Git history: `git show 58e9861:HANDOFF.md`
   anonymous context lookup, while type/score/factor statuses keep the denial.
   Missing fallback data remains unknown. Contracts:
   [PROVIDERS.md](PROVIDERS.md).
+- Provider accounts: the ipapi replacement account (verified October 28) and
+  the ipdata free developer account (verified October 27) are current; account
+  state and history are in [MCP.md](MCP.md) and
+  [CREDENTIALS.md](CREDENTIALS.md#account-mcp-files).
 - Code layout and shared helpers: [AGENTS.md](AGENTS.md#architecture) and
   [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md). Account MCPs: [MCP.md](MCP.md).
   No project daemon exists. Supervisor owns the weekly
@@ -227,72 +129,17 @@ Older dated entries (1) were moved to Git history: `git show 58e9861:HANDOFF.md`
 - **Ping0 on ATT:** `tls_error` (curl 35) on 2026-10-23 while direct verified.
   Ping0 observes the caller, so a direct fallback would not measure ATT.
 
-## Recent changes worth knowing
-
-Full detail is in `git log`; these are the ones a new session could trip over.
-
-- v50: DB-IP daily-limit recovery directly reuses myutils/web-text from the
-  existing Node workspace, verifies the exact public IPv4 record and cleanup,
-  and keeps both surfaces' outcomes. No account MCP or GUI is launched. ipapi
-  recognizes documented account/key denial codes and makes one anonymous
-  context query without clearing the risk restriction. Its parser accepts
-  documented crawler-name strings as positive full-tier detections. Offline
-  regressions cover routes, consent, mismatches, missing labels, browser/error
-  states, unchanged null risk and bilingual tables. The locked MCP dependency
-  cache was replenished for missing existing tarballs and the workspace restored
-  using `npm ci --offline --ignore-scripts`; no dependency versions were upgraded.
-- v49: ipdata owned free developer-key support precedes the relay, keeps keys
-  out of argv/output, validates target-bound booleans and preserves keyed
-  failures. Added three ipdata tools to the existing provider-accounts MCP:
-  private readiness, saved-token HTTP identity and one official risk query.
-  Expired account access tokens do not establish API-key failure. No automatic
-  signup/login/refresh, paid plan or new daemon. Added account/session/schema,
-  credential loading, route, failure and report regressions; removed temporary
-  onboarding code, duplicate key/state and verification-message copies after
-  saving the formal credentials and one-submit receipts.
-- v48: replaced obsolete ipdata demo-key discovery with one same-route free
-  API lookup; preserved country, unknown risk and original relay failure in
-  both terminal/JSON. Removed obsolete HTML fixtures. Regressions cover the
-  reduced free response, wrong targets, stale values, transport/HTTP failures,
-  IPv4/IPv6 routing and the default all-source report. Shared object validation
-  and ipdata validators now reject concatenated JSON documents as malformed.
-- v47: DB-IP quota wording identifies the upstream report, without asserting
-  a personal allowance or next-day recovery. The regression covers cn/en table
-  alignment and unknown risk. Updated MCP provenance to native hidden Chrome.
-- 2026-10-26: MCPs use myutils native hidden Chrome; IPQS auth checks use HTTP.
-  Only origin-scoped private-state restoration is shared in `mcp/common/`.
-  Pending verification state stays separate; browsers close with their owner.
-  Explicit visible Chrome remains a human recovery option. Retired the failed
-  headless auth probe and unused fixed-CDP settings. DB-IP generic limit codes
-  no longer imply a daily reset; added suspension/login and quota regressions.
-- October 26 cleanup keeps only consolidated private verification, the latest
-  offline-test log, bilingual drafts and a sanitized curl attachment; temporary
-  probe scripts, duplicate outputs and owned temporary Chrome profiles removed.
-- 2026-10-24: `common/` holds only helpers with two or more callers.
-  `generate_googlemap_url` became `location_map_url` (`common/location.zsh`);
-  table layout moved to `report/table.zsh`; `safe_snapshot.rb` and `text.rb`
-  moved to `runner/`. `MCP_AUTH.md` became [MCP.md](MCP.md); mail, DNSBL and
-  credential contracts moved to `providers/mail.md`, `providers/dnsbl.md` and
-  [CREDENTIALS.md](CREDENTIALS.md). ENV-safe test suites run in parallel.
-- v44 (2026-10-23): DNSBL reads the DNS header and answer count (SERVFAIL,
-  REFUSED and truncated replies are `Unknown`); Ping0 reports transport, HTTP
-  and schema failures instead of a bare `unknown`.
-- v43: `reputation` no longer requires `bc`; missing commands are listed once.
-- Tests: one shared base class (`test/support/reporter_test_case.rb`); the
-  former zsh self-test and DB-IP suite were folded into Ruby suites.
-
 ## Latest saved live evidence
 
-Private reports under `reports/` are ignored by Git; older runs are in Git
+Private reports under `reports/` are ignored by Git; superseded runs are in Git
 history. Live runs never changed the active Clash state.
 
 | Date / scope | Result / private evidence |
 | --- | --- |
+| October 28, ipapi replacement account | The new key returned full risk data for `1.1.1.1` on direct and default-proxy HTTP routes; a reporter run returned `Mode=full`, `CredentialMode=key` and `ok` in all three ipapi matrices. `reports/ipapi-account-20261028/` |
+| October 27, direct all-source v50 | DB-IP page fallback returned `low` despite visitor daily quota; ipapi anonymous ASN/geography returned but keyed risk remained `account_restricted` (before the October 28 replacement account). Check.Place/MaxMind was blocked and IPinfo supplied basic data. Other sources, including IPQS/Cloudflare/Ping0, succeeded. `reports/direct-source-recheck-20261027/all-after.{json,ansi,log}` |
 | October 27, ipdata v49 | Official owned free key succeeded through direct and isolated ATT: `ProviderStatus.ipdata=ok`, `FactorMeta.ipdata.Source=official_api`; proxy/Tor/server/abuse supplied, VPN/robot null. Native headless account/Profile and browserless GetUser proved the account and matching key. `reports/provider-recheck-20261027/{direct-keyed,att-keyed,ipdata-mcp}.json`; offline log and unsent bilingual ipapi draft in the same private directory. |
-| October 27, ipdata/ipapi v48 | Direct and isolated ATT: ipdata free country data with unknown risk, ipapi HTTP 403. Saved HTTP identity confirms ipapi `bot_login` suspension; fixed-target API probe returns `ERR_FORBIDDEN_NOT_ALLOWED`. Public ipdata browser checks did not complete verification. Private evidence: `reports/provider-recheck-20261027/`. |
-| October 26, ipdata v48 | Focused direct and isolated ATT reports returned `ProviderStatus.ipdata=ok`, `Source=official_free_api`, country data and `FactorMeta.ipdata.Status=not_provided`; all six risk fields remain null. Check.Place returned `cloudflare_blocked` on both routes. Before/after reports and offline test output: `reports/ipdata-recheck-20261026/`. |
 | October 23, direct all-source v43 | 14 of 15 sources returned usable observations, including IPQS, Cloudflare and Ping0. DB-IP returned `daily_quota_exhausted`. `reports/direct-20261023-codex-audit.{json,txt,stderr}` |
-| October 27, direct all-source v50 | DB-IP page fallback returned `low` despite visitor daily quota; ipapi anonymous ASN/geography returned but keyed risk remained `account_restricted`. Check.Place/MaxMind was blocked and IPinfo supplied basic data. Other sources, including IPQS/Cloudflare/Ping0, succeeded. `reports/direct-source-recheck-20261027/all-after.{json,ansi,log}` |
 | October 23, ATT all-source v43 and focused recheck | Cloudflare, IP2Location and the other table providers succeeded except DB-IP's daily quota and IPQS's initial timeout after direct fallback. A focused IPQS recheck succeeded through direct fallback after selected-route TLS failure, with the same discovered target preserved. Ping0 was unavailable. `reports/att-20261023-codex-audit.{json,txt,stderr}` and `reports/att-ipqs-20261023-codex-audit-recheck.{json,txt,stderr}` |
 | October 23, Ping0 v44 | Focused direct check returned `verified`; isolated ATT returned `tls_error`. A separate bounded ATT HTTP probe confirmed curl exit 35, HTTP 000 and no response body. `reports/ping0-{direct,att}-20261023-codex-audit-fixed.{json,stderr}` |
 | October 23, DNSBL v44 | A loopback DNS responder verified NOERROR/NXDOMAIN/SERVFAIL/REFUSED handling against the real system `dig`. `reports/dnsbl-local-20261023-codex-audit-fixed.json` |

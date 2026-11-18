@@ -165,7 +165,9 @@ system route. DNSBL concurrency is 1–50.
 - Reuse shared helpers only where caller semantics match; source schemas,
   labels and lifecycle state stay with their owners. A runtime change bumps
   `script_version` in `bin/ip-quality`.
-- After validating, update the HANDOFF status, commit on `main`, push to both
-  GitHub remotes and read them back.
+- After validating, update the HANDOFF status (current state only; each lane
+  replaces only its own entry), commit on `main`, push to both GitHub remotes
+  (`github-kratoszmx` → `kratoszmx/ip-quality`, `github-kratosbackup` →
+  `kratosbackup/ipquality`) and read them back.
 - Preserve the AGPL-3.0 license and provenance in `UPSTREAM.md`. This directory
   is the worktree root; no nested Git metadata.
