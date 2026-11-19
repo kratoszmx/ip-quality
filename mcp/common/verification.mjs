@@ -10,17 +10,6 @@ export async function prepareBrowserVerification(page, origin, timeoutMs = 8000,
     try { const url = new URL(value); return url.origin === origin && !url.username && !url.password; }
     catch { return false; }
   };
-  const policy = {
-    navigationAllowed: belongs,
-    frameNavigationAllowed(value) {
-      try {
-        const url = new URL(value);
-        return !url.username && !url.password &&
-          [origin, 'https://challenges.cloudflare.com'].includes(url.origin) &&
-          url.pathname.startsWith('/cdn-cgi/challenge-platform/');
-      } catch { return false; }
-    },
-  };
   const inspect = dependencies.inspect || inspectNativeVerification;
   const now = dependencies.now || Date.now;
   const pause = dependencies.pause || (milliseconds => page.waitForTimeout(milliseconds));
@@ -47,7 +36,7 @@ export async function prepareBrowserVerification(page, origin, timeoutMs = 8000,
     }
     encountered ||= pending;
     if (!pending || now() >= deadline) return { encountered, pending, ...activation };
-    if (!activation.attempted) await inspect(page, policy, activation);
+    if (!activation.attempted) await inspect(page, activation);
     if (now() >= deadline) return { encountered, pending: true, ...activation };
     await pause(Math.min(250, deadline - now()));
   }

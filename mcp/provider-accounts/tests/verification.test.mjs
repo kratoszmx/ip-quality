@@ -10,13 +10,8 @@ test('normal checkbox preparation clears a check without claiming account authen
   const page = { url: () => origin + '/login', evaluate: async () => pending };
   const result = await prepareBrowserVerification(page, origin, 1000, {
     now: () => clock, pause: async ms => { clock += ms; },
-    inspect: async (_page, policy, activation) => {
+    inspect: async (_page, activation) => {
       inspections++;
-      assert.equal(policy.navigationAllowed(origin + '/login'), true);
-      assert.equal(policy.navigationAllowed('https://foreign.invalid/login'), false);
-      assert.equal(policy.frameNavigationAllowed('https://challenges.cloudflare.com/cdn-cgi/challenge-platform/widget'), true);
-      assert.equal(policy.frameNavigationAllowed('https://challenges.cloudflare.com/account'), false);
-      assert.equal(policy.frameNavigationAllowed('https://foreign.invalid/cdn-cgi/challenge-platform/widget'), false);
       activation.attempted = true; activation.clicked = true; activation.input = 'dispatched';
       pending = false;
     },
@@ -31,7 +26,7 @@ test('unresolved or unacknowledged verification stays pending and sends at most 
     let clock = 0, attempts = 0;
     const result = await prepareBrowserVerification({ url: () => origin, evaluate: async () => true }, origin, 600, {
       now: () => clock, pause: async ms => { clock += ms; },
-      inspect: async (_page, _policy, activation) => {
+      inspect: async (_page, activation) => {
         attempts++; activation.attempted = true; activation.clicked = clicked;
         activation.input = clicked ? 'dispatched' : 'unknown';
       },

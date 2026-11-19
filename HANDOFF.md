@@ -17,6 +17,14 @@ contracts. The provider-account manifest and MCP lockfile declare the direct
 dependency. The full `/bin/zsh -f scripts/test-offline` passed with 152 reporter
 cases / 4,410 assertions, 35 IPQS cases and 60 provider-account cases.
 
+### myutils native input — 2026-11-19
+
+The shared inspector now takes `(page, activation)` without a caller-supplied
+verification policy. `mcp/common/verification.mjs` uses that interface directly;
+its account origin, bounded settling, TOTP and account identity remain owned here.
+The complete `/bin/zsh -f scripts/test-offline` passed against myutils 0.8.0
+(reporter, IPQS and all 67 provider-account tests). No credentials submitted.
+
 ### user2 — 2026-11-19: faster, tighter offline suites
 
 Tests and documentation only; `script_version` is unchanged. The base test class
