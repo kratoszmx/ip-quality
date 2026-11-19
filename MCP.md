@@ -21,6 +21,25 @@ Fresh dashboard reads share [myutils's account-read contract](/Users/zmx/Project
 This does not apply GET-only policy to login/2FA/confirmed writes. Private state
 belongs to its provider, and cleanup warnings remain distinct from authentication.
 
+## Normal site verification
+
+There is no blanket prohibition on agent-assisted CAPTCHA handling. Browser
+login/setup flows prepare normal Cloudflare checkbox verification through
+myutils's native input on the same owned page before deciding readiness. A
+single activation and bounded settling replace the old immediate stop. Completed
+verification response fields do not themselves establish account authentication;
+the exact account still has to pass its original identity check. An unresolved
+check remains explicit and preserves the retained page.
+
+The DB-IP reporter fallback already uses myutils's automatic public-page path.
+On November 19, `https://db-ip.com/1.1.1.1` first returned HTTP 403, then a fresh
+hidden native read returned HTTP 200, the matching IP record and explicit LOW
+label with `nativeRecovery.verificationActivated=true` and confirmed cleanup.
+This proves that normal checkbox verification can succeed. On the same route,
+Check.Place still returned its explicit block page with no verification control;
+that is a different outcome, not a completed check. Cloudflare's login form loaded
+in Firefox and native hidden Chrome, without a credential submission.
+
 ## Choose a first call
 
 Tool names are server-local; a client may add its own prefix. Readiness calls are

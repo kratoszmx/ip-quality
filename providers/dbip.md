@@ -3,13 +3,15 @@
 Visitor-demo token flow, egress binding and quota semantics. Adapter and parser: [`dbip.zsh`](dbip.zsh).
 Cross-source policy (consent, routes, fallbacks, display): [PROVIDERS.md](../PROVIDERS.md).
 
-Current live checkpoint, October 27: the direct visitor API again returned the
-explicit daily-limit JSON. The new fallback then read the **same tested IPv4**
-from the official detail page in fresh hidden Chrome and obtained its `low`
-label. Both focused and all-source direct reports returned `Source=public_page`,
-`DemoStatus=daily_quota_exhausted`, `PageStatus=ok` and `Band=low`. The original
-API quota has not recovered; the public website is a separate usable surface.
-Private receipts: `reports/direct-source-recheck-20261027/{before,after,all-after}.json`.
+Current live checkpoint, November 19: HTTP for `https://db-ip.com/1.1.1.1`
+returned 403, then myutils's fresh hidden native read completed the normal
+checkbox verification and returned the matching HTTP 200 record and LOW label
+(`verificationActivated=true`, cleanup confirmed). The production
+`readDbipPage` adapter separately returned `ok/low` for the same target on the
+configured system proxy. Private receipts: `reports/verification-20261119/`.
+The earlier October 27 complete direct report established automatic recovery
+from the visitor API's daily-limit JSON through this public-page surface;
+that integration and quota distinction remain the contract below.
 
 Only the explicit daily-limit response triggers this optional fallback, once.
 `mcp/provider-accounts/dbip-page.mjs` directly imports myutils/web-text, without
@@ -112,8 +114,8 @@ IP heading/title, `nativeRecovery.outcome=ready`, and the explicit page label
 `Estimated threat level for this IP address is LOW`. This is a genuine public
 page observation, separate from the still-limited visitor API and the paid
 keyed Extended API. It does not establish a personal DB-IP login or an API
-allowance. At this checkpoint the reporter still uses the visitor API; the
-browser page has not been integrated as an automatic reporter fallback.
+allowance. The reporter now integrates the public page after an explicit
+visitor daily limit, as described above.
 The later recheck with text-browser MCP 0.5.18 again confirmed HTTP 200 and the
 explicit LOW label on that same public detail page. Unlike the earlier
 checkpoint, the visitor API also succeeded in both focused reporter routes.

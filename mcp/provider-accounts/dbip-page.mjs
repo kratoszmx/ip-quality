@@ -55,7 +55,8 @@ export async function readDbipPage(ip, {env = process.env, signal, read} = {}) {
         cdpPort: 19607, leasePort: 19606, proxyServer, signal, keepBrowserOpen: false};
       read = options => extractBrowserText(options, runtime);
     }
-    // The shared default path (text-browser 0.6.0): no backend choice; the read answers no verification.
+    // The shared default owns normal verification and confirms the original
+    // target content afterward; this adapter only projects the matching record.
     const result = await read({url: `https://db-ip.com/${ip}`,
       timeoutMs: 30000, maxChars: 24000, maxLinks: 0}, {proxyServer, signal});
     const status = result?.httpStatus ?? result?.error?.httpStatus;

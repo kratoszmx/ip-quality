@@ -10,7 +10,7 @@ import { enableCloudflareTotp, saveCloudflareRecoveryCodes } from './cloudflare-
 import { verifyPublicProvider } from './public-api.mjs';
 import { loginAccount } from './login.mjs';
 
-const instructions = 'IPQuality provider accounts. Dedicated ipapi/Cloudflare/AbuseIPDB/ipdata accounts only. Free accounts only; no billing or plan upgrade tools. Account creation needs task authorization and CREATE_FREE_ACCOUNT. Stop for human verification; never solve CAPTCHA. Store secrets privately and never return keys, passwords, OTPs, recovery codes or cookies. A saved file is not live authentication. No automatic signup or lookup retries.';
+const instructions = 'IPQuality provider accounts. Dedicated ipapi/Cloudflare/AbuseIPDB/ipdata accounts only. Free accounts only; no billing or plan upgrade tools. Account creation needs task authorization and CREATE_FREE_ACCOUNT. Use myutils for normal site verification: native checkbox preparation is supported, and remaining image/slider challenges can use its verification workflow. Recheck the original page and exact account after verification. Store secrets privately and never return keys, passwords, OTPs, recovery codes or cookies. A saved file is not live authentication. No automatic signup or lookup retries.';
 const server = new McpServer({ name: 'ipquality-provider-accounts', version: '0.1.0' }, { instructions });
 const provider = z.enum(['ipapi', 'cloudflare']);
 async function result(operation) {
@@ -32,7 +32,7 @@ server.registerTool('provider_account_login', {
   inputSchema: { provider: z.enum(['ipapi', 'cloudflare', 'abuseipdb']), confirmation: z.literal('USE_SAVED_ACCOUNT_CREDENTIALS') },
 }, ({ provider, confirmation }) => result(() => loginAccount(provider, confirmation)));
 server.registerTool('provider_account_create_free', {
-  description: buildToolDescription('Submit one reviewed free signup with privately generated credentials. Uses the configured private registration email. Human verification blocks submission.', instructions), inputSchema: { provider, country: z.enum(['Hong Kong', 'China']).optional(), confirmation: z.literal('CREATE_FREE_ACCOUNT') },
+  description: buildToolDescription('Submit one reviewed free signup with privately generated credentials. Uses the configured private registration email. Prepares normal checkbox verification before checking signup readiness.', instructions), inputSchema: { provider, country: z.enum(['Hong Kong', 'China']).optional(), confirmation: z.literal('CREATE_FREE_ACCOUNT') },
 }, ({ provider, country, confirmation }) => result(() => createFreeAccount(provider, country, confirmation)));
 server.registerTool('ipapi_import_free_key', {
   description: buildToolDescription('Import the one visible labelled ipapi API key directly to the reporter. Verifies the complete response with one free 1.1.1.1 lookup.', instructions), inputSchema: { confirmation: z.literal('IMPORT_FREE_API_KEY') },

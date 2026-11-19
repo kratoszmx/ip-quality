@@ -24,7 +24,7 @@ test('public page binds the exact record and projects only its explicit risk lab
     {cleanupConfirmed: false}, {launchMode: 'visible'}, {sessionMode: 'persistent'}
   ]) assert.deepEqual(dbipPageObservation({...fixture, ...patch}, ip), {status: 'invalid_response'});
   // The default path's result needs no particular native recipe (text-browser 0.6.0).
-  for (const nativeRecovery of [undefined, {attempted: true, outcome: 'ready', recipe: 'dbip-public-ip'}])
+  for (const nativeRecovery of [undefined, {attempted: true, outcome: 'ready', recipe: 'dbip-public-ip', verificationActivated: true}])
     assert.equal(dbipPageObservation({...fixture, nativeRecovery}, ip).status, 'ok');
   for (const target of [null, '8.8.8.8', '::1'])
     assert.deepEqual(dbipPageObservation(fixture, target), {status: 'invalid_response'});

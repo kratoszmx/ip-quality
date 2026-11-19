@@ -204,7 +204,12 @@ profile. Close a temporary ATT browser before its private Mihomo exits.
 Passwords are random and saved before signup. Durable receipts prevent automatic
 duplicate registration/token/enrollment submissions after timeouts. Registration
 may be retried on a different route only after explicit user direction and review
-of the prior outcome; preserve the prior receipt. CAPTCHA is left for the user.
+of the prior outcome; preserve the prior receipt. Normal checkbox verification
+is prepared on the owned page using myutils before login/signup readiness is
+classified. The shared `mcp/common/verification.mjs` waits within an eight-second
+settling budget, sends at most one native activation, and returns pending/input
+metadata. A remaining check can be inspected with supported myutils verification
+tools; completion must be followed by the original account identity check.
 No billing, upgrade, email-send, generic arbitrary-selector or recovery-code
 regeneration tool is exposed. Public results never include credentials, codes,
 seeds, cookies, account IDs or verification URL tokens.

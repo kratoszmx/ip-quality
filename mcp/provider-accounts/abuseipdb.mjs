@@ -4,6 +4,7 @@ import { requestHttpRead } from '@myutils/http-read';
 import { inspectPrivateSecretFile, readPrivateSecretFile } from '@myutils/secret-file';
 import { withSession } from './accounts.mjs';
 import { accountNetworkOptions, validApiKey } from './policy.mjs';
+import { prepareBrowserVerification } from '../common/verification.mjs';
 
 const keyPath = fileURLToPath(new URL('../../secrets/abuseipdb', import.meta.url));
 const accountPath = fileURLToPath(new URL('../../secrets/accounts/abuseipdb/credentials.json', import.meta.url));
@@ -46,16 +47,17 @@ export async function verifyAbuseipdb(confirmation, dependencies = {}) {
   } finally { agent.destroy(); }
 }
 
-// Only reviewed signup/login surfaces. Account creation, CAPTCHA, key import
+// Only reviewed signup/login surfaces. Account creation, key import
 // and security settings are explicit maintenance operations, never auto-retried.
 export async function openAbuseipdb(surface, visible = false) {
   if (!['signup', 'login'].includes(surface)) throw new Error('Select signup or login.');
   return withSession('abuseipdb', async page => {
     const response = await page.goto(`https://www.abuseipdb.com/${surface === 'signup' ? 'register' : 'login'}`,
       { waitUntil: 'domcontentloaded', timeout: 20000 });
+    const verification = await prepareBrowserVerification(page, 'https://www.abuseipdb.com');
     const current = new URL(page.url());
     if (current.origin !== 'https://www.abuseipdb.com') throw new Error('Unreviewed account redirect.');
     return { provider: 'abuseipdb', backend: visible ? 'visible_chrome' : 'windowless_native_chrome', httpStatus: response?.status(),
-      path: ['/register', '/login', '/account', '/email/verify'].includes(current.pathname) ? current.pathname : 'unrecognized', submitted: false };
+      path: ['/register', '/login', '/account', '/email/verify'].includes(current.pathname) ? current.pathname : 'unrecognized', submitted: false, verification };
   }, { foreground: visible });
 }

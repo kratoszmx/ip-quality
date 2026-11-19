@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
 
-import { classifyIpqsAuthSignals } from "../src/auth.js";
+import { classifyIpqsAuthSignals, inspectIpqsAuthPage } from "../src/auth.js";
+import type { Page } from "playwright-core";
 
 const base = { trustedOrigin: true, path: "/login", authenticatedMarkerCount: 0, loginFormPresent: false,
   secondaryVerification: false, credentialError: false, totpChallengePresent: false };
@@ -23,5 +25,23 @@ test("IPQS authentication needs trusted dashboard markers and never ignores logi
   ];
   for (const [change, expected] of cases) {
     assert.equal(classifyIpqsAuthSignals({ ...base, ...change }), expected, JSON.stringify(change));
+  }
+});
+
+test("a completed browser check does not require human action while TOTP remains independently pending", async () => {
+  for (const [body, value, expected] of [
+    ['Protected by CAPTCHA', 'synthetic-response', 'unknown'],
+    ['Verify you are not a robot', '', 'secondary-verification'],
+    ['Protected by CAPTCHA. Enter your authenticator verification code.', 'synthetic-response', 'secondary-verification'],
+  ]) {
+    const page = { url: () => 'https://www.ipqualityscore.com/login',
+      evaluate: async (project: (...args: any[]) => any, args: unknown) => runInNewContext(`(${project.toString()})(args)`, {
+        args, document: { title: 'IPQS', body: { innerText: body }, forms: [], querySelector: () => null,
+          querySelectorAll: () => [{ value }] },
+      }),
+    } as unknown as Page;
+    const result = await inspectIpqsAuthPage(page);
+    assert.equal(result.stage, expected);
+    assert.equal(JSON.stringify(result).includes('synthetic-response'), false);
   }
 });

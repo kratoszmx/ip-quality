@@ -13,6 +13,7 @@ import { providerConfig, accountUrl, accountPagePath, accountNetworkOptions, ass
 import { submitReviewedSignup } from './signup.mjs';
 import { httpStatePath, pendingLoginPath, readHttpAccount } from './http-account.mjs';
 import { restoreBrowserState, readBrowserState } from '../common/browser-state.mjs';
+import { prepareBrowserVerification } from '../common/verification.mjs';
 
 export const ROOT = path.dirname(fileURLToPath(import.meta.url));
 export const SECRETS = path.resolve(ROOT, '../../secrets');
@@ -109,7 +110,9 @@ export async function openAccount(provider, surface, visible = false) {
   const url = accountUrl(provider, surface);
   return withSession(provider, async page => {
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20_000 });
-    if (response && response.status() >= 400) return { provider, state: 'access_unavailable', httpStatus: response.status() };
+    const verification = await prepareBrowserVerification(page, providerConfig(provider).origin);
+    if (response && response.status() >= 400 && (!verification.encountered || verification.pending))
+      return { provider, state: verification.pending ? 'human_verification_required' : 'access_unavailable', httpStatus: response.status(), verification };
     await page.locator('body').waitFor({ timeout: 10_000 });
     if (provider === 'cloudflare') await page.waitForFunction(() =>
       !!document.querySelector('input[type="password"],a[href*="logout"]') ||
@@ -117,7 +120,7 @@ export async function openAccount(provider, surface, visible = false) {
     undefined, { timeout: 10_000, polling: 100 }).catch(() => {});
     const result = await snapshot(provider, page);
     if (provider === 'ipapi' && result.state === 'authenticated') await saveStorageStateSafely(page.context(), httpStatePath(provider));
-    return result;
+    return { ...result, verification };
   }, { foreground: visible });
 }
 
@@ -163,6 +166,7 @@ export async function createFreeAccount(provider, country, confirmation) {
   return withSession(provider, async page => {
     assertAccountOrigin(provider, page.url());
     if (new URL(page.url()).pathname !== config.signup) throw new Error('Open the reviewed signup page first.');
+    await prepareBrowserVerification(page, config.origin);
     const current = await snapshot(provider, page);
     if (['human_verification_required', 'automated_browser_blocked'].includes(current.state)) return current;
     const attempt = await inspectPrivateSecretFile(secret(provider, 'registration-attempt.json'));

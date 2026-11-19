@@ -1,10 +1,13 @@
 import type { Locator, Page } from "playwright-core";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 
-import { IPQS_ORIGIN, summarizeIpqsUrl } from "./config.js";
+import { IPQS_ORIGIN, ROOT, summarizeIpqsUrl } from "./config.js";
 import { redactText } from "@myutils/redaction";
+const { prepareBrowserVerification } = await import(pathToFileURL(path.join(ROOT, "../common/verification.mjs")).href);
 
 const AUTHENTICATED_MARKERS = ["Dashboard", "API Keys", "Account Settings", "Logout", "Credits", "Usage"];
-const SECONDARY_VERIFICATION_TEXT = /(?:verification code|two[- ]factor|\b2fa\b|multi[- ]factor|captcha|not a robot|passkey|security key)/i;
+const SECONDARY_VERIFICATION_TEXT = /(?:verification code|two[- ]factor|\b2fa\b|multi[- ]factor|passkey|security key)/i;
 const CREDENTIAL_ERROR_TEXT = /(?:(?:incorrect|invalid|wrong|unrecognized|do not match).{0,80}(?:email|password|credential|login)|(?:email|password|credential|login).{0,80}(?:incorrect|invalid|wrong|unrecognized|do not match)|unable to (?:log|sign) in|login failed)/i;
 
 export type IpqsAuthStage =
@@ -59,12 +62,15 @@ export async function inspectIpqsAuthPage(page: Page) {
         && Boolean(form.querySelector('input[name="email"]'))
         && Boolean(form.querySelector('input[name="password"][type="password"]'));
     });
+    const responses = [...document.querySelectorAll<HTMLInputElement>('input[name="cf_challenge_response"],input[name="cf-turnstile-response"]')];
+    const browserVerification = /captcha|not a robot/i.test(body) &&
+      (!responses.length || responses.some(input => !input.value));
     return {
       title: document.title,
       totpChallengePresent: !!document.querySelector('input[name="2fa"]') && /Finish Login/.test(body),
       authenticatedMarkerCount,
       loginFormPresent,
-      secondaryVerification: new RegExp(secondaryPattern, "i").test(body),
+      secondaryVerification: new RegExp(secondaryPattern, "i").test(body) || browserVerification,
       credentialError: new RegExp(credentialPattern, "i").test(body),
     };
   }, {
@@ -170,6 +176,7 @@ export async function submitIpqsCredentialsOnce(
     await waitUntilEnabled(submit, timeoutMs);
     await submit.click({ timeout: timeoutMs });
     await page.waitForLoadState("domcontentloaded", { timeout: timeoutMs }).catch(() => undefined);
+    await prepareBrowserVerification(page, IPQS_ORIGIN, Math.min(timeoutMs, 8000));
     const outcome = await waitForLoginOutcome(page, timeoutMs);
     if (!outcome.authenticated) await clearReviewedLoginFields(page);
     return {

@@ -93,6 +93,14 @@ failure and byte-for-byte saved-state preservation. `browser-state.test.mjs`
 also verifies that a failed cookie restore leaves the source file intact.
 No real credentials, browser or provider request is used.
 
+`mcp/provider-accounts/tests/verification.test.mjs` tests the shared normal
+verification preparation: one native activation, completed-response recognition,
+pending/deadline outcomes, account/frame scope and no token output. Login tests
+verify that a resolved initial HTTP 403 reaches form validation, while an
+unresolved check stays explicit. IPQS auth tests keep TOTP independent from a
+completed CAPTCHA field; DB-IP fixtures accept successful shared verification
+only alongside the original target/content/cleanup requirements.
+
 All reporter suites inherit `test/support/reporter_test_case.rb`:
 
 | Helper | Use |

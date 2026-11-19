@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { runInNewContext } from 'node:vm';
 import { acceptsLoginForm, loginAccount, loginFailureState } from '../login.mjs';
 
 test('login rejection and verification are explicit rather than reported as authenticated', () => {
@@ -22,6 +23,37 @@ test('saved login accepts only the reviewed origin, POST action and unique crede
       assert.equal(acceptsLoginForm(provider, { ...form, ...change }), false);
     }
     await assert.rejects(loginAccount(provider, ''), /authorization/);
+  }
+});
+
+test('login prepares normal verification before accepting a previous HTTP 403 or returning a remaining check', async () => {
+  for (const pending of [false, true]) {
+    let preparations = 0;
+    const page = { url: () => 'https://dash.cloudflare.com/login',
+      goto: async () => ({ status: () => 403 }), waitForFunction: async () => {},
+      evaluate: async project => runInNewContext(`(${project.toString()})()`, {
+        location: { pathname: '/login' }, document: {
+          body: { innerText: 'Verify you are human' }, querySelectorAll: () => [{ value: 'synthetic-response' }],
+          querySelector: () => ({}),
+        },
+      }),
+      locator: () => ({ filter: () => ({ count: async () => 0 }) }),
+    };
+    const result = await loginAccount('cloudflare', 'USE_SAVED_ACCOUNT_CREDENTIALS', {
+      privateAccount: async () => ({ email: 'fixture@example.test', password: 'synthetic-private-password' }),
+      readHttpAccount: async () => ({ authenticated: false, state: 'login_required', httpStatus: 302 }),
+      withSession: async (_provider, operation) => operation(page),
+      prepareVerification: async (actualPage, origin) => {
+        preparations++; assert.equal(actualPage, page); assert.equal(origin, 'https://dash.cloudflare.com');
+        return { encountered: true, pending, attempted: true, clicked: true };
+      },
+    });
+    assert.equal(preparations, 1);
+    // A resolved check reaches form validation; the deliberately absent form
+    // still prevents a password submission. A remaining check stays explicit.
+    assert.equal(result.state, pending ? 'human_verification_required' : 'unrecognized_login_form');
+    assert.equal(result.credentialsSubmitted, false);
+    assert.equal(JSON.stringify(result).includes('synthetic-private-password'), false);
   }
 });
 

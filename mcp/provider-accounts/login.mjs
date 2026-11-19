@@ -3,6 +3,7 @@ import { unlink } from 'node:fs/promises';
 import { withSession, privateAccount } from './accounts.mjs';
 import { providerConfig, accountUrl, assertAccountOrigin } from './policy.mjs';
 import { httpStatePath, pendingLoginPath, httpAccountIdentity, readHttpAccount } from './http-account.mjs';
+import { prepareBrowserVerification } from '../common/verification.mjs';
 
 const loginForms = Object.freeze({
   cloudflare: { path: '/login', password: 'password', button: 'Sign in' },
@@ -19,13 +20,16 @@ export function loginFailureState({ challenge, text, hasPassword, path }) {
 }
 
 async function failureOnPage(page) {
-  return loginFailureState(await page.evaluate(() => ({
-    challenge: [...document.querySelectorAll('input[name="cf_challenge_response"],input[name="cf-turnstile-response"]')].some(e => !e.value) ||
-      /verify you are human|let us know you are human|checking your browser/i.test(document.body?.innerText || ''),
-    text: (document.body?.innerText || '').slice(0, 20000),
-    path: location.pathname,
-    hasPassword: !!document.querySelector('input[type="password"]'),
-  })));
+  return loginFailureState(await page.evaluate(() => {
+    const responses = [...document.querySelectorAll('input[name="cf_challenge_response"],input[name="cf-turnstile-response"]')];
+    return {
+      challenge: responses.length ? responses.some(e => !e.value) :
+        /verify you are human|let us know you are human|checking your browser/i.test(document.body?.innerText || ''),
+      text: (document.body?.innerText || '').slice(0, 20000),
+      path: location.pathname,
+      hasPassword: !!document.querySelector('input[type="password"]'),
+    };
+  }));
 }
 
 export function acceptsLoginForm(provider, metadata) {
@@ -59,9 +63,12 @@ export async function loginAccount(provider, confirmation, dependencies = {}) {
     nextStep: existing.state === 'account_suspended'
       ? 'The saved account is suspended; provider support must review it. No password retry was made.'
       : 'Restore the dedicated saved session with the approved windowless recovery flow. Automated ipapi password submission remains disabled.' };
+  const prepareVerification = dependencies.prepareVerification || prepareBrowserVerification;
   return (dependencies.withSession || withSession)(provider, async page => {
     const response = await page.goto(accountUrl(provider, 'login'), { waitUntil: 'domcontentloaded', timeout: 20000 });
-    if (response?.status() >= 400) return { provider, authenticated: false, state: 'access_unavailable', httpStatus: response.status(), credentialsSubmitted: false };
+    const verification = await prepareVerification(page, config.origin);
+    if (response?.status() >= 400 && (!verification.encountered || verification.pending))
+      return { provider, authenticated: false, state: verification.pending ? 'human_verification_required' : 'access_unavailable', httpStatus: response.status(), credentialsSubmitted: false, verification };
     await page.waitForFunction(() => document.querySelector('input[type="password"]') || /verify you are human|let us know you are human/i.test(document.body?.innerText || ''), undefined, { timeout: 10000, polling: 100 }).catch(() => {});
     assertAccountOrigin(provider, page.url());
     const before = await failureOnPage(page);
@@ -81,6 +88,7 @@ export async function loginAccount(provider, confirmation, dependencies = {}) {
       await form.getByRole('button', { name: policy.button, exact: true }).click({ timeout: 10000 });
       await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
       await page.waitForFunction(() => !document.querySelector('input[type="password"]') || /invalid|incorrect|verify you are human|captcha/i.test(document.body?.innerText || ''), undefined, { timeout: 8000, polling: 100 }).catch(() => {});
+      await prepareVerification(page, config.origin);
       assertAccountOrigin(provider, page.url());
       const probe = await requestBinaryWithBrowserContext(page.context(), {
         url: provider === 'cloudflare' ? `${config.origin}/api/v4/user` : `${config.origin}${config.dashboard}`,

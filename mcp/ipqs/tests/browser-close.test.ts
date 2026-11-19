@@ -15,7 +15,8 @@ test("explicit browser close reports uncertainty and retains the same handle wit
   let closeCalls = 0, launches = 0, failClose = true, connected = true;
   const session = {
     mode: "hidden", context: {},
-    page: { isClosed: () => !connected, goto: async () => {}, url: () => "https://www.ipqualityscore.com/login" },
+    page: { isClosed: () => !connected, goto: async () => {}, evaluate: async () => false,
+      url: () => "https://www.ipqualityscore.com/login" },
     browser: { isConnected: () => connected },
     close: async () => { closeCalls++; if (failClose) throw Error("private cookie=fixture-secret"); connected = false; },
   };

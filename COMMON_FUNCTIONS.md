@@ -123,6 +123,15 @@ A similar `jq` expression alone is not a shared schema contract.
 
 ## Account MCP shared packages
 
+`mcp/common/verification.mjs:prepareBrowserVerification(page, origin, timeoutMs)`
+is shared by provider-account open/signup/login and IPQS login/open flows. It
+scopes the account page and Cloudflare challenge frames, recognizes pending
+versus completed response fields, and reuses myutils `inspectNativeVerification`
+directly for one native checkbox activation. Its default settling budget is
+eight seconds. It returns `{encountered, pending, attempted, clicked, input?}`;
+no credential or response token is returned, and clearing the check is never
+account identity proof. Fixtures can inject the inspector, clock and pause.
+
 Both MCPs depend directly on sibling `/Users/zmx/Projects/myutils` packages:
 
 | Package | Use |

@@ -27,31 +27,23 @@ choice is unchanged. Offline aggregate passed against the 0.6.0 build: 152
 reporter cases / 4,410 assertions, 35 IPQS and 60 provider-account cases. No
 live lookup was run.
 
-### zmxmacm4 — 2026-11-10: Steam keychain audit and account-read route fix
+### zmxmacm4 — 2026-11-19: verified normal CAPTCHA preparation
 
-Reporter version: `v2026-11-10-standalone.56`.
-
-Reviewed Claude's `Steam-mcp` session and the current shared launcher. Steam's
-saved-profile cookie loss outside macOS Aqua is applicable to persistent native
-Chrome launches. IPQuality's routine checks use HTTP; its native account flows
-use fresh temporary profiles with separately saved state, and isolated reads
-use fresh browser contexts. DB-IP uses no account state. No production path
-reopens a saved native profile. The shared persistent launcher now protects
-explicit manual recovery by default; its five offline keychain tests passed.
-Local Supervisor inventory lists this project's weekly offline suite, with no
-IPQS live account/API probe. No scheduler or account settings were changed.
-
-The audit found and reproduced a route bug in provider browser reads: explicit
-`DIRECT` (or no proxy) was replaced with `http://127.0.0.1:7897`. The reader now
-passes `accountNetworkOptions().proxyServer` unchanged to myutils. An offline
-entrypoint regression fails on the old code and passes after the fix; it also
-checks proxy precedence, cleanup and saved-state preservation on failures.
-Documentation now distinguishes this project's temporary sessions from Steam's
-persistent profiles and corrects the stale IPQS isolated-reader description.
-Full offline aggregate passed: 152 reporter cases / 4,410 assertions, 35 IPQS
-cases and 60 provider-account cases. Evidence:
-`reports/keychain-audit-20261110/offline.log`. No live login or provider lookup
-was needed for this audit.
+Reporter `v2026-11-19-standalone.57`. A fresh myutils hidden read of DB-IP's
+`1.1.1.1` page recovered from HTTP 403 to the exact HTTP 200 record/LOW label
+with `verificationActivated=true` and confirmed cleanup; the production
+`readDbipPage` adapter also returned `ok/low` on the configured system proxy.
+Removed blanket CAPTCHA prohibitions and immediate-stop behavior: IPQS and
+provider-account login/open/setup now share normal checkbox preparation in
+`mcp/common/verification.mjs`. Completed response fields no longer falsely
+require human action merely because the verification label remains; TOTP and
+exact account checks remain independent. Cloudflare's public login loaded in
+Firefox/native hidden Chrome; Check.Place still returned an explicit block
+without a verification control. No account credentials were submitted. Current
+NodeQuality code still invokes xykt/IPQuality, whose Check.Place URLs remain.
+The full offline suite passed: 152 reporter cases / 4,410 assertions, 36 IPQS
+and 66 provider-account cases. Private live receipts and validation:
+`reports/verification-20261119/`.
 
 ## Current behavior and ownership
 
@@ -122,10 +114,11 @@ was needed for this audit.
   and ATT. Upstream can still render a Lite report by skipping several relay
   sources; that is not relay recovery. Source versions, evidence and scope:
   [NodeQuality comparison](providers/check_place.md#current-nodequality-comparison).
-- **Cloudflare account:** Native hidden Chrome loaded the login form, but one
-  password submission required human verification. Existing saved HTTP identity
-  returned 403 on proxy/direct. Official Intel API still succeeded; no GUI
-  fallback or challenge automation was performed.
+- **Cloudflare account:** November 19 anonymous Firefox/native-hidden reads
+  loaded the official login form; no credentials were submitted. The last
+  account-level checkpoint remains October 26: password submission required
+  verification, saved HTTP identity returned 403, and the Intel API succeeded.
+  The new public-page result does not refresh that saved account observation.
 - **Ping0 on ATT:** `tls_error` (curl 35) on 2026-10-23 while direct verified.
   Ping0 observes the caller, so a direct fallback would not measure ATT.
 

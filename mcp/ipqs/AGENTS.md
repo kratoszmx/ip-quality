@@ -48,8 +48,10 @@ use direct networking. No failure opens a GUI automatically.
 The private `http-session.json` is saved only after successful authentication.
 Temporary browser profiles are cleaned by the shared lifecycle worker; account
 API requests use the key independently. Credentials never enter MCP output and
-are not read when restored authentication succeeds. CAPTCHA/email/passkey
-verification stops the flow. An explicitly requested `visible=true` or the
+are not read when restored authentication succeeds. Normal checkbox verification
+uses myutils native input on the same owned page before login readiness is
+classified. Remaining checks retain their observed state; email/passkey recovery
+uses its own flow. An explicitly requested `visible=true` or the
 manual login script provides a human window; there is no automatic GUI fallback.
 
 ## Directory Map
