@@ -6,6 +6,7 @@ import { httpStatePath, pendingLoginPath, httpAccountIdentity, readHttpAccount }
 import { prepareBrowserVerification } from '../common/verification.mjs';
 
 const loginForms = Object.freeze({
+  ipapi: { path: '/app/', password: 'pass', button: 'Sign In' },
   cloudflare: { path: '/login', password: 'password', button: 'Sign in' },
   abuseipdb: { path: '/login', password: 'password', button: 'Login' },
 });
@@ -50,19 +51,9 @@ export async function loginAccount(provider, confirmation, dependencies = {}) {
   const account = await (dependencies.privateAccount || privateAccount)(provider);
   const existing = await (dependencies.readHttpAccount || readHttpAccount)(provider, account.email);
   const liveAuthenticationChecked = Number.isInteger(existing.httpStatus);
-  if (existing.authenticated && existing.state === 'authenticated') {
+  if (existing.authenticated) {
     return { ...existing, liveAuthenticationChecked, credentialsSubmitted: false };
   }
-  // Reusing a verified session is distinct from a new password submission.
-  // ipapi's former account was suspended for bot login; keep that submission
-  // disabled even after a manually registered replacement has a usable session.
-  if (!policy) return { ...existing,
-    state: existing.state === 'account_suspended' ? 'account_suspended' : 'manual_login_required',
-    liveAuthenticationChecked,
-    credentialsSubmitted: false, retryAutomatically: false,
-    nextStep: existing.state === 'account_suspended'
-      ? 'The saved account is suspended; provider support must review it. No password retry was made.'
-      : 'Restore the dedicated saved session with the approved windowless recovery flow. Automated ipapi password submission remains disabled.' };
   const prepareVerification = dependencies.prepareVerification || prepareBrowserVerification;
   return (dependencies.withSession || withSession)(provider, async page => {
     const response = await page.goto(accountUrl(provider, 'login'), { waitUntil: 'domcontentloaded', timeout: 20000 });

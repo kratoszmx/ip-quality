@@ -29,7 +29,7 @@ The formal inventory and current account/2FA evidence are in
 | --- | --- |
 | provider_account_status | Local credential and submission metadata; no network |
 | provider_account_open | Native hidden Chrome by default; `visible=true` explicitly requests a human window |
-| provider_account_login | USE_SAVED_ACCOUNT_CREDENTIALS: saved HTTP identity first; Cloudflare/AbuseIPDB may make one reviewed windowless password submission. ipapi reuses valid state but never automatically submits a password |
+| provider_account_login | USE_SAVED_ACCOUNT_CREDENTIALS: saved HTTP identity first; ipapi/Cloudflare/AbuseIPDB use their official windowless login form when a new session is needed, with normal checkbox preparation |
 | provider_account_close_browsers | Close only this MCP's owned temporary sessions; preserve saved HTTP and pending state |
 | provider_account_read | Default `mode=http`: bounded exact-account identity read with saved state and no Chrome. Explicit `mode=browser`: fresh isolated dashboard text/controls using this adapter's saved/current state |
 | provider_account_create_free | One free signup after CREATE_FREE_ACCOUNT; uses the confirmed private email/country |
@@ -108,8 +108,9 @@ private state; a separate HTTP check then proved the exact new identity with
 Chrome closed. The normal native-hidden MCP dashboard and subsequent HTTP/API
 checks also passed. The keyed risk API passed direct and default-proxy routes
 before credentials were promoted. The registration GUI is closed; routine
-access stays HTTP or windowless myutils Chrome. Reusing saved state is not
-permission to retry a password or create another account when it expires.
+access stays HTTP or windowless myutils Chrome. Expired state can use the normal
+saved-credential login tool. The November 19 public form is a POST to `/app/`,
+with `email` and `pass` fields and the `Sign In` button.
 Current credential/evidence locations are in [../../CREDENTIALS.md](../../CREDENTIALS.md).
 
 October 26 verification adopted the myutils text browser's native hidden engine,
@@ -119,12 +120,12 @@ headless Chrome. AbuseIPDB saved login and HTTP identity passed. Cloudflare
 required human verification after submission. ipapi terms were accepted with
 explicit user permission, but the former account's dashboard reported `bot_login`
 suspension and its API returned 403. One separately authorized visible Chrome
-password login reached the same suspended account. Automatic ipapi password
-submission is disabled; saved HTTP reads distinguish authentication from
+password login reached the same suspended account. Saved HTTP reads distinguish
+authentication from
 `account_suspended`/`apiUsable:false`. That former account remains archived;
-the replacement's successful HTTP reuse does not remove this failure contract.
-These gates do not trigger another password submission or an automatic GUI. A caller may explicitly
-request `visible=true` for a human recovery step. Existing state is preserved.
+the replacement uses the same normal login flow as the other maintained accounts.
+The server's returned service status accompanies authenticated identity.
+`visible=true` provides a visible recovery page when requested.
 
 ## Reporter public-page recovery
 
@@ -240,7 +241,7 @@ Its explicit `DIRECT` mode selects the shared native browser's verified direct
 route. The shared lifecycle verifies process/profile/route ownership; the MCP
 replaces only its own session when an explicit route/display mode changes.
 `login.mjs` owns reviewed POST forms and distinct credential/terms/verification
-outcomes and stops ipapi automated login locally after the observed suspension.
+outcomes across ipapi, Cloudflare and AbuseIPDB.
 `../common/browser-state.mjs` restores only the selected site's state.
 `cloudflare.mjs`
 owns its fixed account paths, server identity check and token policy; its TOTP

@@ -79,7 +79,7 @@ and static parsing directly; it does not launch or fall back to a browser.
 | Platform | Routine access | Fresh login or recovery | 2FA |
 | --- | --- | --- | --- |
 | IPQS | API, saved-session auth and default dashboard text over HTTP; explicit controls through native hidden Chrome | Windowless saved credentials + reviewed TOTP; verified November 5 | TOTP enabled |
-| ipapi.is | Replacement free account: keyed HTTP risk API and saved-state HTTP dashboard, verified October 28 | myutils headless restored the dedicated saved profile; native-hidden MCP dashboard also passed. Routine login reuses HTTP state. Automatic password submission remains disabled; no routine visible browser | No enrollment entry in the reviewed dashboard |
+| ipapi.is | Replacement free account: keyed HTTP risk API and saved-state HTTP dashboard, verified October 28 | Saved HTTP identity first; expired state uses the normal `/app/` Sign In form in windowless myutils Chrome, with checkbox preparation. Form verified November 19; account recovery is evaluated from the server response | No enrollment entry in the reviewed dashboard |
 | Cloudflare | Saved-state HTTP identity read; Intel token over HTTP | Native hidden Chrome; October 26 password flow required human verification; Intel API still passed | TOTP enabled, recovery codes saved |
 | AbuseIPDB | Saved-state HTTP account read; APIv2 key over HTTP | Native hidden Chrome; login and subsequent HTTP identity verified October 26 | No enrollment entry offered |
 | ipdata | Saved-token HTTP account check; owned free developer key over HTTP | October 27 one authorized native-hidden signup/login; saved state also verified in native headless Chrome. No automatic password submission or token refresh | No enrollment control on the reviewed Profile page; GetUser returned no enrolled factor |
@@ -138,8 +138,8 @@ website through a browser is not account authentication.
   reported `bot_login` suspension for automated browser sign-in. The stored key
   matches the dashboard; API HTTP 403 is not a stale-key or pending-terms result.
   One subsequently authorized real visible Chrome password login reached the
-  same suspended account. Automatic ipapi password submission is now disabled;
-  a later authorized normal key regeneration produced a new key but its first
+  same suspended account. A later authorized normal key regeneration produced
+  a new key but its first
   lookup still returned HTTP 403/INVALID_API_KEY. The reporter key was updated
   privately; the suspended account did not become usable through rotation.
 - October 28 replacement-account signup was submitted by the user in ordinary
@@ -148,8 +148,8 @@ website through a browser is not account authentication.
   free key passed both direct and proxy full-risk queries before promotion.
   The GUI was then closed; myutils headless restored its persistent profile,
   exported private state, and pure HTTP independently verified the exact new
-  account with Chrome closed. This proves session reuse, not a new automated
-  password-login method. Preserve the password-submission stop if state expires.
+  account with Chrome closed. November 19 restored the normal saved-credential
+  Sign In path alongside this HTTP session reuse.
 - Signups through proxy routes were rejected: ipapi succeeded only on explicit
   DIRECT, and AbuseIPDB's fresh ATT headless signup needed its dedicated headed
   profile.
@@ -194,10 +194,9 @@ Dated observations, not availability guarantees; private receipts stay under
   `ipqs_complete_totp` (`confirm=USE_SAVED_IPQS_TOTP`) handles a pending one.
 - Provider accounts: `provider_account_login` with
   `confirmation=USE_SAVED_ACCOUNT_CREDENTIALS` checks existing HTTP identity
-  then permits one reviewed windowless Cloudflare/AbuseIPDB password submission.
-  ipapi also reuses a verified HTTP session, but expired state returns a
-  manual-recovery requirement without launching Chrome or submitting a
-  password. A suspended identity remains explicitly suspended. Updated terms,
+  then uses the official windowless ipapi/Cloudflare/AbuseIPDB login form when
+  a new session is needed. An authenticated account response is reused with its
+  actual service status, including suspension where reported. Updated terms,
   human verification, rejected credentials and unconfirmed outcomes remain
   distinct. `provider_account_close_browsers` closes this server's owned
   browsers. `provider_account_open` opens one allowlisted page and

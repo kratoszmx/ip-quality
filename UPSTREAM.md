@@ -173,8 +173,8 @@ runtime dependency:
   Routine account checks now use bounded HTTP with saved-state validation.
   Browser operations reuse myutils native hidden Chrome, with visible Chrome
   only for explicitly requested human recovery. IPQS hidden login and HTTP
-  authentication passed on October 26; ipapi automated password login is disabled
-  after the provider's `bot_login` account suspension. Added provider-bound
+  authentication passed on October 26. Normal checkbox preparation reuses
+  myutils, and ipapi now shares the saved-credential login flow. Added provider-bound
   IPQS TOTP enrollment/challenge handling through shared TOTP primitives, private
   seed/recovery storage, one-attempt reservation and fixture/synthetic regressions.
   The formal server inventory and dated login proofs live in MCP.md.

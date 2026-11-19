@@ -28,7 +28,7 @@ server.registerTool('provider_account_read', {
   description: buildToolDescription('Check the saved account identity over bounded HTTP without Chrome. mode=browser explicitly inspects the existing dedicated page for setup or login recovery.', instructions), inputSchema: { provider, mode: z.enum(['http', 'browser']).default('http') },
 }, ({ provider, mode }) => result(() => readAccount(provider, mode)));
 server.registerTool('provider_account_login', {
-  description: buildToolDescription('Cloudflare/AbuseIPDB: one authorized saved-credential login without a window, reusing HTTP state first. Stops for verification; no automatic GUI or password retry. ipapi automated login is disabled after its bot_login suspension; use read for existing HTTP state. Saves state only after exact account proof.', instructions),
+  description: buildToolDescription('Sign in to ipapi, Cloudflare or AbuseIPDB with saved credentials in windowless Chrome, reusing HTTP state first. Prepares normal checkbox verification and reports the actual account outcome. Saves verified account state privately.', instructions),
   inputSchema: { provider: z.enum(['ipapi', 'cloudflare', 'abuseipdb']), confirmation: z.literal('USE_SAVED_ACCOUNT_CREDENTIALS') },
 }, ({ provider, confirmation }) => result(() => loginAccount(provider, confirmation)));
 server.registerTool('provider_account_create_free', {

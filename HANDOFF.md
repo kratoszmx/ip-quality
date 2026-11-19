@@ -29,21 +29,24 @@ live lookup was run.
 
 ### zmxmacm4 — 2026-11-19: verified normal CAPTCHA preparation
 
-Reporter `v2026-11-19-standalone.57`. A fresh myutils hidden read of DB-IP's
+Reporter `v2026-11-19-standalone.58`. A fresh myutils hidden read of DB-IP's
 `1.1.1.1` page recovered from HTTP 403 to the exact HTTP 200 record/LOW label
 with `verificationActivated=true` and confirmed cleanup; the production
 `readDbipPage` adapter also returned `ok/low` on the configured system proxy.
 Removed blanket CAPTCHA prohibitions and immediate-stop behavior: IPQS and
 provider-account login/open/setup now share normal checkbox preparation in
-`mcp/common/verification.mjs`. Completed response fields no longer falsely
+`mcp/common/verification.mjs`. The remaining provider-wide ipapi password-login
+disable branch is removed; its current official POST `/app/` form (`email`,
+`pass`, `Sign In`) returned HTTP 200 and now shares the normal saved-credential
+flow. Completed response fields no longer falsely
 require human action merely because the verification label remains; TOTP and
 exact account checks remain independent. Cloudflare's public login loaded in
 Firefox/native hidden Chrome; Check.Place still returned an explicit block
 without a verification control. No account credentials were submitted. Current
 NodeQuality code still invokes xykt/IPQuality, whose Check.Place URLs remain.
 The full offline suite passed: 152 reporter cases / 4,410 assertions, 36 IPQS
-and 66 provider-account cases. Private live receipts and validation:
-`reports/verification-20261119/`.
+and 67 provider-account cases. Private live receipts and validation:
+`reports/verification-20261119/` and `reports/ipapi-login-policy-20261119/`.
 
 ## Current behavior and ownership
 

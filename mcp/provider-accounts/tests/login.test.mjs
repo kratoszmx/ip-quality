@@ -13,6 +13,7 @@ test('login rejection and verification are explicit rather than reported as auth
 
 test('saved login accepts only the reviewed origin, POST action and unique credential fields', async () => {
   for (const [provider, url, password, button] of [
+    ['ipapi', 'https://ipapi.is/app/', 'pass', 'Sign In'],
     ['cloudflare', 'https://dash.cloudflare.com/login', 'password', 'Sign in'],
     ['abuseipdb', 'https://www.abuseipdb.com/login', 'password', 'Login'],
   ]) {
@@ -59,27 +60,67 @@ test('login prepares normal verification before accepting a previous HTTP 403 or
 
 for (const [name, identity, expectedState] of [
   ['valid session is reused over HTTP', { authenticated: true, state: 'authenticated', httpStatus: 200 }, 'authenticated'],
-  ['expired session never starts a password login', { authenticated: false, state: 'login_required', httpStatus: 302 }, 'manual_login_required'],
-  ['missing local session does not claim a live identity check', { authenticated: false, state: 'session_unavailable' }, 'manual_login_required'],
+  ['expired session opens the normal login form', { authenticated: false, state: 'login_required', httpStatus: 302 }, 'unrecognized_login_form'],
+  ['missing local session opens the normal login form', { authenticated: false, state: 'session_unavailable' }, 'unrecognized_login_form'],
   ['suspended identity is preserved rather than accepted as usable', { authenticated: true, state: 'account_suspended', apiUsable: false, restriction: 'bot_login', httpStatus: 200 }, 'account_suspended'],
 ]) {
   test(`ipapi ${name}`, async () => {
-    assert.equal(acceptsLoginForm('ipapi', { url: 'https://ipapi.is/app/', action: '/app/', method: 'post', fields: ['email', 'pass'], button: 'Sign In' }), false);
     const calls = [];
     const result = await loginAccount('ipapi', 'USE_SAVED_ACCOUNT_CREDENTIALS', {
       privateAccount: async provider => { calls.push(['account', provider]); return { email: 'owner@example.invalid' }; },
       readHttpAccount: async (provider, email) => { calls.push(['http', provider, email]); return { provider, backend: 'http', ...identity }; },
-      withSession: async () => { assert.fail('ipapi session reuse must never open a browser'); },
+      withSession: async (_provider, operation) => {
+        calls.push(['browser']);
+        return operation({ url: () => 'https://ipapi.is/app/', goto: async () => ({ status: () => 200 }),
+          waitForFunction: async () => {}, evaluate: async () => ({ challenge: false, text: '', hasPassword: true, path: '/app/' }),
+          locator: () => ({ filter: () => ({ count: async () => 0 }) }),
+        });
+      },
+      prepareVerification: async () => ({ encountered: false, pending: false }),
     });
-    assert.deepEqual(calls, [['account', 'ipapi'], ['http', 'ipapi', 'owner@example.invalid']]);
+    assert.deepEqual(calls, [['account', 'ipapi'], ['http', 'ipapi', 'owner@example.invalid'],
+      ...(!identity.authenticated ? [['browser']] : [])]);
     assert.equal(result.state, expectedState);
     assert.equal(result.authenticated, identity.authenticated);
-    assert.equal(result.liveAuthenticationChecked, Number.isInteger(identity.httpStatus));
+    if (identity.authenticated) assert.equal(result.liveAuthenticationChecked, true);
     assert.equal(result.credentialsSubmitted, false);
-    if (expectedState !== 'authenticated') assert.equal(result.retryAutomatically, false);
     if (expectedState === 'account_suspended') {
       assert.equal(result.apiUsable, false);
       assert.equal(result.restriction, 'bot_login');
     }
   });
 }
+
+test('ipapi expired-session login uses its actual pass field and returns the server credential outcome', async () => {
+  const email = 'fixture@example.test', password = 'synthetic-private-password';
+  const fills = [], clicks = [];
+  let text = 'Sign In', preparations = 0, requests = 0, disposed = 0;
+  const field = name => ({ fill: async value => fills.push([name, value]), count: async () => 1 });
+  const form = { count: async () => 1, evaluate: async () => ({
+    url: 'https://ipapi.is/app/', action: '/app/', method: 'post', fields: ['origin', 'bsig', 'hpo_url', 'email', 'pass'], button: 'Sign In',
+  }), locator: selector => field(selector.includes('email') ? 'email' : 'pass'),
+  getByRole: (_role, options) => ({ click: async () => { clicks.push(options.name); text = 'Invalid password'; } }) };
+  const context = { request: { get: async (url, options) => {
+    requests++;
+    assert.equal(url, 'https://ipapi.is/app/home'); assert.equal(options.maxRedirects, 0);
+    return { status: () => 200, headers: () => ({ 'content-type': 'text/html' }),
+      body: async () => Buffer.from('<form><input type="password"></form>'), dispose: async () => { disposed++; } };
+  } } };
+  const page = { url: () => 'https://ipapi.is/app/', context: () => context,
+    goto: async () => ({ status: () => 200 }), waitForFunction: async () => {}, waitForLoadState: async () => {},
+    evaluate: async () => ({ challenge: false, text, hasPassword: true, path: '/app/' }),
+    locator: selector => selector === 'form' ? { filter: () => form } : field('pass'),
+  };
+  const result = await loginAccount('ipapi', 'USE_SAVED_ACCOUNT_CREDENTIALS', {
+    privateAccount: async () => ({ email, password }),
+    readHttpAccount: async () => ({ authenticated: false, state: 'login_required', httpStatus: 302 }),
+    withSession: async (_provider, operation) => operation(page),
+    prepareVerification: async () => { preparations++; return { encountered: false, pending: false }; },
+  });
+  assert.deepEqual(fills, [['email', email], ['pass', password], ['pass', '']]);
+  assert.deepEqual(clicks, ['Sign In']);
+  assert.equal(preparations, 2); assert.equal(requests, 1); assert.equal(disposed, 1);
+  assert.equal(result.authenticated, false); assert.equal(result.state, 'credential_rejected');
+  assert.equal(result.credentialsSubmitted, true);
+  assert.equal(JSON.stringify(result).includes(password), false);
+});
