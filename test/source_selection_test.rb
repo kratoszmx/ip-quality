@@ -13,10 +13,22 @@ class SourceSelectionTest < ReporterTestCase
     stdout, stderr, status = run_script("--sources=ipapi,ipqs,ipapi", "--confirm-network-lookup", "--plan")
     assert status.success?, stderr
     assert_includes stdout, "selected source IDs: ipapi,ipqs\n"
-    ["", "ipapi,", ",ipapi", "ipapi,,ipqs", "bogus", "ipapi,all", "IPQS", "ipapi;id"].each do |selection|
-      _out, _err, result = run_script("--sources", selection, "--confirm-network-lookup")
-      assert_equal 64, result.exitstatus, selection
-    end
+    _out, err, result = run_script("--sources", "ipapi,bogus", "--confirm-network-lookup")
+    assert_equal 64, result.exitstatus
+    assert_includes err, "unknown source ID"
+
+    # Every malformed list is rejected by the one selection function, which
+    # keeps the previous choice instead of selecting a partial list.
+    probe = <<~'ZSH'
+      source "$1"; shift
+      for selection in "$@";do
+        reputation_choose_sources "$selection" 2>/dev/null
+        print -r -- "$?|$source_selection|${#selected_reputation_sources}"
+      done
+    ZSH
+    invalid = ["", "ipapi,", ",ipapi", "ipapi,,ipqs", "bogus", "ipapi,all", "IPQS", "ipapi;id"]
+    expected = Array.new(invalid.length, "64|all|#{IpQuality::SourceCatalog::IDS.length}")
+    assert_equal expected, zsh!(probe, provider_library("selection"), *invalid).lines(chomp: true)
   end
 
   def test_runner_and_reporter_accept_the_same_source_ids_and_forward_choices

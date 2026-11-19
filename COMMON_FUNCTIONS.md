@@ -24,8 +24,6 @@ Browser lifetime, native hidden targets, process ownership and cleanup remain
 in `@myutils/browser-session/chrome`. Provider selectors and login/2FA rules
 stay in their respective MCP packages.
 
-`mcp/provider-accounts/public-api.mjs` and `ipdata.mjs` import `isRecord` directly from `@myutils/value-shapes`. This accepts non-null objects other than arrays while each parser retains its provider-specific field, target and identity checks. The dependency is declared in the provider-account package and root MCP lockfile.
-
 ## zsh provider values (`provider_values.zsh`)
 
 | Function | Result |
@@ -144,6 +142,7 @@ Both MCPs depend directly on sibling `/Users/zmx/Projects/myutils` packages:
 | `http-read` | Provider accounts: bounded API reads, including ipdata's owned-key risk lookup, without redirects or retries |
 | `totp` | Provisioning URI validation and `generateFreshTotp` for Cloudflare and IPQS (IPQS opts into its 80-bit seed) |
 | `redaction` | Both MCPs: one union redactor for account pages, API data and errors (secrets, TOTP/recovery codes, credential syntax, emails, 16+ character tokens, 6+ digit numbers) |
+| `value-shapes` | Provider accounts: `isRecord` (non-null, non-array object) in `public-api.mjs` and `ipdata.mjs`; each parser keeps its own field, target and identity checks |
 
 `mcp/ipqs/src/http-auth.ts:readSavedDashboardHtml(pageName)` owns the IPQS
 private state, exact named dashboard URLs, proxy, request bounds and context cleanup.

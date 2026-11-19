@@ -2,8 +2,8 @@
 
 This project runs no daemon, launchd job or cron entry. Both CLI entrypoints run
 on demand and exit with the report; the account MCP servers are stdio processes
-that live as long as their client. Supervisor owns the weekly offline test and
-finite support-reply watches outside this repository.
+that live as long as their client. Supervisor owns the only scheduled job, the
+weekly offline test, outside this repository.
 
 ## Processes a run can start
 
@@ -80,20 +80,14 @@ MCP browsers and HTTP reads use their separate lifecycle above. See the
 | `test.ipquality.test-offline` | `/bin/zsh -f scripts/test-offline` from the project root: reporter, route runner and both account MCPs |
 
 The schedule belongs to `/Users/zmx/Projects/supervisor`
-(`supervisor/integrations/testing.py`). Local `supervisor inventory` on
-2026-11-10 confirms this weekly test; it registers no IPQS
-account probe or API-expiry check for this project; manual probes in
-[MCP.md](MCP.md) are not scheduled monitoring.
+(`supervisor/integrations/testing.py`); check it with `inventory` there. No IPQS
+account probe or API-expiry check is scheduled for this project; the manual
+probes in [MCP.md](MCP.md) are not monitoring.
 
-## External support-reply watch
-
-On October 26, after the user's explicit authorization and independent Sent
-verification, the existing Supervisor mail-watch service registered
-`mail.ipqs-tls-reply-20261026`. Native status readback confirmed it was active
-with a scheduled next check. It watches only for a newer reply in the verified
-support conversation, stops after a confirmed reply, and sends no automatic
-reminders. It does not probe account login or API health. Current evidence and
-private receipt locations: [IPQS support record](mcp/ipqs/SUPPORT-TLS-20261010.md).
+The finite IPQS support-reply watch `mail.ipqs-tls-reply-20261026` ended: on
+2026-11-19 `mail-watch status` reported `replied` (reply found 2026-11-02 09:00
+HKT), so nothing project-related is still watched. See the
+[IPQS support record](mcp/ipqs/SUPPORT-TLS-20261010.md).
 
 ## Health checks
 

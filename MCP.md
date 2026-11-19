@@ -29,16 +29,10 @@ myutils's native input on the same owned page before deciding readiness. A
 single activation and bounded settling replace the old immediate stop. Completed
 verification response fields do not themselves establish account authentication;
 the exact account still has to pass its original identity check. An unresolved
-check remains explicit and preserves the retained page.
-
-The DB-IP reporter fallback already uses myutils's automatic public-page path.
-On November 19, `https://db-ip.com/1.1.1.1` first returned HTTP 403, then a fresh
-hidden native read returned HTTP 200, the matching IP record and explicit LOW
-label with `nativeRecovery.verificationActivated=true` and confirmed cleanup.
-This proves that normal checkbox verification can succeed. On the same route,
-Check.Place still returned its explicit block page with no verification control;
-that is a different outcome, not a completed check. Cloudflare's login form loaded
-in Firefox and native hidden Chrome, without a credential submission.
+check remains explicit and preserves the retained page. The DB-IP reporter
+fallback uses myutils's automatic public-page path for the same preparation. A
+block page without a verification control (Check.Place) is a different outcome,
+not a pending check.
 
 ## Choose a first call
 
@@ -133,23 +127,13 @@ website through a browser is not account authentication.
   snapshots do not establish that HTTP is intrinsically unsupported.
 - A loaded login page is not successful login. Cloudflare's hidden page loaded
   but its submitted flow required a challenge. No automatic credential retry.
-- For the former account, ipapi's October 3 terms were accepted with approval on
-  October 26. Exact-account HTTP identity passed, but the dashboard explicitly
-  reported `bot_login` suspension for automated browser sign-in. The stored key
-  matches the dashboard; API HTTP 403 is not a stale-key or pending-terms result.
-  One subsequently authorized real visible Chrome password login reached the
-  same suspended account. A later authorized normal key regeneration produced
-  a new key but its first
-  lookup still returned HTTP 403/INVALID_API_KEY. The reporter key was updated
-  privately; the suspended account did not become usable through rotation.
-- October 28 replacement-account signup was submitted by the user in ordinary
-  non-CDP Chrome, with native Accessibility text controls filling the form.
-  The same approved terms version was accepted after mail activation. The new
-  free key passed both direct and proxy full-risk queries before promotion.
-  The GUI was then closed; myutils headless restored its persistent profile,
-  exported private state, and pure HTTP independently verified the exact new
-  account with Chrome closed. November 19 restored the normal saved-credential
-  Sign In path alongside this HTTP session reuse.
+- ipapi suspended the former account for `bot_login` (automated browser
+  sign-in). Its API 403 was neither a stale key nor pending terms, and neither a
+  visible password login nor a key regeneration made it usable; only a
+  replacement account (October 28) restored keyed risk data.
+- A signup that rejects automated browsers can be completed by the user in
+  ordinary non-CDP Chrome. Prove the new key on direct and proxy routes before
+  promoting it, then export the session once and maintain it over HTTP.
 - Signups through proxy routes were rejected: ipapi succeeded only on explicit
   DIRECT, and AbuseIPDB's fresh ATT headless signup needed its dedicated headed
   profile.
@@ -174,6 +158,7 @@ Dated observations, not availability guarantees; private receipts stay under
 
 | Date | Evidence |
 | --- | --- |
+| 2026-11-19, normal verification | `https://db-ip.com/1.1.1.1` first returned HTTP 403; a fresh hidden native read then returned HTTP 200, the matching record and explicit LOW label with `nativeRecovery.verificationActivated=true` and confirmed cleanup. Check.Place still showed its block page with no verification control. Cloudflare's login form loaded in Firefox and native hidden Chrome; no credentials were submitted. ipapi's official `/app/` Sign In form returned HTTP 200. Private receipts: `reports/verification-20261119/`, `reports/ipapi-login-policy-20261119/`. |
 | 2026-11-05, IPQS recovery | Authorized native-hidden saved-credential + TOTP login and independent HTTP auth passed. Default saved-session HTTP text and native-hidden controls both proved authentication with 3,000 characters; controls returned six value-free entries and confirmed cleanup. The incompatible isolated headless reader returned 403 and is no longer used for IPQS. No reputation lookup. Private receipts: `reports/browser-recovery-20261105-PqCmOh/`. |
 | 2026-10-28, replacement ipapi account | User-completed signup, mail-manager activation and previously approved October 3 terms led to the exact new free account (1,000 daily queries). Labelled key and full-risk API passed direct and default-proxy checks. Reporter returned full keyed type/score/factors. Owned GUI closed; myutils headless recovery, native-hidden MCP dashboard and browser-closed HTTP identity/API passed. Canonical credentials/session promoted; former account archived. Evidence: `reports/ipapi-account-20261028/`. |
 | 2026-10-27, candidate ipapi account | Direct visible CDP signup explicitly rejected automation; the parser distinguishes `automated_browser_blocked`. The manual alternative used myutils `openRealChrome`, a persistent private profile and native Accessibility text controls bound to the owned PID and signup URL. No CDP, screenshots or automatic Signup click. The handoff completed October 28 as recorded above. |

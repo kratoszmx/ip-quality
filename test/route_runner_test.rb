@@ -231,20 +231,6 @@ class RouteRunnerTest < ReporterTestCase
     end
   end
 
-  def test_unconfirmed_command_prints_a_plan_without_starting_mihomo
-    Dir.mktmpdir("ip-quality-leaf-plan-") do |directory|
-      profile_path = File.join(directory, "profile.yaml")
-      write_private_yaml(profile_path, fixture_document)
-      code, stdout, stderr = run_route(["--profile", profile_path, "--leaf", "TargetLeaf", "-4"])
-
-      assert_equal 0, code
-      assert_includes stdout, "no network access has occurred"
-      assert_includes stdout, "live Clash profile/selection: read only and unchanged"
-      assert_includes stdout, "Ping0"
-      assert_empty stderr
-    end
-  end
-
   def test_profile_parser_rejects_recursive_aliases_and_non_mapping_roots
     Dir.mktmpdir("ip-quality-profile-parse-") do |directory|
       {
@@ -446,7 +432,9 @@ class RouteRunnerTest < ReporterTestCase
     end
   end
 
-  def test_non_ascii_leaf_names_match_under_a_posix_caller_locale
+  # An unconfirmed exact-leaf command only prints its plan; it also must match a
+  # non-ASCII leaf when the caller's locale is POSIX.
+  def test_unconfirmed_non_ascii_leaf_prints_a_plan_under_a_posix_caller_locale
     Dir.mktmpdir("ip-quality-leaf-locale-") do |directory|
       document = fixture_document
       document["proxies"][1]["name"] = "香港 01"
@@ -460,7 +448,10 @@ class RouteRunnerTest < ReporterTestCase
       )
 
       assert status.success?, stderr
-      assert_includes stdout, "no network access has occurred"
+      ["no network access has occurred", "exact leaf: 香港 01",
+       "live Clash profile/selection: read only and unchanged", "Ping0"].each { |text| assert_includes stdout, text }
+      assert_empty stderr
+      assert_empty Dir.glob(File.join(directory, "ip-quality-leaf-*"), File::FNM_DOTMATCH)
     end
   end
 

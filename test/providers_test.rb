@@ -132,11 +132,16 @@ class ProvidersTest < ReporterTestCase
 
   def test_shodan_rejects_fractional_ports_and_control_text_without_retaining_observations
     fixture = fixture_json("shodan/internetdb.json")
+    # Each malformed body follows a valid parse, so a retained field would show.
     probe = <<~'ZSH'
       source "$1"
-      internetdb_parse_response "$(<"$2")" 198.51.100.23 || exit 1
-      internetdb_parse_response "$3" 198.51.100.23 && exit 2
-      (( ${#internetdb_parsed[@]} == 0 ))
+      valid="$(<"$2")"
+      shift 2
+      for body in "$@";do
+        internetdb_parse_response "$valid" 198.51.100.23 || { print -r -- valid-rejected; continue; }
+        internetdb_parse_response "$body" 198.51.100.23 && { print -r -- accepted; continue; }
+        print -r -- "${#internetdb_parsed[@]}"
+      done
     ZSH
     invalid = [22.5, -1, 0, 65536, nil, "443", true].map { |value| fixture.merge("ports" => [value]) }
     %w[tags vulns hostnames].each do |field|
@@ -144,9 +149,10 @@ class ProvidersTest < ReporterTestCase
         invalid << fixture.merge(field => [value])
       end
     end
-    invalid.each do |body|
-      assert_empty zsh!(probe, provider_library("shodan_internetdb"), fixture_path("shodan/internetdb.json"),
-        JSON.generate(body)), "accepted malformed or retained previous fields: #{body.inspect}"
+    results = zsh!(probe, provider_library("shodan_internetdb"), fixture_path("shodan/internetdb.json"),
+      *invalid.map { |body| JSON.generate(body) }).lines(chomp: true)
+    invalid.zip(results).each do |body, result|
+      assert_equal "0", result, "accepted malformed or retained previous fields: #{body.inspect}"
     end
   end
 
@@ -478,6 +484,32 @@ class ProvidersTest < ReporterTestCase
       File.chmod(0o600, credentials)
       refute zsh(probe, library, credentials)[2].success?
       refute File.exist?(marker)
+
+      # Every rejected file stops loading with 65 and exposes no value.
+      {
+        "UNKNOWN_API_KEY=unknown12345\n" => "unsupported provider credential name",
+        "IPQS_API_KEY=ipqs12345\nIPQS_API_KEY=ipqs67890\n" => "duplicate provider credential name",
+        "IPQS_API_KEY=short\n" => "invalid provider credential value",
+        "IPQS_API_KEY='quoted12345'\n" => "invalid provider credential value",
+        "export IPQS_API_KEY=ipqs12345\n" => "invalid provider credentials file format"
+      }.each do |contents, message|
+        File.write(credentials, contents)
+        stdout, stderr, status = zsh(probe, library, credentials)
+        assert_equal [65, ""], [status.exitstatus, stdout], contents
+        assert_includes stderr, message, contents
+        refute_match(/ipqs12345|ipqs67890|unknown12345|quoted12345/, stderr)
+      end
+      File.write(credentials, "IPQS_API_KEY=ipqs12345\n", perm: 0o600)
+      link = File.join(directory, "linked-credentials")
+      File.symlink(credentials, link)
+      _stdout, stderr, status = zsh(probe, library, link)
+      assert_equal 65, status.exitstatus
+      assert_includes stderr, "not a link"
+      secrets_link = File.join(directory, "linked-secrets")
+      File.symlink(directory, secrets_link)
+      _stdout, stderr, status = zsh('source "$1"; provider_load_credentials "" "$2"', library, secrets_link)
+      assert_equal 65, status.exitstatus
+      assert_includes stderr, "must be a directory, not a link"
     end
 
     source = REPORTER_SOURCES.map { |path| File.read(path, encoding: "UTF-8") }.join("\n")

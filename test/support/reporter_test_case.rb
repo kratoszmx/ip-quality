@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "minitest/autorun"
+require "etc"
 require "open3"
 require "json"
 require "tmpdir"
@@ -8,6 +9,10 @@ require "fileutils"
 require "stringio"
 require_relative "utf8_locale"
 load File.expand_path("../../bin/ip-quality-route", __dir__) unless defined?(IpQuality::RouteCommand)
+
+# System Ruby's Minitest 5.11 gives parallel suites two threads unless N is set.
+# Their cases mostly wait on zsh/jq children, so one thread per core is ~2x faster.
+Minitest.parallel_executor = Minitest::Parallel::Executor.new(Integer(ENV.fetch("N", Etc.nprocessors)))
 
 # Shared paths and offline reporter/runner fixtures; no provider-specific state.
 class ReporterTestCase < Minitest::Test

@@ -58,37 +58,57 @@ class QueryRouteTest < ReporterTestCase
     refute_includes text, "網路備援/可用"
   end
 
-  def test_response_errors_certificate_failures_and_size_limits_never_change_route
-    [
-      [0, "unauthorized\n401", "http_401"],
-      [0, "Sorry, you have been blocked by Cloudflare\n403", "cloudflare_blocked"],
-      [0, "quota\n429", "rate_limited"],
-      [0, "not json\n200", "invalid_response"],
-      [0, '{"success":true,"credits":0,"usage":10}' + "\n200", "official_insufficient_credits"],
-      [60, "\n000", "tls_verification_failed"],
-      [63, "\n000", "network_error"],
-      [28, "partial response\n200", "timeout"]
-    ].each do |exit_code, wire, expected|
-      report, text, calls = lookup(exit_code: exit_code, wire: wire)
-      assert_equal ["account|selected|4|system"], calls, expected
-      assert_equal expected, report.dig("ProviderStatus", "IPQS")
-      assert_nil report.dig("Score", "IPQS")
-      assert_transport report, "IPQS", "selected_route", nil
-      refute_includes text, "網路備援"
+  # The retry decision is query_route.zsh's alone, so its matrix runs in one
+  # process; the end-to-end cases above cover how reports present each outcome.
+  def test_only_pre_http_connection_failures_on_a_proxied_route_retry_once_directly
+    probe = <<~'ZSH'
+      source "$1"; source "$2"; source "$3"
+      calls="$4"
+      shift 4
+      unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy IPQUALITY_ISOLATED_EGRESS
+      curl_with_secret_url(){
+        if [[ " $* " == *" --proxy  --noproxy * "* ]];then
+          print -rn -- direct, >> "$calls"
+          print -rn -- $'{"ok":true}\n200'
+          return 0
+        fi
+        print -rn -- selected, >> "$calls"
+        print -rn -- "$wire"
+        return "$code"
+      }
+      while (( $# ));do
+        code="$1" wire="$2"
+        if [[ "$3" == proxied ]];then export HTTPS_PROXY=http://127.0.0.1:1;else unset HTTPS_PROXY;fi
+        shift 3
+        : > "$calls"
+        query_route_begin 4 system alidns
+        query_route_request https://fixture.invalid/lookup 4096
+        print -r -- "$?|${query_route[route]}|${query_route[primary_status]}|${provider_http_response[status]}|${$(<"$calls")%,}"
+      done
+    ZSH
+    cases = {
+      # Connection failures before any HTTP response: one direct retry.
+      [35, "\n000", "proxied"] => "0|direct_fallback|tls_error|ok|selected,direct",
+      [6, "\n000", "proxied"] => "0|direct_fallback|network_error|ok|selected,direct",
+      [7, "\n000", "proxied"] => "0|direct_fallback|network_error|ok|selected,direct",
+      [28, "\n000", "proxied"] => "0|direct_fallback|timeout|ok|selected,direct",
+      [52, "\n000", "proxied"] => "0|direct_fallback|network_error|ok|selected,direct",
+      [56, "\n000", "proxied"] => "0|direct_fallback|network_error|ok|selected,direct",
+      # A direct run has no other route to try.
+      [35, "\n000", "direct"] => "1|selected_route||tls_error|selected",
+      # HTTP answers, certificates, size limits and late timeouts keep the route.
+      [0, "unauthorized\n401", "proxied"] => "1|selected_route||http_401|selected",
+      [0, "Sorry, you have been blocked by Cloudflare\n403", "proxied"] => "1|selected_route||cloudflare_blocked|selected",
+      [0, "quota\n429", "proxied"] => "1|selected_route||rate_limited|selected",
+      [60, "\n000", "proxied"] => "1|selected_route||tls_verification_failed|selected",
+      [63, "\n000", "proxied"] => "1|selected_route||network_error|selected",
+      [28, "partial response\n200", "proxied"] => "1|selected_route||timeout|selected"
+    }
+    Dir.mktmpdir("ipquality-query-route-") do |directory|
+      stdout = zsh!(probe, COMMON_PROVIDER_LIBRARY, COMMON_HTTP_LIBRARY, QUERY_ROUTE_LIBRARY,
+        File.join(directory, "calls"), *cases.keys.flatten.map(&:to_s))
+      assert_equal cases.values, stdout.lines(chomp: true)
     end
-  end
-
-  def test_connection_errors_before_http_can_fall_back_but_direct_runs_do_not_retry
-    [[6, "network_error"], [7, "network_error"], [28, "timeout"], [52, "network_error"], [56, "network_error"]].each do |code, expected|
-      report, _text, calls = lookup(exit_code: code)
-      assert_equal 3, calls.length
-      assert_equal "ok", report.dig("ProviderStatus", "IPQS")
-      assert_transport report, "IPQS", "direct_fallback", expected
-    end
-    report, _text, calls = lookup(proxy: false)
-    assert_equal ["account|selected|4|alidns"], calls
-    assert_equal "tls_error", report.dig("ProviderStatus", "IPQS")
-    assert_transport report, "IPQS", "selected_route", nil
   end
 
   def test_successful_proxy_route_needs_no_extra_request_or_direct_disclosure

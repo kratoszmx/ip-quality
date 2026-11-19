@@ -104,3 +104,12 @@ The existing Supervisor mail-watch service accepted
 `mail.ipqs-tls-reply-20261026`; status readback confirmed `active` and a scheduled
 next check. It waits for a newer support reply and does not automatically send
 reminders. The separate ipapi appeal remains unauthorized and unsent.
+
+## November 2 support answer — detected, not yet read
+
+On 2026-11-19 Supervisor `mail-watch status` reported
+`mail.ipqs-tls-reply-20261026` as `replied` (`REPLY_FOUND`): a newer support
+message arrived in this thread on 2026-11-02 09:00 HKT and the watch stopped.
+The message itself has not been read or recorded in this project, so its
+diagnosis and any requested follow-up are unknown, and this project records no
+reply after October 26. Reading that message is the next step.

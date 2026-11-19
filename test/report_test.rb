@@ -243,25 +243,6 @@ class ReportTest < ReporterTestCase
     end
   end
 
-  def test_score_rows_align_with_independent_column_widths
-    probe = <<~'ZSH'
-      setopt KSH_ARRAYS
-      source "$1"
-      source "$2"
-      YY="$3"
-      typeset -A sscore cloudflare dbip
-      sscore[title]=Scores
-      cloudflare[status]=ok dbip[status]=ok dbip[risk_status]=not_provided
-      show_score
-    ZSH
-    %w[cn en].each do |language|
-      stdout, stderr, status = zsh(probe, REPUTATION_REPORT, TERMINAL_LIBRARY, language)
-      assert status.success?, stderr
-      assert_empty stderr
-      assert_aligned_table(stdout, minimum_rows: 4)
-    end
-  end
-
   def test_report_files_preserve_json_escapes_ansi_bytes_and_plain_layout
     value = "tab\tline\nterminal\e[31mred\e[0m"
     json = JSON.generate("value" => value)
@@ -307,6 +288,7 @@ class ReportTest < ReporterTestCase
       smail=([t]=2 [c]=1 [m]=0 [b]=1 [u]=0 [dnsbl_results]=$'dnsbl.example\tClean\nlisted.example\tBlacklisted')
       emit(){ save_json || exit 1; print -r -- "$ipjson" | jq -c .; }
       emit
+      fullIP=1; emit; fullIP=0
       cloudflare[threats_json]=null
       emit
       basic_source=ipinfo
@@ -315,7 +297,7 @@ class ReportTest < ReporterTestCase
       query_scope=mail services=(Gmail 163) smailstatus=([Gmail]=true)
       for port25 in 1 2 0;do smail[local]=$port25; emit; done
     ZSH
-    report, no_threats, ipinfo_basic, *mail = zsh!(probe, SCRIPT).lines.map { |line| JSON.parse(line) }
+    report, unmasked, no_threats, ipinfo_basic, *mail = zsh!(probe, SCRIPT).lines.map { |line| JSON.parse(line) }
     special = "Example \"Org\" \\ relay\nsecond line"
     {
       %w[Info Organization] => special, %w[Ping0 Organization] => special,
@@ -346,6 +328,9 @@ class ReportTest < ReporterTestCase
     %w[DBIP IPAPI Cloudflare].each { |name| assert_equal report.dig("Head", "IP"), report.dig("ProviderContext", name, "IP") }
     refute_includes JSON.generate(report), "198.51.100.23"
     refute report.key?("Media")
+    # -f reveals the tested address and routed prefix wherever the masked report showed them.
+    assert_equal ["198.51.100.23", "198.51.100.0/24"], [unmasked.dig("Head", "IP"), unmasked.dig("Routing", "Prefix")]
+    %w[DBIP IPAPI Cloudflare].each { |name| assert_equal "198.51.100.23", unmasked.dig("ProviderContext", name, "IP") }
     # Missing Cloudflare threats stay unknown instead of becoming an empty list.
     assert_nil no_threats.dig("ProviderContext", "Cloudflare", "ThreatCategories")
     assert_equal({"Source" => "IPinfo public demo widget", "ASN" => "64501", "City" => "Fallback City",
@@ -359,38 +344,25 @@ class ReportTest < ReporterTestCase
       mail.map { |json| [json.dig("Mail", "Port25"), json.dig("Mail", "Gmail"), json.dig("Mail", "163")] }
   end
 
-  def test_shared_display_width_aligns_ascii_unicode_ansi_and_whitespace
-    probe = reporter_functions("calc_padding") + <<~'ZSH'
+  # Terminal cells, not characters: ANSI (literal or decoded) is free, CJK and
+  # full-width glyphs take two, narrow punctuation one, combining marks none.
+  def test_display_width_counts_terminal_cells_through_ansi_unicode_and_whitespace
+    probe = <<~'ZSH'
       setopt KSH_ARRAYS SH_WORD_SPLIT NO_CASE_MATCH
       source "$1"
-      source "$2"
-      for value in 'abc' '中文' $'\033[31mA中\033[0m' ' A中 ' '\033[31mA中\033[0m'; do
+      for value in 'abc' '中文' $'\033[31mA中\033[0m' ' A中 ' '\033[31mA中\033[0m' \
+        '可用·直连备援' 'é' $'e\u0301' 'ＡB' '→'; do
         display_width "$value"; print -r -- "$REPLY"
       done
-      terminal_table_cell $'\033[31m A中 \033[0m' 8
-      print -r -- '|'
+      terminal_table_cell $'\033[31m A中 \033[0m' 8; print -r -- '|'
+      terminal_table_cell $'\033[32m可用·直连备援\033[0m' 16; print -r -- '|'
       calc_padding ' A中 ' 11
       print -r -- "${#PADDING}"
       [[ -o KSH_ARRAYS && -o SH_WORD_SPLIT && -o NO_CASE_MATCH ]]
     ZSH
-    stdout, stderr, status = zsh(probe, TERMINAL_LIBRARY, REPUTATION_REPORT
-    )
-    assert status.success?, stderr
-    assert_equal "3\n4\n3\n5\n3\n\e[31m A中 \e[0m   |\n3\n", stdout
-    assert_empty stderr
-  end
-
-  def test_display_width_counts_narrow_unicode_and_combining_marks_as_terminal_cells
-    probe = <<~'ZSH'
-      source "$1"
-      for value in '可用·直连备援' 'é' $'e\u0301' 'ＡB' '→' $'\033[32m可用·直连备援\033[0m'; do
-        display_width "$value"; print -r -- "$REPLY"
-      done
-      terminal_table_cell $'\033[32m可用·直连备援\033[0m' 16
-      print -r -- '|'
-    ZSH
-    output = zsh!(probe, REPORT_TABLE_LIBRARY)
-    assert_equal "13\n1\n1\n3\n1\n13\n\e[32m可用·直连备援\e[0m   |\n", output
+    assert_equal ["3", "4", "3", "5", "3", "13", "1", "1", "3", "1",
+      "\e[31m A中 \e[0m   |", "\e[32m可用·直连备援\e[0m   |", "3"],
+      zsh!(probe, REPORT_TABLE_LIBRARY).lines(chomp: true)
   end
 
   def test_reputation_report_uses_provider_rows_without_the_fragile_score_bar
@@ -660,16 +632,15 @@ class ReportTest < ReporterTestCase
     assert_empty stderr
   end
 
-  def test_report_identifies_the_relay_and_online_repository_without_claiming_a_local_maxmind_database
-    source = REPORTER_SOURCES.map { |path| File.read(path, encoding: "UTF-8") }.join("\n")
-
-    assert_includes source, "https://github.com/kratoszmx/ip-quality"
-    assert_includes source, "Check.Place 中继；上游标注 MaxMind"
-    assert_includes source, "Check.Place relay; MaxMind-labeled upstream data"
-    assert_includes source, "IPinfo public demo widget"
-    refute_includes source, "/Users/zmx/gitrepos/ipquality.git"
-    refute_includes source, "/Users/zmx/gitrepos/network-manager.git"
-    refute_includes source, "Maxmind 数据库"
+  def test_basic_titles_name_the_relay_or_fallback_and_the_head_links_the_online_repository
+    probe = 'source "$1"; YY="$2"; set_language; clean_ansi "${sbasic[title]}|${sbasic[title_lite]}|${shead[git]}"'
+    {
+      "cn" => "一、基础信息（Check.Place 中继；上游标注 MaxMind）|一、基础信息（IPinfo 公开示例组件）",
+      "en" => "1. Basic Information (Check.Place relay; MaxMind-labeled upstream data)|" \
+              "1. Basic Information (IPinfo public demo widget)"
+    }.each do |language, titles|
+      assert_equal "#{titles}|https://github.com/kratoszmx/ip-quality", zsh!(probe, SCRIPT, language), language
+    end
   end
 
   def test_dnsbl_report_explains_aggregate_uceprotect_levels
@@ -716,7 +687,7 @@ class ReportTest < ReporterTestCase
     end
   end
 
-  def test_terminal_tables_share_independent_widths_without_report_state_or_option_changes
+  def test_terminal_tables_use_independent_widths_and_reject_malformed_rows_silently
     probe = <<~'ZSH'
       setopt KSH_ARRAYS SH_WORD_SPLIT NO_CASE_MATCH
       source "$1"
@@ -725,34 +696,20 @@ class ReportTest < ReporterTestCase
       terminal_table_row "$widths" Name 地区 Status
       terminal_table_rule "$widths"
       terminal_table_row "$widths" A $'\033[31m香港\033[0m' unknown
+      # Incomplete rows and invalid widths return 2 and print nothing.
+      malformed=$(
+        terminal_table_widths 3 0; print -rn -- $?
+        terminal_table_widths 3 2 one; print -rn -- $?
+        terminal_table_widths invalid 2 one two; print -rn -- $?
+        terminal_table_row '3 4' one; print -rn -- $?
+        terminal_table_row '3 -4' one two; print -rn -- $?
+        terminal_table_rule '3 invalid'; print -rn -- $?
+      )
+      print -r -- "$malformed"
       [[ -o KSH_ARRAYS && -o SH_WORD_SPLIT && -o NO_CASE_MATCH ]]
     ZSH
-    stdout, stderr, status = zsh(probe, REPORT_TABLE_LIBRARY)
-    assert status.success?, stderr
-    assert_empty stderr
-    assert_equal "4 4 7\nName | 地区 | Status \n-----+------+--------\nA    | \e[31m香港\e[0m | unknown\n", stdout
-  end
-
-  def test_terminal_tables_reject_incomplete_rows_and_invalid_widths_without_output
-    probe = <<~'ZSH'
-      source "$1"
-      terminal_table_widths 3 0
-      (( $? == 2 ))||exit 1
-      terminal_table_widths 3 2 one
-      (( $? == 2 ))||exit 1
-      terminal_table_widths invalid 2 one two
-      (( $? == 2 ))||exit 1
-      terminal_table_row '3 4' one
-      (( $? == 2 ))||exit 1
-      terminal_table_row '3 -4' one two
-      (( $? == 2 ))||exit 1
-      terminal_table_rule '3 invalid'
-      (( $? == 2 ))||exit 1
-    ZSH
-    stdout, stderr, status = zsh(probe, REPORT_TABLE_LIBRARY)
-    assert status.success?, stderr
-    assert_empty stdout
-    assert_empty stderr
+    assert_equal "4 4 7\nName | 地区 | Status \n-----+------+--------\nA    | \e[31m香港\e[0m | unknown\n222222\n",
+      zsh!(probe, REPORT_TABLE_LIBRARY)
   end
 
   private

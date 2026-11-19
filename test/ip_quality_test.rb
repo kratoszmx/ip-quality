@@ -43,14 +43,10 @@ class IpQualityTest < ReporterTestCase
     _stdout, stderr, status = run_script("--scope", "media-ai")
     assert_equal 64, status.exitstatus
     assert_includes stderr, "unsupported scope"
-  end
-
-  def test_explicit_plan_still_prevents_network_after_confirmation
+    # --plan keeps a confirmed run network-free.
     stdout, stderr, status = run_script("--confirm-network-lookup", "--plan", "--scope", "full")
-
     assert status.success?, stderr
     assert_includes stdout, "no network access has occurred"
-    assert_empty stderr
   end
 
   def test_option_parser_accepts_getopts_clusters_and_rejects_invalid_or_removed_flags
@@ -366,61 +362,51 @@ class IpQualityTest < ReporterTestCase
     end
   end
 
-  def test_live_gate_rejects_incompatible_family_and_unsafe_interface_before_lookup
-    %w[dnsbl mail-dnsbl].each do |scope|
-      stdout, stderr, status = run_script(
-        "--confirm-network-lookup",
-        "--scope",
-        scope,
-        "-6"
-      )
-      assert_equal 61, status.exitstatus
-      assert_includes stdout, "DNSBL"
-      assert_empty stderr
+  def test_live_gates_stop_unsupported_family_interface_and_target_combinations_before_lookup
+    {
+      %w[--scope dnsbl -6] => [61, "DNSBL"],
+      %w[--scope mail-dnsbl -6] => [61, "DNSBL"],
+      ["--scope", "reputation", "-i", "en0 --proxy http://example.invalid"] => [7, "指定的网卡"],
+      %w[--scope full 12.217.32.68] => [62, "指定公网IP仅支持信誉或DNSBL范围"],
+      %w[--scope reputation -6 12.217.32.68] => [63, "IPv4/IPv6类型冲突"],
+      %w[--scope reputation 192.168.1.10] => [2, "IP地址格式错误"]
+    }.each do |arguments, (code, message)|
+      stdout, stderr, status = run_script("--confirm-network-lookup", *arguments)
+      assert_equal code, status.exitstatus, arguments.join(" ")
+      assert_includes stdout, message, arguments.join(" ")
+      assert_empty stderr, arguments.join(" ")
     end
-
-    stdout, stderr, status = run_script(
-      "--confirm-network-lookup",
-      "--scope",
-      "reputation",
-      "-i",
-      "en0 --proxy http://example.invalid"
-    )
-    assert_equal 7, status.exitstatus
-    assert_includes stdout, "指定的网卡"
-    assert_empty stderr
   end
 
-  def test_explicit_public_target_is_parsed_before_network_and_restricted_to_honest_scopes
-    stdout, stderr, status = run_script(
-      "--confirm-network-lookup",
-      "--scope",
-      "full",
-      "12.217.32.68"
-    )
-    assert_equal 62, status.exitstatus
-    assert_includes stdout, "指定公网IP仅支持信誉或DNSBL范围"
-    assert_empty stderr
-
-    stdout, stderr, status = run_script(
-      "--confirm-network-lookup",
-      "--scope",
-      "reputation",
-      "-6",
-      "12.217.32.68"
-    )
-    assert_equal 63, status.exitstatus
-    assert_includes stdout, "IPv4/IPv6类型冲突"
-    assert_empty stderr
-
-    stdout, stderr, status = run_script(
-      "--confirm-network-lookup",
-      "--scope",
-      "reputation",
-      "192.168.1.10"
-    )
-    assert_equal 2, status.exitstatus
-    assert_includes stdout, "IP地址格式错误"
-    assert_empty stderr
+  # Private, malformed or failed discovery answers leave no tested IP, so the
+  # run stops before any provider sees a request and before a report exists.
+  def test_failed_egress_discovery_stops_before_provider_lookups_or_report_files
+    discovery = File.join(reporter_workspace, "discovery")
+    write_fake_command("curl", <<~'ZSH')
+      print -r -- "${@[-1]}" >> "$IPQUALITY_TEST_DISCOVERY"
+      case "$*" in
+        *-s4*https://ipinfo.io/ip) print -rn -- 10.0.0.1 ;;
+        *-s4*https://ip.sb) print -rn -- not-an-ip ;;
+        *-s6*https://ip.sb) print -rn -- fd00::1 ;;
+        *) exit 7 ;;
+      esac
+    ZSH
+    ipv4 = %w[https://ipinfo.io/ip https://ip.sb https://ping0.cc https://icanhazip.com
+              https://api64.ipify.org https://ifconfig.co https://ident.me]
+    {
+      %w[-4] => [40, "IPV4不可用", ipv4],
+      %w[-6] => [60, "IPV6不可用", ipv4.drop(1)],
+      [] => [7, "出口IP不存在", ipv4 + ipv4.drop(1)]
+    }.each do |family, (code, message, requests)|
+      File.write(discovery, "")
+      output = File.join(reporter_workspace, "must-not-exist-#{code}.json")
+      stdout, stderr, status = run_script("--confirm-network-lookup", *family, "-j", "-o", output,
+        env: NO_PROXY_ENV.merge("IPQUALITY_TEST_DISCOVERY" => discovery))
+      assert_equal code, status.exitstatus, family.inspect
+      assert_includes stdout, message
+      assert_equal requests, File.readlines(discovery, chomp: true), family.inspect
+      refute File.exist?(output)
+      assert_empty stderr
+    end
   end
 end

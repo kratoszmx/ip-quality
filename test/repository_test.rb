@@ -21,7 +21,10 @@ class RepositoryTest < ReporterTestCase
     cookie_bundle: /ref\/cookies\.txt/,
     bundled_cookie_header: /curl[^\n]+(?:\s-b\s|Cookie:)/i,
     embedded_authorization_header: /authorization:/i,
-    dynamic_api_key_scrape: /apiKey=/
+    dynamic_api_key_scrape: /apiKey=/,
+    # Sources are scanned as bytes, so a non-ASCII pattern must be binary too.
+    local_maxmind_database_claim: Regexp.new("Maxmind 数据库".b, Regexp::IGNORECASE | Regexp::NOENCODING),
+    local_git_remote: %r{/Users/zmx/gitrepos/}
   }.freeze
 
   def test_runtime_sources_are_native_and_contain_no_removed_paths

@@ -17,15 +17,19 @@ contracts. The provider-account manifest and MCP lockfile declare the direct
 dependency. The full `/bin/zsh -f scripts/test-offline` passed with 152 reporter
 cases / 4,410 assertions, 35 IPQS cases and 60 provider-account cases.
 
-### user2 — 2026-11-15: DB-IP page read on text-browser 0.6.0
+### user2 — 2026-11-19: faster, tighter offline suites
 
-text-browser 0.6.0 removes reads that answer a verification. The DB-IP
-daily-limit fallback now takes the shared default path: it names no backend and
-no longer requires `nativeRecovery.recipe=dbip-public-ip`; the IP heading,
-title and explicit threat label still decide the observation, and the proxy
-choice is unchanged. Offline aggregate passed against the 0.6.0 build: 152
-reporter cases / 4,410 assertions, 35 IPQS and 60 provider-account cases. No
-live lookup was run.
+Tests and documentation only; `script_version` is unchanged. The base test class
+now gives Minitest one thread per core (system Ruby's 5.11 defaulted to two),
+and the query-route retry matrix, invalid source IDs and malformed Shodan
+bodies each run in one probe. The complete runner fell from 34.6 s to 10–15 s
+(reporter 24.5 s to 5–8 s). Near-duplicate report, CLI-gate and leaf-plan tests
+were merged. New coverage: failed egress discovery exits 40/60/7 before any
+provider request or report file; credential files with links, unknown or
+duplicate names or bad values are rejected without exposing values; `-f` JSON
+unmasks the target and prefix. The IPQS support-reply watch has ended (see Open
+issues). The full `/bin/zsh -f scripts/test-offline` passed: 146 reporter cases
+/ 4,136 assertions, 36 IPQS and 67 provider-account cases. No live lookup.
 
 ### zmxmacm4 — 2026-11-19: verified normal CAPTCHA preparation
 
@@ -76,47 +80,30 @@ and 67 provider-account cases. Private live receipts and validation:
 - Code layout and shared helpers: [AGENTS.md](AGENTS.md#architecture) and
   [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md). Account MCPs: [MCP.md](MCP.md).
   No project daemon exists. Supervisor owns the weekly
-  `test.ipquality.test-offline` and the finite support-reply watch described in
-  [SERVICES.md](SERVICES.md).
+  `test.ipquality.test-offline` ([SERVICES.md](SERVICES.md)).
 
 ## Open issues
 
-- **ATT to IPQS:** October 26 curl still fails with 35/HTTP 000 for `/login`
-  and the account API, including pinned IPv4/TLS 1.2. Direct IPv4 website login
-  and API succeeded with the same credentials. The route/intermediary/edge
-  cause remains unconfirmed. A later October 26 Gmail read succeeded and
-  confirmed support's October 20 request for IPv4 website/account access and
-  full curl failure output; the earlier OAuth failure was not persistent.
-  After reviewing privacy-minimized drafts, the user explicitly authorized an
-  IPQS reply on October 26. It was sent once to the latest support message;
-  native Sent readback confirmed the same thread and reply headers. The earlier
-  refusal still applies to the separate ipapi appeal, which was not sent.
-  A later October 26 isolated ATT reporter run returned score 75 through
-  `direct_fallback`, with `OriginalRouteFailure=tls_error` and
-  `TargetUnchanged=true`. The reputation lookup works through fallback; the
-  unresolved original transport is not a prerequisite for that result.
-  The reply states this distinction, uses a generic connection description,
-  omits network identifiers and exact timestamps, and supplies only a minimal
-  error excerpt. It preserves the incoming support subject for threading, with
-  no attachments or quoted history. Detailed diagnostics remain private.
-  Supervisor watch `mail.ipqs-tls-reply-20261026` is active; delivery/read and a
-  provider diagnosis are not yet confirmed.
-  See [support record](mcp/ipqs/SUPPORT-TLS-20261010.md).
-- **Check.Place relay:** The later October 26 recheck still returned HTTP 403
-  for the fixed-target ipapi URL on default proxy, direct IPv4, isolated ATT and
-  isolated `awshk` (three distinct egresses verified). Direct Chrome failed in
-  both windowless and visible modes with the branded block page; no IP data was
-  returned. One `awshk` response was plain-text 403, followed by the branded
-  block page on its bounded recheck. This is not a TLS connection failure or
-  proof of one bad node. The exact WAF/security rule requires the site owner's
-  Ray-ID lookup; no new relay recovery is established. Private evidence:
-  `reports/access-recheck-20261026/`; [contract](providers/check_place.md).
-  A further audit of current NodeQuality and its fetched xykt script found the
-  same relay URLs. Reproducing the two original request shapes against each
-  route's actual IPv4 egress returned six branded 403s on default proxy, direct
-  and ATT. Upstream can still render a Lite report by skipping several relay
-  sources; that is not relay recovery. Source versions, evidence and scope:
-  [NodeQuality comparison](providers/check_place.md#current-nodequality-comparison).
+- **ATT to IPQS:** Since October 10 the ATT route fails curl TLS (35/HTTP 000)
+  for `/login` and the account API, including pinned IPv4/TLS 1.2, while direct
+  IPv4 login and API work with the same credentials; the cause (route,
+  intermediary or edge) is unconfirmed. Reputation lookups still succeed through
+  the automatic direct fallback (October 26 isolated ATT run: score 75,
+  `OriginalRouteFailure=tls_error`, `TargetUnchanged=true`). The user-authorized
+  October 26 support reply was sent once and verified; Supervisor's watch
+  `mail.ipqs-tls-reply-20261026` found support's answer on 2026-11-02 09:00 HKT
+  and stopped. That answer has not been read or recorded here, so no provider
+  diagnosis is known. [Support record](mcp/ipqs/SUPPORT-TLS-20261010.md).
+- **Check.Place relay:** Since October 26 the fixed-target relay returns its
+  branded HTTP 403 block page on default proxy, direct IPv4, isolated ATT and
+  `awshk` (three distinct egresses), through curl and windowless or visible
+  Chrome, with no verification control; November 19 still showed the block. The
+  exact WAF rule needs the site owner's Ray-ID lookup; no relay recovery is
+  established, and the reporter's own fallbacks cover the affected sources.
+  Current NodeQuality still runs xykt/IPQuality with the same relay URLs; its
+  original request shapes also got branded 403s, and upstream's Lite report only
+  skips relay sources. Evidence: `reports/access-recheck-20261026/`;
+  [contract and NodeQuality comparison](providers/check_place.md#current-nodequality-comparison).
 - **Cloudflare account:** November 19 anonymous Firefox/native-hidden reads
   loaded the official login form; no credentials were submitted. The last
   account-level checkpoint remains October 26: password submission required
