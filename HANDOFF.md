@@ -55,7 +55,16 @@ the shared Chrome uses. Also repointed `mcp/common/verification.mjs` to
 `inspectNativeVerification`; the old import broke both MCPs). The old `.state/`
 files stay on disk as rollback data. Full `/bin/zsh -f scripts/test-offline`:
 146 reporter cases / 4,136 assertions, 37 IPQS and 68 provider-account cases.
-Live account reads: pending the move's migration status.
+Live, through the converted code: the move had not carried the IPQS, ipapi,
+AbuseIPDB or ipdata session files (only older profiles), so IPQS, ipapi and
+AbuseIPDB were signed in again with their saved-credential logins and ipdata's
+dashboard session was copied from `.state/ipdata-http.json`, then refreshed by
+its own web app. Pass: AbuseIPDB and ipapi HTTP identity, ipdata GetUser
+(free plan, key matches), IPQS account API. IPQS login + TOTP reached the
+dashboard but it now shows an updated Terms/Privacy acceptance modal, so
+`auth:check` reports `unknown` (see Open issues). Cloudflare failed (below).
+Two site changes were fixed: the IPQS 2FA challenge (`type=text`,
+"Finish login") and ipapi's account fields (`#email-tf`, `#api-key`).
 
 ### zmxmacm4 — 2026-11-19: verified normal CAPTCHA preparation
 
@@ -131,11 +140,18 @@ and 67 provider-account cases. Private live receipts and validation:
   original request shapes also got branded 403s, and upstream's Lite report only
   skips relay sources. Evidence: `reports/access-recheck-20261026/`;
   [contract and NodeQuality comparison](providers/check_place.md#current-nodequality-comparison).
-- **Cloudflare account:** November 19 anonymous Firefox/native-hidden reads
-  loaded the official login form; no credentials were submitted. The last
-  account-level checkpoint remains October 26: password submission required
-  verification, saved HTTP identity returned 403, and the Intel API succeeded.
-  The new public-page result does not refresh that saved account observation.
+- **IPQS terms:** since November 21 the signed-in dashboard shows "Review our
+  updated terms" (Terms of Service and Privacy Policy, Accept / Decline and log
+  out). Accepting is the owner's decision; until then the only logout link sits
+  in that modal and the HTTP `auth:check` reports `unknown`. The account API
+  works.
+- **Cloudflare account:** on November 21 the saved-credential login in a hidden
+  tab of the shared Chrome submitted once and ended at `/login`
+  (`login_unconfirmed`); `/api/v4/user` returns 403 both in the page and over
+  HTTP. The account has TOTP, and the MCP has no login-time TOTP step. Do not
+  repeat the password submission; the owner signs in once in a window of the
+  shared Chrome (`provider_account_open` with `surface=login`, `visible=true`).
+  The Intel API key is independent.
 - **Ping0 on ATT:** `tls_error` (curl 35) on 2026-10-23 while direct verified.
   Ping0 observes the caller, so a direct fallback would not measure ATT.
 

@@ -18,6 +18,12 @@ test('ipapi account suspension remains explicit even with a valid saved login', 
 });
 test('HTTP identity requires the matching server account, not a local state file or status 200', () => {
   assert.equal(httpAccountIdentity('ipapi', 200, 'text/html', html, email).authenticated, true);
+  // The November 2026 dashboard: unnamed #email-tf (disabled) and readonly #api-key fields.
+  const current = `<input type="text" id="api-key" readonly value="private"><input type="email" id="email-tf" disabled value="${email}">
+    <input type="email" id="new-email-tf"><a href="/app/logout">Logout</a>`;
+  assert.equal(httpAccountIdentity('ipapi', 200, 'text/html', current, email).authenticated, true);
+  assert.equal(httpAccountIdentity('ipapi', 200, 'text/html', current.replace(email, 'other@example.test'), email).authenticated, false);
+  assert.equal(httpAccountIdentity('ipapi', 200, 'text/html', current.replace('id="api-key"', 'id="other"'), email).authenticated, false);
   for (const [status, body, account] of [[403, html, email], [302, html, email], [200, html, 'other@example.test'],
     [200, `<script>${html}</script>`, email], [200, `${html}<input type="password">`, email], [200, `${html}<input type=password>`, email], [200, '<form>Login</form>', email]]) {
     assert.equal(httpAccountIdentity('ipapi', status, 'text/html', body, account).authenticated, false);

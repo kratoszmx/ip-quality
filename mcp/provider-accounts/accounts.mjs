@@ -67,9 +67,9 @@ async function snapshot(provider, page, submitted = false) {
     const hasPassword = controls.some(e => e.type === 'password');
     // ipapi's logout is an icon, with no visible "Sign out" text. Bind its
     // server-rendered dashboard to the saved identity before importing a key.
-    const account = { url: location.href, email: document.querySelector('input[name="email"]')?.value,
+    const account = { url: location.href, email: document.querySelector('input[name="email"], input#email-tf')?.value,
       logoutUrl: document.querySelector('a[href="/app/logout"]')?.href,
-      keyCount: [...document.querySelectorAll('input[name="key"]')].filter(visible).length, hasPassword };
+      keyCount: [...document.querySelectorAll('input[name="key"], input#api-key')].filter(visible).length, hasPassword };
     return { text, controls, hasPassword, challenge, account };
   });
   const account = await privateAccount(provider).catch(() => null);

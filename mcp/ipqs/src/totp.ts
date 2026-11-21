@@ -68,12 +68,14 @@ export function acceptsIpqsTotpChallenge(value: { url: string; action: string; m
     return url.origin === IPQS_ORIGIN && action.origin === IPQS_ORIGIN && action.pathname === url.pathname &&
       /^\/user\/(?:dashboard|settings|api-keys)$/.test(url.pathname) && value.method.toLowerCase() === "post" &&
       value.fields.filter(name => name === "2fa").length === 1 && value.fields.every(name => ["2fa", "rememberme"].includes(name)) &&
-      value.button.trim() === "Finish Login »";
+      /^Finish login(?: »)?$/i.test(value.button.trim());
   } catch { return false; }
 }
 
+// The challenge's code field: type=number before November 2026, now type=text with
+// inputmode=numeric; its button "Finish Login »", now "Finish login".
 export async function completeIpqsTotp(page: Page) {
-  const form = page.locator('form').filter({ has: page.locator('input[name="2fa"][type="number"]') });
+  const form = page.locator('form').filter({ has: page.locator('input[name="2fa"][type="number"], input[name="2fa"][inputmode="numeric"]') });
   if (await form.count() !== 1) throw new Error("Expected one IPQS authenticator challenge.");
   const metadata = await form.evaluate(form => ({ url: location.href, action: form.getAttribute("action") || "", method: form.getAttribute("method") || "get",
     fields: Array.from(form.querySelectorAll("input")).map(e => e.name), button: form.querySelector("button[type='submit']")?.textContent || "" }));
@@ -82,9 +84,9 @@ export async function completeIpqsTotp(page: Page) {
   const field = form.locator('input[name="2fa"]');
   try {
     await field.fill(code, { timeout: 5000 });
-    await form.getByRole("button", { name: "Finish Login »", exact: true }).click({ timeout: 10000 });
+    await form.getByRole("button", { name: /^Finish login(?: »)?$/i }).click({ timeout: 10000 });
     await page.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => {});
-    await page.waitForFunction(() => !document.querySelector('input[name="2fa"]') || !document.body.innerText.includes("Finish Login"), undefined, { timeout: 10000 }).catch(() => {});
+    await page.waitForFunction(() => !document.querySelector('input[name="2fa"]') || !/Finish login/i.test(document.body.innerText), undefined, { timeout: 10000 }).catch(() => {});
   } catch { throw new Error("IPQS authenticator submission was unconfirmed; do not retry automatically."); }
   finally { if (await field.count() === 1) await field.fill("", { timeout: 500 }).catch(() => {}); }
 }

@@ -32,8 +32,10 @@ test("untrusted or changed MFA pages stop before reading private account files",
 test("the TOTP challenge form must be the exact trusted IPQS finish-login form", () => {
   const value = { url: "https://www.ipqualityscore.com/user/dashboard", action: "", method: "post", fields: ["2fa", "rememberme", "rememberme"], button: "Finish Login »" };
   assert.equal(acceptsIpqsTotpChallenge(value), true);
+  // The November 2026 challenge: whitespace-wrapped "Finish login" without the arrow.
+  assert.equal(acceptsIpqsTotpChallenge({ ...value, button: "\n\t\tFinish login\n\t" }), true);
   for (const changed of [{ action: "https://foreign.invalid" }, { method: "get" }, { fields: ["password", "2fa"] },
-    { fields: ["2fa", "2fa"] }, { button: "Activate 2FA »" }, { url: "https://foreign.invalid/user/dashboard" }]) {
+    { fields: ["2fa", "2fa"] }, { button: "Activate 2FA »" }, { button: "Finish login now" }, { url: "https://foreign.invalid/user/dashboard" }]) {
     assert.equal(acceptsIpqsTotpChallenge({ ...value, ...changed }), false);
   }
 });

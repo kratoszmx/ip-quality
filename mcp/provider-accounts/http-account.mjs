@@ -35,10 +35,11 @@ export function httpAccountIdentity(provider, status, contentType, body, expecte
         || (el.name === 'a' && el.attribs.href === '/account/resend-email-verification'), document.children),
         publicProfile: privacy('public'), publicDomain: privacy('domain-visibility') } : {}) };
   }
+  // ipapi's account email and key fields: named email/key until November 2026, now #email-tf and #api-key.
   const inputs = DomUtils.getElementsByTagName('input', document.children).map(el => el.attribs);
-  const emails = inputs.filter(input => input.name === 'email');
+  const emails = inputs.filter(input => input.name === 'email' || input.id === 'email-tf');
   const authenticated = emails.length === 1 && emails[0].value === expectedEmail &&
-    inputs.filter(input => input.name === 'key').length === 1 &&
+    inputs.filter(input => input.name === 'key' || input.id === 'api-key').length === 1 &&
     !inputs.some(input => input.type?.toLowerCase() === 'password') &&
     DomUtils.existsOne(el => el.name === 'a' && el.attribs.href === '/app/logout', document.children);
   const text = authenticated ? DomUtils.innerText(document.children).replace(/\s+/g, ' ') : '';

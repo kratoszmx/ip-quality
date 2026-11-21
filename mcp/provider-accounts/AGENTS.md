@@ -76,7 +76,9 @@ integration/profile is created.
 
 ipapi's observed dashboard is /app/home. Its logout is an icon, so the account
 check uses the exact saved email, one visible labelled key and the same-origin
-logout link, without relying on visible "Sign out" text. Its current account
+logout link, without relying on visible "Sign out" text. Since November 2026
+those fields are the unnamed `#email-tf` and readonly `#api-key` (formerly
+`name=email`/`name=key`); both forms are accepted. Its current account
 page exposes no 2FA entry; the security surface therefore stops locally instead
 of navigating to a guessed settings path. An activation notice remains pending
 email verification even when a password form is present.

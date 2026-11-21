@@ -67,7 +67,7 @@ export async function inspectIpqsAuthPage(page: Page) {
       (!responses.length || responses.some(input => !input.value));
     return {
       title: document.title,
-      totpChallengePresent: !!document.querySelector('input[name="2fa"]') && /Finish Login/.test(body),
+      totpChallengePresent: !!document.querySelector('input[name="2fa"]') && /Finish login/i.test(body),
       authenticatedMarkerCount,
       loginFormPresent,
       secondaryVerification: new RegExp(secondaryPattern, "i").test(body) || browserVerification,
