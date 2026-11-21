@@ -1,19 +1,10 @@
 import { resolveChromePath } from "@myutils/browser-session";
 
 import { defaultStateSummary, localStatus } from "../src/browser.js";
-import {
-  ROOT,
-  ensureBrowserProfileDirectory,
-  env,
-  getProxyServer,
-} from "../src/config.js";
+import { ROOT, getProxyServer } from "../src/config.js";
 
 async function main() {
-  await ensureBrowserProfileDirectory();
-  const chrome = await resolveChromePath({
-    configuredPath: env("IPQS_CHROME_PATH") || undefined,
-    envName: "IPQS_CHROME_PATH",
-  }).then(
+  const chrome = await resolveChromePath().then(
     (resolvedPath) => ({ available: true, resolvedPath }),
     () => ({ available: false }),
   );
@@ -25,7 +16,7 @@ async function main() {
     browser: {
       ...chrome,
       profilePresent: status.profilePresent,
-      proxyConfigured: Boolean(getProxyServer()),
+      httpProxy: getProxyServer(),
       liveAuthProbed: false,
     },
     savedCredentials: status.savedCredentials,

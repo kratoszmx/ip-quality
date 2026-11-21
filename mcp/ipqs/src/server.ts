@@ -58,7 +58,7 @@ server.registerTool(
   "ipqs_status",
   {
     title: "IPQS Status",
-    description: buildToolDescription("Report sanitized local profile and API credential readiness. The legacy probeBrowser flag checks saved HTTP authentication without opening Chrome.", SERVER_INSTRUCTIONS),
+    description: buildToolDescription("Report sanitized shared-profile and API credential readiness. probeBrowser=true checks HTTP authentication with the shared Chrome profile's IPQS cookies, without opening a page.", SERVER_INSTRUCTIONS),
     inputSchema: {
       probeBrowser: z.boolean().default(false),
     },
@@ -67,7 +67,7 @@ server.registerTool(
     ...(await localStatus()),
     browser: probeBrowser
       ? await probeHttpAuth()
-      : { probed: false, note: "Set probeBrowser=true to verify saved HTTP authentication without opening Chrome." },
+      : { probed: false, note: "Set probeBrowser=true to verify HTTP authentication with the shared Chrome profile's cookies." },
     safety: {
       apiKeyReturned: false,
       browserProfileExported: false,
@@ -81,7 +81,7 @@ server.registerTool(
   "ipqs_open_login",
   {
     title: "Open IPQS Login",
-    description: buildToolDescription("Open the dedicated login without a window. visible=true is only for explicitly requested human verification; there is no automatic GUI fallback.", SERVER_INSTRUCTIONS),
+    description: buildToolDescription("Open the login in a kept hidden tab of the shared Chrome. visible=true is only for explicitly requested human verification; there is no automatic GUI fallback.", SERVER_INSTRUCTIONS),
     inputSchema: { visible: z.boolean().default(false) },
   },
   async ({ visible }) => safeResult(() => startInteractiveLogin(visible)),
@@ -91,7 +91,7 @@ server.registerTool(
   "ipqs_finish_login",
   {
     title: "Finish IPQS Login",
-    description: buildToolDescription("Verify the current dashboard session after human authentication and optionally keep Chrome open.", SERVER_INSTRUCTIONS),
+    description: buildToolDescription("Verify the shared profile's dashboard session after human authentication; keepBrowser keeps the hidden tab for the next call.", SERVER_INSTRUCTIONS),
     inputSchema: {
       keepBrowser: z.boolean().default(false),
     },
@@ -119,7 +119,7 @@ server.registerTool(
   "ipqs_open_dashboard",
   {
     title: "Open IPQS Dashboard",
-    description: buildToolDescription("Open one allowlisted dashboard in windowless native Chrome. visible=true explicitly requests a human window.", SERVER_INSTRUCTIONS),
+    description: buildToolDescription("Open one allowlisted dashboard in a kept hidden tab of the shared Chrome. visible=true explicitly requests a human window.", SERVER_INSTRUCTIONS),
     inputSchema: {
       page: dashboardPageSchema.default("home"),
       visible: z.boolean().default(false),
@@ -132,7 +132,7 @@ server.registerTool(
   "ipqs_read_dashboard",
   {
     title: "Read IPQS Dashboard",
-    description: buildToolDescription("Read one allowlisted dashboard through saved-session HTTP text by default, without launching Chrome or executing page scripts. Use mode=controls for native hidden Chrome DOM text and value-free controls.", SERVER_INSTRUCTIONS),
+    description: buildToolDescription("Read one allowlisted dashboard as HTTP text with the shared Chrome profile's cookies by default, without a page or page scripts. Use mode=controls for a hidden tab's rendered DOM text and value-free controls.", SERVER_INSTRUCTIONS),
     inputSchema: {
       page: dashboardPageSchema.default("home"),
       textLimit: z.number().int().min(500).max(50_000).default(12_000),
@@ -224,7 +224,7 @@ server.registerTool(
   "ipqs_close_browser",
   {
     title: "Close IPQS Browser",
-    description: buildToolDescription("Close the package-managed Chrome/CDP connection after login or dashboard review.", SERVER_INSTRUCTIONS),
+    description: buildToolDescription("Release this server's kept tab and attachment to the shared Chrome after login or dashboard review; the shared Chrome keeps its own idle close.", SERVER_INSTRUCTIONS),
     inputSchema: {},
   },
   async () => safeResult(closeBrowser),

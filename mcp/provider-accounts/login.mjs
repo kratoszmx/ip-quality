@@ -1,8 +1,7 @@
-import { saveStorageStateSafely, requestBinaryWithBrowserContext } from '@myutils/browser-session';
-import { unlink } from 'node:fs/promises';
+import { requestBinaryWithBrowserContext } from '@myutils/browser-session';
 import { withSession, privateAccount } from './accounts.mjs';
 import { providerConfig, accountUrl, assertAccountOrigin } from './policy.mjs';
-import { httpStatePath, pendingLoginPath, httpAccountIdentity, readHttpAccount } from './http-account.mjs';
+import { httpAccountIdentity, readHttpAccount } from './http-account.mjs';
 import { prepareBrowserVerification } from '../common/verification.mjs';
 
 const loginForms = Object.freeze({
@@ -87,17 +86,10 @@ export async function loginAccount(provider, confirmation, dependencies = {}) {
         maxResponseBytes: 524288, readBodyForStatuses: [200],
       });
       const identity = httpAccountIdentity(provider, probe.status, probe.contentType, probe.body.toString('utf8'), account.email);
+      // The login's cookies are the shared profile's own; the kept tab continues any remaining check.
       const failure = identity.authenticated ? null : await failureOnPage(page);
-      if (identity.authenticated) {
-        await saveStorageStateSafely(page.context(), httpStatePath(provider));
-        await unlink(pendingLoginPath(provider)).catch(error => { if (error.code !== 'ENOENT') throw error; });
-      } else if (['human_verification_required', 'terms_acceptance_required', 'secondary_verification_required'].includes(failure)) {
-        // Pending cookies are isolated from verified HTTP state. They permit
-        // later authorized review without claiming auth or retyping passwords.
-        await saveStorageStateSafely(page.context(), pendingLoginPath(provider));
-      }
       return { ...identity, credentialsSubmitted: true, retryAutomatically: false,
-        ...(!identity.authenticated ? { state: failure, nextStep: 'Inspect the existing windowless page; verification or updated terms may still be required. Do not repeat the password submission.' } : {}) };
+        ...(!identity.authenticated ? { state: failure, nextStep: 'Inspect the kept hidden tab; verification or updated terms may still be required. Do not repeat the password submission.' } : {}) };
     } catch {
       return { provider, authenticated: false, state: 'login_unconfirmed', credentialsSubmitted: submitted, retryAutomatically: false };
     } finally { if (await password.count() === 1) await password.fill('', { timeout: 500 }).catch(() => {}); }

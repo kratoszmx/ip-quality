@@ -33,9 +33,12 @@ test("API key and proxy policy reject weak or credential-bearing inputs", () => 
   assert.equal(isLikelyIpqsApiKey("123456789012345678901234"), false);
 
   const previous = process.env.IPQS_PROXY_SERVER;
+  const standard = { HTTPS_PROXY: process.env.HTTPS_PROXY, HTTP_PROXY: process.env.HTTP_PROXY };
   try {
-    process.env.IPQS_PROXY_SERVER = "http://127.0.0.1:7897";
-    assert.equal(getProxyServer(), "http://127.0.0.1:7897");
+    delete process.env.IPQS_PROXY_SERVER; delete process.env.HTTPS_PROXY; delete process.env.HTTP_PROXY;
+    assert.equal(getProxyServer(), "http://127.0.0.1:7897", "without a configured proxy HTTP reads use the shared Chrome's system proxy");
+    process.env.IPQS_PROXY_SERVER = "http://127.0.0.1:17897";
+    assert.equal(getProxyServer(), "http://127.0.0.1:17897");
     process.env.IPQS_PROXY_SERVER = "http://user:secret@127.0.0.1:7897";
     assert.throws(() => getProxyServer(), /credential-free/);
     process.env.IPQS_PROXY_SERVER = "https://127.0.0.1:7897/private";
@@ -43,5 +46,6 @@ test("API key and proxy policy reject weak or credential-bearing inputs", () => 
   } finally {
     if (previous === undefined) delete process.env.IPQS_PROXY_SERVER;
     else process.env.IPQS_PROXY_SERVER = previous;
+    for (const [name, value] of Object.entries(standard)) if (value !== undefined) process.env[name] = value;
   }
 });

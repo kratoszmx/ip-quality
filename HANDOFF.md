@@ -39,6 +39,24 @@ unmasks the target and prefix. The IPQS support-reply watch has ended (see Open
 issues). The full `/bin/zsh -f scripts/test-offline` passed: 146 reporter cases
 / 4,136 assertions, 36 IPQS and 67 provider-account cases. No live lookup.
 
+### login move — 2026-11-21: account logins in the shared Chrome profile
+
+Owner decision (見微): every account login lives in the text browser's saved
+Chrome profile. IPQS and provider accounts no longer launch Chrome or keep
+profiles, `http-session.json`, `{provider}-http.json` or pending-login files:
+HTTP reads carry the shared profile's cookies and write back what the site
+changed (`mcp/common/shared-cookies.mjs`, replacing `browser-state.mjs`); pages
+are hidden tabs of the one dedicated Chrome (kept per flow, released by the
+close tools); ipdata reads its Cognito token from the dashboard's localStorage
+there. A Chrome that cannot start outside the GUI session is
+`browser_unavailable`, not a logout. IPQS HTTP reads default to the system proxy
+the shared Chrome uses. Also repointed `mcp/common/verification.mjs` to
+`@myutils/web-text/verification/activation` (myutils 0.9.5 moved
+`inspectNativeVerification`; the old import broke both MCPs). The old `.state/`
+files stay on disk as rollback data. Full `/bin/zsh -f scripts/test-offline`:
+146 reporter cases / 4,136 assertions, 37 IPQS and 68 provider-account cases.
+Live account reads: pending the move's migration status.
+
 ### zmxmacm4 — 2026-11-19: verified normal CAPTCHA preparation
 
 Reporter `v2026-11-19-standalone.58`. A fresh myutils hidden read of DB-IP's
@@ -82,8 +100,9 @@ and 67 provider-account cases. Private live receipts and validation:
   Missing fallback data remains unknown. Contracts:
   [PROVIDERS.md](PROVIDERS.md).
 - Provider accounts: the ipapi replacement account (verified October 28) and
-  the ipdata free developer account (verified October 27) are current; account
-  state and history are in [MCP.md](MCP.md) and
+  the ipdata free developer account (verified October 27) are current. Since
+  2026-11-21 every account login (IPQS included) lives in the shared Chrome
+  profile; account state and history are in [MCP.md](MCP.md) and
   [CREDENTIALS.md](CREDENTIALS.md#account-mcp-files).
 - Code layout and shared helpers: [AGENTS.md](AGENTS.md#architecture) and
   [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md). Account MCPs: [MCP.md](MCP.md).

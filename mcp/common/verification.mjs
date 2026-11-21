@@ -1,4 +1,4 @@
-import { inspectNativeVerification } from '@myutils/web-text/native-verification';
+import { inspectNativeVerification } from '@myutils/web-text/verification/activation';
 
 // Normal site verification on an account-owned page. The shared text browser
 // owns checkbox discovery and native input; this module owns the account origin,

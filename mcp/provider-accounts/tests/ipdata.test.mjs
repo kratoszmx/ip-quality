@@ -9,22 +9,25 @@ const valid = { ip: '1.1.1.1', country_code: 'AU', privateField: 'not returned',
   threat: { is_proxy: false, is_tor: false, is_datacenter: true, is_threat: false, is_known_abuser: false, is_known_attacker: false } };
 const identity = { Username: 'not returned', UserAttributes: Object.entries({ email, email_verified: 'true',
   'custom:api_key': key, 'custom:billing_plan': 'free', sub: 'not returned' }).map(([Name, Value]) => ({ Name, Value })) };
-const savedState = { cookies: [], origins: [{ origin: 'https://dashboard.ipdata.co',
-  localStorage: [{ name: 'CognitoIdentityServiceProvider.fixture.accessToken', value: token }] }] };
+const COGNITO = 'CognitoIdentityServiceProvider.d5gbgc9v0lblant4pctftrahe';
+const dashboardStorage = { [`${COGNITO}.LastAuthUser`]: 'fixture-user', [`${COGNITO}.fixture-user.accessToken`]: token };
 
-function secrets(state = savedState, account = { email }) {
-  return async path => ({ secret: path.endsWith('credentials.json') ? JSON.stringify(account) :
-    path.endsWith('-http.json') ? JSON.stringify(state) : key });
+function secrets(account = { email }) {
+  return async path => ({ secret: path.endsWith('credentials.json') ? JSON.stringify(account) : key });
 }
 
-test('ipdata local readiness accepts session-sized files without claiming live authentication', async () => {
+function storage(entries = dashboardStorage) {
+  return async (origin, names) => {
+    assert.equal(origin, 'https://dashboard.ipdata.co');
+    return Object.fromEntries(names.map(name => [name, entries[name] ?? null]));
+  };
+}
+
+test('ipdata local readiness reads only private files and claims no live authentication', async () => {
   let checks = 0;
-  const result = await ipdataStatus({ inspectSecret: async (path, policy) => {
-    checks++;
-    return { usable: path.endsWith('-http.json') ? policy.maxBytes >= 8192 : true };
-  } });
-  assert.equal(checks, 3);
-  assert.equal(result.httpSessionSaved, true);
+  const result = await ipdataStatus({ inspectSecret: async () => { checks++; return { usable: true }; } });
+  assert.equal(checks, 2);
+  assert.equal(result.loginState, 'shared_chrome_profile');
   assert.equal(result.liveVerified, false);
 });
 
@@ -96,7 +99,7 @@ test('ipdata account identity binds exact email, compares the key and rejects am
 
 test('ipdata account check uses one read-only HTTP operation and disposes the session', async () => {
   let calls = 0, disposed = 0;
-  const result = await checkIpdataAccount({ readSecret: secrets(), createContext: async () => ({
+  const result = await checkIpdataAccount({ readSecret: secrets(), readStorage: storage(), createContext: async () => ({
     post: async (url, options) => {
       calls++;
       assert.equal(url, 'https://cognito-idp.us-east-1.amazonaws.com/');
@@ -115,17 +118,20 @@ test('ipdata account check uses one read-only HTTP operation and disposes the se
   for (const secret of [token, key, email]) assert.equal(JSON.stringify(result).includes(secret), false);
 });
 
-test('ipdata account check stops ambiguous or foreign saved state before HTTP', async () => {
+test('ipdata account check stops a missing or malformed dashboard session before HTTP', async () => {
   let calls = 0;
   const createContext = async () => { calls++; throw new Error('unexpected HTTP'); };
-  for (const state of [{}, { origins: [] }, { origins: [{ ...savedState.origins[0], origin: 'https://foreign.invalid' }] },
-    { origins: [...savedState.origins, ...savedState.origins] },
-    { origins: [{ ...savedState.origins[0], localStorage: [...savedState.origins[0].localStorage, ...savedState.origins[0].localStorage] }] }]) {
-    const result = await checkIpdataAccount({ readSecret: secrets(state), createContext });
+  for (const entries of [{}, { [`${COGNITO}.LastAuthUser`]: 'fixture-user' },
+    { ...dashboardStorage, [`${COGNITO}.LastAuthUser`]: '../foreign user' },
+    { ...dashboardStorage, [`${COGNITO}.fixture-user.accessToken`]: 'not-a-token' }]) {
+    const result = await checkIpdataAccount({ readSecret: secrets(), readStorage: storage(entries), createContext });
     assert.equal(result.state, 'session_unavailable');
   }
-  const missing = await checkIpdataAccount({ readSecret: secrets(savedState, {}), createContext });
+  const missing = await checkIpdataAccount({ readSecret: secrets({}), readStorage: storage(), createContext });
   assert.equal(missing.state, 'session_unavailable');
+  const keychain = Object.assign(new Error('CHROME_KEYCHAIN_SESSION_UNAVAILABLE'), { code: 'CHROME_KEYCHAIN_SESSION_UNAVAILABLE' });
+  const unavailable = await checkIpdataAccount({ readSecret: secrets(), readStorage: async () => { throw keychain; }, createContext });
+  assert.equal(unavailable.state, 'browser_unavailable', 'a Chrome that cannot start is not a logout');
   assert.equal(calls, 0);
 });
 
@@ -140,7 +146,7 @@ test('ipdata account check handles expired state, bad content, redirects and err
     [0, '', '', 'session_unavailable'],
   ];
   for (const [status, contentType, body, expected] of cases) {
-    const result = await checkIpdataAccount({ readSecret: secrets(), createContext: async () => ({
+    const result = await checkIpdataAccount({ readSecret: secrets(), readStorage: storage(), createContext: async () => ({
       post: async () => {
         if (!status) throw new Error(token);
         return { status: () => status, headers: () => ({ 'content-type': contentType }), body: async () => {

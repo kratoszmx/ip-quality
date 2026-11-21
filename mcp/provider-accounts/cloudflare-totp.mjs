@@ -67,7 +67,7 @@ export async function enableCloudflareTotp(confirmation) {
     return { provider: 'cloudflare', enabled: after.authenticated && after.twoFactorEnabled && after.totpConfigured,
       seedSaved: true, recoverySaved: (await inspectPrivateSecretFile(statePath('recovery-codes.json'))).usable,
       state: after.totpConfigured ? 'totp_enabled_recovery_pending' : 'enrollment_unconfirmed' };
-  });
+  }, { page: 'current' });
 }
 
 export function validateCloudflareRecoveryCodes(codes) {
@@ -107,5 +107,5 @@ export async function saveCloudflareRecoveryCodes(confirmation) {
     if (saved.conflict) throw new Error('Different recovery codes already exist locally.');
     await page.getByRole('button', { name: 'Next', exact: true }).click({ timeout: 5000 });
     return { provider: 'cloudflare', saved: true, codeCount: values.length, changed: saved.changed };
-  });
+  }, { page: 'current' });
 }

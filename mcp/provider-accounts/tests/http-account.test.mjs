@@ -25,11 +25,16 @@ test('HTTP identity requires the matching server account, not a local state file
   assert.equal(httpAccountIdentity('cloudflare', 200, 'application/json', '{"success":false}', email).authenticated, false);
 });
 
-test('HTTP reads use private state without starting Chrome; reject redirects and dispose on failure', async () => {
+test('HTTP reads use the shared profile cookies without a page; reject redirects and dispose on failure', async () => {
   let disposed = 0, reads = 0;
+  const cookies = [{ name: 'session', value: 'synthetic', domain: 'ipapi.is', path: '/', expires: -1, httpOnly: true, secure: true, sameSite: 'Lax' }];
   const dependencies = {
-    readSecret: async () => ({ secret: JSON.stringify({ cookies: [], origins: [] }) }),
-    createContext: async () => ({ dispose: async () => { disposed++; } }),
+    readCookies: async urls => { assert.deepEqual(urls, ['https://ipapi.is/app/home']); return cookies; },
+    writeCookies: async () => assert.fail('an unchanged cookie jar writes nothing back'),
+    createContext: async options => {
+      assert.deepEqual(options.storageState, { cookies, origins: [] });
+      return { storageState: async () => ({ cookies, origins: [] }), dispose: async () => { disposed++; } };
+    },
     readResponse: async (_, options) => {
       reads++;
       assert.equal(options.maxRedirects, 0);
@@ -45,6 +50,10 @@ test('HTTP reads use private state without starting Chrome; reject redirects and
   assert.equal(failed.state, 'session_unavailable');
   assert.equal(JSON.stringify(failed).includes('private cookie value'), false);
   assert.equal(disposed, 2);
+  const keychain = Object.assign(new Error('CHROME_KEYCHAIN_SESSION_UNAVAILABLE: private detail'), { code: 'CHROME_KEYCHAIN_SESSION_UNAVAILABLE' });
+  const unavailable = await readHttpAccount('ipapi', email, { ...dependencies, readCookies: async () => { throw keychain; } });
+  assert.equal(unavailable.state, 'browser_unavailable', 'a Chrome that cannot start is not a logout');
+  assert.equal(JSON.stringify(unavailable).includes('private detail'), false);
 });
 
 test('AbuseIPDB HTTP identity ignores feedback/change-password forms and exposes privacy booleans only', () => {

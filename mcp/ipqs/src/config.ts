@@ -1,9 +1,8 @@
-import { constants as fsConstants, existsSync } from "node:fs";
-import { lstat, open } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-import { ensurePrivateDirectoryStrict } from "@myutils/browser-session";
+import { SYSTEM_PROXY_SERVER } from "@myutils/web-text/browser-options";
 import { fingerprintSecret, inspectPrivateSecretFile, readPrivateSecretFile } from "@myutils/secret-file";
 
 function findPackageRoot(startDir: string) {
@@ -20,7 +19,6 @@ export const ROOT = findPackageRoot(path.dirname(fileURLToPath(import.meta.url))
 export const REPO_ROOT = path.resolve(ROOT, "../..");
 export const IPQS_ORIGIN = "https://www.ipqualityscore.com";
 export const IPQS_API_BASE = `${IPQS_ORIGIN}/api/json`;
-const DEFAULT_BROWSER_PROFILE_DIR = path.join(ROOT, ".state", "chrome-profile");
 export const DEFAULT_API_KEY_FILE = path.join(REPO_ROOT, "secrets", "ipqs");
 
 export const DASHBOARD_PAGES = {
@@ -51,10 +49,6 @@ function integerEnv(name: string, fallback: number, minimum: number, maximum: nu
   return value;
 }
 
-export function getBrowserProfileDir() {
-  return env("IPQS_BROWSER_PROFILE_DIR", DEFAULT_BROWSER_PROFILE_DIR);
-}
-
 export function getApiKeyFile() {
   return env("IPQS_API_KEY_FILE", DEFAULT_API_KEY_FILE);
 }
@@ -63,9 +57,11 @@ export function getTimeoutMs() {
   return integerEnv("IPQS_TIMEOUT_MS", 20_000, 1_000, 60_000);
 }
 
+// HTTP reads: an explicit proxy, else the system proxy the shared Chrome uses, so
+// the dashboard session and its HTTP reads leave through one exit.
 export function getProxyServer() {
   const value = env("IPQS_PROXY_SERVER") || env("HTTPS_PROXY") || env("HTTP_PROXY");
-  if (!value) return undefined;
+  if (!value) return SYSTEM_PROXY_SERVER;
   let url: URL;
   try {
     url = new URL(value);
@@ -108,50 +104,6 @@ export function isLikelyIpqsApiKey(value: string) {
     && /^[A-Za-z0-9_-]+$/.test(value)
     && /[A-Za-z]/.test(value)
     && /\d/.test(value);
-}
-
-function assertNormalizedAbsolutePath(target: string, label: string) {
-  if (!path.isAbsolute(target) || path.resolve(target) !== target) {
-    throw new Error(`${label} must be a normalized absolute path.`);
-  }
-}
-
-async function assertNoSymlinkComponents(target: string, allowMissingTail: boolean) {
-  const parsed = path.parse(target);
-  let current = parsed.root;
-  for (const component of target.slice(parsed.root.length).split(path.sep).filter(Boolean)) {
-    current = path.join(current, component);
-    try {
-      const state = await lstat(current);
-      if (state.isSymbolicLink()) throw new Error("IPQS browser profile paths may not contain symbolic links.");
-    } catch (error) {
-      if (allowMissingTail && (error as NodeJS.ErrnoException).code === "ENOENT") return;
-      throw error;
-    }
-  }
-}
-
-export async function ensureBrowserProfileDirectory() {
-  const directory = getBrowserProfileDir();
-  assertNormalizedAbsolutePath(directory, "IPQS_BROWSER_PROFILE_DIR");
-  await assertNoSymlinkComponents(directory, true);
-  await ensurePrivateDirectoryStrict(directory);
-  await assertNoSymlinkComponents(directory, false);
-  const handle = await open(
-    directory,
-    fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | (fsConstants.O_NOFOLLOW || 0),
-  );
-  try {
-    const state = await handle.stat();
-    if (!state.isDirectory()
-      || (typeof process.getuid === "function" && state.uid !== process.getuid())
-      || (state.mode & 0o777) !== 0o700) {
-      throw new Error("IPQS browser profile directory must be an owned directory at mode 0700.");
-    }
-  } finally {
-    await handle.close();
-  }
-  return directory;
 }
 
 export async function inspectApiCredential() {

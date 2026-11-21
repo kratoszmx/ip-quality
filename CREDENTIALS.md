@@ -37,16 +37,15 @@ configuration, never process arguments, Git configuration or reports.
 | Existing IPQS login | Fixed private two-line bundle under `/Users/zmx/codexworkspace/secrets/infrastructure/network/ipqs/`; discovered by `mcp/ipqs/src/credentials.ts` |
 | Registration identity | `secrets/accounts/registration-email`, the email confirmed by the user |
 | Provider login | `secrets/accounts/{ipapi,cloudflare,abuseipdb,ipdata}/credentials.json`, private email/password and any explicitly authorized registration fields |
-| Active ipapi replacement | `secrets/accounts/ipapi/credentials.json`, `secrets/ipapi` and `mcp/provider-accounts/.state/ipapi-http.json` were promoted only after October 28 full-risk API and exact-account HTTP verification. Routine access uses HTTP; no visible browser is needed |
+| Active ipapi replacement | `secrets/accounts/ipapi/credentials.json` and `secrets/ipapi` were promoted only after October 28 full-risk API and exact-account HTTP verification. Routine access uses HTTP with the shared Chrome profile's cookies; no visible browser is needed |
 | Retired ipapi account | `secrets/accounts/ipapi/retired-20261028/` preserves the former credentials, reporter key, HTTP/pending state, rejected signup receipts and October 26 key-rotation evidence. These are not runtime inputs |
 | ipapi registration and promotion evidence | `secrets/accounts/ipapi/candidate-20261027/` preserves the authorized candidate credentials, activation/terms receipts, verified key and promotion receipt. It became the active account on October 28. Its retained private profile is under `mcp/provider-accounts/.state/ipapi-candidate-20261027/manual-chrome-profile`; myutils headless restored it successfully after the GUI was closed |
 | Cloudflare authenticator | `secrets/accounts/cloudflare/totp-uri`, private RFC 6238 provisioning URI |
 | Cloudflare recovery codes | `secrets/accounts/cloudflare/recovery-codes.json`, private recovery data after enrollment |
 | IPQS authenticator | `secrets/accounts/ipqs/totp-uri`, private exact-account provisioning URI; issuer provisions an 80-bit seed |
 | IPQS emergency recovery | `secrets/accounts/ipqs/recovery-code`; `enrollment-attempt.json` prevents duplicate activation |
-| Browserless account sessions | `mcp/provider-accounts/.state/{ipapi,cloudflare,abuseipdb,ipdata}-http.json`, owner-only saved state; never emitted or committed. ipdata includes Cognito access/refresh tokens in dashboard local storage; treat the whole file as a credential |
-| IPQS HTTP/browser session | `mcp/ipqs/.state/chrome-profile/http-session.json` (under `IPQS_BROWSER_PROFILE_DIR` when overridden); saved only after authentication |
-| Pending provider login | `mcp/provider-accounts/.state/{provider}-pending-login.json`; terms/challenge continuation only, distinct from verified account state |
+| Account login sessions (IPQS, ipapi, Cloudflare, AbuseIPDB, ipdata) | Only in the shared Chrome profile, the text browser's saved profile (`~/.local/state/myutils/text-browser-kernel/chrome-profile` or `chromeProfileDir` of its `saved-profile.json`): native cookies, and ipdata's Cognito tokens in the dashboard's own localStorage. Read through `@myutils/web-text/shared-chrome`; never emitted or committed |
+| Former session files (rollback only) | `mcp/provider-accounts/.state/{ipapi,cloudflare,abuseipdb,ipdata}-http.json`, `{provider}-pending-login.json`, `.state/{provider}/` profiles and `mcp/ipqs/.state/chrome-profile/` (with `http-session.json`) stay on disk untouched until a separate deletion; no code reads them. Treat them as credentials |
 | Account action evidence | Provider-local registration/token/enrollment receipts and `availability.json` under `secrets/accounts/` |
 
 A saved registration password does not establish that an account was created.
@@ -59,11 +58,10 @@ email-verification URL.
 
 ipdata signup, email activation and login have separate one-submit receipts.
 Its API key is independent of the short-lived account access token: an expired
-HTTP account session does not invalidate reporter queries. The MCP does not
+dashboard session does not invalidate reporter queries. The MCP does not
 refresh tokens or repeat password login automatically.
 
-Browser profiles live in each MCP's private `.state/` directory. Saved HTTP
-state serves account checks only; the reporter uses no cookies or duplicate
-keys. Textual provider setup seeds are imported directly into private storage;
+Account sessions live in the shared Chrome profile and serve account checks
+only; the reporter uses no cookies or duplicate keys. Textual provider setup seeds are imported directly into private storage;
 QR images are not processed. Checked login state and recovery paths are in
 [MCP.md](MCP.md).

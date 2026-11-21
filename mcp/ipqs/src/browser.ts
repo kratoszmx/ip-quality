@@ -3,14 +3,11 @@ import { access } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import {
-  settleBrowserOperation,
-  saveStorageStateSafely,
-  waitForEnter,
-} from "@myutils/browser-session";
-import { launchChromeSession } from "@myutils/browser-session/chrome";
+import { settleBrowserOperation, waitForEnter } from "@myutils/browser-session";
 import { reserveOneUseRecord, takeOneUseRecord } from "@myutils/one-use-token";
 import { writePrivateSecretFile } from "@myutils/secret-file";
+import { releaseDedicatedChromePages, withDedicatedChrome } from "@myutils/web-text/dedicated-chrome";
+import { sharedChromeCdpPort, sharedChromeProfileDir, sharedChromeRuntime } from "@myutils/web-text/shared-chrome";
 import { chromium, type Page } from "playwright-core";
 
 import { validateIpqsApiCredential } from "./api.js";
@@ -21,10 +18,7 @@ import {
   IPQS_API_KEY_POLICY,
   IPQS_ORIGIN,
   dashboardUrl,
-  env,
   getApiKeyFile,
-  getBrowserProfileDir,
-  getProxyServer,
   getTimeoutMs,
   inspectApiCredential,
   loginUrl,
@@ -33,7 +27,6 @@ import {
 } from "./config.js";
 import { inspectIpqsCredentials, readIpqsCredentials } from "./credentials.js";
 import { readDashboardText } from "./dashboard-text.js";
-import { HTTP_STATE_FILE } from "./http-auth.js";
 import {
   assertSafeSettingControl,
   dashboardContentReady,
@@ -51,8 +44,6 @@ import { boundedVisibleText } from "./redaction.js";
 import { probeIpqsAccount } from "./account-probe.js";
 import { enrollIpqsTotp, completeIpqsTotp } from "./totp.js";
 
-type ChromeSession = Awaited<ReturnType<typeof launchChromeSession>>;
-const { restoreBrowserState } = await import(pathToFileURL(path.join(ROOT, "../common/browser-state.mjs")).href);
 const { prepareBrowserVerification } = await import(pathToFileURL(path.join(ROOT, "../common/verification.mjs")).href);
 
 interface PendingSettingChange {
@@ -66,7 +57,6 @@ interface PendingSettingChange {
 const pendingSettingChanges = new Map<string, PendingSettingChange>();
 const SETTING_CHANGE_TTL_MS = 10 * 60 * 1000;
 const MAX_PENDING_SETTING_CHANGES = 100;
-let activeSession: ChromeSession | null = null;
 let browserLease = Promise.resolve();
 
 async function withBrowserLease<T>(operation: () => Promise<T>) {
@@ -83,48 +73,22 @@ async function withBrowserLease<T>(operation: () => Promise<T>) {
   }
 }
 
-function sessionIsUsable(session: ChromeSession | null): session is ChromeSession {
-  return Boolean(session && !session.page.isClosed() && session.browser.isConnected());
+// The IPQS login lives only in the shared Chrome profile (the text browser's
+// saved profile). Every page is a tab of the one dedicated Chrome on it: a
+// hidden tab of its own, or with `retain` the tab this server keeps for the
+// next call; `visible` opens a window of that Chrome for the owner.
+async function withIpqsPage<T>(options: { visible?: boolean; page?: "own" | "retain" }, operation: (page: Page) => Promise<T>) {
+  return withDedicatedChrome(sharedChromeRuntime({ chromium }), {
+    locale: "en-US", window: options.visible ? "shown" : "hidden",
+    deadline: Date.now() + 60_000, page: options.page ?? "own",
+  }, (_session, page) => operation(page));
 }
 
-async function openSession({ visible = false } = {}) {
-  // This is the isolated MCP/controller process, never the parent App env.
-  process.env.PW_CHROMIUM_ATTACH_TO_OTHER = "1";
-  const proxy = getProxyServer();
-  const session = await launchChromeSession(chromium, {
-    stateDir: path.join(getBrowserProfileDir(), "sessions"),
-    mode: visible ? "visible" : "hidden",
-    route: proxy ? { mode: "proxy", server: proxy } : { mode: "direct" },
-    chromePath: env("IPQS_CHROME_PATH") || undefined,
-    startupTimeoutMs: Math.min(getTimeoutMs(), 20_000), lifetimeMs: 30 * 60 * 1000,
-  });
-  try {
-    await restoreBrowserState(session.context, HTTP_STATE_FILE, IPQS_ORIGIN);
-    return session;
-  } catch (error) { await session.close(); throw error; }
-}
-
-async function activeOrNewSession() {
-  const staleSession = activeSession;
-  if (staleSession && !sessionIsUsable(staleSession)) {
-    await (staleSession as ChromeSession).close().catch(() => undefined);
-    activeSession = null;
-  }
-  if (activeSession) return { session: activeSession, temporary: false };
-  return { session: await openSession(), temporary: true };
-}
-
-async function withDashboardSession<T>(pageName: DashboardPageName, operation: (session: ChromeSession) => Promise<T>) {
-  return withBrowserLease(async () => {
-    const selected = await activeOrNewSession();
-    return settleBrowserOperation(async () => {
-      await selected.session.page.goto(dashboardUrl(pageName), {
-        waitUntil: "domcontentloaded",
-        timeout: getTimeoutMs(),
-      });
-      return await operation(selected.session);
-    }, async () => { if (selected.temporary) await selected.session.close(); });
-  });
+async function withDashboardSession<T>(pageName: DashboardPageName, operation: (page: Page) => Promise<T>) {
+  return withBrowserLease(() => withIpqsPage({}, async (page) => {
+    await page.goto(dashboardUrl(pageName), { waitUntil: "domcontentloaded", timeout: getTimeoutMs() });
+    return operation(page);
+  }));
 }
 
 async function waitForDashboardContent(page: Page, pageName: DashboardPageName) {
@@ -206,47 +170,37 @@ async function collectDashboardSnapshot(page: Page, pageName: DashboardPageName,
 
 export function defaultStateSummary() {
   return {
-    profileDir: getBrowserProfileDir(),
-    httpStateFile: HTTP_STATE_FILE,
-    cdpPort: "dynamic loopback port",
+    profileDir: sharedChromeProfileDir(),
+    loginState: "shared-chrome-profile",
+    cdpPort: sharedChromeCdpPort(),
     loginUrl: loginUrl(),
     dashboardPages: DASHBOARD_PAGES,
-    browserBackend: "windowless-native-chrome",
+    browserBackend: "shared-dedicated-chrome-hidden-tab",
   };
 }
 
 export async function localStatus() {
-  const profileDir = getBrowserProfileDir();
-  const profilePresent = await access(profileDir).then(() => true, () => false);
+  const profilePresent = await access(sharedChromeProfileDir()).then(() => true, () => false);
   return {
     state: defaultStateSummary(),
     profilePresent,
-    interactiveBrowserOpen: sessionIsUsable(activeSession),
     savedCredentials: await inspectIpqsCredentials(),
     apiCredential: await inspectApiCredential(),
   };
 }
 
 export async function startInteractiveLogin(visible = false) {
-  return withBrowserLease(async () => {
-    if (sessionIsUsable(activeSession) && (activeSession.mode === "visible") !== visible) {
-      await activeSession.close(); activeSession = null;
-    }
-    if (!sessionIsUsable(activeSession)) {
-      const staleSession = activeSession;
-      if (staleSession) await (staleSession as ChromeSession).close().catch(() => undefined);
-      activeSession = await openSession({ visible });
-    }
-    await activeSession.page.goto(loginUrl(), { waitUntil: "domcontentloaded", timeout: getTimeoutMs() });
-    const verification = await prepareBrowserVerification(activeSession.page, IPQS_ORIGIN);
+  return withBrowserLease(() => withIpqsPage({ visible, page: "retain" }, async (page) => {
+    await page.goto(loginUrl(), { waitUntil: "domcontentloaded", timeout: getTimeoutMs() });
+    const verification = await prepareBrowserVerification(page, IPQS_ORIGIN);
     return {
       opened: true,
-      backend: activeSession.mode === "visible" ? "visible-chrome" : "windowless-native-chrome",
-      path: summarizeIpqsUrl(activeSession.page.url()).path,
+      backend: visible ? "shared-chrome-window" : "shared-chrome-hidden-tab",
+      path: summarizeIpqsUrl(page.url()).path,
       verification,
       note: "Reviewed checkbox verification uses myutils native input. Use the confirmed saved-login tool to authenticate.",
     };
-  });
+  }));
 }
 
 export async function loginWithSavedCredentials(options: {
@@ -256,13 +210,8 @@ export async function loginWithSavedCredentials(options: {
   if (options.confirmedUseSavedCredentials !== true) {
     throw new Error("IPQS saved-credential login requires explicit task-level authorization.");
   }
-  return withBrowserLease(async () => {
-    if (!sessionIsUsable(activeSession)) {
-      const staleSession = activeSession;
-      if (staleSession) await (staleSession as ChromeSession).close().catch(() => undefined);
-      activeSession = await openSession();
-    }
-    const page = activeSession.page;
+  const keep = options.keepBrowser !== false;
+  return withBrowserLease(() => withIpqsPage({ page: keep ? "retain" : "own" }, async (page) => {
     await page.goto(dashboardUrl("home"), { waitUntil: "domcontentloaded", timeout: getTimeoutMs() });
     let status = await inspectIpqsAuthPage(page);
     let credentialsRead = false;
@@ -287,12 +236,6 @@ export async function loginWithSavedCredentials(options: {
       await completeIpqsTotp(page);
       status = await inspectIpqsAuthPage(page);
     }
-    if (status.authenticated) await saveStorageStateSafely(activeSession.context, HTTP_STATE_FILE);
-    const shouldKeepBrowser = !status.authenticated || options.keepBrowser !== false;
-    if (!shouldKeepBrowser) {
-      await activeSession.close().catch(() => undefined);
-      activeSession = null;
-    }
     const secondary = status.stage === "secondary-verification";
     return {
       ok: status.authenticated,
@@ -303,41 +246,35 @@ export async function loginWithSavedCredentials(options: {
       credentialSubmissions: submissions,
       state: status.stage,
       page: status,
-      browserLeftOpen: sessionIsUsable(activeSession),
+      tabKept: keep,
       retryAutomatically: false,
       secretReturned: false,
       ...(status.authenticated
         ? {
           note: credentialsRead
-            ? "IPQS returned an authenticated dashboard after one bounded windowless login. Private HTTP state was saved."
-            : "The dedicated IPQS profile already had an authenticated dashboard session; saved credentials were not read.",
+            ? "IPQS returned an authenticated dashboard after one bounded windowless login; the shared Chrome profile keeps the session."
+            : "The shared Chrome profile already had an authenticated IPQS dashboard session; saved credentials were not read.",
         }
         : secondary
-          ? { nextStep: "Continue verification on the existing page with myutils; the remaining check is not authentication proof." }
+          ? { nextStep: "Continue verification on the kept page with myutils; the remaining check is not authentication proof." }
           : { note: "The bounded IPQS login stopped without an automatic retry or visible browser fallback." }),
     };
-  });
+  }));
 }
 
 export async function finishInteractiveLogin(keepBrowser = false) {
-  return withBrowserLease(async () => {
-    if (!sessionIsUsable(activeSession)) activeSession = await openSession();
-    await activeSession.page.goto(dashboardUrl("home"), { waitUntil: "domcontentloaded", timeout: getTimeoutMs() });
-    await prepareBrowserVerification(activeSession.page, IPQS_ORIGIN);
-    const status = await inspectIpqsAuthPage(activeSession.page);
-    if (status.authenticated) await saveStorageStateSafely(activeSession.context, HTTP_STATE_FILE);
-    if (status.authenticated && !keepBrowser) {
-      await activeSession.close().catch(() => undefined);
-      activeSession = null;
-    }
+  return withBrowserLease(() => withIpqsPage({ page: keepBrowser ? "retain" : "own" }, async (page) => {
+    await page.goto(dashboardUrl("home"), { waitUntil: "domcontentloaded", timeout: getTimeoutMs() });
+    await prepareBrowserVerification(page, IPQS_ORIGIN);
+    const status = await inspectIpqsAuthPage(page);
     return {
       ...status,
-      browserKeptOpen: sessionIsUsable(activeSession),
+      tabKept: keepBrowser,
       note: status.authenticated
-        ? "The dedicated profile currently reaches an authenticated IPQS dashboard."
-        : "Authentication is not yet proven. Inspect the existing session; a human window requires an explicit visible=true request.",
+        ? "The shared Chrome profile currently reaches an authenticated IPQS dashboard."
+        : "Authentication is not yet proven. A human window requires an explicit visible=true request.",
     };
-  });
+  }));
 }
 
 export async function manualLogin() {
@@ -349,27 +286,23 @@ export async function manualLogin() {
 }
 
 export async function openInteractiveDashboard(pageName: DashboardPageName, visible = false) {
-  return withBrowserLease(async () => {
-    if (sessionIsUsable(activeSession) && (activeSession.mode === "visible") !== visible) {
-      await activeSession.close(); activeSession = null;
-    }
-    if (!sessionIsUsable(activeSession)) activeSession = await openSession({ visible });
-    await activeSession.page.goto(dashboardUrl(pageName), { waitUntil: "domcontentloaded", timeout: getTimeoutMs() });
-    await prepareBrowserVerification(activeSession.page, IPQS_ORIGIN);
-    const auth = await inspectIpqsAuthPage(activeSession.page);
+  return withBrowserLease(() => withIpqsPage({ visible, page: "retain" }, async (page) => {
+    await page.goto(dashboardUrl(pageName), { waitUntil: "domcontentloaded", timeout: getTimeoutMs() });
+    await prepareBrowserVerification(page, IPQS_ORIGIN);
+    const auth = await inspectIpqsAuthPage(page);
     return {
       opened: true,
       page: pageName,
       path: auth.path,
       authenticated: auth.authenticated,
-      browserKeptOpen: true,
+      tabKept: true,
     };
-  });
+  }));
 }
 
 export async function readDashboard(pageName: DashboardPageName, limit = 12_000, mode: "text" | "controls" = "text") {
   if (mode === "text") return readDashboardText(pageName, limit);
-  return withDashboardSession(pageName, async ({ page }) => {
+  return withDashboardSession(pageName, async (page) => {
     await waitForDashboardContent(page, pageName);
     return collectDashboardSnapshot(page, pageName, limit);
   });
@@ -377,17 +310,16 @@ export async function readDashboard(pageName: DashboardPageName, limit = 12_000,
 
 export async function enableIpqsTotp() {
   if ((await probeIpqsAccount()).outcome !== "authenticated") throw new Error("Verify usable IPQS API credits before authenticator enrollment.");
-  return withDashboardSession("settings", async ({ page }) => {
+  return withDashboardSession("settings", async (page) => {
     if (!(await inspectIpqsAuthPage(page)).authenticated) throw new Error("Authenticate the IPQS account before enrollment.");
     return enrollIpqsTotp(page);
   });
 }
 
 export async function finishIpqsTotp() {
-  return withDashboardSession("home", async ({ page }) => {
+  return withDashboardSession("home", async (page) => {
     await completeIpqsTotp(page);
     const result = await inspectIpqsAuthPage(page);
-    if (result.authenticated) await saveStorageStateSafely(page.context(), HTTP_STATE_FILE);
     return { authenticated: result.authenticated, stage: result.stage, submittedOnce: true };
   });
 }
@@ -458,7 +390,7 @@ export async function importApiKeyFromDashboard(options: {
   replaceExisting?: boolean;
   revealIfNeeded?: boolean;
 } = {}) {
-  return withDashboardSession("api_keys", async ({ page }) => {
+  return withDashboardSession("api_keys", async (page) => {
     const auth = await inspectIpqsAuthPage(page);
     if (!auth.authenticated) throw new Error("Authenticated IPQS API-key dashboard access is required.");
     if (!await waitForDashboardContent(page, "api_keys")) {
@@ -551,7 +483,7 @@ export async function prepareSettingChange(options: {
   value: string | boolean;
   submitLabel?: string;
 }) {
-  return withDashboardSession("settings", async ({ page }) => {
+  return withDashboardSession("settings", async (page) => {
     const auth = await inspectIpqsAuthPage(page);
     if (!auth.authenticated) throw new Error("Authenticated IPQS settings dashboard access is required.");
     const forms = await collectSettingForms(page);
@@ -650,13 +582,11 @@ export async function applySettingChange(changeId: string) {
     const claim = takeOneUseRecord(pendingSettingChanges, changeId, Date.now());
     if (claim.kind !== "taken") throw new Error("Prepared IPQS setting change is missing or expired.");
     const pending = claim.record;
-    const selected = await activeOrNewSession();
-    try {
-      await selected.session.page.goto(dashboardUrl("settings"), {
+    return withIpqsPage({}, async (page) => {
+      await page.goto(dashboardUrl("settings"), {
         waitUntil: "domcontentloaded",
         timeout: getTimeoutMs(),
       });
-      const page = selected.session.page;
       const authBefore = await inspectIpqsAuthPage(page);
       if (!authBefore.authenticated) throw new Error("Authenticated IPQS settings dashboard access is required.");
       const forms = await collectSettingForms(page);
@@ -690,20 +620,16 @@ export async function applySettingChange(changeId: string) {
           ? "The page displayed sanitized success evidence after submission."
           : "The form was submitted once, but the current DOM did not expose a clear success marker; inspect the setting before retrying.",
       };
-    } finally {
-      if (selected.temporary) await selected.session.close().catch(() => undefined);
-    }
+    });
   });
 }
 
+// Release this server's kept tab and its attachment to the shared Chrome. The
+// Chrome itself stays under its own 30-minute idle close.
 export async function closeBrowser() {
   return withBrowserLease(async () => {
-    const wasOpen = sessionIsUsable(activeSession);
-    const result = await settleBrowserOperation(async () => ({ closed: wasOpen, browserOpen: false }), async () => {
-      if (activeSession) await activeSession.close();
-    });
-    if ("cleanup" in result) return { ...result, closed: false, browserOpen: null };
-    activeSession = null;
+    const result = await settleBrowserOperation(async () => ({ released: true }), () => releaseDedicatedChromePages());
+    if ("cleanup" in result) return { ...result, released: false };
     return result;
   });
 }

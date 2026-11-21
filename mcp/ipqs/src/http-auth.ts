@@ -1,13 +1,11 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { request } from "playwright-core";
 import { requestBinaryWithBrowserContext } from "@myutils/browser-session";
 import { parseActiveHtmlDocument } from "@myutils/web-text/http-text";
 import { DomUtils } from "htmlparser2";
-import { ROOT, IPQS_ORIGIN, getBrowserProfileDir, dashboardUrl, getProxyServer, type DashboardPageName } from "./config.js";
+import { ROOT, dashboardUrl, getProxyServer, type DashboardPageName } from "./config.js";
 
-export const HTTP_STATE_FILE = path.join(getBrowserProfileDir(), "http-session.json");
-const { readBrowserState } = await import(pathToFileURL(path.join(ROOT, "../common/browser-state.mjs")).href);
+const { withSharedCookies } = await import(pathToFileURL(path.join(ROOT, "../common/shared-cookies.mjs")).href);
 
 export function httpAuthStatus(status: number, contentType: string, body: string) {
   if (status !== 200) return { authenticated: false, stage: status === 403 || status === 429 ? "access-blocked" : "login", backend: "http", httpStatus: status };
@@ -22,24 +20,19 @@ export function httpAuthStatus(status: number, contentType: string, body: string
   return { authenticated, stage: authenticated ? "authenticated" : challenge ? "secondary-verification" : login ? "login" : "unknown", backend: "http", httpStatus: status };
 }
 
-// One allowlisted GET using only this account's saved state. No browser,
-// navigation, redirects, credential submission or persisted cookie changes.
-export async function readSavedDashboardHtml(pageName: DashboardPageName) {
-  const state = await readBrowserState(HTTP_STATE_FILE, IPQS_ORIGIN);
-  if (!state) throw new Error("No saved IPQS session is available for a dashboard read.");
-  const proxy = getProxyServer();
-  const context = await request.newContext({ storageState: state, ...(proxy ? { proxy: { server: proxy } } : {}) });
-  try {
-    return await requestBinaryWithBrowserContext({ request: context }, {
-      url: dashboardUrl(pageName), headers: { "Accept": "text/html", "Cache-Control": "no-store" }, timeoutMs: 15000,
-      maxRedirects: 0, maxResponseBytes: 1_048_576, readBodyForStatuses: [200],
-    });
-  } finally { await context.dispose(); }
+// One allowlisted GET with the shared Chrome profile's IPQS cookies; cookies the
+// response refreshes go back to that profile. No page, redirect, retry or credential submission.
+export async function readDashboardHtml(pageName: DashboardPageName): Promise<Awaited<ReturnType<typeof requestBinaryWithBrowserContext>>> {
+  const url = dashboardUrl(pageName);
+  return withSharedCookies(url, getProxyServer(), (context: unknown) => requestBinaryWithBrowserContext({ request: context }, {
+    url, headers: { "Accept": "text/html", "Cache-Control": "no-store" }, timeoutMs: 15000,
+    maxRedirects: 0, maxResponseBytes: 1_048_576, readBodyForStatuses: [200],
+  }));
 }
 
 export async function probeHttpAuth() {
   try {
-    const response = await readSavedDashboardHtml("home");
+    const response = await readDashboardHtml("home");
     return httpAuthStatus(response.status, response.contentType || "", new TextDecoder("utf-8", { fatal: true }).decode(response.body));
   } catch { return { authenticated: false, stage: "unavailable", backend: "http" }; }
 }

@@ -75,11 +75,12 @@ Each suite maps to one area of the code; check it before adding coverage.
 | `test/repository_test.rb` | Runtime-source bans, vendored references, file safety, AGPL provenance |
 | `test/route_runner_test.rb` | `bin/ip-quality-route` and `runner/`: menus, listings, option rules, leaf rendering, Mihomo lifecycle, snapshots, printable text |
 | `test/prefix_sample_test.rb` | Prefix input rules, batch files, failure/interrupt evidence |
-| `mcp/ipqs/tests/` | IPQS API, saved-session HTTP auth (concealed logout links, lookalike attributes), dashboard text over an intercepted HTTP client, TOTP independent of a completed CAPTCHA field, browser close, secrets, default-windowless stdio contract |
-| `mcp/provider-accounts/tests/` | HTTP identity versus account status; login/terms/challenge outcomes, including a resolved initial 403 reaching form validation; ipapi session reuse and normal expired-session login; signup/TOTP; public-provider probes; ipdata identity, expired tokens and risk projection; the browser-read entry and byte-for-byte saved-state preservation; shared checkbox verification (`verification.test.mjs`); DB-IP page reads from a sanitized fixture and injected reader (`dbip-page.test.mjs`); stdio contract |
+| `mcp/ipqs/tests/` | IPQS API, HTTP auth (concealed logout links, lookalike attributes), dashboard text over an intercepted HTTP client with a synthetic shared profile and cookie write-back, TOTP independent of a completed CAPTCHA field, shared-Chrome tabs and release, secrets, default-windowless stdio contract |
+| `mcp/provider-accounts/tests/` | HTTP identity versus account status, with the shared profile's cookies and `browser_unavailable` when its Chrome cannot start; login/terms/challenge outcomes, including a resolved initial 403 reaching form validation; ipapi session reuse and normal expired-session login; signup/TOTP; public-provider probes; ipdata identity from the dashboard's shared-profile token, expired tokens and risk projection; shared-Chrome tabs (own reads, kept flows per provider, release) in `browser-read.test.mjs`; the cookie diff and write-back of `mcp/common/shared-cookies.mjs` (`shared-cookies.test.mjs`); shared checkbox verification (`verification.test.mjs`); DB-IP page reads from a sanitized fixture and injected reader (`dbip-page.test.mjs`); stdio contract |
 
-The MCP suites use synthetic private state and intercepted HTTP/browser
-boundaries; no real credential, browser or provider request is involved.
+The MCP suites resolve the shared Chrome modules (`@myutils/web-text/shared-chrome`,
+`/dedicated-chrome`) to synthetic ones and intercept HTTP; no real profile,
+credential, Chrome process or provider request is involved.
 
 All reporter suites inherit `test/support/reporter_test_case.rb`:
 

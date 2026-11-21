@@ -1,35 +1,38 @@
 import assert from "node:assert/strict";
-import { mkdtemp, realpath, writeFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
+import { registerHooks } from "node:module";
 import test from "node:test";
 import { request, type APIRequestContext } from "playwright-core";
 
-// Test the public default read against a transport double, with synthetic state.
-// No real profile, credentials, browser process or external requests are used.
-test("saved HTTP dashboard reads preserve transport, authentication and privacy boundaries", async t => {
-  const directory = await mkdtemp(path.join(await realpath(tmpdir()), "ipqs-http-text-"));
-  const previousProfile = process.env.IPQS_BROWSER_PROFILE_DIR;
+type Cookie = { name: string; value: string; domain: string; path: string; expires: number; httpOnly: boolean; secure: boolean; sameSite: string };
+const fixture = globalThis as typeof globalThis & { __ipqsSharedCookies?: { read(urls: string[]): Promise<Cookie[]>; write(cookies: Cookie[]): Promise<number> } };
+
+// Test the public default read against a transport double and a synthetic shared
+// profile. No real profile, credentials, Chrome process or external requests are used.
+test("dashboard reads with the shared profile's cookies preserve transport, authentication and privacy boundaries", async t => {
   const previousProxy = process.env.IPQS_PROXY_SERVER;
-  process.env.IPQS_BROWSER_PROFILE_DIR = directory;
   process.env.IPQS_PROXY_SERVER = "http://127.0.0.1:17897";
-  const stateFile = path.join(directory, "http-session.json");
-  const state = {
-    cookies: [
-      { name: "session", value: "synthetic", domain: ".ipqualityscore.com", path: "/", expires: -1, httpOnly: true, secure: true, sameSite: "Lax" },
-      { name: "foreign", value: "excluded", domain: "foreign.invalid", path: "/", expires: -1, httpOnly: true, secure: true, sameSite: "Lax" },
-    ],
-    origins: [{ origin: "https://foreign.invalid", localStorage: [{ name: "private", value: "excluded" }] }],
+  const session: Cookie = { name: "session", value: "synthetic", domain: ".ipqualityscore.com", path: "/", expires: -1, httpOnly: true, secure: true, sameSite: "Lax" };
+  const cookieReads: string[][] = [], cookieWrites: Cookie[][] = [];
+  let jar: Cookie[] = [session];
+  fixture.__ipqsSharedCookies = {
+    async read(urls) { cookieReads.push(urls); return [session]; },
+    async write(cookies) { cookieWrites.push(cookies); return cookies.length; },
   };
-  await writeFile(stateFile, JSON.stringify(state), { mode: 0o600 });
+  const hooks = registerHooks({ resolve(specifier, context, next) {
+    if (specifier !== "@myutils/web-text/shared-chrome") return next(specifier, context);
+    const original = next(specifier, context);
+    const source = `export * from ${JSON.stringify(original.url)};
+      export const readSharedChromeCookies = urls => globalThis.__ipqsSharedCookies.read(urls);
+      export const writeSharedChromeCookies = cookies => globalThis.__ipqsSharedCookies.write(cookies);`;
+    return { url: `data:text/javascript,${encodeURIComponent(source)}`, shortCircuit: true };
+  } });
   let status = 200, contentType = "text/html; charset=utf-8", contentLength: string | undefined;
   let body = Buffer.from('<title>Account</title><a href="/logout">Logout</a>');
   let requests = 0, responsesClosed = 0, contextsClosed = 0, bodyReads = 0;
   let transportFailure = false, cleanupFailure = false;
   let expectedPath = "/user/dashboard";
-  const originalState = JSON.stringify(state);
   t.mock.method(request, "newContext", async (options: Record<string, any>) => {
-    assert.deepEqual(options.storageState, { cookies: [state.cookies[0]], origins: [] });
+    assert.deepEqual(options.storageState, { cookies: [session], origins: [] });
     assert.deepEqual(options.proxy, { server: "http://127.0.0.1:17897" });
     return {
       async get(url: string, options: Record<string, any>) {
@@ -49,6 +52,7 @@ test("saved HTTP dashboard reads preserve transport, authentication and privacy 
           dispose: async () => { responsesClosed++; },
         };
       },
+      async storageState() { return { cookies: jar, origins: [] }; },
       async dispose() { contextsClosed++; if (cleanupFailure) throw new Error("synthetic cleanup failure"); },
     } as unknown as APIRequestContext;
   });
@@ -154,14 +158,24 @@ test("saved HTTP dashboard reads preserve transport, authentication and privacy 
       assert.equal((await probeHttpAuth()).stage, "unavailable");
       cleanupFailure = false;
     });
-    const { readFile } = await import("node:fs/promises");
-    assert.equal(await readFile(stateFile, "utf8"), originalState, "reads never rewrite saved authentication");
+    await t.test("cookies the site refreshed or removed go back to the shared profile", async () => {
+      body = Buffer.from('<a href="/logout">Logout</a>');
+      const refreshed = { ...session, value: "rotated", expires: 1_900_000_000 };
+      const visitor = { ...session, name: "visitor", value: "new", domain: "www.ipqualityscore.com" };
+      jar = [refreshed, visitor];
+      assert.equal((await readDashboard("home")).authenticated, true);
+      assert.deepEqual(cookieWrites.at(-1), [refreshed, visitor]);
+      jar = [];
+      await readDashboard("home");
+      assert.deepEqual(cookieWrites.at(-1), [{ ...session, expires: 1 }]);
+      jar = [session];
+    });
+    assert.ok(cookieReads.every(urls => urls.length === 1 && urls[0].startsWith("https://www.ipqualityscore.com/user/")));
+    assert.equal(cookieWrites.length, 2, "an unchanged cookie jar writes nothing back");
     assert.equal(contextsClosed, requests);
   } finally {
-    if (previousProfile === undefined) delete process.env.IPQS_BROWSER_PROFILE_DIR;
-    else process.env.IPQS_BROWSER_PROFILE_DIR = previousProfile;
+    hooks.deregister(); delete fixture.__ipqsSharedCookies;
     if (previousProxy === undefined) delete process.env.IPQS_PROXY_SERVER;
     else process.env.IPQS_PROXY_SERVER = previousProxy;
-    await rm(directory, { recursive: true, force: true });
   }
 });

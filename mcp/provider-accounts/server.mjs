@@ -10,7 +10,7 @@ import { enableCloudflareTotp, saveCloudflareRecoveryCodes } from './cloudflare-
 import { verifyPublicProvider } from './public-api.mjs';
 import { loginAccount } from './login.mjs';
 
-const instructions = 'IPQuality provider accounts. Dedicated ipapi/Cloudflare/AbuseIPDB/ipdata accounts only. Free accounts only; no billing or plan upgrade tools. Account creation needs task authorization and CREATE_FREE_ACCOUNT. Use myutils for normal site verification: native checkbox preparation is supported, and remaining image/slider challenges can use its verification workflow. Recheck the original page and exact account after verification. Store secrets privately and never return keys, passwords, OTPs, recovery codes or cookies. A saved file is not live authentication. No automatic signup or lookup retries.';
+const instructions = 'IPQuality provider accounts. Dedicated ipapi/Cloudflare/AbuseIPDB/ipdata accounts only. Free accounts only; no billing or plan upgrade tools. Account creation needs task authorization and CREATE_FREE_ACCOUNT. Use myutils for normal site verification: native checkbox preparation is supported, and remaining image/slider challenges can use its verification workflow. Recheck the original page and exact account after verification. Logins live in the shared Chrome profile (the text browser saved profile); pages are tabs of its one dedicated Chrome. Store secrets privately and never return keys, passwords, OTPs, recovery codes or cookies. A saved file is not live authentication. No automatic signup or lookup retries.';
 const server = new McpServer({ name: 'ipquality-provider-accounts', version: '0.1.0' }, { instructions });
 const provider = z.enum(['ipapi', 'cloudflare']);
 async function result(operation) {
@@ -22,13 +22,13 @@ server.registerTool('provider_account_status', {
   description: buildToolDescription('Read local credential and one-submit registration state without network access.', instructions), inputSchema: { provider },
 }, ({ provider }) => result(() => accountStatus(provider)));
 server.registerTool('provider_account_open', {
-  description: buildToolDescription('Open one reviewed page in native hidden Chrome with no OS window. Routine reads use HTTP. visible=true requires explicit human-recovery intent; never open a GUI automatically.', instructions), inputSchema: { provider, surface: z.enum(['signup', 'login', 'dashboard', 'security']), visible: z.boolean().default(false) },
+  description: buildToolDescription('Open one reviewed page in a kept hidden tab of the shared Chrome. Routine reads use HTTP. visible=true requires explicit human-recovery intent; never open a GUI automatically.', instructions), inputSchema: { provider, surface: z.enum(['signup', 'login', 'dashboard', 'security']), visible: z.boolean().default(false) },
 }, ({ provider, surface, visible }) => result(() => openAccount(provider, surface, visible)));
 server.registerTool('provider_account_read', {
-  description: buildToolDescription('Check the saved account identity over bounded HTTP without Chrome. mode=browser explicitly inspects the existing dedicated page for setup or login recovery.', instructions), inputSchema: { provider, mode: z.enum(['http', 'browser']).default('http') },
+  description: buildToolDescription('Check the account identity over bounded HTTP with the shared Chrome profile\'s cookies, without a page. mode=browser reads the dashboard in a hidden tab of the shared Chrome for setup or login recovery.', instructions), inputSchema: { provider, mode: z.enum(['http', 'browser']).default('http') },
 }, ({ provider, mode }) => result(() => readAccount(provider, mode)));
 server.registerTool('provider_account_login', {
-  description: buildToolDescription('Sign in to ipapi, Cloudflare or AbuseIPDB with saved credentials in windowless Chrome, reusing HTTP state first. Prepares normal checkbox verification and reports the actual account outcome. Saves verified account state privately.', instructions),
+  description: buildToolDescription('Sign in to ipapi, Cloudflare or AbuseIPDB with saved credentials in a hidden tab of the shared Chrome, after checking the shared profile\'s session over HTTP. Prepares normal checkbox verification and reports the actual account outcome. The login stays in the shared profile.', instructions),
   inputSchema: { provider: z.enum(['ipapi', 'cloudflare', 'abuseipdb']), confirmation: z.literal('USE_SAVED_ACCOUNT_CREDENTIALS') },
 }, ({ provider, confirmation }) => result(() => loginAccount(provider, confirmation)));
 server.registerTool('provider_account_create_free', {
@@ -43,7 +43,7 @@ server.registerTool('public_provider_verify_free_api', {
 }, ({ provider, surface, confirmation }) => result(() => verifyPublicProvider(provider, confirmation, undefined, surface)));
 
 server.registerTool('cloudflare_account_check', {
-  description: buildToolDescription('Verify the saved Cloudflare identity, email and 2FA state with one HTTP account read and private saved state. No Chrome and no Intel lookup; expired state requires explicit browser recovery.', instructions), inputSchema: {},
+  description: buildToolDescription('Verify the Cloudflare identity, email and 2FA state with one HTTP account read using the shared Chrome profile\'s cookies. No page and no Intel lookup; an expired session needs provider_account_login.', instructions), inputSchema: {},
 }, () => result(() => readAccount('cloudflare')));
 server.registerTool('cloudflare_prepare_intel_token', {
   description: buildToolDescription('Prepare and validate an account-scoped Intel Read token on the official dashboard without submitting it.', instructions), inputSchema: {},
@@ -65,24 +65,24 @@ server.registerTool('abuseipdb_account_status', {
   description: buildToolDescription('Inspect private AbuseIPDB account/key presence without network access. Saved files do not prove a live account or quota.', instructions), inputSchema: {},
 }, () => result(abuseipdbStatus));
 server.registerTool('abuseipdb_account_check', {
-  description: buildToolDescription('Read the exact saved AbuseIPDB account over HTTP, without Chrome. Returns authentication, email-verification and public-profile setting booleans only. Does not change settings or submit abuse reports.', instructions), inputSchema: {},
+  description: buildToolDescription('Read the exact saved AbuseIPDB account over HTTP with the shared Chrome profile\'s cookies, without a page. Returns authentication, email-verification and public-profile setting booleans only. Does not change settings or submit abuse reports.', instructions), inputSchema: {},
 }, () => result(() => readAccount('abuseipdb')));
 server.registerTool('abuseipdb_verify_free_api', {
   description: buildToolDescription('Read the official AbuseIPDB APIv2 CHECK endpoint for 1.1.1.1 once. Uses the private owned key and native HTTP. Returns only validated public observations; no abuse report, key, account identity or browser state.', instructions), inputSchema: { confirmation: z.literal('VERIFY_FREE_API') },
 }, ({ confirmation }) => result(() => verifyAbuseipdb(confirmation)));
 server.registerTool('abuseipdb_account_open', {
-  description: buildToolDescription('Open the reviewed AbuseIPDB page in windowless native Chrome, without submission. visible=true explicitly requests human recovery. Routine queries use HTTP.', instructions), inputSchema: { surface: z.enum(['signup', 'login']), visible: z.boolean().default(false) },
+  description: buildToolDescription('Open the reviewed AbuseIPDB page in a kept hidden tab of the shared Chrome, without submission. visible=true explicitly requests human recovery. Routine queries use HTTP.', instructions), inputSchema: { surface: z.enum(['signup', 'login']), visible: z.boolean().default(false) },
 }, ({ surface, visible }) => result(() => openAbuseipdb(surface, visible)));
 
 server.registerTool('provider_account_close_browsers', {
-  description: buildToolDescription('Close only the temporary browsers owned by this MCP; preserve the private saved login state.', instructions), inputSchema: {},
+  description: buildToolDescription('Release this MCP\'s kept tab and attachment to the shared Chrome; logins stay in the shared profile.', instructions), inputSchema: {},
 }, () => result(closeAccountBrowsers));
 
 server.registerTool('ipdata_account_status', {
-  description: buildToolDescription('Read local ipdata developer-account, API-key and HTTP-session readiness without network access.', instructions), inputSchema: {},
+  description: buildToolDescription('Read local ipdata developer-account and API-key readiness without network access; the dashboard session lives in the shared Chrome profile.', instructions), inputSchema: {},
 }, () => result(ipdataStatus));
 server.registerTool('ipdata_account_check', {
-  description: buildToolDescription('One read-only Cognito GetUser HTTP POST with the saved ipdata access token. Binds the saved email and compares the reporter key; no Chrome, password login, token refresh or quota-consuming IP lookup.', instructions), inputSchema: {},
+  description: buildToolDescription('One read-only Cognito GetUser HTTP POST with the ipdata dashboard access token from the shared Chrome profile. Binds the saved email and compares the reporter key; no Chrome, password login, token refresh or quota-consuming IP lookup.', instructions), inputSchema: {},
 }, () => result(checkIpdataAccount));
 server.registerTool('ipdata_verify_free_api', {
   description: buildToolDescription('One official ipdata lookup for 1.1.1.1 using the private developer key. Native HTTP, no browser, redirects or retries. Returns only target-bound risk flags; missing VPN data remains unknown.', instructions), inputSchema: { confirmation: z.literal('VERIFY_FREE_API') },

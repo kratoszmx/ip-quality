@@ -4,11 +4,15 @@ import { Agent } from 'node:https';
 import { request } from 'playwright-core';
 import { requestHttpRead } from '@myutils/http-read';
 import { inspectPrivateSecretFile, readPrivateSecretFile } from '@myutils/secret-file';
+import { readSharedChromeLocalStorage } from '@myutils/web-text/shared-chrome';
 import { accountNetworkOptions } from './policy.mjs';
 
 const keyPath = fileURLToPath(new URL('../../secrets/ipdata', import.meta.url));
 const accountPath = fileURLToPath(new URL('../../secrets/accounts/ipdata/credentials.json', import.meta.url));
-const statePath = fileURLToPath(new URL('./.state/ipdata-http.json', import.meta.url));
+// The dashboard's Amplify session, in its own localStorage of the shared Chrome profile
+// (the Cognito app client of the public dashboard web app).
+const DASHBOARD = 'https://dashboard.ipdata.co';
+const COGNITO = 'CognitoIdentityServiceProvider.d5gbgc9v0lblant4pctftrahe';
 const target = '1.1.1.1';
 const keyPolicy = { minBytes: 32, maxBytes: 128, validate: value => /^[a-f0-9]{32,128}$/.test(value) };
 const factors = ['is_proxy', 'is_vpn', 'is_tor', 'is_datacenter', 'is_threat', 'is_known_abuser', 'is_known_attacker'];
@@ -25,11 +29,9 @@ export function ipdataObservation(status, body) {
 
 export async function ipdataStatus(dependencies = {}) {
   const inspect = dependencies.inspectSecret || inspectPrivateSecretFile;
-  const [account, key, state] = await Promise.all([
-    inspect(accountPath, { maxBytes: 4096 }), inspect(keyPath, keyPolicy), inspect(statePath, { maxBytes: 524288 }),
-  ]);
+  const [account, key] = await Promise.all([inspect(accountPath, { maxBytes: 4096 }), inspect(keyPath, keyPolicy)]);
   return { provider: 'ipdata', accountSaved: account.usable, apiKeySaved: key.usable,
-    httpSessionSaved: state.usable, liveVerified: false, backend: 'http' };
+    loginState: 'shared_chrome_profile', liveVerified: false, backend: 'http' };
 }
 
 export async function verifyIpdata(confirmation, dependencies = {}) {
@@ -66,26 +68,27 @@ export function ipdataAccountIdentity(status, body, expectedEmail, expectedKey) 
     mfaEnrollmentObserved: Array.isArray(body.UserMFASettingList) && body.UserMFASettingList.some(value => ['SOFTWARE_TOKEN_MFA', 'SMS_MFA'].includes(value)) };
 }
 
-// The dashboard uses Cognito GetUser. This read-only POST needs the saved access
-// token, starts no browser and never repeats a password login or refresh attempt.
+// The dashboard uses Cognito GetUser. This read-only POST takes the dashboard's
+// access token from the shared Chrome profile, opens no page and never repeats a
+// password login or refresh attempt.
 export async function checkIpdataAccount(dependencies = {}) {
   let context;
   try {
     const read = dependencies.readSecret || readPrivateSecretFile;
+    const readStorage = dependencies.readStorage || readSharedChromeLocalStorage;
     const account = JSON.parse((await read(accountPath, { maxBytes: 4096 })).secret);
-    const state = JSON.parse((await read(statePath, { maxBytes: 524288 })).secret);
     const key = (await read(keyPath, keyPolicy)).secret;
     if (!isRecord(account) || typeof account.email !== 'string' || !account.email || !keyPolicy.validate(key)) throw new Error('Missing private identity.');
-    const origins = state.origins?.filter(origin => origin.origin === 'https://dashboard.ipdata.co');
-    if (origins?.length !== 1 || !Array.isArray(origins[0].localStorage)) throw new Error('Missing dedicated session.');
-    const tokens = origins[0].localStorage.filter(item => typeof item.name === 'string' &&
-      item.name.startsWith('CognitoIdentityServiceProvider.') && item.name.endsWith('.accessToken'));
-    if (tokens.length !== 1 || typeof tokens[0].value !== 'string' || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(tokens[0].value)) throw new Error('Ambiguous session token.');
+    const user = (await readStorage(DASHBOARD, [`${COGNITO}.LastAuthUser`]))[`${COGNITO}.LastAuthUser`];
+    if (typeof user !== 'string' || !/^[A-Za-z0-9@._+-]{1,128}$/.test(user)) throw new Error('Missing dashboard session.');
+    const tokenName = `${COGNITO}.${user}.accessToken`;
+    const token = (await readStorage(DASHBOARD, [tokenName]))[tokenName];
+    if (typeof token !== 'string' || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) throw new Error('Missing session token.');
     const proxy = accountNetworkOptions().proxyServer;
     context = await (dependencies.createContext || (options => request.newContext(options)))(proxy ? { proxy: { server: proxy } } : {});
     const response = await context.post('https://cognito-idp.us-east-1.amazonaws.com/', {
       headers: { 'Content-Type': 'application/x-amz-json-1.1', 'X-Amz-Target': 'AWSCognitoIdentityProviderService.GetUser' },
-      data: { AccessToken: tokens[0].value }, maxRedirects: 0, maxRetries: 0, timeout: 10000,
+      data: { AccessToken: token }, maxRedirects: 0, maxRetries: 0, timeout: 10000,
     });
     const status = response.status();
     let body;
@@ -96,6 +99,10 @@ export async function checkIpdataAccount(dependencies = {}) {
       }
     }
     return ipdataAccountIdentity(status, body, account.email, key);
-  } catch { return { provider: 'ipdata', backend: 'http', authenticated: false, state: 'session_unavailable' }; }
+  } catch (error) {
+    // The shared Chrome could not give the token: not a logout.
+    const browser = /^CHROME_/.test(String(error?.code ?? error?.message ?? ''));
+    return { provider: 'ipdata', backend: 'http', authenticated: false, state: browser ? 'browser_unavailable' : 'session_unavailable' };
+  }
   finally { await context?.dispose().catch(() => {}); }
 }

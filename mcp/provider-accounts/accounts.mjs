@@ -3,16 +3,15 @@ import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { Agent } from 'node:https';
 import { chromium } from 'playwright-core';
-import { withLoopbackOperationLease, saveStorageStateSafely, settleBrowserOperation } from '@myutils/browser-session';
-import { launchChromeSession } from '@myutils/browser-session/chrome';
-import { openIsolatedAccountRead } from '@myutils/web-text/browser-sessions';
+import { withLoopbackOperationLease } from '@myutils/browser-session';
+import { releaseDedicatedChromePages, withDedicatedChrome } from '@myutils/web-text/dedicated-chrome';
+import { sharedChromeRuntime } from '@myutils/web-text/shared-chrome';
 import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@myutils/secret-file';
 import { requestHttpRead } from '@myutils/http-read';
 import { redactText } from '@myutils/redaction';
 import { providerConfig, accountUrl, accountPagePath, accountNetworkOptions, assertAccountOrigin, classifyAccountPage, ipapiDashboardAccepted, validApiKey, ipapiKeyAccepted } from './policy.mjs';
 import { submitReviewedSignup } from './signup.mjs';
-import { httpStatePath, pendingLoginPath, readHttpAccount } from './http-account.mjs';
-import { restoreBrowserState, readBrowserState } from '../common/browser-state.mjs';
+import { readHttpAccount } from './http-account.mjs';
 import { prepareBrowserVerification } from '../common/verification.mjs';
 
 export const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -20,44 +19,31 @@ export const SECRETS = path.resolve(ROOT, '../../secrets');
 const secret = (provider, name) => path.join(SECRETS, 'accounts', providerConfig(provider) && provider, name);
 const keyFile = provider => path.join(SECRETS, provider === 'ipapi' ? 'ipapi' : 'cloudflare_token');
 const keyPolicy = { minBytes: 8, maxBytes: 256, validate: validApiKey };
-const activeSessions = new Map();
+let keptProvider = null;
 
-export async function withSession(provider, operation, { foreground = false } = {}) {
+// Every account login lives in the shared Chrome profile (the text browser's
+// saved profile); pages are tabs of the one dedicated Chrome on it. A call that
+// opens a page keeps its hidden tab for the next step of the flow (`retain`),
+// `current` continues on that tab, `own` reads in a tab of its own. `foreground`
+// opens a window of the same Chrome for the owner.
+export async function withSession(provider, operation, { foreground = false, page = 'retain' } = {}) {
   const config = providerConfig(provider);
   return withLoopbackOperationLease({ port: config.port + 100 }, async () => {
-    const routing = accountNetworkOptions();
-    const mode = foreground ? 'visible' : 'hidden';
-    const route = routing.proxyServer ? { mode: 'proxy', server: routing.proxyServer } : { mode: 'direct' };
-    let session = activeSessions.get(provider);
-    if (session && (!session.browser.isConnected() || session.page.isClosed() ||
-        session.mode !== mode || JSON.stringify(session.route) !== JSON.stringify(route))) {
-      await session.close(); activeSessions.delete(provider); session = null;
-    }
-    if (!session) {
-      // Only this isolated MCP process sees the hidden-target attach flag.
-      process.env.PW_CHROMIUM_ATTACH_TO_OTHER = '1';
-      session = await launchChromeSession(chromium, {
-        stateDir: path.join(ROOT, '.state', 'sessions', provider), mode, route,
-        startupTimeoutMs: 20_000, lifetimeMs: 30 * 60 * 1000,
-      });
-      try {
-        const pending = await inspectPrivateSecretFile(pendingLoginPath(provider));
-        await restoreBrowserState(session.context, pending.exists ? pendingLoginPath(provider) : httpStatePath(provider), config.origin);
-      }
-      catch (error) { await session.close(); throw error; }
-      activeSessions.set(provider, session);
-      const owned = session;
-      void owned.closed.finally(() => { if (activeSessions.get(provider) === owned) activeSessions.delete(provider); }).catch(() => {});
-    }
-    return operation(session.page);
+    if (page === 'current' && keptProvider !== provider) throw new Error('Open the provider page first.');
+    const keeps = page === 'retain' && !foreground;
+    if (keeps) keptProvider = null;
+    const result = await withDedicatedChrome(sharedChromeRuntime({ chromium }),
+      { locale: 'en-US', window: foreground ? 'shown' : 'hidden', deadline: Date.now() + 60_000, page },
+      (_session, tab) => operation(tab));
+    if (keeps) keptProvider = provider;
+    return result;
   });
 }
 
 export async function closeAccountBrowsers() {
-  const sessions = [...activeSessions.values()]; activeSessions.clear();
-  const results = await Promise.allSettled(sessions.map(session => session.close()));
-  if (results.some(result => result.status === 'rejected')) throw new Error('Account browser cleanup was not confirmed.');
-  return { closed: sessions.length };
+  keptProvider = null;
+  await releaseDedicatedChromePages();
+  return { released: true };
 }
 
 export async function privateAccount(provider) {
@@ -118,41 +104,15 @@ export async function openAccount(provider, surface, visible = false) {
       !!document.querySelector('input[type="password"],a[href*="logout"]') ||
       /verify you are human|let us know you are human|checking your browser/i.test(document.body?.innerText || ''),
     undefined, { timeout: 10_000, polling: 100 }).catch(() => {});
-    const result = await snapshot(provider, page);
-    if (provider === 'ipapi' && result.state === 'authenticated') await saveStorageStateSafely(page.context(), httpStatePath(provider));
-    return { ...result, verification };
+    return { ...await snapshot(provider, page), verification };
   }, { foreground: visible });
 }
 
 export async function readAccount(provider, mode = 'http') {
-  if (mode === 'browser') {
-    const config = providerConfig(provider);
-    return withLoopbackOperationLease({port:config.port + 100}, async () => {
-      const active = activeSessions.get(provider);
-      const storageState = active?.browser.isConnected() && !active.page.isClosed() ? await active.context.storageState()
-        : await readBrowserState(httpStatePath(provider), config.origin);
-      if (!storageState) throw Error('No saved account session is available for a browser read.');
-      const stateDir = path.join(ROOT, '.state', 'reads', provider);
-      const paths = new Set([config.dashboard, config.login, config.security].filter(Boolean));
-      const session = await openIsolatedAccountRead({chromium, stateDir,
-        profileDir:path.join(stateDir,'chrome'), playwrightProfileDir:path.join(stateDir,'playwright'),
-        cdpPort:config.port, leasePort:config.port + 200,
-        proxyServer:accountNetworkOptions().proxyServer}, {
-        storageState,
-        allowNavigation(value) {
-          try { assertAccountOrigin(provider, value); const url = new URL(value);
-            return paths.has(url.pathname) || provider === 'cloudflare' && /^\/[a-f\d]{32}\/?$/.test(url.pathname);
-          } catch { return false; }
-        },
-      });
-      return settleBrowserOperation(async () => {
-        await session.page.goto(accountUrl(provider,'dashboard'), {waitUntil:'domcontentloaded',timeout:20000});
-        const result = await snapshot(provider, session.page);
-        session.assertAllowed();
-        return result;
-      }, session.close);
-    });
-  }
+  if (mode === 'browser') return withSession(provider, async page => {
+    await page.goto(accountUrl(provider, 'dashboard'), { waitUntil: 'domcontentloaded', timeout: 20000 });
+    return snapshot(provider, page);
+  }, { page: 'own' });
   if (mode !== 'http') throw new Error('Unknown read mode.');
   return readHttpAccount(provider, (await privateAccount(provider)).email);
 }
@@ -184,7 +144,7 @@ export async function createFreeAccount(provider, country, confirmation) {
       if (saved.conflict || !saved.changed) throw new Error('Registration attempt already reserved.');
     });
     return snapshot(provider, page, true);
-  });
+  }, { page: 'current' });
 }
 
 export async function importIpapiKey(confirmation) {
@@ -209,5 +169,5 @@ export async function importIpapiKey(confirmation) {
       if (written.conflict) throw new Error('A different local API key already exists.');
       return { provider: 'ipapi', imported: true, fullApiVerified: true, lookupsUsed: 1 };
     } finally { agent.destroy(); }
-  });
+  }, { page: 'current' });
 }

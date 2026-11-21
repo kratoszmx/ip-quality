@@ -40,38 +40,33 @@ Unsupported interface/bypass settings and IPv6 targets skip this fallback.
 | IPQS | `npm --prefix mcp/ipqs run build` | `npm --prefix mcp/ipqs start` | `npm --prefix mcp/ipqs run check` |
 | Provider accounts | None | `npm --prefix mcp/provider-accounts start` | `npm --prefix mcp/provider-accounts test` |
 
-Browsers are owned by myutils' native Chrome lifecycle worker, with a 30-minute
-maximum lifetime and cleanup on controller exit. Their fresh profiles are
-removed on shutdown; owner-only HTTP/pending login files persist separately:
+Every page is a hidden tab of the one dedicated Chrome on the shared profile,
+the text browser's saved profile, which holds these accounts' logins (since
+2026-11-21). myutils starts that Chrome hidden when none runs (macOS GUI session
+only; elsewhere the launch is refused and reported as browser unavailable) and
+closes it after 30 idle minutes; neither MCP launches or stops a Chrome of its own.
 
-- IPQS `ipqs_close_browser` stops its active owned browser; `auth:check` opens
-  none. Temporary dashboard reads close their browser after completion.
-- `provider_account_close_browsers` closes the provider server's owned browser
-  sessions. Multi-step setup tools reuse the same session until closed, expired,
-  or explicitly switched between routes/display modes.
-- A GUI is available only through an explicitly requested `visible=true` or
-  the manual IPQS login script. No failed HTTP/headless/hidden operation opens
-  a window automatically. Old persistent profiles are retained as private
-  recovery data and are not the default runtime browser.
-- Close a browser started through a temporary proxy before stopping that proxy,
-  and close it before changing its route. Routing details:
-  [provider-accounts guide](mcp/provider-accounts/AGENTS.md#private-files-and-lifetime).
+- IPQS `ipqs_close_browser` releases the tab this server kept and its attachment;
+  `auth:check` opens no page. Dashboard control reads close their own tab.
+- `provider_account_close_browsers` releases the provider server's kept tab.
+  Multi-step setup tools continue on the tab the opening call kept, for the same
+  provider, until it is released or closes after 30 idle minutes. Server
+  shutdown releases it too.
+- A window of the same Chrome opens only through an explicitly requested
+  `visible=true` or the manual IPQS login script. No failed HTTP or hidden
+  operation opens a window automatically.
+- The former per-MCP profiles and session files (`mcp/ipqs/.state/`,
+  `mcp/provider-accounts/.state/`) stay on disk untouched as rollback data until
+  a separate deletion; nothing starts a browser on them.
 
 An explicitly requested manual-account handoff may instead use myutils
 `openRealChrome` with a dedicated persistent profile and no CDP. The user owns
-that visible browser's remaining lifetime; it is not one of the MCP's temporary
-sessions and is not closed by `provider_account_close_browsers`. The October 27
-ipapi registration profile is listed in [CREDENTIALS.md](CREDENTIALS.md#account-mcp-files).
-Its GUI process was closed after successful activation on October 28. myutils
-headless restored the saved profile; routine maintenance now uses HTTP or the
-native-hidden MCP browser, both verified without an OS window. Retaining a
-profile alone proves neither signup nor authentication. It is never a reporter
-cache and must not be restored into another account's automated session.
-Keep myutils' `requireUserKeychainSession` protection enabled for such a
-persistent-profile recovery. It refuses a new native Chrome launch outside the
-macOS GUI login session before encrypted cookies can be lost; the temporary
-MCP browsers and HTTP reads use their separate lifecycle above. See the
-[saved-login audit](MCP.md#saved-login-protection).
+that visible browser's remaining lifetime. The October 27 ipapi registration
+profile is listed in [CREDENTIALS.md](CREDENTIALS.md#account-mcp-files); its GUI
+process was closed after activation on October 28. Retaining a profile alone
+proves neither signup nor authentication. Keep myutils'
+`requireUserKeychainSession` protection enabled for any persistent-profile
+recovery. See the [saved-login audit](MCP.md#saved-login-protection).
 
 ## External weekly check
 

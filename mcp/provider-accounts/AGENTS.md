@@ -1,6 +1,10 @@
 # Provider accounts MCP
 
 Owns free ipapi.is, Cloudflare, AbuseIPDB and ipdata account maintenance for the IPQuality reporter.
+Since 2026-11-21 every login of these accounts lives only in the shared Chrome
+profile, the text browser's saved profile, and is used only through the one
+dedicated Chrome on it (`@myutils/web-text/shared-chrome`); this package keeps
+no profile, cookie or session file.
 ipwho.is and DB-IP need no account or key for their free context APIs. This package
 reuses myutils' web-text, browser-session/http-read, secret-file, totp, redaction and
 mcp-server directly. Provider state, selectors, quotas and API contracts stay here.
@@ -28,10 +32,10 @@ The formal inventory and current account/2FA evidence are in
 | Tool | Effect |
 | --- | --- |
 | provider_account_status | Local credential and submission metadata; no network |
-| provider_account_open | Native hidden Chrome by default; `visible=true` explicitly requests a human window |
-| provider_account_login | USE_SAVED_ACCOUNT_CREDENTIALS: saved HTTP identity first; ipapi/Cloudflare/AbuseIPDB use their official windowless login form when a new session is needed, with normal checkbox preparation |
-| provider_account_close_browsers | Close only this MCP's owned temporary sessions; preserve saved HTTP and pending state |
-| provider_account_read | Default `mode=http`: bounded exact-account identity read with saved state and no Chrome. Explicit `mode=browser`: fresh isolated dashboard text/controls using this adapter's saved/current state |
+| provider_account_open | A kept hidden tab of the shared Chrome by default; `visible=true` explicitly requests a window of that Chrome |
+| provider_account_login | USE_SAVED_ACCOUNT_CREDENTIALS: HTTP identity with the shared profile's cookies first; ipapi/Cloudflare/AbuseIPDB use their official login form in a kept hidden tab when a new session is needed, with normal checkbox preparation |
+| provider_account_close_browsers | Release this MCP's kept tab and attachment to the shared Chrome; logins stay in the shared profile |
+| provider_account_read | Default `mode=http`: bounded exact-account identity read with the shared profile's cookies and no page. Explicit `mode=browser`: dashboard text/controls in a hidden tab of its own |
 | provider_account_create_free | One free signup after CREATE_FREE_ACCOUNT; uses the confirmed private email/country |
 | ipapi_import_free_key | Import a labelled key after one full-response free lookup and IMPORT_FREE_API_KEY |
 | public_provider_verify_free_api | VERIFY_FREE_API with surface=free_api checks DB-IP/ipwho.is context for 1.1.1.1. public_demo checks IPWHOIS security for 1.1.1.1 or DB-IP's requesting egress via its page and one visitor lookup. No account/browser |
@@ -44,9 +48,9 @@ The formal inventory and current account/2FA evidence are in
 | abuseipdb_account_status | Local private account/key presence only; no network or claim of current quota |
 | abuseipdb_account_check | Bounded HTTP read of the exact saved account; returns authentication, email-verification and public-profile/domain-visibility booleans |
 | abuseipdb_verify_free_api | VERIFY_FREE_API makes one official APIv2 CHECK for 1.1.1.1 using the reporter's private key; no browser or abuse-report submission |
-| abuseipdb_account_open | Windowless native signup/login page; explicit visible=true for human recovery; no form submission |
-| ipdata_account_status | Local private account/key/HTTP-state readiness only; no live authentication claim |
-| ipdata_account_check | One read-only Cognito GetUser HTTP POST with the dedicated saved access token; exact email/key binding, no browser, password login, refresh or IP query |
+| abuseipdb_account_open | Signup/login page in a kept hidden tab; explicit visible=true for human recovery; no form submission |
+| ipdata_account_status | Local private account/key readiness only; no live authentication claim |
+| ipdata_account_check | One read-only Cognito GetUser HTTP POST with the dashboard's access token from the shared profile's localStorage; exact email/key binding, no page, password login, refresh or IP query |
 | ipdata_verify_free_api | VERIFY_FREE_API makes one official 1.1.1.1 query using the reporter key; only supplied risk flags returned, missing VPN remains unknown |
 
 The user requires API usability before 2FA. A missing key, unavailable API,
@@ -85,11 +89,14 @@ submission receipts separate from the active account until a full-risk API
 lookup verifies the new key; an HTTP 200 signup response alone is insufficient.
 
 Routine account reads use `http-account.mjs` and the shared bounded HTTP context
-reader with private saved state, without launching Chrome. Cloudflare uses one
-fixed GET to /api/v4/user; ipapi uses /app/home; AbuseIPDB uses /account.
-All bind the saved identity and reject login/error bodies, redirects and retries. A failed HTTP check returns a
-failure rather than automatically opening a browser. HTTP-state recovery is
-described below; opening a browser alone does not refresh every provider's state.
+reader with the shared profile's cookies for the request URL
+(`../common/shared-cookies.mjs`), without a page; cookies the response sets or
+removes go back to the profile. Cloudflare uses one fixed GET to /api/v4/user;
+ipapi uses /app/home; AbuseIPDB uses /account. All bind the saved identity and
+reject login/error bodies, redirects and retries. A failed HTTP check returns a
+failure rather than automatically opening a browser; a shared Chrome that cannot
+start (outside the owner's GUI session) is `browser_unavailable`, not a logout.
+Recovery is described [below](#session-recovery).
 Intel lookups use native bounded HTTP with the saved token and no Chrome.
 ipdata uses `ipdata.mjs` for its fixed read-only Cognito GetUser POST and official
 API lookup. The account parser binds the saved email, compares the reporter key
@@ -108,15 +115,14 @@ private state; a separate HTTP check then proved the exact new identity with
 Chrome closed. The normal native-hidden MCP dashboard and subsequent HTTP/API
 checks also passed. The keyed risk API passed direct and default-proxy routes
 before credentials were promoted. The registration GUI is closed; routine
-access stays HTTP or windowless myutils Chrome. Expired state can use the normal
-saved-credential login tool. The November 19 public form is a POST to `/app/`,
+access now uses HTTP with the shared profile's cookies or a hidden tab of the
+shared Chrome, and an expired session uses the normal saved-credential login tool. The November 19 public form is a POST to `/app/`,
 with `email` and `pass` fields and the `Sign In` button.
 Current credential/evidence locations are in [../../CREDENTIALS.md](../../CREDENTIALS.md).
 
-October 26 verification adopted the myutils text browser's native hidden engine,
-`@myutils/browser-session/chrome`. It proves the target has no OS window, keeps
-the browser sandbox and uses explicit routes; it is distinct from ordinary
-headless Chrome. AbuseIPDB saved login and HTTP identity passed. Cloudflare
+October 26 verification (then on `@myutils/browser-session/chrome` temporary
+profiles, replaced on November 21 by tabs of the shared Chrome): AbuseIPDB saved
+login and HTTP identity passed. Cloudflare
 required human verification after submission. ipapi terms were accepted with
 explicit user permission, but the former account's dashboard reported `bot_login`
 suspension and its API returned 403. One separately authorized visible Chrome
@@ -139,37 +145,24 @@ Only `--confirm-network-lookup` plus a single stdin `{ip: ...}` request enables
 the CLI read. It saves no cookies, visitor keys or page cache. Dependencies are
 restored from the shared reviewed workspace lockfile; there is no runtime install.
 
-## HTTP state recovery
+## Session recovery
 
 The ipapi and AbuseIPDB readers inspect controls in the shared web-text form
 projection. Account and logout evidence must come from actual attributes.
 Only active body text can establish an ipapi suspension. AbuseIPDB privacy
 checkboxes are scoped to its unique account-basics form.
 
-After an authorized login, `provider_account_open` on ipapi's `dashboard`
-refreshes `.state/ipapi-http.json` only after exact account recognition.
-`provider_account_read` with `mode=browser` navigates the known dashboard in
-web-text's fresh isolated account reader. Only reviewed dashboard/login/security
-routes are accepted, with no POST, private-destination, worker or socket traffic.
-It uses `accountNetworkOptions` unchanged: `DIRECT` is refused with a fixed error,
-and with no configured proxy every path uses web-text's `SYSTEM_PROXY_SERVER` (0.6.1).
-It preserves retained login/write sessions and never exports the copied state.
-Shared bounded cleanup reports uncertainty without losing useful results or
-the original operation error. The normal HTTP reader remains the first path.
-
-Cloudflare's generic open/read tools do not refresh `.state/cloudflare-http.json`.
-The package currently has no dedicated MCP tool for that step. Authorized
-maintenance can use `withSession('cloudflare', identityOnPage)`, importing
-`withSession` from `accounts.mjs` and `identityOnPage` from `cloudflare.mjs`.
-This checks the authenticated browser's `/api/v4/user`, saves state only for the
-expected identity, and returns boolean metadata. It does not create an API token
-or change 2FA. Then `cloudflare_account_check` can validate the saved HTTP path.
-
-For AbuseIPDB, open `surface=login` only when the HTTP check requires recovery.
-After the authorized login, inspect `/account` with `withSession('abuseipdb', ...)`
-and `httpAccountIdentity` against `privateAccount('abuseipdb').email`. Save the
-context to `httpStatePath('abuseipdb')` with shared `saveStorageStateSafely` only
-after that exact identity matches. Then check HTTP with Chrome closed.
+A login, its verification and the site's own cookie refreshes all land in the
+shared profile itself, so there is no state file to refresh. When an HTTP check
+reports `login_required`, run `provider_account_login` (ipapi, Cloudflare,
+AbuseIPDB) after task authorization, then repeat the HTTP check. A remaining
+check stays on the kept hidden tab; `provider_account_open(visible=true)` gives
+the owner a window of the same Chrome. `provider_account_read` with
+`mode=browser` reads the dashboard in a hidden tab of its own. Cloudflare's
+`identityOnPage(page)` checks the kept tab's `/api/v4/user` for the expected
+identity before token or 2FA steps. ipdata has no login tool: when its access
+token has expired, open https://dashboard.ipdata.co once in the shared Chrome so
+its own web app signs in or refreshes; then `ipdata_account_check` reads again.
 Account creation and key import are separate reviewed maintenance operations:
 preserve one-submit receipts, inspect the free individual plan and labelled key,
 and privately write `secrets/abuseipdb` without replacing an existing different
@@ -186,21 +179,18 @@ submission receipts, API proof, TOTP URI and recovery codes stay in private
 ../../secrets/accounts/provider directories; raw API keys use the reporter's
 flat secrets/ipapi, secrets/cloudflare_token and secrets/abuseipdb paths.
 
-Temporary profiles are under `.state/sessions/{provider}/`, with dynamic
-loopback CDP ports and operation leases at 19603/19604/19605. Native sessions
-are retained within this server for multi-step flows; the shared worker cleans
-them on close, controller exit or the 30-minute lifetime limit. Verified HTTP
-state and pending terms/verification state are separate owner-only files. The
-legacy `.state/{provider}` profiles remain private recovery data.
-PROVIDER_ACCOUNTS_PROXY chooses a credential-free HTTP proxy only for this
-package. Set it to DIRECT for explicit direct access: Chrome receives
---no-proxy-server and bypasses macOS system proxy preferences. The shared engine
-verifies actual launch routing; an explicit route change closes and replaces
-only this server's owned session. Local CDP traffic stays direct;
-when launching a child through an isolated ATT session, pass its proxy with that
-variable and retain localhost in NO_PROXY. No live Clash setting changes.
-The shared worker verifies owned process shutdown and removes its temporary
-profile. Close a temporary ATT browser before its private Mihomo exits.
+Pages are tabs of the dedicated Chrome on the shared profile (CDP port 19551),
+on the system proxy; it starts hidden when none runs (Aqua session only) and
+closes itself after 30 idle minutes. A call that opens a provider page keeps
+its tab for the flow's next call (`page: 'current'`, the same provider only);
+`provider_account_close_browsers` and server shutdown release it. Operation
+leases stay at 19603/19604/19605. The former `.state/{provider}` profiles,
+`.state/{provider}-http.json`, pending-login files and `.state/sessions/` stay
+on disk untouched as rollback data until a separate deletion; no code reads them.
+PROVIDER_ACCOUNTS_PROXY chooses a credential-free HTTP proxy for this package's
+HTTP and API reads only; `DIRECT` is refused, and without it reads use the
+system proxy the shared Chrome uses, so a session and its reads share one exit.
+No live Clash setting changes.
 
 Passwords are random and saved before signup. Durable receipts prevent automatic
 duplicate registration/token/enrollment submissions after timeouts. Registration
@@ -217,8 +207,9 @@ seeds, cookies, account IDs or verification URL tokens.
 
 ipdata was registered once on October 27 after explicit disclosure approval,
 verified by email and confirmed as Free Tier/$0/1,500 daily queries. The private
-reporter key is `secrets/ipdata`; its saved Cognito state is
-`.state/ipdata-http.json`. Both the native hidden login and restored native
+reporter key is `secrets/ipdata`; its Cognito session is the dashboard's own
+localStorage (`CognitoIdentityServiceProvider.<client>.*`) of
+https://dashboard.ipdata.co in the shared profile. Both the native hidden login and restored native
 headless dashboard/Profile were verified with shared myutils Chrome. Profile
 offered name/email/password fields but no 2FA control; no enrollment was made.
 The API returned proxy/Tor/datacenter/abuse flags on direct and ATT; VPN was
@@ -234,15 +225,16 @@ receipts stay under `../../secrets/accounts/`.
 
 ## Module APIs
 
-Inside `mcp/provider-accounts`, `accounts.mjs::withSession` owns the shared
-provider profile binding and lease, `privateAccount` validates saved identities,
-and `policy.mjs::accountNetworkOptions` validates a task-scoped browser/API route.
-Its explicit `DIRECT` mode selects the shared native browser's verified direct
-route. The shared lifecycle verifies process/profile/route ownership; the MCP
-replaces only its own session when an explicit route/display mode changes.
+Inside `mcp/provider-accounts`, `accounts.mjs::withSession(provider, operation,
+{foreground, page})` runs `operation(page)` on a tab of the shared Chrome under
+the provider's lease: `retain` (default) keeps the tab for the flow, `current`
+continues on it for the same provider, `own` reads in a tab of its own;
+`foreground` opens a window. `privateAccount` validates saved identities, and
+`policy.mjs::accountNetworkOptions` validates the task-scoped HTTP/API route.
 `login.mjs` owns reviewed POST forms and distinct credential/terms/verification
 outcomes across ipapi, Cloudflare and AbuseIPDB.
-`../common/browser-state.mjs` restores only the selected site's state.
+`../common/shared-cookies.mjs::withSharedCookies` carries the shared profile's
+cookies for one request URL and writes back what the response changed.
 `cloudflare.mjs`
 owns its fixed account paths, server identity check and token policy; its TOTP
 consumer reuses these directly. `cloudflare-policy.mjs` contains fixture-testable
@@ -254,13 +246,11 @@ HTTP helpers live in `mcp/provider-accounts/http-account.mjs`:
 
 | Function | Input / output |
 | --- | --- |
-| `httpStatePath(provider)` | Validates `ipapi`/`cloudflare`/`abuseipdb` and returns its absolute private HTTP-state path |
 | `httpAccountIdentity(provider, status, contentType, body, expectedEmail)` | Pure provider-specific identity check; returns booleans/status metadata without email or response content |
-| `readHttpAccount(provider, expectedEmail, dependencies = {})` | One bounded HTTP GET using private saved state; returns identity/status metadata, disposes its HTTP context, and starts no Chrome. Tests can inject secret/context/response readers |
+| `readHttpAccount(provider, expectedEmail, dependencies = {})` | One bounded HTTP GET with the shared profile's cookies; returns identity/status metadata (`browser_unavailable` when the shared Chrome cannot start), writes back changed cookies, disposes its HTTP context, and opens no page. Tests can inject cookie/context/response functions |
 
-Cloudflare's `identityOnPage(page)` verifies the active browser's server identity
-before refreshing saved HTTP state. Ordinary HTTP checks only consume that state;
-see [recovery guidance](#http-state-recovery).
+Cloudflare's `identityOnPage(page)` verifies the kept tab's server identity;
+see [recovery guidance](#session-recovery).
 
 AbuseIPDB's identity parsing (see [Tools and workflow](#tools-and-workflow))
 also requires the logout action. Its API observation validation stays in

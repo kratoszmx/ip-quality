@@ -2,11 +2,10 @@ import path from 'node:path';
 import { Agent } from 'node:https';
 import { requestHttpRead } from '@myutils/http-read';
 import { inspectPrivateSecretFile, readPrivateSecretFile, writePrivateSecretFile } from '@myutils/secret-file';
-import { withLoopbackOperationLease, requestBinaryWithBrowserContext, saveStorageStateSafely } from '@myutils/browser-session';
+import { withLoopbackOperationLease, requestBinaryWithBrowserContext } from '@myutils/browser-session';
 import { SECRETS, withSession, privateAccount } from './accounts.mjs';
 import { accountNetworkOptions, assertAccountOrigin, validApiKey } from './policy.mjs';
 import { cloudflareIdentity, cloudflareApiUsable, intelReadPolicy } from './cloudflare-policy.mjs';
-import { httpStatePath } from './http-account.mjs';
 
 const ORIGIN = 'https://dash.cloudflare.com';
 export const keyPath = path.join(SECRETS, 'cloudflare_token');
@@ -24,9 +23,7 @@ export async function identityOnPage(page) {
   });
   let body;
   if (/^application\/json\b/i.test(response.contentType || '')) { try { body = JSON.parse(response.body.toString('utf8')); } catch { /* unconfirmed */ } }
-  const identity = cloudflareIdentity(response.status, body, account.email);
-  if (identity.authenticated) await saveStorageStateSafely(page.context(), httpStatePath('cloudflare'));
-  return identity;
+  return cloudflareIdentity(response.status, body, account.email);
 }
 
 
@@ -96,7 +93,7 @@ export async function createCloudflareToken(confirmation) {
       if (saved.conflict) throw new Error('The local token changed concurrently.');
       return { provider: 'cloudflare', created: true, saved: true, permission: 'Intel Read', apiUsabilityVerified: false };
     } finally { await page.unroute(endpoint, guard); }
-  });
+  }, { page: 'current' });
 }
 
 export async function verifyCloudflareApi(confirmation) {

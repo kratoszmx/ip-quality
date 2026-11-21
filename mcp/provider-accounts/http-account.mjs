@@ -1,21 +1,9 @@
-import { fileURLToPath } from 'node:url';
-import { request } from 'playwright-core';
-import { readPrivateSecretFile } from '@myutils/secret-file';
 import { requestBinaryWithBrowserContext } from '@myutils/browser-session';
 import { parseActiveHtmlDocument } from '@myutils/web-text/http-text';
 import { DomUtils } from 'htmlparser2';
 import { providerConfig, accountNetworkOptions } from './policy.mjs';
 import { cloudflareIdentity } from './cloudflare-policy.mjs';
-
-export function httpStatePath(provider) {
-  providerConfig(provider);
-  return fileURLToPath(new URL(`./.state/${provider}-http.json`, import.meta.url));
-}
-
-export function pendingLoginPath(provider) {
-  providerConfig(provider);
-  return fileURLToPath(new URL(`./.state/${provider}-pending-login.json`, import.meta.url));
-}
+import { withSharedCookies } from '../common/shared-cookies.mjs';
 
 export function httpAccountIdentity(provider, status, contentType, body, expectedEmail) {
   providerConfig(provider);
@@ -59,25 +47,23 @@ export function httpAccountIdentity(provider, status, contentType, body, expecte
     ...(suspended ? { apiUsable: false, restriction: /\bbot_login\b/.test(text) ? 'bot_login' : 'account_suspended' } : {}) };
 }
 
+// One bounded GET with the shared Chrome profile's cookies for this provider;
+// cookies the site refreshes go back to that profile. No page, redirect or retry.
 export async function readHttpAccount(provider, expectedEmail, dependencies = {}) {
   const config = providerConfig(provider);
-  const readSecret = dependencies.readSecret || readPrivateSecretFile;
-  const createContext = dependencies.createContext || (options => request.newContext(options));
-  let context;
+  const url = provider === 'cloudflare' ? `${config.origin}/api/v4/user` : `${config.origin}${config.dashboard}`;
+  const read = dependencies.readResponse || requestBinaryWithBrowserContext;
   try {
-    const stored = await readSecret(httpStatePath(provider), { minBytes: 2, maxBytes: 2_097_152 });
-    const storageState = JSON.parse(stored.secret);
-    if (!Array.isArray(storageState.cookies) || !Array.isArray(storageState.origins)) throw new Error('Invalid saved state.');
-    const proxy = accountNetworkOptions().proxyServer;
-    context = await createContext({ storageState, ...(proxy ? { proxy: { server: proxy } } : {}) });
-    const read = dependencies.readResponse || requestBinaryWithBrowserContext;
-    const response = await read({ request: context }, {
-      url: provider === 'cloudflare' ? `${config.origin}/api/v4/user` : `${config.origin}${config.dashboard}`,
-      headers: { 'Cache-Control': 'no-cache' }, timeoutMs: 15000, maxRedirects: 0,
+    const response = await withSharedCookies(url, accountNetworkOptions().proxyServer, context => read({ request: context }, {
+      url, headers: { 'Cache-Control': 'no-cache' }, timeoutMs: 15000, maxRedirects: 0,
       maxResponseBytes: 524288, readBodyForStatuses: [200],
-    });
+    }), dependencies);
     return httpAccountIdentity(provider, response.status, response.contentType, response.body.toString('utf8'), expectedEmail);
-  } catch {
-    return { provider, backend: 'http', authenticated: false, state: 'session_unavailable', nextStep: 'Restore the dedicated account login and refresh its private HTTP state.' };
-  } finally { await context?.dispose().catch(() => {}); }
+  } catch (error) {
+    // The shared Chrome could not give or keep the cookies: not a logout.
+    const browser = /^(?:SHARED_)?CHROME_/.test(String(error?.code ?? error?.message ?? ''));
+    return { provider, backend: 'http', authenticated: false, state: browser ? 'browser_unavailable' : 'session_unavailable',
+      nextStep: browser ? 'Run from the owner\'s GUI session so the shared Chrome can start; the login state is unknown, not expired.'
+        : 'The HTTP read failed before an account answer; the login state is unknown.' };
+  }
 }

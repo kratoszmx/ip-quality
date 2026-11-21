@@ -45,13 +45,13 @@ offline. Live MCP reads run when called; the reporter's
 | IPQS local readiness | `ipqs_status` | `{"probeBrowser":false}` | None; saved files are not proof of login or credits |
 | ipapi/Cloudflare local readiness | `provider_account_status` | `{"provider":"ipapi"}` | None; use `cloudflare` for that account |
 | AbuseIPDB local readiness | `abuseipdb_account_status` | `{}` | None; account/key presence only |
-| ipdata local readiness | `ipdata_account_status` | `{}` | None; account/key/session presence only |
+| ipdata local readiness | `ipdata_account_status` | `{}` | None; account/key presence only |
 | IPQS account/API acceptance | `ipqs_account_usage` | `{}` | One live account read; no lookup credit |
-| ipapi saved-session identity | `provider_account_read` | `{"provider":"ipapi","mode":"http"}` | Live HTTP, no Chrome; inspect `authenticated` and `state` |
-| Cloudflare identity and 2FA state | `cloudflare_account_check` | `{}` | Live HTTP, no Chrome or Intel lookup |
+| ipapi session identity | `provider_account_read` | `{"provider":"ipapi","mode":"http"}` | Live HTTP with the shared profile's cookies, no page; inspect `authenticated` and `state` |
+| Cloudflare identity and 2FA state | `cloudflare_account_check` | `{}` | Live HTTP, no page or Intel lookup |
 | AbuseIPDB identity and privacy settings | `abuseipdb_account_check` | `{}` | Live HTTP; exact saved account, email-verification and public-profile booleans |
 | AbuseIPDB free API proof | `abuseipdb_verify_free_api` | `{"confirmation":"VERIFY_FREE_API"}` | One official `1.1.1.1` CHECK; no browser or abuse report |
-| ipdata saved-session identity | `ipdata_account_check` | `{}` | One read-only Cognito GetUser HTTP POST; exact saved email and reporter-key comparison, no browser or IP lookup |
+| ipdata session identity | `ipdata_account_check` | `{}` | One read-only Cognito GetUser HTTP POST with the dashboard token from the shared profile; exact saved email and reporter-key comparison, no page or IP lookup |
 | ipdata free API proof | `ipdata_verify_free_api` | `{"confirmation":"VERIFY_FREE_API"}` | One official `1.1.1.1` query; returns only supplied risk flags, no browser |
 | DB-IP free geography probe | `public_provider_verify_free_api` | `{"provider":"dbip","surface":"free_api","confirmation":"VERIFY_FREE_API"}` | One live `1.1.1.1` lookup; context, not a risk verdict |
 
@@ -61,22 +61,28 @@ and quotas differ from `free_api`; see [providers/dbip.md](providers/dbip.md).
 
 ## Access methods
 
-HTTP with saved cookies reuses an earlier login; it is not a fresh password login.
-Playwright's `request.newContext` is an HTTP client and starts no browser.
-Browser operations reuse the same `@myutils/browser-session/chrome` native
-`hidden` engine as myutils' text browser: Chrome has a verified hidden CDP
-target with no OS window, rather than a minimized GUI. Ordinary `headless`
-is a different mode and received IPQS HTTP 403 again on November 5 despite
-valid saved authentication. The HTTP text reader imports shared bounded transport
-and static parsing directly; it does not launch or fall back to a browser.
+Since 2026-11-21 (見微: "把我們的所有登入態挪到文字瀏覽器的chrome專屬設定檔裡,以後都放在那邊")
+every login of both MCPs lives only in the shared Chrome profile, the text
+browser's saved profile, and is used only through the one dedicated Chrome on
+it (CDP port 19551). HTTP reads carry that profile's cookies for the request
+(`readSharedChromeCookies`) and write back the cookies the site changed
+(`writeSharedChromeCookies`); they reuse an earlier login and are not a fresh
+password login. Playwright's `request.newContext` is an HTTP client and opens no
+page. Browser operations are hidden background tabs of that Chrome
+(`withDedicatedChrome` with `sharedChromeRuntime`), with no OS window; the
+packages never launch Chrome on a profile of their own. Ordinary `headless` is
+a different mode and received IPQS HTTP 403 on November 5. The HTTP text reader
+imports shared bounded transport and static parsing directly; it does not fall
+back to a browser. A Chrome that cannot start outside the owner's GUI session is
+reported as browser unavailable, never as logged out.
 
 | Platform | Routine access | Fresh login or recovery | 2FA |
 | --- | --- | --- | --- |
-| IPQS | API, saved-session auth and default dashboard text over HTTP; explicit controls through native hidden Chrome | Windowless saved credentials + reviewed TOTP; verified November 5 | TOTP enabled |
-| ipapi.is | Replacement free account: keyed HTTP risk API and saved-state HTTP dashboard, verified October 28 | Saved HTTP identity first; expired state uses the normal `/app/` Sign In form in windowless myutils Chrome, with checkbox preparation. Form verified November 19; account recovery is evaluated from the server response | No enrollment entry in the reviewed dashboard |
-| Cloudflare | Saved-state HTTP identity read; Intel token over HTTP | Native hidden Chrome; October 26 password flow required human verification; Intel API still passed | TOTP enabled, recovery codes saved |
-| AbuseIPDB | Saved-state HTTP account read; APIv2 key over HTTP | Native hidden Chrome; login and subsequent HTTP identity verified October 26 | No enrollment entry offered |
-| ipdata | Saved-token HTTP account check; owned free developer key over HTTP | October 27 one authorized native-hidden signup/login; saved state also verified in native headless Chrome. No automatic password submission or token refresh | No enrollment control on the reviewed Profile page; GetUser returned no enrolled factor |
+| IPQS | API, auth and default dashboard text over HTTP with the shared profile's cookies; explicit controls in a hidden tab | Saved credentials + reviewed TOTP in a hidden tab of the shared Chrome | TOTP enabled |
+| ipapi.is | Replacement free account: keyed HTTP risk API and HTTP dashboard with the shared profile's cookies, verified October 28 | HTTP identity first; an expired session uses the normal `/app/` Sign In form in a hidden tab of the shared Chrome, with checkbox preparation. Form verified November 19; account recovery is evaluated from the server response | No enrollment entry in the reviewed dashboard |
+| Cloudflare | HTTP identity read with the shared profile's cookies; Intel token over HTTP | Hidden tab of the shared Chrome; October 26 password flow required human verification; Intel API still passed | TOTP enabled, recovery codes saved |
+| AbuseIPDB | HTTP account read with the shared profile's cookies; APIv2 key over HTTP | Hidden tab of the shared Chrome; login and subsequent HTTP identity verified October 26 | No enrollment entry offered |
+| ipdata | HTTP GetUser with the dashboard's Cognito token from the shared profile's localStorage; owned free developer key over HTTP | October 27 one authorized signup/login. No automatic password submission or token refresh; an expired token is renewed by opening the dashboard once in the shared Chrome | No enrollment control on the reviewed Profile page; GetUser returned no enrolled factor |
 | Ipregistry | API key in the reporter only | No account MCP | Not audited |
 | DB-IP | Account-free HTTP free API and visitor demo; reporter daily-limit fallback reads the exact public IP page in fresh hidden Chrome via myutils/web-text | None; no account state | Not applicable |
 | IPWHOIS | Account-free HTTP free API and website demo | None | Not applicable |
@@ -85,33 +91,27 @@ and static parsing directly; it does not launch or fall back to a browser.
 A failed HTTP identity read returns its failure; it never silently opens a
 browser, submits credentials, retries or treats a saved file as success.
 `PROVIDER_ACCOUNTS_PROXY=DIRECT` is refused with a fixed error (見微: the system
-proxy only). With no proxy configured, sessions, HTTP reads and browser reads all
-use web-text's `SYSTEM_PROXY_SERVER` (text browser 0.6.1), so one flow keeps one
-exit; otherwise the proxy selected by `accountNetworkOptions` is used, with the
-same precedence for login, HTTP and browser reads.
-Default browser tools also open no window. `visible=true` is an explicit
-human-recovery exception; no failure automatically switches to GUI. Pending
-terms/verification cookies are stored separately from verified HTTP state and
-do not establish authentication. Existing manual tools remain available.
+proxy only). The shared Chrome always uses web-text's `SYSTEM_PROXY_SERVER`; with
+no proxy configured, HTTP reads use it too, so one session keeps one exit.
+`PROVIDER_ACCOUNTS_PROXY` and `IPQS_PROXY_SERVER` select a different route for
+HTTP/API reads only.
+Default browser tools also open no window. `visible=true` opens a window of the
+same Chrome as an explicit human-recovery exception; no failure automatically
+switches to GUI. Cookies of an unfinished login (terms, verification) are the
+profile's own and do not establish authentication.
 
 ## Saved-login protection
 
 The November 10 Steam investigation established that launching a saved native
 Chrome profile outside macOS's GUI login session can discard its encrypted
-cookies when the login keychain is unavailable. This project's routine checks
-use HTTP state; native account sessions use a fresh temporary Chrome profile
-and restore only the owner's separately saved state. Isolated account reads
-also create a fresh browser context. DB-IP has no saved login. None of these
-paths reopens an old persistent cookie database, and failed reads never replace
-the saved state. This architecture does not need Steam's persistent-launch
-option on the temporary launcher.
-
-An explicitly authorized recovery of an old persistent profile is different:
-use myutils `openRealChrome` / `connectOrLaunchChromeOverCDP` with
-`requireUserKeychainSession: true` (now the shared default). A refusal outside
-the macOS GUI session means browser access is unavailable, not that the account
-logged out. Do not disable that guard to retry. Process details:
-[SERVICES.md](SERVICES.md#account-mcp-start-and-stop).
+cookies when the login keychain is unavailable. The shared Chrome therefore
+starts only in the GUI (Aqua) session: myutils refuses the launch elsewhere with
+`CHROME_KEYCHAIN_SESSION_UNAVAILABLE`, which these MCPs report as
+`browser_unavailable`/`unavailable`, not as a logout. Do not disable that guard
+and never launch Chrome (or a Playwright persistent context) on the shared
+profile directly. DB-IP has no saved login. The former per-MCP profiles and
+session files stay on disk untouched as rollback data; nothing reads them.
+Process details: [SERVICES.md](SERVICES.md#account-mcp-start-and-stop).
 
 October 26 local inventory confirms that this project has no DB-IP account
 credentials, owned API key or saved HTTP/browser login state. No DB-IP signup,
@@ -154,7 +154,7 @@ website through a browser is not account authentication.
 ## Latest live account evidence
 
 Dated observations, not availability guarantees; private receipts stay under
-`secrets/accounts/` and each MCP's `.state/`.
+`secrets/accounts/` and `reports/`.
 
 | Date | Evidence |
 | --- | --- |
@@ -173,31 +173,30 @@ Dated observations, not availability guarantees; private receipts stay under
 ## Routine verification and recovery
 
 - IPQS: `npm --prefix mcp/ipqs run probe:sanitized` performs one non-lookup
-  account read; `npm --prefix mcp/ipqs run auth:check` checks private saved
-  HTTP state without Chrome. Authorized recovery uses `ipqs_login_with_saved_credentials`
+  account read; `npm --prefix mcp/ipqs run auth:check` checks the shared
+  profile's session over HTTP without a page. Authorized recovery uses `ipqs_login_with_saved_credentials`
   (`confirm=USE_SAVED_IPQS_CREDENTIALS`), completing one reviewed TOTP challenge;
   `ipqs_complete_totp` (`confirm=USE_SAVED_IPQS_TOTP`) handles a pending one.
 - Provider accounts: `provider_account_login` with
   `confirmation=USE_SAVED_ACCOUNT_CREDENTIALS` checks existing HTTP identity
-  then uses the official windowless ipapi/Cloudflare/AbuseIPDB login form when
+  then uses the official ipapi/Cloudflare/AbuseIPDB login form in a hidden tab of the shared Chrome when
   a new session is needed. An authenticated account response is reused with its
   actual service status, including suspension where reported. Updated terms,
   human verification, rejected credentials and unconfirmed outcomes remain
-  distinct. `provider_account_close_browsers` closes this server's owned
-  browsers. `provider_account_open` opens one allowlisted page and
-  `provider_account_read` with `mode=browser` inspects it. A verified ipapi
-  dashboard visit refreshes its HTTP state; Cloudflare and AbuseIPDB need the
-  steps in [HTTP state recovery](mcp/provider-accounts/AGENTS.md#http-state-recovery).
-  Close the owned browser before changing its route or visibility.
+  distinct. `provider_account_close_browsers` releases this server's kept tab.
+  `provider_account_open` opens one allowlisted page in a kept hidden tab and
+  `provider_account_read` with `mode=browser` reads the dashboard in a tab of
+  its own. The login lands in the shared profile itself; see
+  [session recovery](mcp/provider-accounts/AGENTS.md#session-recovery).
 - Enrollment: `ipqs_enable_totp` (`confirm=ENABLE_IPQS_TOTP`) verifies usable
   credits, binds issuer/account from the textual QR URL, saves seed/recovery data
   and reserves the one submission; Cloudflare keeps its API-before-2FA rule.
-- ipdata: `ipdata_account_check` reads its saved access token with no refresh or
-  login retry. `login_required` can mean that short-lived token expired; it does
-  not establish an invalid API key. `ipdata_verify_free_api` independently
-  checks the reporter key. Authorized session recovery restores only ipdata's
-  dedicated state with shared myutils Chrome, verifies the exact email and
-  labelled key, then saves `.state/ipdata-http.json`. Do not repeat signup.
+- ipdata: `ipdata_account_check` reads the dashboard's access token from the
+  shared profile with no refresh or login retry. `login_required` can mean that
+  short-lived token expired; it does not establish an invalid API key.
+  `ipdata_verify_free_api` independently checks the reporter key. Opening
+  https://dashboard.ipdata.co once in the shared Chrome lets its own web app
+  refresh or sign in; then repeat the check. Do not repeat signup.
 
 A past audit's authorization for recovery or 2FA is not a standing instruction;
 documentation and test work never repeats enrollment.

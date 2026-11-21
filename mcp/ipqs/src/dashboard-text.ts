@@ -3,11 +3,11 @@ import { extractHtmlTitle, htmlToReadableText, parseActiveHtmlDocument } from "@
 import { redactText } from "@myutils/redaction";
 
 import { dashboardUrl, type DashboardPageName } from "./config.js";
-import { httpAuthStatus, readSavedDashboardHtml } from "./http-auth.js";
+import { httpAuthStatus, readDashboardHtml } from "./http-auth.js";
 import { boundedVisibleText } from "./redaction.js";
 
 export async function readDashboardText(pageName: DashboardPageName, limit: number) {
-  const response = await readSavedDashboardHtml(pageName);
+  const response = await readDashboardHtml(pageName);
   let html = "";
   if (response.status === 200) {
     if (!/^text\/html(?:;|$)/i.test(response.contentType || "")) {
@@ -36,6 +36,6 @@ export async function readDashboardText(pageName: DashboardPageName, limit: numb
     controls: [],
     buttons: [],
     controlsIncluded: false,
-    note: "Saved-session HTTP GET with static, value-free HTML extraction and no browser launch; use mode=controls for native rendered DOM/control inspection.",
+    note: "HTTP GET with the shared Chrome profile's IPQS cookies and static, value-free HTML extraction, without a page; use mode=controls for rendered DOM/control inspection.",
   };
 }

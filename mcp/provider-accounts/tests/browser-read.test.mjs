@@ -1,83 +1,69 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { registerHooks } from 'node:module';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
 import test from 'node:test';
 
-// Exercise the public read entry, real private-state reader and cleanup. Only
-// the state-file location and browser boundary are synthetic; no account data,
-// Chrome or external network is used.
-test('isolated account reads preserve explicit routing and saved state on failure', async () => {
-  const directory = await realpath(await mkdtemp(path.join(tmpdir(), 'provider-browser-read-')));
-  const stateFile = path.join(directory, 'saved.json');
-  const state = JSON.stringify({ cookies: [
-    { name: 'fixture', value: 'synthetic', domain: 'ipapi.is', path: '/' },
-    { name: 'foreign', value: 'synthetic', domain: 'foreign.invalid', path: '/' },
-  ], origins: [] });
-  await writeFile(stateFile, state, { mode: 0o600 });
-  const previous = Object.fromEntries(['PROVIDER_ACCOUNTS_PROXY', 'HTTPS_PROXY', 'https_proxy'].map(key => [key, process.env[key]]));
-  const calls = [];
-  let closed = 0, failStartup = false;
-  globalThis.__providerReadFixture = { stateFile, async open(runtime, policy) {
-    calls.push(runtime);
-    assert.deepEqual(policy.storageState.cookies.map(cookie => cookie.name), ['fixture']);
-    assert.equal(policy.allowNavigation('https://ipapi.is/app/home'), true);
-    assert.equal(policy.allowNavigation('https://foreign.invalid/app/home'), false);
-    if (failStartup) throw Error('synthetic startup failure');
-    return { page: { goto: async () => { throw Error('synthetic navigation failure'); } },
-      close: async () => { closed++; } };
-  } };
-  const accountsUrl = new URL('../accounts.mjs', import.meta.url).href;
+// Exercise the public page entries with the shared Chrome modules resolved to
+// synthetic ones. No profile, Chrome process, account data or network is used.
+test('account pages are tabs of the shared Chrome: own reads, kept flows and released attachments', async () => {
+  const views = [], visited = [];
+  let releases = 0, failNavigation = false;
+  const page = {
+    goto: async url => { visited.push(url); if (failNavigation) throw Error('synthetic navigation failure'); },
+    url: () => visited.at(-1) || 'about:blank',
+  };
+  globalThis.__providerChrome = {
+    async use(runtime, view, use) {
+      assert.equal(runtime.fixture, 'shared-runtime');
+      views.push(view);
+      if (view.page === 'current' && !globalThis.__providerChrome.kept) throw Object.assign(Error('no kept DOM tab'), { code: 'DOM_PAGE_NOT_KEPT' });
+      const result = await use({}, page);
+      if (view.page === 'retain' && view.window === 'hidden') globalThis.__providerChrome.kept = true;
+      return result;
+    },
+    async release() { releases++; globalThis.__providerChrome.kept = false; },
+  };
+  const modules = {
+    '@myutils/web-text/dedicated-chrome': `export const withDedicatedChrome = (...args) => globalThis.__providerChrome.use(...args);
+      export const releaseDedicatedChromePages = () => globalThis.__providerChrome.release();`,
+    '@myutils/web-text/shared-chrome': `export const sharedChromeRuntime = () => ({ fixture: 'shared-runtime' });
+      export const readSharedChromeCookies = async () => { throw Error('unexpected cookie read'); };
+      export const writeSharedChromeCookies = async () => { throw Error('unexpected cookie write'); };
+      export const readSharedChromeLocalStorage = async () => { throw Error('unexpected storage read'); };`,
+  };
   const hooks = registerHooks({ resolve(specifier, context, next) {
-    if (specifier === '@myutils/web-text/browser-sessions') {
-      return { url: 'data:text/javascript,export const openIsolatedAccountRead = (...args) => globalThis.__providerReadFixture.open(...args);', shortCircuit: true };
-    }
-    if (context.parentURL === accountsUrl && specifier === './http-account.mjs') {
-      const original = next(specifier, context);
-      const source = `export * from ${JSON.stringify(original.url)}; export const httpStatePath = () => globalThis.__providerReadFixture.stateFile;`;
-      return { url: `data:text/javascript,${encodeURIComponent(source)}`, shortCircuit: true };
-    }
-    return next(specifier, context);
+    return Object.hasOwn(modules, specifier)
+      ? { url: `data:text/javascript,${encodeURIComponent(modules[specifier])}`, shortCircuit: true }
+      : next(specifier, context);
   } });
   try {
-    const { readAccount } = await import('../accounts.mjs');
-    for (const [explicit, upper, lower, expected] of [
-      [undefined, undefined, undefined, 'http://127.0.0.1:7897'],
-      ['http://127.0.0.1:17898', 'http://127.0.0.1:17897', undefined, 'http://127.0.0.1:17898'],
-      [undefined, 'http://127.0.0.1:17897', undefined, 'http://127.0.0.1:17897'],
-      [undefined, undefined, 'http://127.0.0.1:17899', 'http://127.0.0.1:17899'],
-    ]) {
-      for (const [key, value] of Object.entries({ PROVIDER_ACCOUNTS_PROXY: explicit, HTTPS_PROXY: upper, https_proxy: lower })) {
-        if (value === undefined) delete process.env[key]; else process.env[key] = value;
-      }
-      const before = calls.length;
-      await assert.rejects(readAccount('ipapi', 'browser'), /synthetic navigation failure/);
-      assert.equal(calls.length, before + 1);
-      assert.equal(calls.at(-1).proxyServer, expected);
-      assert.equal(closed, calls.length);
-      assert.equal(await readFile(stateFile, 'utf8'), state);
-    }
-    const before = calls.length;
-    process.env.PROVIDER_ACCOUNTS_PROXY = 'not-a-proxy';
-    await assert.rejects(readAccount('ipapi', 'browser'));
-    assert.equal(calls.length, before);
-    process.env.PROVIDER_ACCOUNTS_PROXY = 'DIRECT';
-    await assert.rejects(readAccount('ipapi', 'browser'), /PROVIDER_ACCOUNTS_PROXY=DIRECT is refused/);
-    assert.equal(calls.length, before);
-    delete process.env.PROVIDER_ACCOUNTS_PROXY;
-    failStartup = true;
-    await assert.rejects(readAccount('ipapi', 'browser'), /synthetic startup failure/);
-    assert.equal(calls.length, before + 1);
-    assert.equal(await readFile(stateFile, 'utf8'), state);
-    await rm(stateFile);
-    await assert.rejects(readAccount('ipapi', 'browser'), /No saved account session/);
-    assert.equal(calls.length, before + 1);
+    const { readAccount, withSession, closeAccountBrowsers } = await import('../accounts.mjs');
+    // The navigation fails before the snapshot, so no private account file is read.
+    failNavigation = true;
+    await assert.rejects(readAccount('ipapi', 'browser'), /synthetic navigation failure/);
+    failNavigation = false;
+    assert.deepEqual(visited, ['https://ipapi.is/app/home']);
+    assert.deepEqual({ window: views.at(-1).window, page: views.at(-1).page }, { window: 'hidden', page: 'own' });
+
+    // A flow continues on the tab its opening call kept, and only for that provider.
+    await assert.rejects(withSession('cloudflare', async () => 'unexpected', { page: 'current' }), /Open the provider page first/);
+    assert.equal(views.length, 1);
+    await withSession('cloudflare', async tab => tab.goto('https://dash.cloudflare.com/'));
+    assert.equal(views.at(-1).page, 'retain');
+    assert.equal(await withSession('cloudflare', async () => 'continued', { page: 'current' }), 'continued');
+    await assert.rejects(withSession('ipapi', async () => 'unexpected', { page: 'current' }), /Open the provider page first/);
+    await withSession('abuseipdb', async () => 'window', { foreground: true });
+    assert.equal(views.at(-1).window, 'shown');
+    assert.equal(await withSession('cloudflare', async () => 'still kept', { page: 'current' }), 'still kept');
+
+    failNavigation = true;
+    await assert.rejects(withSession('ipapi', async tab => tab.goto('https://ipapi.is/app/')), /synthetic navigation failure/);
+    await assert.rejects(withSession('cloudflare', async () => 'unexpected', { page: 'current' }), /Open the provider page first/);
+    failNavigation = false;
+
+    assert.deepEqual(await closeAccountBrowsers(), { released: true });
+    assert.equal(releases, 1);
+    await assert.rejects(withSession('cloudflare', async () => 'unexpected', { page: 'current' }), /Open the provider page first/);
   } finally {
-    hooks.deregister(); delete globalThis.__providerReadFixture;
-    for (const [key, value] of Object.entries(previous)) {
-      if (value === undefined) delete process.env[key]; else process.env[key] = value;
-    }
-    await rm(directory, { recursive: true, force: true });
+    hooks.deregister(); delete globalThis.__providerChrome;
   }
 });

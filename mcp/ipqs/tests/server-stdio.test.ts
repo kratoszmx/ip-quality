@@ -20,7 +20,6 @@ test("compiled stdio MCP lists the complete tool surface and returns a secret-fr
     env: {
       PATH: process.env.PATH || "/usr/bin:/bin",
       HOME: path.join(temporary, "home"),
-      IPQS_BROWSER_PROFILE_DIR: path.join(temporary, "profile"),
       IPQS_API_KEY_FILE: path.join(temporary, "secrets", "api_key"),
     },
     stderr: "pipe",

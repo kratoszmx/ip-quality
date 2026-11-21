@@ -57,7 +57,7 @@ export async function openAbuseipdb(surface, visible = false) {
     const verification = await prepareBrowserVerification(page, 'https://www.abuseipdb.com');
     const current = new URL(page.url());
     if (current.origin !== 'https://www.abuseipdb.com') throw new Error('Unreviewed account redirect.');
-    return { provider: 'abuseipdb', backend: visible ? 'visible_chrome' : 'windowless_native_chrome', httpStatus: response?.status(),
+    return { provider: 'abuseipdb', backend: visible ? 'shared_chrome_window' : 'shared_chrome_hidden_tab', httpStatus: response?.status(),
       path: ['/register', '/login', '/account', '/email/verify'].includes(current.pathname) ? current.pathname : 'unrecognized', submitted: false, verification };
   }, { foreground: visible });
 }
