@@ -87,6 +87,16 @@ The full offline suite passed: 152 reporter cases / 4,410 assertions, 36 IPQS
 and 67 provider-account cases. Private live receipts and validation:
 `reports/verification-20261119/` and `reports/ipapi-login-policy-20261119/`.
 
+### IPQS auth check — 2026-11-21: Svelte dashboard login proof
+
+`npm --prefix mcp/ipqs run auth:check` reported `unknown` while the shared
+profile was logged in: the dashboard is now a Svelte shell with no logout link
+in its HTML. `httpAuthStatus` also accepts an executable inline script assigning
+`globalThis.staticUser` a numeric `id` and an `email` (login/TOTP forms still
+veto). The live check now returns `authenticated`; `npm run check` passed 38
+IPQS tests. The shell has almost no static text, so page content needs
+`mode=controls` or the usage API.
+
 ## Current behavior and ownership
 
 - The current reporter version is `script_version` in `bin/ip-quality`.
