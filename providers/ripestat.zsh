@@ -10,7 +10,10 @@ ripestat_parse_network_info(){
 emulate -LR zsh
 setopt KSH_ARRAYS
 typeset response="$1"
-typeset prefix origins
+typeset prefix origins address prefix_length
+# The reporter's address validators set family flags. Keep the flags local
+# so this provider cannot affect discovery or the next family to report.
+typeset IPV4work IPV6work
 
 ripestat_parsed=()
 print -rn -- "$response"|jq -e '
@@ -30,6 +33,14 @@ prefix=$(print -rn -- "$response"|jq -r '.data.prefix')
 origins=$(print -rn -- "$response"|jq -r '[.data.asns[] | "AS" + tostring] | join(", ")')
 [[ -n "$prefix" && ${#prefix} -le 128 && "$prefix" == */* && "$prefix" != *[[:cntrl:]]* ]]||return 1
 [[ ${#origins} -le 1024 && "$origins" != *[[:cntrl:]]* ]]||return 1
+address="${prefix%/*}"
+prefix_length="${prefix##*/}"
+[[ "$address" != *%* && ${#prefix_length} -le 3 ]]||return 1
+if [[ "$address" == *:* ]];then
+[[ "$prefix_length" == <0-128> ]]&&is_valid_ipv6 "$address"||return 1
+else
+[[ "$prefix_length" == <0-32> ]]&&is_valid_ipv4 "$address"||return 1
+fi
 
 ripestat_parsed[prefix]="$prefix"
 ripestat_parsed[origins]="$origins"

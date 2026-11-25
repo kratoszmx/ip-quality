@@ -8,6 +8,14 @@ listed in [AGENTS.md](AGENTS.md#start-here).
 
 ## Latest entry per lane
 
+### Report addresses — 2026-11-25
+
+Reporter `v2026-11-25-standalone.59`. Terminal, plain text, ANSI and JSON
+reports show the full tested IPv4 or IPv6 address and validated RIPEstat
+prefix. Existing commands can still include `-f`. The full offline suite
+passed with 147 reporter cases / 4,140 assertions, 38 IPQS and 68
+provider-account cases.
+
 ### user1 — 2026-11-16: direct shared record predicates
 
 Provider-account public API and ipdata parsers now import `isRecord` directly

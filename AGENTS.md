@@ -63,7 +63,7 @@ A live run flows through four layers:
    associative array per source; `providers/<source>.md` is its contract.
    Relay pauses, query-route fallback and credentials also live here.
 4. **Report** — `report/` renders cn/en terminal sections and tables and
-   assembles JSON. The tested IP and routed prefix are masked unless `-f`.
+   assembles JSON. Reports show the full tested IP and routed prefix.
 
 Directory map: `common/` (helpers used by two or more modules; see
 COMMON_FUNCTIONS.md), `ref/` (vendored DNSBL zones, ISO countries, non-public
@@ -99,7 +99,7 @@ or an explicit ID list; unselected providers make no request and report
 `disabled`. IPQS DNS repair, direct-IPv4 recovery and public-page fallbacks are
 automatic and disclosed in the plan
 ([PROVIDERS.md](PROVIDERS.md#automatic-query-route-fallback)). Report flags:
-`-j` JSON, `-E`/`-l en` English (default `cn`), `-f` unmasked IP, and `-o FILE`
+`-j` JSON, `-E`/`-l en` English (default `cn`), and `-o FILE`
 a new `.json`, `.ansi` or plain-text file (existing paths and links are rejected).
 
 ## Runtime requirements

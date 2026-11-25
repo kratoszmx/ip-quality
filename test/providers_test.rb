@@ -114,20 +114,38 @@ class ProvidersTest < ReporterTestCase
 
   def test_official_context_provider_parsers_reject_mismatches_and_keep_dimensions
     probe = <<~'ZSH'
-      setopt KSH_ARRAYS
       source "$1"
       ripestat_parse_network_info "$(<"$2")" || exit $?
       print -r -- "${ripestat_parsed[prefix]}|${ripestat_parsed[origins]}"
-      source "$3"
-      internetdb_parse_response "$(<"$4")" "$5" || exit $?
+      internetdb_parse_response "$(<"$3")" "$4" || exit $?
       print -r -- "${internetdb_parsed[ports]}|${internetdb_parsed[port_count]}|${internetdb_parsed[hostname_count]}|${internetdb_parsed[vulnerability_count]}"
     ZSH
-    arguments = [provider_library("ripestat"), fixture_path("ripestat/network-info.json"),
-                 provider_library("shodan_internetdb"), fixture_path("shodan/internetdb.json")]
+    arguments = [SCRIPT, fixture_path("ripestat/network-info.json"), fixture_path("shodan/internetdb.json")]
     assert_equal "198.51.100.0/24|AS64500\n22, 443|2|1|1\n", zsh!(probe, *arguments, "198.51.100.23")
     refute zsh(probe, *arguments, "198.51.100.24")[2].success?
-    refute zsh('setopt KSH_ARRAYS; source "$1"; ripestat_parse_network_info "$2"', provider_library("ripestat"),
+    refute zsh('source "$1"; ripestat_parse_network_info "$2"', SCRIPT,
       '{"status":"ok","data":{"prefix":"198.51.100.0/24","asns":["AS64500"]}}')[2].success?
+  end
+
+  def test_ripestat_validates_the_reported_prefix_without_changing_family_flags
+    probe = <<~'ZSH'
+      source "$1"
+      shift
+      IPV4work=41 IPV6work=61
+      for prefix in "$@";do
+        if ripestat_parse_network_info "{\"status\":\"ok\",\"data\":{\"prefix\":\"$prefix\",\"asns\":[64500]}}";then
+          print -r -- "${ripestat_parsed[prefix]}"
+        else
+          print -r -- "rejected:${#ripestat_parsed[@]}"
+        fi
+      done
+      print -r -- "$IPV4work:$IPV6work"
+    ZSH
+    valid = ["198.51.100.0/24", "2001:db8:1234::/48"]
+    malformed = ["example.test/24", "198.51.300.0/24", "198.51.100.0/33", "198.51.100.0/x",
+                 "2001:::1/48", "fe80::1%en0/64", "2001:db8::/129"]
+    assert_equal [*valid, *(["rejected:0"] * malformed.size), "41:61"],
+      zsh!(probe, SCRIPT, *valid, *malformed).lines(chomp: true)
   end
 
   def test_shodan_rejects_fractional_ports_and_control_text_without_retaining_observations

@@ -270,8 +270,8 @@ MaxMind basic data](providers/check_place.md), [ipapi.is](providers/ipapi.md),
   or schema change is `Unknown`/unavailable, not clean. A missing required command
   stops the run with an explicit dependency error before a report is produced.
 - The additional providers retain visible source status in their assigned sections.
-  Missing Cloudflare credentials are shown as unconfigured. Context IP fields use the
-  same masking as `Head.IP`. Cloudflare category names remain intact JSON strings,
+  Missing Cloudflare credentials are shown as unconfigured. Known context IP
+  fields show the full tested address, matching `Head.IP`. Cloudflare category names remain intact JSON strings,
   including names containing commas.
 - A field missing from an otherwise useful result appears as `-` in the terminal
   matrix and `null` in JSON. Unavailable sources retain their named status or a
@@ -289,8 +289,8 @@ MaxMind basic data](providers/check_place.md), [ipapi.is](providers/ipapi.md),
   elements must be bounded strings without control characters; malformed values
   are unavailable, not usable observations. Its documented no-information response means no public record,
   not a clean reputation judgment. Arbitrary upstream error text is not echoed.
-- Default terminal and JSON output mask both the tested address and any RIPEstat
-  prefix derived from it. `-f` is required to reveal either.
+- Terminal and saved reports show the full tested IPv4 or IPv6 address and any
+  validated RIPEstat prefix. Existing commands with `-f` produce the same output.
 
 ## Optional official credentials
 

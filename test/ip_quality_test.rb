@@ -12,6 +12,7 @@ class IpQualityTest < ReporterTestCase
     assert_empty stderr
     [
       "no network access has occurred", "scope: reputation", "reputation sources:",
+      "output: full IP addresses; local stdout/file only",
       "telemetry/report upload/downloaded CLI execution: disabled",
       "one direct IPv4 fallback, querying the same target IP",
       "same provider also sees the system-route egress",
@@ -79,7 +80,7 @@ class IpQualityTest < ReporterTestCase
     assert_empty stderr
   end
 
-  def test_address_prefix_decimal_and_dnsbl_helpers_validate_their_inputs
+  def test_address_decimal_and_dnsbl_helpers_validate_their_inputs
     probe = <<~'ZSH'
       source "$1"
       check(){ "$@" && print -rn -- 1 || print -rn -- 0; }
@@ -90,7 +91,6 @@ class IpQualityTest < ReporterTestCase
       check is_nonnegative_decimal 0.25; check is_nonnegative_decimal '0; print unsafe'
       check is_signed_decimal -33.86; check is_signed_decimal '1; print unsafe'
       print
-      print -r -- "$(mask_network_prefix 198.51.100.0/24)|$(mask_network_prefix 2001:db8:1234::/48)"
       printf '%s\n' Clean Clean Blacklisted Other Unknown | summarize_dnsbl_results
       (
         query_scope=reputation requested_ip=8.8.8.8
@@ -98,7 +98,7 @@ class IpQualityTest < ReporterTestCase
         prepare_explicit_target && print -r -- "$IPV4|$IPV4work|$IPV6check"
       )
     ZSH
-    assert_equal ["101010101010", "198.51.*.*/24|2001:db8:*::/48", "5 2 1 1 1", "8.8.8.8|1|0"],
+    assert_equal ["101010101010", "5 2 1 1 1", "8.8.8.8|1|0"],
       zsh!(probe, SCRIPT).lines(chomp: true)
   end
 
@@ -135,18 +135,19 @@ class IpQualityTest < ReporterTestCase
     assert_equal %w[yes yes no no no], stdout.split
   end
 
-  def test_ipv6_masking_shows_three_canonical_groups_without_ambiguous_colons
-    cases = {
-      "2001:db8::1" => "2001:db8:0:*:*:*:*:*",
-      "fe80::1%en0" => "fe80:0:0:*:*:*:*:*",
-      "2001:0DB8:85a3:0000:0000:8a2e:0370:7334" => "2001:db8:85a3:*:*:*:*:*",
-      "2606:4700:4700::1111" => "2606:4700:4700:*:*:*:*:*",
-      "2001:db8:zz::1" => ""
-    }
-    probe = 'source "$1"; shift; setopt KSH_ARRAYS; for ip in "$@";do hide_ipv6 "$ip"; print -r -- "$IPhide";done'
-    stdout, stderr, status = zsh(probe, SCRIPT, *cases.keys)
+  def test_default_terminal_and_ansi_file_show_the_full_ipv6_address
+    ip = "2606:4700:4700::1111"
+    path = File.join(reporter_workspace, "ipv6.ansi")
+    write_fake_command("curl", <<~'ZSH')
+      [[ "${@[-1]}" == "https://ip.sb" ]] || exit 7
+      print -r -- "2606:4700:4700::1111"
+    ZSH
+    stdout, stderr, status = run_script("--confirm-network-lookup", "--sources", "ripestat", "-6", "-o", path)
+
     assert status.success?, stderr
-    assert_equal cases.values, stdout.lines(chomp: true)
+    assert_includes stdout, ip
+    assert_equal stdout, File.read(path)
+    assert_equal 0o600, File.stat(path).mode & 0o777
   end
 
   def test_concurrency_is_hard_bounded
@@ -196,7 +197,7 @@ class IpQualityTest < ReporterTestCase
     report = JSON.parse(stdout)
     assert_equal report, JSON.parse(File.read(output_path))
     assert_equal 0o600, File.stat(output_path).mode & 0o777
-    refute_includes stdout, "12.217.32.68"
+    assert_equal "12.217.32.68", report.dig("Head", "IP")
     dnsbl = report.dig("Mail", "DNSBlacklist")
     zones = File.readlines(DNSBL, chomp: true)
     assert_equal zones.sort, dnsbl.fetch("Results").keys.sort
@@ -283,14 +284,14 @@ class IpQualityTest < ReporterTestCase
 
     assert status.success?, stderr
     report = JSON.parse(stdout)
-    refute_includes stdout, "12.217.32.68"
-    assert_equal "12.217.*.*", report.dig("Head", "IP")
+    assert_equal "12.217.32.68", report.dig("Head", "IP")
     assert_equal true, report.dig("Mail", "Port25")
     assert_equal true, report.dig("Mail", "Gmail")
     %w[163 Outlook QQ].each { |service| assert_equal false, report.dig("Mail", service), service }
     # Only the lowest-preference MX is probed; services without MX make no SMTP call.
     assert_equal %w[smtp.mailgun.org mx1.gmail.test. mx.163.test.], File.readlines(hosts, chomp: true)
     text = File.read(text_path)
+    assert_includes text, "12.217.32.68"
     assert_includes text, "本地25端口出站：可用"
     assert_match(/通信：.*\+Gmail.*-Outlook.*-163/, text)
   end

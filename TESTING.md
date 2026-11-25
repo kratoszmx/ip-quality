@@ -71,7 +71,7 @@ Each suite maps to one area of the code; check it before adding coverage.
 | `test/public_demo_test.rb` | DB-IP visitor/page fallback and IPWHOIS demos; explicit-target suppression, quota distinctions, target binding and preserved failure metadata |
 | `test/source_selection_test.rb` | Source presets/IDs, IPQS AliDNS policy, deselected versus failed sources |
 | `test/query_route_test.rb` | IPQS/Cloudflare direct-IPv4 fallback end to end, plus the whole retry/no-retry matrix of `query_route_request` in one probe |
-| `test/report_test.rb` | `report/`: matrices, terminal cell widths, fallback labels, JSON typing, masking and `-f` unmasking, report files |
+| `test/report_test.rb` | `report/`: matrices, terminal cell widths, fallback labels, JSON typing, full addresses and routed prefixes, report files |
 | `test/repository_test.rb` | Runtime-source bans, vendored references, file safety, AGPL provenance |
 | `test/route_runner_test.rb` | `bin/ip-quality-route` and `runner/`: menus, listings, option rules, leaf rendering, Mihomo lifecycle, snapshots, printable text |
 | `test/prefix_sample_test.rb` | Prefix input rules, batch files, failure/interrupt evidence |

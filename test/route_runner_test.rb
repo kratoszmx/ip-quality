@@ -70,10 +70,10 @@ class RouteRunnerTest < ReporterTestCase
       cases = [
         [%w[--direct --confirm-network-lookup -4 -j], "", "--confirm-network-lookup --scope reputation -4 -j",
          [], ["no Mihomo process is started", "live Clash state was unchanged"]],
-        [%w[--confirm-network-lookup -f], "1\n", "--confirm-network-lookup --scope reputation -4 -f",
+        [%w[--confirm-network-lookup -f], "1\n", "--confirm-network-lookup --scope reputation -4",
          ["Direct IP reputation report"], ["current system IPv4 route", "Direct reputation report finished"]],
         [%w[--confirm-network-lookup -4 -f], "2\n12.217.32.68\n",
-         "--confirm-network-lookup --scope reputation -4 -f 12.217.32.68",
+         "--confirm-network-lookup --scope reputation -4 12.217.32.68",
          ["Specific IP lookup", "Enter one public IP address"],
          ["Inspecting specific IP 12.217.32.68", "Specific-IP report finished"]]
       ]

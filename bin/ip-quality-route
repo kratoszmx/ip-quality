@@ -148,8 +148,8 @@ module IpQuality
       OptionParser.new do |options|
         options.banner = <<~BANNER
           Usage:
-            ip-quality-route --confirm-network-lookup [-4|-6] [-f] [-j]
-            ip-quality-route --direct --confirm-network-lookup [-4] [-f] [-j]
+            ip-quality-route --confirm-network-lookup [-4|-6] [-j]
+            ip-quality-route --direct --confirm-network-lookup [-4] [-j]
             ip-quality-route --list-subscriptions
             ip-quality-route --subscription NAME --list-leaves
             ip-quality-route --profile PATH --leaf NAME --config-test-only
@@ -190,7 +190,7 @@ module IpQuality
         end
         options.on("-4", "Test IPv4 only") { choose_family("-4") }
         options.on("-6", "Test IPv6 only") { choose_family("-6") }
-        options.on("-f", "Show the full tested IP in the local report") { @report_arguments << "-f" }
+        options.on("-f", "Compatibility option; reports always show the full IP") {}
         options.on("-j", "Write JSON report to stdout") { @report_arguments << "-j" }
         options.on("-E", "Use English report labels") { @report_arguments << "-E" }
         options.on("-l LANGUAGE", "Use reporter language: cn or en") do |value|
@@ -298,7 +298,7 @@ module IpQuality
 
       configure_direct_route!
       batch.run(reports_root: @reports_root, stdout: @stdout, stderr: @stderr) do |ip, output, errors, text_path|
-        command = reporter_command + ["-f", "-j", "-o", text_path, ip]
+        command = reporter_command + ["-j", "-o", text_path, ip]
         run_reporter(NetworkEnvironment.without_proxy_variables, command, out: output, err: errors)
       end
     rescue PrefixSample::Error => error

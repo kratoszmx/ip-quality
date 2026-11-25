@@ -207,7 +207,7 @@ class ReportTest < ReporterTestCase
       sbasic[title]='1. Basic Information (relay)' sbasic[title_lite]='1. Basic Information (fallback)'
       stype[title]='2. IP Type' sscore[title]='3. Risk Score' sfactor[title]='4. Risk Factors'
       scope_includes(){ [[ "$1" == reputation ]]; }
-      for operation in hide_ipv4 show_head show_tail show_unavailable_sources \
+      for operation in show_head show_tail show_unavailable_sources \
         db_maxmind_relay db_ipinfo db_ipregistry db_scamalytics db_ipapi db_ipwhois \
         db_dbip db_cloudflare db_abuseipdb db_ip2location db_ipdata db_ipqs db_ping0 \
         db_ripestat db_shodan_internetdb;do
@@ -262,13 +262,13 @@ class ReportTest < ReporterTestCase
     end
   end
 
-  def test_json_report_keeps_types_escapes_masking_and_unknown_states
+  def test_json_report_keeps_types_full_addresses_and_unknown_states
     probe = <<~'ZSH'
       source "$1"
       set_language
       special=$'Example "Org" \\ relay\nsecond line'
-      query_scope=reputation fullIP=0 basic_source=maxmind
-      IP=198.51.100.23 IPhide='198.51.*.*' shead[time_raw]=2026-08-23T00:00:00Z
+      query_scope=reputation basic_source=maxmind
+      IP=198.51.100.23 shead[time_raw]=2026-08-23T00:00:00Z
       maxmind=([status]=ok [org]="$special" [countrycode]=US [regcountrycode]=US)
       ipinfo=([status]=ok [susetype]="${stype[hosting]}")
       ipregistry=([status]=ok [susetype]="${stype[hosting]}" [scomtype]="${stype[hosting]}" [proxy]=false)
@@ -288,7 +288,6 @@ class ReportTest < ReporterTestCase
       smail=([t]=2 [c]=1 [m]=0 [b]=1 [u]=0 [dnsbl_results]=$'dnsbl.example\tClean\nlisted.example\tBlacklisted')
       emit(){ save_json || exit 1; print -r -- "$ipjson" | jq -c .; }
       emit
-      fullIP=1; emit; fullIP=0
       cloudflare[threats_json]=null
       emit
       basic_source=ipinfo
@@ -297,7 +296,7 @@ class ReportTest < ReporterTestCase
       query_scope=mail services=(Gmail 163) smailstatus=([Gmail]=true)
       for port25 in 1 2 0;do smail[local]=$port25; emit; done
     ZSH
-    report, unmasked, no_threats, ipinfo_basic, *mail = zsh!(probe, SCRIPT).lines.map { |line| JSON.parse(line) }
+    report, no_threats, ipinfo_basic, *mail = zsh!(probe, SCRIPT).lines.map { |line| JSON.parse(line) }
     special = "Example \"Org\" \\ relay\nsecond line"
     {
       %w[Info Organization] => special, %w[Ping0 Organization] => special,
@@ -318,7 +317,8 @@ class ReportTest < ReporterTestCase
       %w[Factor CountryCode IPWhois] => "US", %w[Factor Proxy IPWhois] => false,
       %w[Factor VPN IPWhois] => true, %w[Factor Abuser IPWhois] => nil, %w[FactorMeta IPWhois Source] => "public_demo",
       %w[Factor Proxy IPQS] => true, %w[Factor Proxy Ipregistry] => false, %w[Factor VPN IPinfo] => nil,
-      %w[Routing Prefix] => "198.51.*.*/24", %w[Exposure Ports] => [22, 443], %w[Exposure HostnameCount] => 1,
+      %w[Head IP] => "198.51.100.23", %w[Routing Prefix] => "198.51.100.0/24",
+      %w[Exposure Ports] => [22, 443], %w[Exposure HostnameCount] => 1,
       %w[Mail DNSBlacklist Results dnsbl.example] => "Clean",
       %w[Mail DNSBlacklist Results listed.example] => "Blacklisted", %w[Mail Port25] => nil
     }.each do |path, expected|
@@ -326,11 +326,7 @@ class ReportTest < ReporterTestCase
     end
     refute_nil report.dig("Type", "Usage", "IPQS")
     %w[DBIP IPAPI Cloudflare].each { |name| assert_equal report.dig("Head", "IP"), report.dig("ProviderContext", name, "IP") }
-    refute_includes JSON.generate(report), "198.51.100.23"
     refute report.key?("Media")
-    # -f reveals the tested address and routed prefix wherever the masked report showed them.
-    assert_equal ["198.51.100.23", "198.51.100.0/24"], [unmasked.dig("Head", "IP"), unmasked.dig("Routing", "Prefix")]
-    %w[DBIP IPAPI Cloudflare].each { |name| assert_equal "198.51.100.23", unmasked.dig("ProviderContext", name, "IP") }
     # Missing Cloudflare threats stay unknown instead of becoming an empty list.
     assert_nil no_threats.dig("ProviderContext", "Cloudflare", "ThreatCategories")
     assert_equal({"Source" => "IPinfo public demo widget", "ASN" => "64501", "City" => "Fallback City",
@@ -491,7 +487,7 @@ class ReportTest < ReporterTestCase
     context_probe = <<~'ZSH'
       setopt KSH_ARRAYS
       Font_B='' Font_Red='' Font_Green='' Font_Purple='' Font_Cyan='' Font_Suffix=''
-      YY=cn fullIP=1
+      YY=cn
       typeset -A ping0 ripestat internetdb sping0
       ping0[status]=verified ping0[match]=true ping0[location]='东京'
       ping0[asn]=AS64500 ping0[org]='Example Network'
@@ -512,7 +508,7 @@ class ReportTest < ReporterTestCase
     refute_includes stdout, "Cloudflare"
     refute_includes stdout, "IPWHOIS"
     assert_includes stdout, "Ping0：已核对"
-    assert_includes stdout, "RIPEstat：状态=announced"
+    assert_includes stdout, "RIPEstat：状态=announced | 前缀=198.51.100.0/24"
     assert_includes stdout, "Shodan：端口=22, 443"
     assert_includes stdout, "主机名数量=1"
     refute_includes stdout, "Ping0 官方公开观测"
@@ -524,7 +520,7 @@ class ReportTest < ReporterTestCase
     context_probe = <<~'ZSH'
       setopt KSH_ARRAYS
       Font_B='' Font_Red='' Font_Green='' Font_Purple='' Font_Cyan='' Font_Suffix=''
-      YY=cn fullIP=1
+      YY=cn
       typeset -A ipapi ipwhois cloudflare dbip ping0 ripestat internetdb sping0
       dbip[status]=ok dbip[countrycode]=US dbip[city]='Example City'
       ipapi[mode]=anonymous ipapi[anonymous_asn]='AS64500 Example ISP'

@@ -4,13 +4,8 @@
 
 show_head(){
 print -r -- "${(l:72::#:)}"
-if [ $fullIP -eq 1 ];then
 calc_padding "$(printf '%*s' "${shead[ltitle]}" '')$IP" 72
 print -r -- "$PADDING$Font_B${shead[title]}$Font_Cyan$IP$Font_Suffix"
-else
-calc_padding "$(printf '%*s' "${shead[ltitle]}" '')$IPhide" 72
-print -r -- "$PADDING$Font_B${shead[title]}$Font_Cyan$IPhide$Font_Suffix"
-fi
 calc_padding "${shead[git]}" 72
 print -r -- "$PADDING$Font_U${shead[git]}$Font_Suffix"
 print -r -- "${shead[ptime]}${shead[time]}  ${shead[ver]}"

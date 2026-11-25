@@ -533,10 +533,6 @@ fi
 
 show_network_context(){
 typeset -a observations
-typeset displayed_prefix="${ripestat[prefix]}"
-if [[ ${fullIP:-0} -ne 1 && -n "$displayed_prefix" ]];then
-displayed_prefix=$(mask_network_prefix "$displayed_prefix")||displayed_prefix=""
-fi
 
 if [[ "${ping0[status]}" == "verified" && "${ping0[match]}" == "true" ]];then
 if [[ "$YY" == "cn" ]];then
@@ -563,9 +559,9 @@ fi
 
 if [[ "${ripestat[status]}" != disabled ]] && report_any_known "${ripestat[status]}" "${ripestat[prefix]}" "${ripestat[origins]}";then
 if [[ "$YY" == "cn" ]];then
-observations+=("${Font_Cyan}RIPEstat：${Font_Suffix}状态=$(report_neutral_or_dash "${ripestat[status]}") | 前缀=$(report_neutral_or_dash "$displayed_prefix") | 起源=$(report_neutral_or_dash "${ripestat[origins]}")")
+observations+=("${Font_Cyan}RIPEstat：${Font_Suffix}状态=$(report_neutral_or_dash "${ripestat[status]}") | 前缀=$(report_neutral_or_dash "${ripestat[prefix]}") | 起源=$(report_neutral_or_dash "${ripestat[origins]}")")
 else
-observations+=("${Font_Cyan}RIPEstat: ${Font_Suffix}status=$(report_neutral_or_dash "${ripestat[status]}") | prefix=$(report_neutral_or_dash "$displayed_prefix") | origin=$(report_neutral_or_dash "${ripestat[origins]}")")
+observations+=("${Font_Cyan}RIPEstat: ${Font_Suffix}status=$(report_neutral_or_dash "${ripestat[status]}") | prefix=$(report_neutral_or_dash "${ripestat[prefix]}") | origin=$(report_neutral_or_dash "${ripestat[origins]}")")
 fi
 fi
 

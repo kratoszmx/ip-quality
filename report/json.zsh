@@ -50,14 +50,8 @@ done
 mail_services=$(jq -cn "${mail_service_args[@]}" '$ARGS.named')||return 1
 fi
 
-local displayed_ip="${IPhide:-}"
-[[ $fullIP -eq 1 ]]&&displayed_ip="${IP:-}"
-local displayed_routing_prefix="${ripestat[prefix]:-}"
-if [[ $fullIP -ne 1 && -n "$displayed_routing_prefix" ]];then
-displayed_routing_prefix=$(mask_network_prefix "$displayed_routing_prefix")||displayed_routing_prefix=""
-fi
 ipjson=$(jq -n \
---arg head_ip "$displayed_ip" \
+--arg head_ip "$IP" \
 --arg head_repository "${shead[git]:-}" \
 --arg head_time "${shead[time_raw]:-}" \
 --arg head_version "${script_version:-}" \
@@ -114,7 +108,7 @@ ipjson=$(jq -n \
 --arg relay_status_ipdata "${ipdata[relay_status]:-}" \
 --arg status_ipapi "${ipapi[status]:-unknown}" \
 --arg ipapi_risk_status "${ipapi[risk_status]:-${ipapi[status]:-unknown}}" --arg ipapi_credential_mode "${ipapi[credential_mode]:-}" \
---arg ipapi_mode "${ipapi[mode]:-}" --arg ipapi_ip "${ipapi[ip]:+$displayed_ip}" \
+--arg ipapi_mode "${ipapi[mode]:-}" --arg ipapi_ip "${ipapi[ip]:+$IP}" \
 --arg ipapi_primary_status "${ipapi[primary_status]:-}" --arg ipapi_error_code "${ipapi[error_code]:-}" \
 --arg ipapi_fallback_status "${ipapi[fallback_status]:-}" \
 --arg ipapi_countrycode "${ipapi[countrycode]:-}" \
@@ -122,7 +116,7 @@ ipjson=$(jq -n \
 --arg ipapi_country "${ipapi[anonymous_country]:-}" --arg ipapi_city "${ipapi[anonymous_city]:-}" \
 --arg ipapi_region "${ipapi[anonymous_region]:-}" --arg ipapi_timezone "${ipapi[anonymous_timezone]:-}" \
 --arg status_ipwhois "${ipwhois[status]:-unknown}" \
---arg status_dbip "${dbip[status]:-unknown}" --arg dbip_ip "${dbip[ip]:+$displayed_ip}" \
+--arg status_dbip "${dbip[status]:-unknown}" --arg dbip_ip "${dbip[ip]:+$IP}" \
 --arg dbip_source "${dbip[source]:-public_demo}" --arg dbip_demo_status "${dbip[demo_status]:-}" --arg dbip_page_status "${dbip[page_status]:-}" \
 --arg dbip_risk_status "${dbip[risk_status]:-${dbip[status]:-unknown}}" --arg band_dbip "${dbip[threat_level]:-}" \
 --arg dbip_countrycode "${dbip[countrycode]:-}" --arg dbip_country "${dbip[country]:-}" \
@@ -135,7 +129,7 @@ ipjson=$(jq -n \
 --arg ipwhois_tor "${ipwhois[tor]:-}" --arg ipwhois_server "${ipwhois[server]:-}" \
 --arg status_cloudflare "${cloudflare[status]:-not_configured}" \
 --arg route_cloudflare "${cloudflare[query_route]:-}" --arg primary_status_cloudflare "${cloudflare[primary_status]:-}" \
---arg cloudflare_ip "${cloudflare[ip]:+$displayed_ip}" --arg cloudflare_countrycode "${cloudflare[countrycode]:-}" \
+--arg cloudflare_ip "${cloudflare[ip]:+$IP}" --arg cloudflare_countrycode "${cloudflare[countrycode]:-}" \
 --arg cloudflare_network "${cloudflare[network]:-}" --arg cloudflare_org "${cloudflare[org]:-}" \
 --arg cloudflare_infrastructure "${cloudflare[infrastructure]:-}" \
 --argjson cloudflare_threats "${cloudflare[threats_json]:-null}" \
@@ -176,7 +170,7 @@ ipjson=$(jq -n \
 --arg ping_location "${ping0[location]:-}" --arg ping_asn "${ping0[asn]:-}" \
 --arg ping_org "${ping0[org]:-}" \
 --arg ping_risk "${ping0[riskstatus]:-official_public_endpoint_does_not_expose_risk}" \
---arg routing_status "${ripestat[status]:-unknown}" --arg routing_prefix "$displayed_routing_prefix" \
+--arg routing_status "${ripestat[status]:-unknown}" --arg routing_prefix "${ripestat[prefix]:-}" \
 --arg routing_origins "${ripestat[origins]:-}" \
 --arg exposure_status "${internetdb[status]:-unknown}" --arg exposure_ports "${internetdb[ports]:-}" \
 --arg exposure_port_count "${internetdb[port_count]:-}" \

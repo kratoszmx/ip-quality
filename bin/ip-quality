@@ -9,7 +9,7 @@ umask 077
 # Display widths and byte validation need UTF-8 whatever the caller locale is.
 export LC_ALL=en_US.UTF-8
 
-script_version="v2026-11-19-standalone.58"
+script_version="v2026-11-25-standalone.59"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
@@ -56,8 +56,6 @@ Back_Yellow=$'\033[43m'
 Back_Purple=$'\033[45m'
 Font_Suffix=$'\033[0m'
 typeset IP=""
-typeset IPhide
-typeset fullIP=0
 typeset YY="cn"
 typeset -A maxmind
 typeset -A ipinfo
@@ -114,7 +112,7 @@ typeset -a shelp_lines=(
 "            --plan                          Print disclosure plan only                仅显示披露计划"
 "            -4                             Test IPv4                                  测试IPv4"
 "            -6                             Test IPv6                                  测试IPv6"
-"            -f                             Show full IP on reports                    报告展示完整IP地址"
+"Reports show full IP addresses by default. 报告默认展示完整 IP 地址。"
 "            -h                             Help information                           帮助信息"
 "            -i eth0                        Specify network interface                  指定检测网卡"
 "               ipaddress                   Inspect a public target IP                 检测指定公网IP"
@@ -205,7 +203,7 @@ fi
 case "$option" in
 4)if (( IPV4check ));then IPV6check=0;else set_cli_error 4;fi ;;
 6)if (( IPV6check ));then IPV4check=0;else set_cli_error 6;fi ;;
-f)fullIP=1 ;;
+f);; # Compatibility with commands that requested the full IP.
 h)help_requested=1 ;;
 j)mode_json=1 ;;
 E)YY="en" ;;
@@ -273,7 +271,7 @@ print_query_plan(){
 print -r -- "IP Quality query plan (no network access has occurred)"
 print -r -- "  scope: $query_scope"
 print -r -- "  DNSBL concurrency cap: $dnsbl_concurrency"
-print -r -- "  output: masked IP by default; local stdout/file only"
+print -r -- "  output: full IP addresses; local stdout/file only"
 print -r -- "  telemetry/report upload/downloaded CLI execution: disabled"
 [[ -n "$requested_ip" ]]&&print -r -- "  target: explicit IP, sent to providers as a lookup parameter"
 if scope_includes reputation;then
@@ -379,32 +377,6 @@ break
 fi
 done
 }
-hide_ipv4(){
-if [[ -n $1 ]];then
-local -a ip_parts=("${(@s:.:)1}")
-IPhide="${ip_parts[0]}.${ip_parts[1]}.*.*"
-else
-IPhide=""
-fi
-}
-mask_network_prefix(){
-typeset prefix="$1"
-typeset address="${prefix%/*}"
-typeset prefix_length="${prefix##*/}"
-[[ -n "$address" && "$prefix" != "$address" && "$prefix_length" == <-> ]]||return 1
-if [[ "$address" == *:* ]];then
-typeset -a parts=("${(@s/:/)address}")
-[[ -n "${parts[0]}" && -n "${parts[1]}" ]]||{
-print -rn -- "*::/$prefix_length"
-return 0
-}
-print -rn -- "${parts[0]}:${parts[1]}:*::/$prefix_length"
-else
-typeset -a parts=("${(@s:.:)address}")
-(( ${#parts[@]} == 4 ))||return 1
-print -rn -- "${parts[0]}.${parts[1]}.*.*/$prefix_length"
-fi
-}
 is_valid_ipv6(){
 local ip=$1
 if [[ $ip =~ ^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$ || $ip =~ ^([0-9a-fA-F]{1,4}:){1,7}:$ || $ip =~ ^:([0-9a-fA-F]{1,4}:){1,7}$ || $ip =~ ^([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}$ || $ip =~ ^([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}$ || $ip =~ ^([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}$ || $ip =~ ^([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}$ || $ip =~ ^([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}$ || $ip =~ ^[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})$ || $ip =~ ^:((:[0-9a-fA-F]{1,4}){1,7}|:)$ || $ip =~ ^fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}$ || $ip =~ ^::(ffff(:0{1,4}){0,1}:){0,1}(([0-9]{1,3}\.){3}[0-9]{1,3})$ || $ip =~ ^([0-9a-fA-F]{1,4}:){1,4}:(([0-9]{1,3}\.){3}[0-9]{1,3})$ ]];then
@@ -484,31 +456,6 @@ ERRORcode=2
 return 1
 }
 
-hide_ipv6(){
-emulate -LR zsh
-setopt EXTENDED_GLOB
-IPhide=""
-[[ -n $1 ]]||return 0
-# Expand "::" into zero groups, then show the first three groups in canonical
-# lower-case hex (leading zeros dropped, a zero group shown as 0). A malformed
-# group leaves IPhide empty rather than revealing anything.
-local address=${1%%\%*} group
-local -a groups head_groups tail_groups shown
-if [[ $address == *::* ]];then
-head_groups=(${(s.:.)address%%::*})
-tail_groups=(${(s.:.)address#*::})
-groups=("${head_groups[@]}")
-repeat $(( 8 - ${#head_groups} - ${#tail_groups} )) groups+=(0)
-groups+=("${tail_groups[@]}")
-else
-groups=(${(s.:.)address})
-fi
-for group in "${groups[@]:0:3}";do
-[[ $group == [[:xdigit:]](#c1,4) ]]||return 0
-shown+=("$(( [##16] 16#$group ))")
-done
-IPhide="${(L)${(j.:.)shown}}:*:*:*:*:*"
-}
 # VALUE (validated signed decimal degrees) as D°M′S″ plus POSITIVE/NEGATIVE
 # hemisphere. Integer arithmetic on 12 fraction digits rounds total seconds, so
 # 59.6″ carries into the next minute instead of printing 60″.
@@ -566,8 +513,6 @@ ipjson='{
       "Exposure": {},
       "Mail": {}
     }'
-[[ $2 -eq 4 ]]&&hide_ipv4 $IP
-[[ $2 -eq 6 ]]&&hide_ipv6 $IP
 if scope_includes reputation;then
 basic_source=ipinfo
 local source_id source_array

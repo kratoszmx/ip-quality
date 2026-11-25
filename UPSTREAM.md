@@ -119,8 +119,8 @@ runtime dependency:
 - Replaced score bars with aligned per-provider type/score/factor matrices,
   provider-specific scales, ASCII missing-field markers, colored risk factors,
   and compact unavailable-source summaries. IPQS keeps a source/status row;
-  Ping0, RIPEstat, and Shodan share one context section. Reports mask IP/prefix
-  by default; JSON preserves types and report files are created exclusively.
+  Ping0, RIPEstat, and Shodan share one context section. Reports show the full
+  IP and routed prefix. JSON preserves types and report files are created exclusively.
   Every attempted source remains in its applicable type/score/factor matrix
   after failure, with query-status rows and unknown values. HTTP transport
   failures preserve timeout/TLS/certificate distinctions; JSON includes every
