@@ -9,7 +9,7 @@ weekly offline test, outside this repository.
 
 | Mode | Processes and lifetime |
 | --- | --- |
-| Reporter; direct, specific-IP or prefix-sample runner route | Runs `bin/ip-quality` (one at a time for prefix samples); starts no Mihomo |
+| Reporter; direct or specific-IP runner route | Runs `bin/ip-quality` once; starts no Mihomo |
 | DB-IP daily-limit recovery in an IPv4 egress report | One Node process imports myutils/web-text and reads the exact public IP page in fresh hidden Chrome; 30-second read budget, operation lease 19606 and dynamic loopback CDP; closes on completion/cancellation |
 | Exact-leaf plan or name listing | Reads local inputs only |
 | `--config-test-only` | Runs Mihomo with `-t` on a rendered private profile, then exits; no listener or lookup |

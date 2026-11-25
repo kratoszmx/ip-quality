@@ -28,8 +28,8 @@ the caller's egress, not an arbitrary address. They remain visible as
 
 The route runner maintains two honest measurement boundaries:
 
-- Direct mode removes inherited proxy variables, starts no
-  Mihomo process, defaults to IPv4, and runs `reputation` over the system route. A
+- Direct and specific-IP modes remove inherited proxy variables, start no
+  Mihomo process, and run `reputation` over the system route. Direct mode defaults to IPv4. A
   system-level VPN or TUN can still affect that route.
 - Exact-leaf mode runs only `reputation`. Egress discovery and initial HTTP(S)
   requests use a verified loopback Mihomo for one selected cached-subscription
@@ -60,31 +60,12 @@ when a single JSON document is needed.
 scope before any network access. Mail and DNSBL remain opt-in because their
 many DNS/TCP probes add latency and cannot describe an HTTP-proxied leaf.
 
-## Prefix sampling
+## Fixed-IP lookups
 
-Route menu 3 accepts incomplete IPv4 prefixes. It treats three octets as an
-assumed /24, accepts explicit `.0/24` notation, deduplicates up to 20 networks
-and queries `.23`, `.127`, `.231` from each. All input must
-pass the public-IPv4 boundary in `ref/non_public_ipv4.txt` (IANA special-purpose
-ranges, shared with the reporter) before any lookup starts. A blank line
-finishes a multiline paste. Queries run sequentially over the current system
-IPv4 route with proxy variables removed, with the normal sources and fallback
-policy. The lookup transport is not the sampled IP's transport.
-
-Each sample can consume the configured providers' API quota; there is no batch
-retry loop for timeouts, blocks or rate limits. Per-source failures stay visible
-and never become clean scores. The comparison retains each source's scale and
-uses Cloudflare or IPWHOIS country/ASN context, without a combined score or a
-claim about every IP in a prefix. DB-IP/Ping0 are inapplicable as above.
-
-Batch artifacts contain **full sample IPs** under a unique private directory
-in `reports/`: `summary.md`, `summary.json`, and each target's JSON, text report
-and stderr log. Summary JSON has `schema_version: 1`, input prefixes/suffixes,
-query route, per-sample scores, provider statuses and links to raw evidence.
-The summary updates after every sample; Ctrl-C/TERM stops the owned reporter
-process group, preserves completed results and marks pending samples. A failed
-reporter or malformed/mismatched report is retained as such, while later samples
-still run. An empty field is never substituted with another provider's score.
+In route menu **2**, enter one complete public IP, such as `12.217.32.68`.
+The runner performs one lookup with the usual provider selection, fallback
+policy, terminal output and optional report file. Each result describes that
+address. For observations at several addresses, run the menu once for each IP.
 
 ## Source selection
 

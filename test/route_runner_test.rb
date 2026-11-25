@@ -24,11 +24,11 @@ class RouteRunnerTest < ReporterTestCase
   def test_default_flow_selects_subscription_then_leaf_without_repeating_the_leaf_count
     Dir.mktmpdir("ip-quality-subscription-select-") do |directory|
       write_clash_verge_fixture(directory)
-      code, stdout, stderr = run_route([], stdin: "4\n2\n", app_root: directory)
+      code, stdout, stderr = run_route([], stdin: "3\n2\n", app_root: directory)
 
       assert_equal 0, code
       ["Available test routes:", "Direct IP reputation report", "Specific IP lookup",
-       "Cached subscription: Fixture Remote", "Available inline leaves", "exact leaf: TargetLeaf",
+       "3  Cached subscription: Fixture Remote", "Available inline leaves", "exact leaf: TargetLeaf",
        "one direct IPv4 fallback queries the same leaf IP", "both route outcomes remain visible",
        "same provider also sees the system-route egress"].each { |text| assert_includes stdout, text }
       refute_match(/\d+ inline leaves/, stdout)
@@ -72,8 +72,8 @@ class RouteRunnerTest < ReporterTestCase
          [], ["no Mihomo process is started", "live Clash state was unchanged"]],
         [%w[--confirm-network-lookup -f], "1\n", "--confirm-network-lookup --scope reputation -4",
          ["Direct IP reputation report"], ["current system IPv4 route", "Direct reputation report finished"]],
-        [%w[--confirm-network-lookup -4 -f], "2\n12.217.32.68\n",
-         "--confirm-network-lookup --scope reputation -4 12.217.32.68",
+        [%w[--confirm-network-lookup -4 -j -o report.json], "2\n12.217.32.68\n",
+         "--confirm-network-lookup --scope reputation -4 -j -o report.json 12.217.32.68",
          ["Specific IP lookup", "Enter one public IP address"],
          ["Inspecting specific IP 12.217.32.68", "Specific-IP report finished"]]
       ]
@@ -94,12 +94,47 @@ class RouteRunnerTest < ReporterTestCase
     end
   end
 
+  def test_fixed_ip_builds_one_standard_report_without_a_batch
+    workspace = reporter_workspace
+    target = "12.217.32.68"
+    report_path = File.join(workspace, "report.json")
+    requests_path = File.join(workspace, "requests")
+    write_fake_command("curl", <<~'ZSH')
+      print -r -- "$*" >> "$IPQUALITY_TEST_REQUESTS"
+      [[ "${@[-1]}" == "https://stat.ripe.net/data/network-info/data.json" ]] || exit 97
+      print -r -- '{"status":"ok","data":{"prefix":"12.217.32.0/24","asns":[64500]}}'
+    ZSH
+    environment = {
+      "PATH" => "#{workspace}/commands:#{ENV.fetch('PATH')}",
+      "XDG_CONFIG_HOME" => File.join(workspace, "config"),
+      "IPQUALITY_TEST_REQUESTS" => requests_path
+    }
+    code, stdout, stderr = with_environment(environment) do
+      run_route(%W[--confirm-network-lookup --sources ripestat -4 -o #{report_path}], stdin: "2\n#{target}\n",
+        app_root: workspace, reporter_path: File.join(workspace, "bin", "ip-quality"))
+    end
+
+    assert_equal 0, code, stderr
+    assert_includes stdout, "Enter one public IP address"
+    refute_includes stdout, "IPv4 /24 samples"
+    assert_equal 1, File.readlines(requests_path).size
+    assert_includes File.read(requests_path), "resource=#{target}"
+    report = JSON.parse(File.read(report_path))
+    assert_equal [target, "explicit_target", "12.217.32.0/24"],
+      [report.dig("Head", "IP"), report.dig("Query", "TargetMode"), report.dig("Routing", "Prefix")]
+    assert_equal 0o600, File.stat(report_path).mode & 0o777
+    refute File.exist?(File.join(workspace, "reports"))
+  end
+
   def test_usage_errors_stop_before_any_lookup
     Dir.mktmpdir("ip-quality-specific-ip-reject-") do |directory|
       write_clash_verge_fixture(directory)
-      code, _stdout, stderr = run_route([], stdin: "2\nnot-an-ip\n", app_root: directory)
-      assert_equal IpQuality::RouteCommand::EX_USAGE, code
-      assert_includes stderr, "specific IP must be one valid public address"
+      ["not-an-ip", "99.37.*.*", "12.217.32", "12.217.32.0/24", "12.217.32.68 1.1.1.1",
+       "bad\xff".dup.force_encoding("UTF-8")].each do |input|
+        code, _stdout, stderr = run_route([], stdin: "2\n#{input}\n", app_root: directory)
+        assert_equal IpQuality::RouteCommand::EX_USAGE, code
+        assert_includes stderr, "specific IP must be one valid public address"
+      end
       code, _stdout, stderr = run_route(["-4"], stdin: "2\n2001:db8::1\n", app_root: directory)
       assert_equal IpQuality::RouteCommand::EX_USAGE, code
       assert_includes stderr, "conflicts with the selected address family"

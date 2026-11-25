@@ -35,9 +35,8 @@ retired `-p` compatibility flag was removed. The upstream `bc` coordinate
 formatter was replaced by exact integer arithmetic, so `bc` is no longer a
 runtime dependency:
 
-- Added interactive sampling of incomplete IPv4 prefixes: three explicit
-  public targets per assumed /24, separate provider scores, private per-sample
-  files and partial-result preservation. Visitor-only DB-IP and Ping0 requests
+- Added an interactive single-address lookup using the standard IP-quality
+  report. Visitor-only DB-IP and Ping0 requests
   are skipped for explicit targets instead of querying the caller's egress.
 - Added the user-authorized selected-route to direct-IPv4 fallback for official
   IPQS and Cloudflare target lookups after pre-HTTP connectivity errors. The

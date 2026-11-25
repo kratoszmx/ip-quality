@@ -9,7 +9,7 @@ umask 077
 # Display widths and byte validation need UTF-8 whatever the caller locale is.
 export LC_ALL=en_US.UTF-8
 
-script_version="v2026-11-25-standalone.59"
+script_version="v2026-11-25-standalone.60"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
@@ -339,8 +339,8 @@ IPV4work=0
 return 1
 fi
 }
-# Non-public ranges come from ref/non_public_ipv4.txt, shared with prefix
-# sampling. An unreadable list fails closed: every address counts as non-public.
+# Non-public ranges come from ref/non_public_ipv4.txt. An unreadable list
+# fails closed: every address counts as non-public.
 typeset -ga non_public_ipv4_ranges=()
 is_private_ipv4(){
 local ip_address=$1

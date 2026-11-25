@@ -63,7 +63,7 @@ Each suite maps to one area of the code; check it before adding coverage.
 | File | Covers |
 | --- | --- |
 | `test/common_test.rb` | `common/`: secret curl stdin, HTTP envelopes, batched jq fields, jq predicates, proxy overrides, ANSI cleanup, DMS and map links |
-| `test/ip_quality_test.rb` | `bin/ip-quality`: plans, option parsing, live gates, failed egress discovery, `--help`/`--version`, validators, per-scope required commands, fixture DNSBL and mail runs |
+| `test/ip_quality_test.rb` | `bin/ip-quality`: plans, option parsing, live gates, failed egress discovery, `--help`/`--version`, validators and IPv4 range boundaries, per-scope required commands, fixture DNSBL and mail runs |
 | `test/providers_test.rb` | Provider parsers and adapters: literal JSON, ipapi and Ping0 outcomes, Cloudflare/Ipregistry/IPQS/Shodan/RIPEstat, credential loading and rejection, IPQS preflight |
 | `test/check_place_test.rb` | Check.Place relay pauses and MaxMind validation with IPinfo fallback |
 | `test/scamalytics_test.rb` | Scamalytics page parsing and its single same-route fallback |
@@ -73,8 +73,7 @@ Each suite maps to one area of the code; check it before adding coverage.
 | `test/query_route_test.rb` | IPQS/Cloudflare direct-IPv4 fallback end to end, plus the whole retry/no-retry matrix of `query_route_request` in one probe |
 | `test/report_test.rb` | `report/`: matrices, terminal cell widths, fallback labels, JSON typing, full addresses and routed prefixes, report files |
 | `test/repository_test.rb` | Runtime-source bans, vendored references, file safety, AGPL provenance |
-| `test/route_runner_test.rb` | `bin/ip-quality-route` and `runner/`: menus, listings, option rules, leaf rendering, Mihomo lifecycle, snapshots, printable text |
-| `test/prefix_sample_test.rb` | Prefix input rules, batch files, failure/interrupt evidence |
+| `test/route_runner_test.rb` | `bin/ip-quality-route` and `runner/`: menus, listings, option rules, one-target reporting, leaf rendering, Mihomo lifecycle, snapshots, printable text |
 | `mcp/ipqs/tests/` | IPQS API, HTTP auth (concealed logout links, lookalike attributes), dashboard text over an intercepted HTTP client with a synthetic shared profile and cookie write-back, TOTP independent of a completed CAPTCHA field, shared-Chrome tabs and release, secrets, default-windowless stdio contract |
 | `mcp/provider-accounts/tests/` | HTTP identity versus account status, with the shared profile's cookies and `browser_unavailable` when its Chrome cannot start; login/terms/challenge outcomes, including a resolved initial 403 reaching form validation; ipapi session reuse and normal expired-session login; signup/TOTP; public-provider probes; ipdata identity from the dashboard's shared-profile token, expired tokens and risk projection; shared-Chrome tabs (own reads, kept flows per provider, release) in `browser-read.test.mjs`; the cookie diff and write-back of `mcp/common/shared-cookies.mjs` (`shared-cookies.test.mjs`); shared checkbox verification (`verification.test.mjs`); DB-IP page reads from a sanitized fixture and injected reader (`dbip-page.test.mjs`); stdio contract |
 
@@ -93,8 +92,7 @@ All reporter suites inherit `test/support/reporter_test_case.rb`:
 | `fixture_path`, `fixture_json`, `provider_library`, `write_ipqs_key`, `with_environment`, `NO_PROXY_ENV` | Fixture paths, provider sources, a workspace IPQS key, temporary `ENV` overrides and a proxy-free environment |
 
 Suites that neither change `ENV` nor send signals call `parallelize_me!` and run
-concurrently after the serial ones (`route_runner_test.rb` and
-`prefix_sample_test.rb`). The base class sizes Minitest's pool to one thread per
+concurrently after the serial `route_runner_test.rb`. The base class sizes Minitest's pool to one thread per
 core (system Ruby's Minitest 5.11 otherwise uses two); set `N` to override. A new
 suite that uses `with_environment` or process signals must stay serial.
 

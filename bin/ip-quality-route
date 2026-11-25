@@ -7,7 +7,6 @@ require_relative "../common/network_environment"
 require_relative "../runner/profile"
 require_relative "../runner/subscription_catalog"
 require_relative "../runner/isolated_mihomo_session"
-require_relative "../runner/prefix_sample"
 require_relative "../runner/source_catalog"
 
 module IpQuality
@@ -19,11 +18,10 @@ module IpQuality
     REPORTER = File.expand_path("../bin/ip-quality", __dir__).freeze
     CLEANUP_SIGNALS = %w[HUP TERM].freeze
     REPORTER_STOP_TIMEOUT_SECONDS = 3
-# Fixed menu entries precede cached subscriptions; numbering derives from this list.
+    # Fixed menu entries precede cached subscriptions; numbering derives from this list.
     FIXED_ROUTES = [
       [:direct, "Direct IP reputation report (system IPv4 route)"],
-      [:specific_ip, "Specific IP lookup (enter one public target; current system route)"],
-      [:prefix_samples, "IPv4 /24 samples / 網段抽樣（貼上多個三段 IP，每段抽查 3 個地址）"]
+      [:specific_ip, "Specific IP lookup / 指定 IP 查詢（輸入一個完整 IP）"]
     ].freeze
 
     def initialize(
@@ -31,15 +29,13 @@ module IpQuality
       stderr: $stderr,
       stdin: $stdin,
       app_root: SubscriptionCatalog::DEFAULT_APP_ROOT,
-      reporter_path: REPORTER,
-      reports_root: File.expand_path("../reports", __dir__)
+      reporter_path: REPORTER
     )
       @stdout = stdout
       @stderr = stderr
       @stdin = stdin
       @app_root = app_root
       @reporter_path = reporter_path
-      @reports_root = reports_root
       @profile_path = nil
       @mihomo_path = IsolatedMihomoSession::DEFAULT_MIHOMO
       @subscription_name = nil
@@ -90,8 +86,6 @@ module IpQuality
         @specific_ip = select_specific_ip
         return run_direct_route
       end
-      return run_prefix_samples if source == :prefix_samples
-
       profile = ClashLeafProfile.new(source)
 
       if @list_leaves
@@ -154,9 +148,8 @@ module IpQuality
             ip-quality-route --subscription NAME --list-leaves
             ip-quality-route --profile PATH --leaf NAME --config-test-only
 
-          By default, choose one direct reputation report or one cached remote
-          Clash Verge subscription. The menu also accepts one specific public
-          target IP or several incomplete IPv4 prefixes (/24 samples).
+          Choose a direct reputation report, one specific public IP address,
+          or one cached Clash Verge subscription.
           A subscription route then asks for one exact inline leaf.
           Direct, specific-IP and leaf routes all measure IP reputation.
           The default direct route is IPv4; -6 selects IPv6. Direct and specific-IP lookups remove
@@ -275,44 +268,14 @@ module IpQuality
       choices.fetch(read_selection(choices.length, "route"))
     end
 
-    def run_prefix_samples
-      if @family == "-6" || @report_arguments.include?("-o") || @report_arguments.include?("-j")
-        raise OptionParser::InvalidArgument, "prefix sampling is IPv4 and automatically saves JSON/text reports; omit -6, -o and -j"
-      end
-      @stdout.puts "貼上 IPv4 前三段（例如 128.241.47）或 128.241.47.0/24。"
-      @stdout.puts "每行一段，也可用空格或逗號分隔；最多 #{PrefixSample::MAX_PREFIXES} 段，貼完後空行 Enter 開始。"
-      @stdout.flush
-      input = +""
-      while (line = @stdin.gets(PrefixSample::MAX_INPUT_BYTES + 1))
-        break if line.strip.empty?
-
-        input << line
-        raise OptionParser::InvalidArgument, "prefix input is too large" if input.bytesize > PrefixSample::MAX_INPUT_BYTES
-      end
-      batch = PrefixSample.new(input, sources: @sources, ipqs_dns: @ipqs_dns)
-      @stdout.puts batch.plan
-      unless @confirmed
-        @stdout.puts "No network access has occurred; start gate: add --confirm-network-lookup"
-        return 0
-      end
-
-      configure_direct_route!
-      batch.run(reports_root: @reports_root, stdout: @stdout, stderr: @stderr) do |ip, output, errors, text_path|
-        command = reporter_command + ["-j", "-o", text_path, ip]
-        run_reporter(NetworkEnvironment.without_proxy_variables, command, out: output, err: errors)
-      end
-    rescue PrefixSample::Error => error
-      raise OptionParser::InvalidArgument, error.message
-    end
-
     def select_specific_ip
       @stdout.print "Enter one public IP address to inspect: "
       @stdout.flush
       answer = @stdin.gets
       raise OptionParser::InvalidArgument, "no specific IP was entered" unless answer
 
-      candidate = answer.strip
-      unless candidate.bytesize.between?(2, 64) && candidate.match?(/\A[0-9A-Fa-f:.]+\z/)
+      candidate = answer.strip if answer.valid_encoding?
+      unless candidate && candidate.bytesize.between?(2, 64) && candidate.match?(/\A[0-9A-Fa-f:.]+\z/)
         raise OptionParser::InvalidArgument, "specific IP must be one valid public address"
       end
       address = IPAddr.new(candidate)
@@ -479,8 +442,8 @@ module IpQuality
       @previous_signal_handlers.clear
     end
 
-    def run_reporter(environment, command, **redirection)
-      pid = Process.spawn(environment, *command, pgroup: true, **redirection)
+    def run_reporter(environment, command)
+      pid = Process.spawn(environment, *command, pgroup: true)
       _waited_pid, status = Process.wait2(pid)
       pid = nil
       status

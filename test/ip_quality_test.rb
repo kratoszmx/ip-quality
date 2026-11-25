@@ -119,6 +119,30 @@ class IpQualityTest < ReporterTestCase
     assert_includes stdout, "IPQS direct fallback uses AliDNS"
   end
 
+  def test_non_public_ipv4_reference_boundaries
+    ranges = File.readlines(File.join(ROOT, "ref", "non_public_ipv4.txt"), chomp: true)
+      .reject { |line| line.empty? || line.start_with?("#") }
+      .map { |cidr| IPAddr.new(cidr) }
+    edges = ranges.flat_map do |network|
+      first = network.to_range.first.to_i
+      last = network.to_range.last.to_i
+      [first - 1, first, last, last + 1].select { |value| value.between?(0, 2**32 - 1) }
+    end.uniq.map { |value| IPAddr.new(value, Socket::AF_INET).to_s }
+    probe = <<~'ZSH'
+      source "$1"; shift
+      for ip in "$@";do
+        is_private_ipv4 "$ip" && print -r -- "$ip private" || print -r -- "$ip public"
+      done
+    ZSH
+    expected = edges.map do |ip|
+      address = IPAddr.new(ip)
+      "#{ip} #{ranges.any? { |range| range.include?(address) } ? 'private' : 'public'}"
+    end
+    assert_equal expected, zsh!(probe, SCRIPT, *edges).lines(chomp: true)
+    assert_includes expected, "100.63.255.255 public"
+    assert_includes expected, "198.20.0.0 public"
+  end
+
   def test_smtp_success_requires_a_greeting_line_not_a_220_substring
     probe = reporter_functions("smtp_greeting_received") + <<~'ZSH'
       for response in "$@";do smtp_greeting_received "$response"&&print -r -- yes||print -r -- no;done

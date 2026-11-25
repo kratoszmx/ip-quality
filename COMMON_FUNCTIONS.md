@@ -117,7 +117,6 @@ These are reporter or provider policy and stay with their owners:
 | `providers/<source>.zsh` | Each source's schema, endpoint, fallback and `db_*` adapter (for example Scamalytics page parsing, IPQS connection types) |
 | `report/` | Localized labels, table layout (`report/table.zsh`), `report_query_status`, `report_source_visible`, missing-value display |
 | `runner/` | Mihomo lifecycle, listener ownership and cleanup; `safe_snapshot.rb` (verified owner-controlled reads) and `text.rb` (printable metadata), used only by the runner |
-| `runner/prefix_sample.rb` | /24 input policy, fixed sample expansion, target-bound batch results and private summaries; single product caller, not a general network utility |
 
 A similar `jq` expression alone is not a shared schema contract.
 

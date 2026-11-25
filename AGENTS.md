@@ -2,7 +2,7 @@
 
 A source-auditable IP reputation and quality reporter derived from
 `xykt/IPQuality`. It asks up to 15 named sources about one IP address (the
-current egress, a given public IP, /24 prefix samples or one proxy-subscription
+current egress, a given public IP or one proxy-subscription
 node) and reports each source separately — no combined quality score, and a
 failed or missing answer is `unknown`, never clean. Shell code runs with
 `/bin/zsh`; the route runner uses only the system Ruby standard library.
@@ -15,7 +15,7 @@ Give the user only the normal interactive, all-source command:
 cd /Users/zmx/Projects/projects/ipquality && /usr/bin/ruby --disable-gems bin/ip-quality-route --confirm-network-lookup -4
 ```
 
-It asks for direct, a public IP, IPv4 prefix samples, or a subscription leaf.
+It asks for direct, one public IP, or a subscription leaf.
 DNS repair and source fallback are automatic; do not ask the user to choose
 presets or diagnostic flags. Everything below is for agents. These commands are
 network-free:
@@ -35,7 +35,7 @@ action after the user accepts the disclosure.
 | Document | Read it for |
 | --- | --- |
 | [HANDOFF.md](HANDOFF.md) | Current status, open issues, recent changes and live evidence |
-| [PROVIDERS.md](PROVIDERS.md) | Consent and routes, scopes, prefix sampling, source selection, fallbacks, display mapping; links each `providers/<source>.md` contract |
+| [PROVIDERS.md](PROVIDERS.md) | Consent and routes, scopes, fixed-IP lookups, source selection, fallbacks, display mapping; links each `providers/<source>.md` contract |
 | [TESTING.md](TESTING.md) | Running the offline suites, which suite covers what, test helpers |
 | [COMMON_FUNCTIONS.md](COMMON_FUNCTIONS.md) | Shared helpers in `common/`, their callers and boundaries |
 | [SERVICES.md](SERVICES.md) | Processes a run starts (no daemon) and the external weekly test |
@@ -52,8 +52,7 @@ A live run flows through four layers:
 1. **Route runner** — `bin/ip-quality-route` (Ruby) shows the menu or parses
    flags, then prepares the route: it clears proxy variables for direct and
    specific-IP runs, or starts a private loopback Mihomo for one exact
-   subscription leaf (`runner/`). Prefix sampling runs the reporter once per
-   sample and saves a comparison (`runner/prefix_sample.rb`).
+   subscription leaf (`runner/`). Every run uses the same reporter.
 2. **Reporter** — `bin/ip-quality` (zsh) enforces the consent gate and required
    commands, discovers the public egress unless a target was given, and calls
    each selected source's `db_<source>` adapter. `providers/sources.tsv` is the
@@ -86,13 +85,10 @@ Discover cached node names with `--list-subscriptions` and
 `--subscription 'NAME' --list-leaves`. Only inline leaf proxies and their
 `dialer-proxy` dependencies are supported, not groups or remote providers.
 `--profile PATH` uses a local profile; `--config-test-only` runs Mihomo's local
-check only. Without the Clash Verge cache the menu still offers direct, specific
-IP and prefix sampling. A system VPN/TUN can still affect direct traffic.
-
-Menu **3** samples up to 20 pasted public /24 prefixes at `.23`, `.127` and
-`.231` and saves full sample IPs under a private `reports/prefix-samples-*`
-directory; these are database samples, not whole-network verdicts. Contract:
-[PROVIDERS.md](PROVIDERS.md#prefix-sampling).
+check only. Without the Clash Verge cache the menu still offers direct and
+specific-IP lookups. A system VPN/TUN can still affect direct traffic.
+Menu **2** accepts one complete public IP and produces a standard report.
+[Fixed-IP lookups](PROVIDERS.md#fixed-ip-lookups)
 
 Both entrypoints default to `--sources all` and accept `--sources independent`
 or an explicit ID list; unselected providers make no request and report

@@ -8,13 +8,16 @@ listed in [AGENTS.md](AGENTS.md#start-here).
 
 ## Latest entry per lane
 
-### Report addresses — 2026-11-25
+### Report addresses and fixed-IP route — 2026-11-25
 
-Reporter `v2026-11-25-standalone.59`. Terminal, plain text, ANSI and JSON
-reports show the full tested IPv4 or IPv6 address and validated RIPEstat
-prefix. Existing commands can still include `-f`. The full offline suite
-passed with 147 reporter cases / 4,140 assertions, 38 IPQS and 68
-provider-account cases.
+Reporter `v2026-11-25-standalone.60`. Menu 2 queries one complete public IP
+and uses the standard reporter. The former batch route has been retired.
+Terminal, plain text, ANSI and JSON reports show the full tested IPv4 or
+IPv6 address and validated RIPEstat prefix. Existing commands can still
+include `-f`. The full offline suite passed with 140 reporter cases /
+4,034 assertions, 38 IPQS and 68 provider-account cases. Three separate
+IPv4 runs in Terminal each exited successfully and saved a standard,
+target-bound JSON report. Check.Place MaxMind was blocked in all three.
 
 ### user1 — 2026-11-16: direct shared record predicates
 
@@ -108,8 +111,8 @@ IPQS tests. The shell has almost no static text, so page content needs
 ## Current behavior and ownership
 
 - The current reporter version is `script_version` in `bin/ip-quality`.
-- The runner defaults to `reputation` with all sources. Direct, specific-IP,
-  prefix-sample and isolated-leaf routes share one reporter. Every attempted
+- The runner defaults to `reputation` with all sources. Direct, specific-IP
+  and isolated-leaf routes share one reporter. Every attempted
   source stays visible on failure with unknown risk, never a clean result.
 - Official direct IPv4 IPQS uses verified AliDNS HTTPS resolution
   automatically. Official IPQS/Cloudflare target queries recover from pre-HTTP
