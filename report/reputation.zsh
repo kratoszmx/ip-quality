@@ -155,7 +155,7 @@ cn:relay)source_label="中继"
 ;;
 cn:demo)source_label="公开示例"
 ;;
-cn:page|cn:fallback)source_label="網路備援"
+cn:page|cn:fallback)source_label="网络备援"
 ;;
 en:official)source_label="official"
 ;;
@@ -258,7 +258,7 @@ en:disabled)state_label="not selected"
 *)state_label="failed"
 esac
 if [[ "${2:-}" == direct_fallback ]];then
-[[ "$YY" == cn ]]&&state_label="網路備援/$state_label"||state_label="network fallback/$state_label"
+[[ "$YY" == cn ]]&&state_label="网络备援/$state_label"||state_label="network fallback/$state_label"
 fi
 print -rn -- "${state_color}$state_label${Font_Suffix:-}"
 }
@@ -266,7 +266,7 @@ print -rn -- "${state_color}$state_label${Font_Suffix:-}"
 report_query_route_note(){
 [[ "$2" == direct_fallback ]]||return 0
 if [[ "$YY" == cn ]];then
-print -r -- "$1 查询通路：原通路$(report_query_status "$3") → 網路備援；查询目标仍为所选 IP。"
+print -r -- "$1 查询通路：原通路$(report_query_status "$3") → 网络备援；查询目标仍为所选 IP。"
 else
 print -r -- "$1 lookup route: original route $(report_query_status "$3") → network fallback; the selected target IP is unchanged."
 fi
@@ -557,7 +557,7 @@ observations+=("${Font_Cyan}ipapi.is: ${Font_Suffix}anonymous minimal response |
 fi
 fi
 
-if [[ "${ripestat[status]}" != disabled ]] && report_any_known "${ripestat[status]}" "${ripestat[prefix]}" "${ripestat[origins]}";then
+if [[ "${ripestat[status]}" == (announced|not_announced) ]];then
 if [[ "$YY" == "cn" ]];then
 observations+=("${Font_Cyan}RIPEstat：${Font_Suffix}状态=$(report_neutral_or_dash "${ripestat[status]}") | 前缀=$(report_neutral_or_dash "${ripestat[prefix]}") | 起源=$(report_neutral_or_dash "${ripestat[origins]}")")
 else
@@ -665,10 +665,10 @@ en:not_applicable_target)missing+=("Ping0 (/geo verifies the current egress only
 *:verified|*:ip_mismatch|*:disabled) ;;
 *)missing+=("Ping0 ($(report_query_status "${ping0[status]:-unknown}"))")
 esac
-report_any_known "${ripestat[status]}" "${ripestat[prefix]}" "${ripestat[origins]}"||missing+=("RIPEstat")
+[[ "${ripestat[status]}" == (announced|not_announced|disabled) ]]||missing+=("RIPEstat ($(report_query_status "${ripestat[status]:-unknown}"))")
 if [[ "${internetdb[status]}" != "not_found" && "${internetdb[status]}" != disabled ]] &&
    ! report_any_known "${internetdb[ports]}" "${internetdb[port_count]}" "${internetdb[hostname_count]}" "${internetdb[vulnerability_count]}" "${internetdb[tags]}";then
-missing+=("Shodan InternetDB")
+missing+=("Shodan InternetDB ($(report_query_status "${internetdb[status]:-unknown}"))")
 fi
 if (( ${#relay_cloudflare_blocked[@]} ));then
 if [[ "$YY" == "cn" ]];then
@@ -682,6 +682,24 @@ if [[ "$YY" == "cn" ]];then
 missing+=("Check.Place 中继 HTTP 403（${(j:、:)relay_http_403[@]}）")
 else
 missing+=("Check.Place relay HTTP 403 (${(j:, :)relay_http_403[@]})")
+fi
+fi
+if (( ${#transport_retry[@]} ));then
+local -a retry_answered retry_failed
+local retry_id retry_array
+for retry_id in "${transport_retry[@]}";do
+retry_array="$retry_id"
+[[ "$retry_id" == shodan ]]&&retry_array=internetdb
+if [[ "${(P)${:-${retry_array}[status]}}" == (tls_error|timeout|network_error) ]];then
+retry_failed+=("${reputation_source_labels[$retry_id]:-$retry_id}")
+else
+retry_answered+=("${reputation_source_labels[$retry_id]:-$retry_id}")
+fi
+done
+if [[ "$YY" == "cn" ]];then
+print -r -- "${Font_Yellow}首轮 TLS 握手失败的 ${#transport_retry[@]} 个来源已在同一通路、同一目标重试一次：已回应 ${(j:、:)retry_answered[@]:-无}；仍连接失败 ${(j:、:)retry_failed[@]:-无}${Font_Suffix}"
+else
+print -r -- "${Font_Yellow}${#transport_retry[@]} source(s) whose first TLS handshake failed were retried once on the same route and target: answered ${(j:, :)retry_answered[@]:-none}; still failing ${(j:, :)retry_failed[@]:-none}${Font_Suffix}"
 fi
 fi
 (( ${#missing[@]} ))||return 0

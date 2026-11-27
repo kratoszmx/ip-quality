@@ -76,7 +76,7 @@ class ReportTest < ReporterTestCase
     ZSH
     %w[cn en].each do |language|
       output = zsh!(probe, REPUTATION_REPORT, TERMINAL_LIBRARY, language)
-      assert_includes output, language == "cn" ? "網路備援/可用" : "network fallback/available"
+      assert_includes output, language == "cn" ? "网络备援/可用" : "network fallback/available"
       assert_includes output, language == "cn" ? "账户受限" : "account restricted"
       assert_includes output, "ipapi.is"
       types, scores, factors = output.split(/Scores\n|Factors\n/)
@@ -471,8 +471,8 @@ class ReportTest < ReporterTestCase
       assert_aligned_table(section)
     end
     source_status = sections[1].lines.find { |line| line.start_with?("来源/状态") }
-    assert_equal ["網路備援/可用", "網路備援/可用"], source_status.split("|").last(2).map(&:strip)
-    [sections[0], sections[2]].each { |section| assert_includes section, "網路備援/可用" }
+    assert_equal ["网络备援/可用", "网络备援/可用"], source_status.split("|").last(2).map(&:strip)
+    [sections[0], sections[2]].each { |section| assert_includes section, "网络备援/可用" }
     refute_includes plain, "直连备援"
     refute_includes plain, "网页备援"
     assert_equal 1, sections[0].lines.count { |line| line.start_with?("参数") }

@@ -14,7 +14,7 @@ class QueryRouteTest < ReporterTestCase
     assert_equal "87", report.dig("Score", "IPQS")
     assert_equal "alidns", report.dig("Query", "IPQSDNS")
     assert_transport report, "IPQS", "direct_fallback", "tls_error"
-    assert_includes text, "網路備援/可用"
+    assert_includes text, "网络备援/可用"
     assert_includes text, "原通路TLS 握手失败"
     assert_includes text, "查询目标仍为所选 IP"
     assert_equal 1, File.read(@config).scan("/api/json/ip/fixturekey123/#{TARGET}?").length
@@ -54,8 +54,8 @@ class QueryRouteTest < ReporterTestCase
     assert_equal "tls_error", report.dig("ProviderStatus", "IPQS")
     assert_nil report.dig("Score", "IPQS")
     assert_transport report, "IPQS", "direct_fallback", "tls_error"
-    assert_includes text, "網路備援/TLS 握手失败"
-    refute_includes text, "網路備援/可用"
+    assert_includes text, "网络备援/TLS 握手失败"
+    refute_includes text, "网络备援/可用"
   end
 
   # The retry decision is query_route.zsh's alone, so its matrix runs in one
@@ -116,7 +116,7 @@ class QueryRouteTest < ReporterTestCase
     assert_equal ["account|selected|4|system", "lookup|selected|4|system"], calls
     assert_equal "ok", report.dig("ProviderStatus", "IPQS")
     assert_transport report, "IPQS", "selected_route", nil
-    refute_includes text, "網路備援"
+    refute_includes text, "网络备援"
   end
 
   private

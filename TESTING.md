@@ -63,7 +63,7 @@ Each suite maps to one area of the code; check it before adding coverage.
 | File | Covers |
 | --- | --- |
 | `test/common_test.rb` | `common/`: secret curl stdin, HTTP envelopes, batched jq fields, jq predicates, proxy overrides, ANSI cleanup, DMS and map links |
-| `test/ip_quality_test.rb` | `bin/ip-quality`: plans, option parsing, live gates, failed egress discovery, `--help`/`--version`, validators and IPv4 range boundaries, per-scope required commands, fixture DNSBL and mail runs |
+| `test/ip_quality_test.rb` | `bin/ip-quality`: plans, option parsing, live gates, failed egress discovery, the same-route TLS-handshake retry, `--help`/`--version`, validators and IPv4 range boundaries, per-scope required commands, fixture DNSBL and mail runs |
 | `test/providers_test.rb` | Provider parsers and adapters: literal JSON, ipapi and Ping0 outcomes, Cloudflare/Ipregistry/IPQS/Shodan/RIPEstat, credential loading and rejection, IPQS preflight |
 | `test/check_place_test.rb` | Check.Place relay pauses and MaxMind validation with IPinfo fallback |
 | `test/scamalytics_test.rb` | Scamalytics page parsing and its single same-route fallback |
@@ -114,8 +114,12 @@ suite that uses `with_environment` or process signals must stay serial.
 - Fake network commands match on the request and append to a calls file, so a
   test can prove both what was sent and that nothing else was. Functions stubbed
   inside a probe often run in a `$(...)` subshell, so record calls in a file, not
-  a shell variable. The tripwires cover command lookups, not new socket APIs or
-  absolute-path executables, so review any new transport.
+  a shell variable. Requests that read an HTTP code pass
+  `--write-out $'\n%{http_code}'`, so a fake that logs `"$*"` writes two lines
+  per call; log `"${*//$'\n'/ }"` or a request label when counting lines. The
+  reporter's retry pause is the `sleep` command, which a fake can record. The
+  tripwires cover command lookups, not new socket APIs or absolute-path
+  executables, so review any new transport.
 - Fixtures spell control and combining characters as escapes (`\u0301`,
   `\0`, `\e`). Some editing tools write the decoded character instead, which
   still passes but hides the case; check `git diff` for raw bytes.

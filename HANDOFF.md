@@ -98,15 +98,26 @@ The full offline suite passed: 152 reporter cases / 4,410 assertions, 36 IPQS
 and 67 provider-account cases. Private live receipts and validation:
 `reports/verification-20261119/` and `reports/ipapi-login-policy-20261119/`.
 
-### IPQS auth check — 2026-11-21: Svelte dashboard login proof
+### wincn TLS retry — 2026-11-27: same-route retry after a dropped leaf
 
-`npm --prefix mcp/ipqs run auth:check` reported `unknown` while the shared
-profile was logged in: the dashboard is now a Svelte shell with no logout link
-in its HTML. `httpAuthStatus` also accepts an executable inline script assigning
-`globalThis.staticUser` a numeric `id` and an `email` (login/TOTP forms still
-veto). The live check now returns `authenticated`; `npm run check` passed 38
-IPQS tests. The shell has almost no static text, so page content needs
-`mode=controls` or the usage API.
+Reporter `v2026-11-27-standalone.61`. The user's `hongkongvps`/`wincn` run
+showed most sources as `TLS 握手失败` after the first few answered. 30 and 180
+bare handshakes through the isolated leaf and a full leaf run all succeeded
+afterwards, so the node dropped for a while during that run. Every source whose
+request fails the TLS handshake (curl 35, nothing sent) now gets one retry on the
+same route and target after a 5 s pause. Timeouts and sources that already used
+the IPQS/Cloudflare direct fallback are not retried. JSON `Query.TransportRetry`
+lists them, and the terminal says which answered. RIPEstat and Shodan now keep
+their transport/HTTP status (Shodan 404 no-information is `not_found`). They
+appear in the unavailable-source line, and the label reads `网络备援`. Offline
+suite: 142 reporter cases / 4,051 assertions, 38 IPQS, 68 provider-account.
+Live `wincn` run (ripestat, shodan, ipapi): RIPEstat `announced`
+120.235.128.0/21, Shodan `not_found`, ipapi `ok`, no retry needed. The retry
+path itself is proven offline only. An outage that outlasts the pause stays
+`tls_error`.
+
+The IPQS `auth:check` also recognizes the Svelte dashboard's inline
+`globalThis.staticUser` (numeric `id` + `email`; login/TOTP forms still veto).
 
 ## Current behavior and ownership
 

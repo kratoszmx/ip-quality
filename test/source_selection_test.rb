@@ -162,6 +162,7 @@ class SourceSelectionTest < ReporterTestCase
       print -rn -- $'\n000'
       exit 35
     ZSH
+    write_fake_command("sleep", %q{print -r -- "sleep $*" >> "$IPQUALITY_TEST_CALLS"})
     stdout, stderr, status = run_script("--sources", "ipapi", "--confirm-network-lookup",
       "-4", "-j", "-o", report_path, "12.217.32.68", env: {"IPQUALITY_TEST_CALLS" => calls})
     assert status.success?, stderr
@@ -169,7 +170,8 @@ class SourceSelectionTest < ReporterTestCase
     assert_equal "tls_error", report.dig("ProviderStatus", "ipapi")
     assert_equal "disabled", report.dig("ProviderStatus", "IPQS")
     assert_nil report.dig("Score", "IPQS")
-    assert_equal 1, File.readlines(calls).length
+    # The TLS handshake failure gets its one same-route retry (see ip_quality_test.rb).
+    assert_equal ["called", "sleep 5", "called"], File.readlines(calls, chomp: true)
     text = File.read(report_path)
     assert_includes text, "ipapi.is"
     assert_includes text, "TLS 握手失败"

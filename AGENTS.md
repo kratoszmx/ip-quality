@@ -92,8 +92,9 @@ Menu **2** accepts one complete public IP and produces a standard report.
 
 Both entrypoints default to `--sources all` and accept `--sources independent`
 or an explicit ID list; unselected providers make no request and report
-`disabled`. IPQS DNS repair, direct-IPv4 recovery and public-page fallbacks are
-automatic and disclosed in the plan
+`disabled`. IPQS DNS repair, direct-IPv4 recovery, one same-route retry after a
+TLS handshake failure and public-page fallbacks are automatic and disclosed in
+the plan
 ([PROVIDERS.md](PROVIDERS.md#automatic-query-route-fallback)). Report flags:
 `-j` JSON, `-E`/`-l en` English (default `cn`), and `-o FILE`
 a new `.json`, `.ansi` or plain-text file (existing paths and links are rejected).

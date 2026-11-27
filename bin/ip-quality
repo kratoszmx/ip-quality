@@ -9,7 +9,7 @@ umask 077
 # Display widths and byte validation need UTF-8 whatever the caller locale is.
 export LC_ALL=en_US.UTF-8
 
-script_version="v2026-11-25-standalone.60"
+script_version="v2026-11-27-standalone.61"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
@@ -92,6 +92,8 @@ typeset -A smail
 typeset -A smailstatus
 typeset -A stail
 typeset basic_source=ipinfo
+# Source IDs whose first request failed the TLS handshake and were retried once.
+typeset -a transport_retry
 typeset mode_json=0
 typeset mode_output=0
 typeset outputfile=""
@@ -287,6 +289,7 @@ print -r -- "  targeted IPQS/Cloudflare APIs: selected route first; connectivity
 print -r -- "  fallback privacy: the same provider also sees the system-route egress; egress discovery and visitor/self demos never switch routes"
 reputation_source_selected ipqs&&print -r -- "  IPQS direct fallback uses AliDNS (https://dns.alidns.com/dns-query); this resolver receives the IPQS hostname only, not the API key or target"
 fi
+print -r -- "  TLS handshake failure (no HTTP request sent): that source is retried once on the same route and target after 5 s"
 print -r -- "  reputation sources:"
 reputation_source_disclosure_lines "$requested_ip"
 fi
@@ -515,6 +518,7 @@ ipjson='{
     }'
 if scope_includes reputation;then
 basic_source=ipinfo
+transport_retry=()
 local source_id source_array
 for source_id in "${reputation_source_ids[@]}";do
 source_array="$source_id"
@@ -523,8 +527,25 @@ source_array="$source_id"
 set -A "$source_array" status disabled risk_status disabled
 if reputation_source_selected "$source_id";then
 "${reputation_source_functions[$source_id]}" "$2"
+# Curl exit 35 (tls_error) means the TLS handshake failed before any HTTP
+# request, so the provider never saw the query and no quota was spent. A proxy
+# leaf that dropped for a moment would otherwise blank every later source; each
+# such source gets one more attempt on the same route and target after a short
+# pause. A source that already used its direct-IPv4 fallback had its second try.
+[[ "${(P)${:-${source_array}[status]}}" == tls_error && "${(P)${:-${source_array}[query_route]}:-}" != direct_fallback ]]&&
+  transport_retry+=("$source_id")
 fi
 done
+if (( ${#transport_retry[@]} ));then
+show_progress "${#transport_retry[@]} source(s) failed the TLS handshake; retrying once"
+sleep 5
+for source_id in "${transport_retry[@]}";do
+source_array="$source_id"
+[[ "$source_id" == shodan ]]&&source_array=internetdb
+set -A "$source_array" status disabled risk_status disabled
+"${reputation_source_functions[$source_id]}" "$2"
+done
+fi
 fi
 scope_includes mail&&check_mail
 if scope_includes dnsbl&&[[ $2 -eq 4 ]];then

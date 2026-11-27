@@ -132,7 +132,7 @@ on direct do not trigger another provider, account or proxy chain.
 
 The same provider sees the tested target plus the fallback's system-route egress.
 The plan discloses this before confirmation. Terminal status uses
-`網路備援/<status>` / `network fallback/<status>` for this route recovery and
+`网络备援/<status>` / `network fallback/<status>` for this route recovery and
 DB-IP's page recovery. The route note retains the initial error; JSON
 `Query.ProviderTransport.IPQS` and
 `.Cloudflare` contain `Route` (`selected_route` or `direct_fallback`),
@@ -141,6 +141,19 @@ null route/failure. `ProviderStatus` describes the final response. This metadata
 does not claim that the selected node can now connect to that provider.
 The shared display label does not change provenance: JSON still distinguishes
 `direct_fallback` transport from DB-IP's `public_page` source.
+
+Every selected source also gets one same-route retry when its request fails
+the TLS handshake (curl exit 35, `tls_error`): no HTTP request was sent, so the
+provider saw nothing and no quota was spent. After all sources ran, the reporter
+pauses 5 s and repeats each such adapter once with the same route, family and
+target. This covers a proxy leaf that drops for a moment and would otherwise
+blank every later source (wincn, November 27). Timeouts, other connection
+errors, HTTP responses and certificate failures are not retried here: a timeout
+or lost reply may already have reached the provider. A source that already used
+its direct-IPv4 fallback above has had its second attempt and is skipped.
+`ProviderStatus` and the source fields describe the retry; JSON
+`Query.TransportRetry` lists the retried source IDs, and the terminal prints
+which of them answered and which still failed.
 
 Other sources keep their existing selected-route contracts. In particular,
 DB-IP's visitor/self demo and Ping0 observe the caller: changing their transport
@@ -265,6 +278,8 @@ MaxMind basic data](providers/check_place.md), [ipapi.is](providers/ipapi.md),
 - Ping0 accepts exactly four bounded lines after a successful HTTP response and
   requires the returned IP to match. TLS, timeout, HTTP and malformed-response
   failures stay identifiable in JSON and the terminal unavailable-source summary.
+  RIPEstat and Shodan keep the same transport and HTTP statuses instead of a
+  bare unknown; Shodan HTTP 404 with its no-information detail is `not_found`.
   RIPEstat validates prefix/ASN structure. Shodan validates the target IP and
   bounded arrays. Ports must be integers from 1 through 65535, and text array
   elements must be bounded strings without control characters; malformed values

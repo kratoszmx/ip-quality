@@ -434,4 +434,45 @@ class IpQualityTest < ReporterTestCase
       assert_empty stderr
     end
   end
+
+  # A leaf that drops mid-run fails later sources at the TLS handshake, before
+  # any HTTP request. Those get one same-route retry after a pause; a timeout,
+  # which may already have reached the provider, keeps its first answer.
+  def test_tls_handshake_failures_get_one_same_route_retry_and_are_disclosed
+    calls = File.join(reporter_workspace, "calls")
+    report_path = File.join(reporter_workspace, "report.txt")
+    write_fake_command("curl", <<~'ZSH')
+      case "$*" in
+        *stat.ripe.net*) source=ripestat ;;
+        *internetdb.shodan.io*) source=shodan ;;
+        *) source=other ;;
+      esac
+      print -r -- "$source" >> "$IPQUALITY_TEST_CALLS"
+      if [[ "$source" == shodan ]];then
+        print -rn -- $'\n000'
+        exit 28
+      fi
+      if [[ "$source" == ripestat && -e "$IPQUALITY_TEST_CALLS.ripestat" ]];then
+        print -r -- '{"status":"ok","data":{"prefix":"12.217.32.0/24","asns":[64500]}}'
+        print -rn -- 200
+        exit 0
+      fi
+      [[ "$source" == ripestat ]]&&: > "$IPQUALITY_TEST_CALLS.ripestat"
+      print -rn -- $'\n000'
+      exit 35
+    ZSH
+    write_fake_command("sleep", %q{print -r -- "sleep $*" >> "$IPQUALITY_TEST_CALLS"})
+    stdout, stderr, status = run_script("--sources", "ipapi,ripestat,shodan", "--confirm-network-lookup",
+      "-4", "-j", "-o", report_path, "12.217.32.68", env: NO_PROXY_ENV.merge("IPQUALITY_TEST_CALLS" => calls))
+    assert status.success?, stderr
+    assert_equal %w[other ripestat shodan] + ["sleep 5"] + %w[other ripestat], File.readlines(calls, chomp: true)
+    report = JSON.parse(stdout)
+    assert_equal %w[ipapi ripestat], report.dig("Query", "TransportRetry")
+    assert_equal ["tls_error", "announced", "12.217.32.0/24", "timeout"],
+      [report.dig("ProviderStatus", "ipapi"), report.dig("Routing", "Status"),
+       report.dig("Routing", "Prefix"), report.dig("Exposure", "Status")]
+    text = File.read(report_path)
+    assert_includes text, "首轮 TLS 握手失败的 2 个来源已在同一通路、同一目标重试一次：已回应 RIPEstat；仍连接失败 ipapi.is"
+    assert_includes text, "Shodan InternetDB (连接超时)"
+  end
 end

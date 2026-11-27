@@ -51,6 +51,7 @@ mail_services=$(jq -cn "${mail_service_args[@]}" '$ARGS.named')||return 1
 fi
 
 ipjson=$(jq -n \
+--arg transport_retry "${(j:, :)transport_retry[@]}" \
 --arg head_ip "$IP" \
 --arg head_repository "${shead[git]:-}" \
 --arg head_time "${shead[time_raw]:-}" \
@@ -205,6 +206,7 @@ def dnsresults($value):
     SelectedSources: (if $reputation_enabled then ($selected_sources | split(",") | map(select(length > 0))) else [] end),
     TargetMode: $target_mode,
     IPQSDNS: opt($ipqs_dns),
+    TransportRetry: list($transport_retry),
     ProviderTransport: {
       IPQS: {Route: opt($route_ipqs), OriginalRouteFailure: opt($primary_status_ipqs), TargetUnchanged: true},
       Cloudflare: {Route: opt($route_cloudflare), OriginalRouteFailure: opt($primary_status_cloudflare), TargetUnchanged: true}

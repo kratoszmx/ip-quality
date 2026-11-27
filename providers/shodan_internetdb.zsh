@@ -68,7 +68,16 @@ internetdb[status]="not supported for IPv6"
 return 0
 fi
 show_progress "${sinfo[database]}Shodan InternetDB"
-local RESPONSE=$(curl -q $CurlARG -sS -L -4 -m 10 --max-filesize 262144 "https://internetdb.shodan.io/$IP" 2>/dev/null)
+local wire_response RESPONSE
+wire_response=$(curl -q $CurlARG -sS -L -4 -m 10 --max-filesize 262144 --write-out $'\n%{http_code}' "https://internetdb.shodan.io/$IP" 2>/dev/null)
+if ! provider_decode_http_response "$wire_response" "$?";then
+internetdb[status]="${provider_http_response[status]}"
+# An IP without a public record is HTTP 404 with a "No information available" body.
+[[ "${provider_http_response[http_code]}" == 404 ]]&&internetdb_parse_unavailability "${wire_response%$'\n'*}"&&
+  internetdb[status]="${internetdb_unavailable[status]}"
+return 0
+fi
+RESPONSE="${provider_http_response[body]}"
 if internetdb_parse_response "$RESPONSE" "$IP";then
 internetdb[status]="${internetdb_parsed[status]}"
 internetdb[ports]="${internetdb_parsed[ports]}"

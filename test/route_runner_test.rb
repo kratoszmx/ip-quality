@@ -100,9 +100,11 @@ class RouteRunnerTest < ReporterTestCase
     report_path = File.join(workspace, "report.json")
     requests_path = File.join(workspace, "requests")
     write_fake_command("curl", <<~'ZSH')
-      print -r -- "$*" >> "$IPQUALITY_TEST_REQUESTS"
+      # One line per request; the --write-out argument itself contains a newline.
+      print -r -- "${*//$'\n'/ }" >> "$IPQUALITY_TEST_REQUESTS"
       [[ "${@[-1]}" == "https://stat.ripe.net/data/network-info/data.json" ]] || exit 97
       print -r -- '{"status":"ok","data":{"prefix":"12.217.32.0/24","asns":[64500]}}'
+      print -rn -- 200
     ZSH
     environment = {
       "PATH" => "#{workspace}/commands:#{ENV.fetch('PATH')}",

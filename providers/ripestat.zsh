@@ -52,8 +52,11 @@ db_ripestat(){
 show_progress "${sinfo[database]}RIPEstat routing"
 ripestat=()
 ripestat[status]="unknown"
-local RESPONSE=$(curl -q $CurlARG -sS -L -$1 -m 10 --max-filesize 65536 --get --data-urlencode "resource=$IP" "https://stat.ripe.net/data/network-info/data.json" 2>/dev/null)
-if ripestat_parse_network_info "$RESPONSE";then
+local wire_response
+wire_response=$(curl -q $CurlARG -sS -L -$1 -m 10 --max-filesize 65536 --write-out $'\n%{http_code}' --get --data-urlencode "resource=$IP" "https://stat.ripe.net/data/network-info/data.json" 2>/dev/null)
+# A transport or HTTP failure keeps its own status rather than a bare unknown.
+provider_decode_http_response "$wire_response" "$?"||{ ripestat[status]="${provider_http_response[status]}"; return 0; }
+if ripestat_parse_network_info "${provider_http_response[body]}";then
 ripestat[status]="${ripestat_parsed[status]}"
 ripestat[prefix]="${ripestat_parsed[prefix]}"
 ripestat[origins]="${ripestat_parsed[origins]}"

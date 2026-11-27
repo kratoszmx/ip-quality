@@ -127,6 +127,51 @@ class ProvidersTest < ReporterTestCase
       '{"status":"ok","data":{"prefix":"198.51.100.0/24","asns":["AS64500"]}}')[2].success?
   end
 
+# Transport and HTTP failures keep their own status instead of a bare unknown,
+# and Shodan answers an IP it has no record of with HTTP 404 plus a detail.
+def test_routing_and_exposure_adapters_keep_transport_and_http_failure_statuses
+  ripe = File.read(fixture_path("ripestat/network-info.json"))
+  shodan = File.read(fixture_path("shodan/internetdb.json"))
+  no_information = File.read(fixture_path("shodan/no-information.json"))
+  cases = [
+    ["db_ripestat", "#{ripe}\n200", 0, "announced|198.51.100.0/24"],
+    ["db_ripestat", "\n000", 35, "tls_error|"],
+    ["db_ripestat", "\n000", 28, "timeout|"],
+    ["db_ripestat", "{}\n429", 0, "rate_limited|"],
+    ["db_ripestat", "<html>challenge</html>\n200", 0, "unknown|"],
+    ["db_shodan_internetdb", "#{shodan}\n200", 0, "available|22, 443"],
+    ["db_shodan_internetdb", "\n000", 35, "tls_error|"],
+    ["db_shodan_internetdb", "#{no_information}\n404", 0, "not_found|"],
+    ["db_shodan_internetdb", "Not Found\n404", 0, "http_404|"],
+    ["db_shodan_internetdb", "{}\n503", 0, "http_503|"]
+  ]
+  probe = <<~'ZSH'
+    source "$1"
+    shift
+    IP=198.51.100.23
+    show_progress(){ :; }
+    curl(){ print -rn -- "$wire"; return "$curl_code"; }
+    while (( $# ));do
+      adapter="$1" wire="$2" curl_code="$3"
+      shift 3
+      "$adapter" 4
+      if [[ "$adapter" == db_ripestat ]];then
+        print -r -- "${ripestat[status]}|${ripestat[prefix]:-}"
+      else
+        print -r -- "${internetdb[status]}|${internetdb[ports]:-}"
+      fi
+    done
+    set_language
+    ripestat=([status]=tls_error) internetdb=([status]=timeout)
+    clean_ansi "$(show_unavailable_sources)"
+  ZSH
+  lines = zsh!(probe, SCRIPT, *cases.flat_map { |adapter, wire, code, _| [adapter, wire, code.to_s] }).lines(chomp: true)
+  assert_equal cases.map(&:last), lines.first(cases.size)
+  report = lines.drop(cases.size).join("\n")
+  assert_includes report, "RIPEstat (TLS 握手失败)"
+  assert_includes report, "Shodan InternetDB (连接超时)"
+end
+
   def test_ripestat_validates_the_reported_prefix_without_changing_family_flags
     probe = <<~'ZSH'
       source "$1"
