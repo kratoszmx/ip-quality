@@ -63,7 +63,7 @@ Each suite maps to one area of the code; check it before adding coverage.
 | File | Covers |
 | --- | --- |
 | `test/common_test.rb` | `common/`: secret curl stdin, HTTP envelopes, batched jq fields, jq predicates, proxy overrides, ANSI cleanup, DMS and map links |
-| `test/ip_quality_test.rb` | `bin/ip-quality`: plans, option parsing, live gates, failed egress discovery, the same-route TLS-handshake retry, `--help`/`--version`, validators and IPv4 range boundaries, per-scope required commands, fixture DNSBL and mail runs |
+| `test/ip_quality_test.rb` | `bin/ip-quality`: plans, option parsing, live gates, failed egress discovery and its TLS-handshake rounds, the same-route TLS-handshake retry, `--help`/`--version`, validators and IPv4 range boundaries, per-scope required commands, fixture DNSBL and mail runs |
 | `test/providers_test.rb` | Provider parsers and adapters: literal JSON, ipapi and Ping0 outcomes, Cloudflare/Ipregistry/IPQS/Shodan/RIPEstat, credential loading and rejection, IPQS preflight |
 | `test/check_place_test.rb` | Check.Place relay pauses and MaxMind validation with IPinfo fallback |
 | `test/scamalytics_test.rb` | Scamalytics page parsing and its single same-route fallback |

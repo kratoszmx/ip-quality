@@ -98,23 +98,26 @@ The full offline suite passed: 152 reporter cases / 4,410 assertions, 36 IPQS
 and 67 provider-account cases. Private live receipts and validation:
 `reports/verification-20261119/` and `reports/ipapi-login-policy-20261119/`.
 
-### wincn TLS retry — 2026-11-27: same-route retry after a dropped leaf
+### wincn TLS retry — 2026-11-27: rounds and retries for a flapping leaf
 
-Reporter `v2026-11-27-standalone.61`. The user's `hongkongvps`/`wincn` run
-showed most sources as `TLS 握手失败` after the first few answered. 30 and 180
-bare handshakes through the isolated leaf and a full leaf run all succeeded
-afterwards, so the node dropped for a while during that run. Every source whose
-request fails the TLS handshake (curl 35, nothing sent) now gets one retry on the
-same route and target after a 5 s pause. Timeouts and sources that already used
-the IPQS/Cloudflare direct fallback are not retried. JSON `Query.TransportRetry`
-lists them, and the terminal says which answered. RIPEstat and Shodan now keep
-their transport/HTTP status (Shodan 404 no-information is `not_found`). They
-appear in the unavailable-source line, and the label reads `网络备援`. Offline
-suite: 142 reporter cases / 4,051 assertions, 38 IPQS, 68 provider-account.
-Live `wincn` run (ripestat, shodan, ipapi): RIPEstat `announced`
-120.235.128.0/21, Shodan `not_found`, ipapi `ok`, no retry needed. The retry
-path itself is proven offline only. An outage that outlasts the pause stays
-`tls_error`.
+Reporter `v2026-11-27-standalone.62`. The `hongkongvps`/`wincn` leaf flaps:
+probing `ipinfo.io/ip` through the isolated leaf every 2 s for 4 minutes gave
+6 of 98 requests failing in 2–6 s windows, each an instant curl 35. One window
+blanked most sources in the user's first run and failed all seven discovery
+endpoints in the second (`IPV4不可用`). Egress discovery now repeats a round
+that saw a TLS handshake failure after 5 s, at most twice; a round with only
+connection errors (no IPv6 route) is not repeated. `get_ipv4`/`get_ipv6` became
+one `discover_egress FAMILY`. Each source whose request fails the TLS handshake
+(nothing sent) gets one retry on the same route and target after a 5 s pause.
+Timeouts and sources that already used the IPQS/Cloudflare direct fallback are
+not retried. JSON `Query.TransportRetry` lists them, and the terminal says which
+answered. RIPEstat and Shodan keep their transport/HTTP status (Shodan 404
+no-information is `not_found`) and appear in the unavailable-source line. The
+label reads `网络备援`. Offline suite: 143 reporter cases / 4,055 assertions,
+38 IPQS, 68 provider-account. A full all-source `wincn` run on `.62` exited 0
+with every source available. No window hit it, so both retry paths are proven
+offline only. The ipify endpoint fails through this leaf on every pass (35/28);
+the other six discovery endpoints answer. Evidence: `reports/wincn-20261127-diag-2.*`.
 
 The IPQS `auth:check` also recognizes the Svelte dashboard's inline
 `globalThis.staticUser` (numeric `id` + `email`; login/TOTP forms still veto).

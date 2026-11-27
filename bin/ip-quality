@@ -9,7 +9,7 @@ umask 077
 # Display widths and byte validation need UTF-8 whatever the caller locale is.
 export LC_ALL=en_US.UTF-8
 
-script_version="v2026-11-27-standalone.61"
+script_version="v2026-11-27-standalone.62"
 typeset SCRIPT_DIR="${0:A:h:h}"
 typeset REF_DIR="$SCRIPT_DIR/ref"
 typeset DNSBL_FILE="$REF_DIR/dnsbl.list"
@@ -276,6 +276,7 @@ print -r -- "  DNSBL concurrency cap: $dnsbl_concurrency"
 print -r -- "  output: full IP addresses; local stdout/file only"
 print -r -- "  telemetry/report upload/downloaded CLI execution: disabled"
 [[ -n "$requested_ip" ]]&&print -r -- "  target: explicit IP, sent to providers as a lookup parameter"
+[[ -z "$requested_ip" ]]&&print -r -- "  egress discovery: a round lost to TLS handshake failures is repeated after 5 s, at most twice"
 if scope_includes reputation;then
 print -r -- "  selected source IDs: ${(j:,:)selected_reputation_sources[@]}"
 print -r -- "  reputation lookups use selected IDs; automatic egress discovery is separate from this catalogue"
@@ -367,17 +368,33 @@ mask=$(( prefix_length == 0 ? 0 : (0xFFFFFFFF << (32 - prefix_length)) & 0xFFFFF
 done
 return 1
 }
-get_ipv4(){
-local response
-IPV4=""
-local API_NET=("https://ipinfo.io/ip" "https://ip.sb" "https://ping0.cc" "https://icanhazip.com" "https://api64.ipify.org" "https://ifconfig.co" "https://ident.me")
-for p in "${API_NET[@]}";do
-response=$(curl -q $CurlARG -s4 --max-time 2 "$p")
-local curl_status=$?
-if (( curl_status == 0 ))&&is_valid_ipv4 "$response"&&! is_private_ipv4 "$response";then
-IPV4="$response"
-break
+# Ask public what-is-my-IP endpoints in order; the first valid public answer
+# wins. A proxy leaf that drops for a few seconds fails every endpoint at the TLS
+# handshake (curl 35) within about a second, so such a round is repeated after a
+# 5 s pause, at most twice. A route without this family fails to connect instead
+# and is not repeated.
+discover_egress(){
+local family="$1" response curl_status endpoint round tls_failed
+local -a endpoints=("https://ipinfo.io/ip" "https://ip.sb" "https://ping0.cc" "https://icanhazip.com" "https://api64.ipify.org" "https://ifconfig.co" "https://ident.me")
+# ipinfo.io/ip answers over IPv4 only.
+[[ "$family" == 6 ]]&&endpoints=("${endpoints[@]:1}")
+for round in 1 2 3;do
+tls_failed=0
+for endpoint in "${endpoints[@]}";do
+response=$(curl -q $CurlARG -s$family --max-time 2 "$endpoint")
+curl_status=$?
+if (( curl_status == 0 ));then
+if [[ "$family" == 4 ]];then
+is_valid_ipv4 "$response"&&! is_private_ipv4 "$response"&&{ IPV4="$response"; return 0; }
+else
+is_valid_ipv6 "$response"&&! is_private_ipv6 "$response"&&{ IPV6="$response"; return 0; }
 fi
+fi
+(( curl_status == 35 ))&&tls_failed=1
+done
+(( tls_failed && round < 3 ))||return 1
+show_progress "IPv$family egress discovery: no endpoint answered and a TLS handshake failed; retrying in 5 s (round $(( round + 1 )) of 3)"
+sleep 5
 done
 }
 is_valid_ipv6(){
@@ -399,20 +416,6 @@ if [[ $address == :: || $address == ::1 ]]||[[ $address =~ ^f[cd][0-9a-f]{2}: ]]
 return 0
 fi
 return 1
-}
-get_ipv6(){
-local response
-IPV6=""
-local API_NET=("https://ip.sb" "https://ping0.cc" "https://icanhazip.com" "https://api64.ipify.org" "https://ifconfig.co" "https://ident.me")
-for p in "${API_NET[@]}";do
-response=$(curl -q $CurlARG -s6 --max-time 2 "$p")
-local curl_status=$?
-response="${response%$'\n'}"
-if (( curl_status == 0 ))&&is_valid_ipv6 "$response"&&! is_private_ipv6 "$response";then
-IPV6="$response"
-break
-fi
-done
 }
 
 prepare_explicit_target(){
@@ -610,13 +613,15 @@ check_reference_files||exit $?
 set_report_time
 if [[ -z "$requested_ip" ]];then
 if [[ $IPV4check -ne 0 ]];then
-get_ipv4
+IPV4=""
+discover_egress 4
 is_valid_ipv4 "$IPV4"
 else
 IPV4work=0
 fi
 if [[ $IPV6check -ne 0 ]];then
-get_ipv6
+IPV6=""
+discover_egress 6
 is_valid_ipv6 "$IPV6"
 else
 IPV6work=0

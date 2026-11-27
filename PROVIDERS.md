@@ -17,7 +17,11 @@ address before running the selected scope. IPv4 discovery tries, in order:
 IPinfo, `ip.sb`, Ping0, ICanHazIP, ipify, ifconfig.co, and Ident.me.
 IPv6 discovery uses the same order without IPinfo. It accepts the first
 syntactically valid, non-private address, so only services reached before that
-success receive a discovery request.
+success receive a discovery request. A proxy leaf that drops for a few seconds
+fails every endpoint at the TLS handshake (curl 35) within about a second; such a
+round is repeated after a 5 s pause, at most twice, before the run stops with
+`IPV4不可用` / `IPv4 is not available`. A round without any TLS handshake failure
+(for example no IPv6 route) is not repeated.
 
 A positional public IP skips egress discovery and is accepted only for
 `reputation` or `dnsbl`. Reputation providers receive that target while also

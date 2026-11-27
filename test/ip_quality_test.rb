@@ -435,6 +435,37 @@ class IpQualityTest < ReporterTestCase
     end
   end
 
+  # A leaf that drops for a few seconds fails all discovery endpoints at the TLS
+  # handshake; that round is repeated after a pause, at most twice. A family with
+  # no route fails to connect and is not repeated.
+  def test_egress_discovery_repeats_a_round_lost_to_tls_handshake_failures
+    probe = <<~'ZSH'
+      source "$1"
+      calls="$2"
+      curl(){
+        print -r -- "${@[-1]}" >> "$calls"
+        case "$mode" in
+          recover) (( $(grep -c "^https" "$calls") > 7 ))&&{ print -rn -- 12.217.32.68; return 0; }; return 35 ;;
+          tls) return 35 ;;
+          *) return 7 ;;
+        esac
+      }
+      sleep(){ print -r -- "sleep $*" >> "$calls"; }
+      show_progress(){ print -r -- "progress $1" >> "$calls"; }
+      for mode family in recover 4 tls 4 refused 6;do
+        : > "$calls"
+        IPV4="" IPV6=""
+        discover_egress "$family"
+        result=$?
+        print -r -- "$mode/$family:$result:${IPV4}${IPV6}:$(grep -c "^https" "$calls"):$(grep -c "^sleep 5" "$calls")"
+        if [[ "$mode" == tls ]];then grep "^progress" "$calls";fi
+      done
+    ZSH
+    lines = zsh!(probe, SCRIPT, File.join(reporter_workspace, "discovery-calls")).lines(chomp: true)
+    progress = ->(round) { "progress IPv4 egress discovery: no endpoint answered and a TLS handshake failed; retrying in 5 s (round #{round} of 3)" }
+    assert_equal ["recover/4:0:12.217.32.68:8:1", "tls/4:1::21:2", progress.(2), progress.(3), "refused/6:1::6:0"], lines
+  end
+
   # A leaf that drops mid-run fails later sources at the TLS handshake, before
   # any HTTP request. Those get one same-route retry after a pause; a timeout,
   # which may already have reached the provider, keeps its first answer.
